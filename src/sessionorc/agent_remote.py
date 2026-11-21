@@ -647,7 +647,11 @@ class RemoteMixin:
         elif isinstance(result, dict) and result.get("host") == host and result.get("id"):
             # the node answered with its view of the record: the caller gets this home's, addressed
             held = self.remote.get(host, {}).get(str(result["id"]))
-            result = self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}
+            killed = {"brief_killed": True} if result.get("brief_killed") else {}  # a send's kill, said (TD-1898)
+            result = {
+                **(self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}),
+                **killed,
+            }
         await self._push_changes()
         return result
 

@@ -227,6 +227,7 @@ NODE_ACTS = frozenset(
         "disk",
         "disk_dry_run",
         "identity_ack",
+        "mark_wind_down",
     }
 )
 # The acts addressed by a `host` param rather than an `id`'s address (§4.4a *Acts across the link*): the link pops

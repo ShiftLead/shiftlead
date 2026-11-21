@@ -2237,11 +2237,7 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
             # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
             # a prompt would only start a turn that `--close` could then land in the middle of. Unread
             # mail says it is not finished for these words: the doorbell rings it (§4.9, TD-1051)
-            n = int(s.get("unread") or 0)
-            action = (
-                f"out of work, {n} unread — left idle for the doorbell" if n else "finished (out of work), nothing sent"
-            )
-            st.acted.append({**_entry(s, "member"), "action": action, "state": s["state"], "unread": n})
+            st.acted.append(_mark_finished(call, s))
             continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
@@ -2324,17 +2320,49 @@ def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _mark_finished(call: Call, s: dict[str, Any]) -> dict[str, Any]:
+    """A finished member's entry in a Wind down (design §4.9a *A wind-down closes its members*, TD-1898): it
+    declared and is not mid-turn, so nothing is typed, and the `mark_wind_down` call marks it for rule 9 to close
+    once it settles, its unread mail kept for the name's next start. A seat is never marked, and keeps the old
+    words (a seat with unread mail is rung for it); a refused mark is this entry's outcome, as a refused send is."""
+    n = int(s.get("unread") or 0)
+    entry = {**_entry(s, "member"), "state": s["state"], "unread": n}
+    if s.get("seat"):
+        action = (
+            f"out of work, {n} unread — left idle for the doorbell" if n else "finished (out of work), nothing sent"
+        )
+        return {**entry, "action": action}
+    try:
+        call("mark_wind_down", id=s["id"])
+    except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
+        return {**entry, "action": f"refused: {e}", "refused": True}
+    action = (
+        f"out of work, {n} unread — marked, closed once it settles, mail kept"
+        if n
+        else "finished (out of work), marked"
+    )
+    return {**entry, "action": action, "marked": True}
+
+
 def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
     """One member's or the lead's stop. A refusal — its host unreachable (§4.4a), a pending prompt
     — is this entry's outcome, not the stop's: the rest of the team is still wrapped up, and the
-    refused one is named with the reason (TD-057 step 4a, the 3b leftover)."""
+    refused one is named with the reason (TD-057 step 4a, the 3b leftover).
+
+    A member's wrap-up carries `wind_down` (§4.9a *A wind-down closes its members*, TD-1898), so the record is
+    marked once it is submitted — never the lead's, a seat's, or a kill's. A member whose brief was not in is
+    killed by the send itself and reads *killed (brief not in)*, never *wrap-up sent*."""
+    sent: Any = None
     try:
         if now or s.get("agent") is False:  # a record with no agent is killed at once, typed nothing (§4.3)
             call("kill", id=s["id"])
         else:
-            call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True)
+            mark = {"wind_down": True} if role == "member" and not s.get("seat") else {}
+            sent = call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True, **mark)
     except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
         return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
+    if isinstance(sent, dict) and sent.get("brief_killed"):
+        return {**_entry(s, role), "action": "killed (brief not in)", "state": "killed", "brief_killed": True}
     killed = now or s.get("agent") is False
     return {**_entry(s, role), "action": "killed" if killed else "wrap-up sent", "state": "killed" if killed else "?"}
 

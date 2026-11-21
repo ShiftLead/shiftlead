@@ -203,6 +203,7 @@ ACTING_RPCS = frozenset(
         "set_controllers",
         "set_stop",
         "set_start",
+        "mark_wind_down",
     }
 )
 

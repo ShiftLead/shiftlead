@@ -4716,8 +4716,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             task = asyncio.create_task(asyncio.to_thread(teamrun.stop_lead, rpc, st))
             background.add(task)
             task.add_done_callback(_lead_stopped(name, pending))
-        sent = sum(1 for e in st.acted if e["role"] != "person")  # a person's session is left alone (§4.9)
-        msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
+        msg = f"{name}: {stop_tail(st.acted, now)}"
         if pending:
             msg += f" — {pending} follows when they settle"
         for e in st.acted:
@@ -4726,6 +4725,30 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse(
             {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
         )
+
+
+def stop_tail(acted: list[dict[str, Any]], now: bool) -> str:
+    """What a Wind down's or a Stop now's toast says it did (design §4.9a *A wind-down closes its members*,
+    TD-1898): *wrap-up sent to N sessions*, N the sessions the wrap-up reached (Stop now's *killed N*), then
+    *, m finished and marked*, each *<name> killed (brief not in)* and *, n refused: <name> (<why>)* where there
+    are any. A person's session is left alone (§4.9) and named after it by the caller."""
+    rows = [e for e in acted if e["role"] != "person"]
+    refused = [e for e in rows if e.get("refused")]
+    marked = sum(1 for e in rows if e.get("marked"))
+    brief = [e for e in rows if e.get("brief_killed")]
+    if now:
+        n = sum(1 for e in rows if e.get("action") == "killed")
+    else:
+        n = sum(1 for e in rows if e.get("action") == "wrap-up sent")
+    msg = f"{'killed' if now else 'wrap-up sent to'} {n} session{'' if n == 1 else 's'}"
+    if marked:
+        msg += f", {marked} finished and marked"
+    for e in brief:
+        msg += f", {e.get('name') or e['id']} killed (brief not in)"
+    if refused:
+        why = ", ".join(f"{e.get('name') or e['id']} ({str(e['action']).removeprefix('refused: ')})" for e in refused)
+        msg += f", {len(refused)} refused: {why}"
+    return msg
 
 
 def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:

@@ -196,3 +196,87 @@ def test_a_mark_alone_holds_a_record_off_as_a_wrap_up_does():
     assert not seat_send.stopping(r, now)
     r.wind_down = {"at": "2026-01-01T00:00:00Z", "by": "person", "waits": True}
     assert r.wrapup_at is None and seat_send.stopping(r, now)
+
+
+async def test_mark_wind_down_marks_a_finished_member_with_no_wait(agent, monkeypatch):
+    """A finished member sent nothing is marked by `mark_wind_down` (§4.9a, TD-1898): `waits` false, `by` the
+    caller's as `closer_of` reads it, a person's word kept by a later session's press; nothing is typed."""
+    await park_ticks(agent)
+    t = Typist(agent, monkeypatch)
+    _, w = _team(agent)
+    view = await agent.rpc_mark_wind_down(id=w.id, caller="ao-mgr")
+    assert w.wind_down["by"] == "ao-mgr" and w.wind_down["waits"] is False and w.wind_down["at"]
+    assert view["wind_down"] == w.wind_down and agent.store.load(w.id).wind_down == w.wind_down
+    assert winding(w) and not t.typed
+    await agent.rpc_mark_wind_down(id=w.id)
+    assert w.wind_down["by"] == "person"
+    await agent.rpc_mark_wind_down(id=w.id, caller="ao-mgr")
+    assert w.wind_down["by"] == "person"
+
+
+async def test_mark_wind_down_refuses_a_seat_a_persons_session_and_a_closed_record(agent):
+    await park_ticks(agent)
+    seat = _rec(agent, "ao-seat", team="t", seat="techlead")
+    mine = _rec(agent, "ao-mine", team="t", unattended=False)
+    gone = _rec(agent, "ao-gone", team="t", state="closed")
+    for s, words in ((seat, "never a seat"), (mine, "a person's session"), (gone, "is closed")):
+        with pytest.raises(RpcError, match=words):
+            await agent.rpc_mark_wind_down(id=s.id)
+        assert s.wind_down is None
+
+
+async def test_mark_wind_down_is_an_acting_call_routed_to_a_nodes_member(agent):
+    """It joins `mail.ACTING_RPCS`, so the gate checks it as `send`'s, and both node tables, so the home routes it."""
+    from sessionorc import agent_common, mail, modes
+
+    await park_ticks(agent)
+    assert "mark_wind_down" in mail.ACTING_RPCS
+    assert "mark_wind_down" in agent_common.NODE_ACTS and "mark_wind_down" in modes.NODE_ACTS
+    assert "mark_wind_down" in modes.PERSON_NODE_BOUND
+    _, w = _team(agent)
+    _rec(agent, "ao-other", team="t", capabilities=["control"])
+    graph = agent._graph()
+    assert mail.act_gate(graph, "ao-mgr", "mark_wind_down", {"id": w.id}) is None
+    assert mail.act_gate(graph, w.id, "mark_wind_down", {"id": w.id}) is None  # its own record, as its own send
+    assert "not in its controllers" in mail.act_gate(graph, "ao-other", "mark_wind_down", {"id": w.id})
+    assert agent._act_host("mark_wind_down", {"id": "ao-w@node"}) == "node"
+
+
+async def test_a_wrap_up_to_a_member_whose_brief_is_not_in_says_it_killed(agent, monkeypatch):
+    """`rpc_send`'s brief-held wrap-up kills before any stamp, and its view says so (`brief_killed`), so a Wind down
+    names it *killed (brief not in)*; the member takes no mark."""
+    await park_ticks(agent)
+    _, w = _team(agent)
+    monkeypatch.setattr(agent, "_brief_holds", lambda s: True)
+
+    async def kill(id, caller=None, killer=None):
+        return {"id": id, "state": "exited"}
+
+    monkeypatch.setattr(agent, "rpc_kill", kill)
+    out = await agent.rpc_send(id=w.id, text="wrap up", wrapup=True, wind_down=True)
+    assert out == {"id": w.id, "state": "exited", "brief_killed": True}
+    assert w.wind_down is None and w.wrapup_at is None
+
+
+async def test_a_nodes_brief_kill_is_said_across_the_link(agent, monkeypatch):
+    """The home answers a node's send with its own view of the record, and keeps the node's `brief_killed`."""
+    await park_ticks(agent)
+    w = Session(id="ao-w", name="ao-w", kind="interactive", adapter="claude-code", dir="/tmp", host="node")
+    w.unattended, w.team, w.state = True, "t", "idle"
+    agent.remote = {"node": {"ao-w": w}}
+
+    class Mux:
+        async def request(self, name, timeout=None, **kw):
+            return {"result": {"id": "ao-w", "host": "node", "state": "exited", "brief_killed": True}}
+
+    monkeypatch.setattr(agent, "_node_mux", lambda host: Mux())
+    out = await agent._route_act("send", {"id": "ao-w@node", "text": "w", "wrapup": True}, None, "node")
+    assert out["brief_killed"] is True and out["id"] == "ao-w@node"
+    monkeypatch.setattr(
+        Mux, "request", lambda self, name, timeout=None, **kw: _done({"result": {"id": "ao-w", "host": "node"}})
+    )
+    assert "brief_killed" not in await agent._route_act("send", {"id": "ao-w@node", "text": "w"}, None, "node")
+
+
+async def _done(value):
+    return value
