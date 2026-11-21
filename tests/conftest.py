@@ -29,6 +29,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -36,6 +37,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from _pytest.faulthandler import fault_handler_stderr_fd_key
 from _stubs import AgentShellStub, ComposerStub, HookFedStub
 
 from sessionorc import paths
@@ -601,6 +603,46 @@ async def agent(tmp_path, monkeypatch):
 
 # -- the subprocess agent -----------------------------------------------------------------------
 
+# **A hang shows the agent's side too** (TD-2037). A test that waits on a child agent past the hang bound is ended by
+# pytest-timeout, and pyproject's `faulthandler_timeout` prints the worker's own stacks just before, but those show
+# only the test waiting on a reply. So, ten seconds before them, every live child agent is sent SIGUSR1 (it dumps all
+# its threads to its stderr file, `_agent_child.py`) and the file's tail is written to the worker's stderr, which
+# xdist prints. A test that takes no child agent arms nothing.
+_LIVE_CHILDREN: dict[int, Path] = {}  # pid → its stderr file, while the module's agent runs
+HANG_WATCH = 100.0  # seconds: below pyproject's faulthandler_timeout (110) and timeout (120)
+HANG_TAIL = 20_000  # bytes of each child's stderr shown
+
+
+def _show_children_stacks(nodeid: str, fd: int) -> None:
+    for pid in list(_LIVE_CHILDREN):
+        with contextlib.suppress(OSError):
+            os.kill(pid, signal.SIGUSR1)
+    time.sleep(1.0)
+    for pid, path in list(_LIVE_CHILDREN.items()):
+        try:
+            tail = path.read_bytes()[-HANG_TAIL:]
+        except OSError as e:
+            tail = f"(cannot read {path}: {e})".encode()
+        head = f"\n--- TD-2037: {nodeid} still running after {HANG_WATCH:.0f}s; child agent {pid}'s stderr tail ---\n"
+        with contextlib.suppress(OSError):
+            os.write(fd, head.encode() + tail + b"\n--- end of child agent stderr ---\n")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    timer = None
+    if _LIVE_CHILDREN or "subprocess_agent" in getattr(item, "fixturenames", ()):
+        # the stderr pytest's faulthandler writes to: fd 2 itself is captured while a test runs
+        fd = item.config.stash.get(fault_handler_stderr_fd_key, 2)
+        timer = threading.Timer(HANG_WATCH, _show_children_stacks, args=(item.nodeid, fd))
+        timer.daemon = True
+        timer.start()
+    try:
+        yield
+    finally:
+        if timer is not None:
+            timer.cancel()
+
 
 class ChildAgent(NamedTuple):
     home: Path
@@ -626,35 +668,47 @@ def subprocess_agent(tmp_path_factory):
         mp.delenv("SHIFTLEAD_SESSION", raising=False)
         # the board write-back lands an edit through `gh` (§4.4, TD-264): the child gets the fake
         mp.setenv("PATH", f"{fake_gh_bin(home / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
-        proc = subprocess.Popen(
-            [sys.executable, str(CHILD), sock_name],
-            env=dict(os.environ),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        # its stderr goes to a file, never an unread pipe (TD-2037): the agent lives for the whole module and logs
+        # as it goes, and a pipe nobody drains blocks its next write once full, which freezes every request to it
+        err_path = home / "agent.stderr"
+        with open(err_path, "w") as err_file:
+            proc = subprocess.Popen(
+                [sys.executable, str(CHILD), sock_name],
+                env=dict(os.environ),
+                stdout=subprocess.DEVNULL,
+                stderr=err_file,
+                text=True,
+            )
+
+        def err() -> str:
+            return err_path.read_text(errors="replace")
+
+        _LIVE_CHILDREN[proc.pid] = err_path
         sock = home / "agent.sock"
         if not wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0):
             proc.kill()
-            raise RuntimeError(f"child agent never opened {sock}:\n{proc.communicate(timeout=5)[1]}")
+            proc.wait(timeout=5)
+            raise RuntimeError(f"child agent never opened {sock}:\n{err()}")
         if proc.poll() is not None:
-            raise RuntimeError(f"child agent exited {proc.returncode}:\n{proc.communicate(timeout=5)[1]}")
+            raise RuntimeError(f"child agent exited {proc.returncode}:\n{err()}")
         yield ChildAgent(home=home, sock_name=sock_name, proc=proc)
         proc.send_signal(signal.SIGTERM)
         try:
-            _, err = proc.communicate(timeout=5)
+            proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
-            _, err = proc.communicate(timeout=5)
-            raise RuntimeError(f"child agent ignored SIGTERM:\n{err}") from None
+            proc.wait(timeout=5)
+            raise RuntimeError(f"child agent ignored SIGTERM:\n{err()}") from None
     finally:
+        if proc is not None:
+            _LIVE_CHILDREN.pop(proc.pid, None)
         # runs on setup failure too, so the env never leaks into later modules
         if proc is not None and proc.poll() is None:
             proc.kill()
         kill_private_server(Tmux(socket_name=sock_name))
         mp.undo()
     if proc.returncode not in (0, -signal.SIGTERM):
-        raise RuntimeError(f"child agent exited {proc.returncode}:\n{err}")
+        raise RuntimeError(f"child agent exited {proc.returncode}:\n{err()}")
 
 
 # -- hook-fed stub adapter ----------------------------------------------------------------------

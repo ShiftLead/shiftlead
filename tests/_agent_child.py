@@ -10,8 +10,10 @@ pending-task traceback — `test_agent_restart.py` asserts exactly that on this 
 """
 
 import asyncio
+import faulthandler
 import logging
 import os
+import signal
 import sys
 from datetime import timedelta
 
@@ -48,6 +50,9 @@ async def _run(socket_name: str) -> None:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # TD-2037: conftest's hang watchdog sends SIGUSR1 to a child agent a test is stuck on, so a request that never
+    # comes back shows where the agent is, not only the test's side of the wait
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
     asyncio.run(_run(sys.argv[1]))
     return 0
 
