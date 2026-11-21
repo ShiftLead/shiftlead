@@ -3,12 +3,14 @@
 import asyncio
 import base64
 import contextlib
+import json
 import os
 import re
 import signal
 import stat
 import subprocess
 import sys
+from datetime import UTC, datetime
 
 import pytest
 import yaml
@@ -606,6 +608,18 @@ class Acts:
 async def at_home(home, address):
     async with LocalClient(sock=home.dir / "agent.sock") as h:
         return {v["id"]: v for v in await h.call("list")}.get(address)
+
+
+async def home_ticked_since(home, at, timeout=15.0):
+    """Until the home's `host.json` holds a `last_tick` later than `at` (a whole second, as the stamp is)."""
+    path = home.dir / "host.json"
+    for _ in range(int(timeout / 0.1)):
+        with contextlib.suppress(OSError, ValueError):
+            stamp = json.loads(path.read_text()).get("last_tick") or ""
+            if stamp and datetime.fromisoformat(stamp.replace("Z", "+00:00")) > at:
+                return
+        await asyncio.sleep(0.1)
+    raise AssertionError(f"the home never ticked after {at}: {path.read_text() if path.exists() else 'no host.json'}")
 
 
 async def until(home, address, pred, timeout=15.0):
@@ -2008,7 +2022,11 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         node._id_alarm({"channel": f"session {w['id']}", "claimed": "ao-b", "rpc": "msg"}, w["id"])
         seen = await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
         assert [a["claimed"] for a in seen["identity_alarms"]] == ["ao-b"]
-        await asyncio.sleep(FAST_TICK * 2)  # a home tick notes the alarm row, so its ending has one to end
+        # a home tick notes the alarm row, so its ending has one to end. Waited for, never slept on (TD-2038): under
+        # load no tick ran in two tick lengths, the ack ended a row never noted, and the trail had nothing. The home
+        # writes `last_tick` (its tick's snapshot time) just before it notes the rows, with no await between, so a
+        # `last_tick` past the second the alarm was seen is a tick that saw it.
+        await home_ticked_since(home, datetime.now(UTC).replace(microsecond=0))
 
         async with LocalClient(sock=home.dir / "agent.sock", caller="ao-someone") as as_session:
             with pytest.raises(AgentError, match="a person's own act"):
@@ -2026,8 +2044,13 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         assert (await at_home(home, address))["identity_alarms"] == []
         # and the **home** wrote the word, keyed by the record's address: the act ran at the node,
         # so without this the row's ending would read *resolved* (TD-077 a1; review of PR #269)
+        # — written by the home tick that finds the row gone, so read until it has run (TD-2038)
         async with LocalClient(sock=home.dir / "agent.sock") as person:
-            trail = (await person.call("inbox"))["trail"]
+            for _ in range(150):
+                trail = (await person.call("inbox"))["trail"]
+                if any(e["kind"] == "alarm" for e in trail):
+                    break
+                await asyncio.sleep(0.1)
         assert [(e["sid"], e["kind"], e["how"]) for e in trail if e["kind"] == "alarm"] == [
             (address, "alarm", "dismissed by you")
         ]
