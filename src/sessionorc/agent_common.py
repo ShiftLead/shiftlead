@@ -41,6 +41,7 @@ from sessionorc.models import (
     normalize_review,
     owner_word,
     report_line,
+    winding,
 )
 
 log = logging.getLogger("shiftlead.agent")
@@ -1368,7 +1369,7 @@ def tick_ready(s: Session, now: datetime) -> bool:
         and not s.out_of_work
         and not s.restart_wanted
         and not any(e.status == "claimed" and e.source == "declared" for e in s.progress)
-        and not (s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)))
+        and not (winding(s) or (s.run_until and now >= _parse(s.run_until)))
         and all(isinstance(git.get(k), int) for k in ("dirty", "unpushed"))
         and git.get("dirty") == 0
         and git.get("unpushed") == 0
