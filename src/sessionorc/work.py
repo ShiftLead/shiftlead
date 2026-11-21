@@ -13,7 +13,7 @@ from typing import Any
 from sessionorc import ledger as ledger_mod
 from sessionorc import naming
 from sessionorc.agent_common import FINISHED_SETTLE
-from sessionorc.models import Session, has_control, reference_of
+from sessionorc.models import Session, has_control, reference_of, winding
 
 DEAD = ("exited", "closed")
 
@@ -118,16 +118,39 @@ def _instant(v: Any) -> datetime | None:
 
 def _how_stopped(r: Session) -> str | None:
     """One record's word on how its team stopped: `person`, `until`, or None for neither. Its end's own mark is
-    `ended` where it stands, else `closer`: a Close after a kill never overrides the kill."""
+    `ended` where it stands, else `closer`: a Close after a kill never overrides the kill. The tick's close of a
+    Wind down's member, a rule 9 close and a record's close of itself read `person` where its mark's `by` or its
+    `wrapup_by` is the person's, and a manager's by the `wound_down_by` its close or `closed_for` carries (§4.9a
+    *What it leaves*, TD-1898)."""
     mark = r.ended if isinstance(r.ended, Mapping) else r.closer if isinstance(r.closer, Mapping) else {}
     if mark.get("by") == "person":
         return "person"
     if mark.get("why") == "stop time":
         return "until"
-    if mark.get("by"):
+    by, why = mark.get("by"), mark.get("why")
+    held = r.closed_for if isinstance(r.closed_for, Mapping) else {}
+    # a manager rule 9 closed after a Wind down carries who wound the run down (§4.9a *What it leaves*, TD-1898):
+    # on the tick's close, or on `closed_for` where it closed itself after the line — ahead of the own-id reading
+    if by == "tick" and why == "finished" and mark.get("wound_down_by") == "person":
+        return "person"
+    if held.get("why") == "finished" and held.get("wound_down_by") == "person":
+        return "person"
+    wind = r.wind_down if isinstance(r.wind_down, Mapping) else {}
+    if (by == "tick" and why in ("wind_down", "finished")) or (by and by == r.id):
+        # the tick's close of a marked member or after a wrap-up, or a record that closed itself: the person's where
+        # the mark or the wrap-up, as it stands, is theirs
+        return "person" if "person" in (wind.get("by"), r.wrapup_by) else None
+    if by:
         return None  # ended by a session, or by the tick for another cause
-    # it ended naming nobody: after a wrap-up, the person's (Wind down, Wrap up) or the stop time's own
-    mine = _instant(r.wrapup_at) if r.wrapup_by == "person" else None
+    # it ended naming nobody: after a wrap-up, the person's (Wind down, Wrap up) or the stop time's own; a mark the
+    # person's later send left when it cleared `wrapup_at` stands for it
+    mine = (
+        _instant(r.wrapup_at)
+        if r.wrapup_by == "person"
+        else _instant(wind.get("at"))
+        if wind.get("by") == "person"
+        else None
+    )
     clock = _instant(r.wrapup_sent_at)
     if mine and clock:
         return "person" if mine >= clock else "until"
@@ -223,10 +246,14 @@ def finished_alone(records: Iterable[Session]) -> list[Session]:
     one a person closed (its `closer` names the person: *stopped*, left alone) or that was killed (a
     kill destroys the pane, `pane: False`, and writes no closer: never read as a finish), nor one its
     flow sat out, nor a record a successor took over. Only for a team that **runs on** — a seat or a
-    member live: one with nobody live that is not wound down is *stopped*, which rule 8 never starts."""
+    member live: one with nobody live that is not wound down is *stopped*, which rule 8 never starts. A record a
+    Wind down closed, or any ended one carrying its mark, is the team's ending, never one member's; and while a live
+    record of the crew reads `winding`, none is returned (§4.9a *A wind-down closes its members*, TD-1898)."""
     mine = crew(records)
     if not any(r.state not in DEAD for r in mine):
         return []
+    if any(r.state not in DEAD and winding(r) for r in mine):
+        return []  # the team is being ended: no member that finished alone is replayed meanwhile (TD-1898)
     manager = manager_of(mine)
     return [
         r
@@ -240,6 +267,8 @@ def finished_alone(records: Iterable[Session]) -> list[Session]:
         and not r.superseded_by
         and not sat_out(r)
         and (r.closer or {}).get("by") != "person"
+        and (r.closer or {}).get("why") != "wind_down"  # a Wind down's close ends the team's run, never one member's
+        and not r.wind_down  # a marked member that exited on its own after declaring (§4.9a, TD-1898)
     ]
 
 

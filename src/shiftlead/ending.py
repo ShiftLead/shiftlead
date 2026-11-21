@@ -196,7 +196,8 @@ def exit_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None, now
         words = f"exited · {EXIT_REASON.get(e['reason'], e['reason'])}"
     else:
         words = "exited"
-    wrap, at = _instant(s.get("wrapup_at")), _instant(e.get("at"))
+    mark = s.get("wind_down") if isinstance(s.get("wind_down"), dict) else {}
+    wrap, at = _instant(s.get("wrapup_at") or mark.get("at")), _instant(e.get("at"))  # a Wind down's mark too
     if wrap is not None and at is not None and wrap < at:
         words += " · after wrap-up"
     return words
