@@ -1037,6 +1037,11 @@ class HostAgent(
         # team → that reading's first tick, where no manager is live to carry `finished_sent_at` and a
         # member was left open with work: the note to the person is owed until the last one is gone
         self._finished_owed: dict[str, datetime] = {}
+        # rule 9's wind-down close (§4.9a *A wind-down closes its members*, TD-1898): record address → `{at, seen,
+        # idle}` — the mark's `at` this was read for, the first tick that read that mark, and the first tick that
+        # read the member idle after the wrap-up's turn (None until then, and again on any tick that reads it not
+        # idle); in memory, as `_finished_first` is, so a restart of the home starts both windows again
+        self._wind_first: dict[str, dict[str, Any]] = {}
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}
