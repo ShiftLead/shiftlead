@@ -390,10 +390,14 @@ def restart_waits_of(rec: Any) -> dict[str, Any] | None:
 def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
     """A close's `closer: {by, why, at}` (§4.5 row 5 (b), TD-265): `closer` as handed in — the
     tick's word, or the home's over the link — only from a call with no session caller; otherwise
-    `person` for no caller and the caller's id for a session, which the acting gate verified."""
+    `person` for no caller and the caller's id for a session, which the acting gate verified. A handed-in
+    `wound_down_by` (rule 9's close of a manager after a Wind down, TD-1898) is kept on the same terms."""
     if mail.is_person(caller) and isinstance(closer, dict) and closer.get("by"):
         why = closer.get("why")
-        return {"by": str(closer["by"]), "why": str(why) if why else None, "at": at}
+        out = {"by": str(closer["by"]), "why": str(why) if why else None, "at": at}
+        if closer.get("wound_down_by"):
+            out["wound_down_by"] = str(closer["wound_down_by"])  # rule 9's manager close after a Wind down (TD-1898)
+        return out
     return {"by": "person" if mail.is_person(caller) else str(caller), "why": None, "at": at}
 
 
