@@ -137,6 +137,8 @@ html.phonefocus body { padding: 0; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
 .btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; background: var(--topfg); color: var(--top); border-color: var(--topfg); }  /* + New ▾, the bar's one filled button in both themes (§4.5a *the bar's three groups*) */
 .btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
+/* a press with no row, marked while it is out (§4.5 screen 6 rule 2, TD-1997): styled as :disabled is */
+[data-act][aria-disabled="true"] { opacity: .45; cursor: default; }
 .btn.on { background: var(--ended-bg); color: var(--fg); }
 /* §4.5a **a control's look** (§4.5 screen 6 *A control answers the press*, TD-340): one hover, one
    press and one focus ring for every `.btn`, whatever its variant — the wash is a layer over the

@@ -135,7 +135,7 @@
       <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
       {% if s.taken_over and needs %}{{ hand_back }}{% endif %}
     {% elif next_act == 'forget' %}
-      <button class="btn sm next" data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
+      <button class="btn sm next" data-act="remove" data-verb="forgetting…" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
     {% elif next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
       <button class="btn sm next" data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
@@ -155,7 +155,7 @@
         {%- if s.state == 'scheduled' %}
         {#- §4.5a **starts** note: `more ⋯`'s two on a scheduled card (§6 *Start time*, TD-152) -#}
         <button data-act="start" data-id="{{ s.id }}" data-at="now" title="start it on the next tick instead of at its time">Start now</button>
-        <button data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
+        <button data-act="close" data-verb="cancelling…" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
         {#- those two alone: nothing runs, so nothing else has anything to act on (TD-328) -#}
         {%- else %}
         {#- a record with no agent (§4.5a *A record with no agent*, TD-666): no Message…, Wrap up or mode
@@ -166,7 +166,7 @@
             gone, so Message…, Restart where restartable, and Forget — the rest are left out, not dimmed -#}
         {% if s.restartable %}<button data-act="restart" data-id="{{ s.id }}"{% if not s.restart_marked %} data-confirm="Restart {{ s.name }}? It is closed if still there and started again from its launch record, in its team."{% endif %} title="{{ help_title('restart') }}">Restart</button>{% endif %}
         {#- never Forget on a seat while the definition names it (§4.5 *A seat*, TD-097) -#}
-        {% if not s.seat %}<button data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>{% endif %}
+        {% if not s.seat %}<button data-act="remove" data-verb="forgetting…" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>{% endif %}
         {%- else %}
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         {% if s.agent and not s.taken_over %}<button data-act="mode" data-via="card" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>{% endif %}
