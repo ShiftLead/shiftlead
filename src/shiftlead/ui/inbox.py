@@ -3089,6 +3089,7 @@ def rail_rows(
         for e in rows
         if e.get("home") != "queue"  # drawn on its Queue card, not on this page (§4.5 screen 6 *Where a row is drawn*)
         and not e.get("then_yours")  # *waiting, then yours* stays in the list, counted nowhere (TD-1926)
+        and not e.get("held_by")  # a held build is drawn nowhere in *Later* (TD-2026)
     ]
 
 
@@ -3380,6 +3381,7 @@ def ledger_for_you(
                 # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift
                 # on its item or its `answered.lift`, which would lift the design alone
                 and not builds
+                and me_q not in held_of  # a held build: its design's question lifts it (TD-2026)
                 and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
                 and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key, held_of)
             )
@@ -3446,7 +3448,30 @@ def ledger_for_you(
                     else "",
                 }
             )
-        groups.append({"repo": name, "rows": rows, "n": sum(1 for x in rows if not x.get("then_yours"))})
+            # a held build's word (§4.4 *A design's question is asked once, on the design*, TD-2026), where no
+            # earlier word stands — the person's own session holding it, a press landing, a hand-off or a mail answer
+            # (a board answer it replaces): no answers, no Lift, counted nowhere, and out of *Later*
+            design = held_of.get(me_q, "")
+            if (
+                design
+                and applying is None
+                and not any(not s.get("unattended") for s in holders)
+                and not (got_q and got_q.get("kind") != "board")
+            ):
+                rows[-1].update(
+                    held_by=design,
+                    held_word=f"waits on {design.rpartition('#')[2]}'s question",
+                    answers=[],
+                    consequences=[],
+                    heads=[],
+                    default="",
+                    answered=None,
+                    then_yours=None,
+                    lift_item=False,
+                )
+        groups.append(
+            {"repo": name, "rows": rows, "n": sum(1 for x in rows if not x.get("then_yours") and not x.get("held_by"))}
+        )
     # the open entries of every repo read, by `<repo>#TD-n`: what a board line covers is read through them
     # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
     entries_open = {

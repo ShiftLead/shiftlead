@@ -169,13 +169,14 @@ def test_a_line_closed_see_an_entry_holds_as_carried_to_does(tmp_path):
     line = _closed("TD-001 decision (paul). Parts: TD-002", "see TD-005: the bought round")
     root, r = _setup(tmp_path, [design, build, rnd], line)
     q = _read({root: r})
-    for ref in ("r#TD-001", "r#TD-002"):
-        row = _row(q, ref)
-        assert row["state"] == "answered — waiting on TD-005" and row["answered"]["line"]["to"] == ["TD-005"], ref
+    row = _row(q, "r#TD-001")
+    assert row["state"] == "answered — waiting on TD-005" and row["answered"]["line"]["to"] == ["TD-005"]
+    # the line's Parts are the design's held builds: the build reads its design's question (TD-2026)
+    assert _row(q, "r#TD-002")["state"] == "waits on TD-001's question"
     assert not any(c["status"] == "needs you" for c in q["cards"] if c["top"]["qid"] in ("r#TD-001", "r#TD-002"))
     rec = _worker("ao-r-designer", "TD-005")
     rec.repo = rec.dir = root
-    assert _row(_read({root: r}, [rec]), "r#TD-002")["state"] == "answered — waiting on designer"
+    assert _row(_read({root: r}, [rec]), "r#TD-001")["state"] == "answered — waiting on designer"
     # TD-005 archived: the person's again
     root2, r2 = _setup(tmp_path / "a", [design, build], line)
     assert _row(_read({root2: r2}), "r#TD-001")["answered"] is None

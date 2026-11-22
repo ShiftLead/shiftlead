@@ -6,10 +6,10 @@
    renders this at load and its poll puts it back (`html.ledger`). #}
 {% import "inbox_row.html" as hr with context %}
 {%- if lf and lf.n %}
-{%- for g in lf.groups %}
+{%- for g in lf.groups if g.rows | rejectattr('held_by') | list %}
 <div class="ledgergroup">
   <div class="meta mono ledgerrepo">{{ g.repo }}</div>
-  <div class="inboxrows">{% for e in g.rows %}{{ hr.row(e, 'later') }}{% endfor %}</div>
+  <div class="inboxrows">{% for e in g.rows if not e.held_by %}{{ hr.row(e, 'later') }}{% endfor %}</div>
 </div>
 {%- endfor %}
 {%- endif %}

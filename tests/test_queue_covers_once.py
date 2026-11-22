@@ -317,7 +317,13 @@ def test_a_line_that_is_no_open_decide_or_do_hides_no_for_you_row(tmp_path, monk
     """Only an open undecided Decide or Do line is its covered rows' question (§4.5 screen 11 *For you*, TD-1380):
     a decided line, or a Read line, leaves each row it covers drawn as itself, its own answers with it."""
     html = _client(tmp_path, monkeypatch, **how).get("/repo/r").text
-    assert html.count('data-answer="Keep"') >= 3, "each covered row draws its own answers"
+    if how.get("kind") == "watch":
+        assert html.count('data-answer="Keep"') >= 3, "each covered row draws its own answers"
+    else:
+        # a decided line's Parts are the design's held builds (§4.4 *A design's question is asked once*, TD-2026):
+        # each reads its design's question with no answers; the part it does not list keeps its own
+        assert html.count("waits on TD-050&#39;s question") + html.count("waits on TD-050&#x27;s question") == 2
+        assert html.count('data-answer="Keep"') >= 1, "the unlisted part draws its own answers"
     assert html.count('class="brow"') > 1, "and its own row, not the column's plain row"
 
 
