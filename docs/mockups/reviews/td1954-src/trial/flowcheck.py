@@ -99,7 +99,7 @@ def check(doc):
         ow = st.get("only-when")
         if ow is not None and (kind != "review" or ow != "protected-files"):
             bad.append(f"{nm}: `only-when: protected-files` is the one value, and only on a review stage")
-        stages[key] = {"name": nm, "kind": kind, "model": st.get("model"), "outs": outs, "edges": [], "asks": [], "ends": False}
+        stages[key] = {"name": nm, "kind": kind, "model": st.get("model"), "outs": outs, "edges": [], "asks": [], "ends": False, "merges": False, "only": bool(ow)}
     for kind, who in takes.items():
         if len(who) != 1:
             tip = "; a flow with no design stage writes `takes: any` on its first build stage" if kind == "design-first" and not who else ""
@@ -134,7 +134,7 @@ def check(doc):
             elif o not in CAN_MERGE:
                 bad.append(f"{st['name']}: `{where}`: only `work-pushed` or `ship` can go to merge (rule 1)")
             else:
-                st["ends"] = True
+                st["ends"] = st["merges"] = True
                 one(st, f"{o}.refused", refused if refused is not None else "person", top=False)
         elif v == "person":
             st["asks"].append(where)
@@ -189,6 +189,20 @@ def check(doc):
             for k in sorted(r - {key}):
                 if stages[k]["kind"] == "review" and stages[k]["model"] == st["model"]:
                     info.append(f"warning: {stages[k]['name']} reviews on {st['model']}, the same model {st['name']} writes on")
+    # rule 11: a writing stage from which merge is reachable past no review that always runs
+    always = {k for k, st in stages.items() if st["kind"] == "review" and not st["only"]}
+    for key, st in stages.items():
+        if st["kind"] in WRITES:
+            seen, todo, own = {key}, [key], False
+            while todo:
+                k = todo.pop()
+                own = own or stages[k]["merges"]
+                for _, v, _ in stages[k]["edges"]:
+                    if v not in seen and v not in always:
+                        seen.add(v)
+                        todo.append(v)
+            if own:
+                info.append(f"{st['name']}: merge can be reached with no review that always runs, so its session runs the repo's own review first (rule 11)")
     entered = {v for st in stages.values() for _, v, _ in st["edges"]} | {slug(n) for who in takes.values() for n in who}
     for key, st in stages.items():
         if key not in entered:

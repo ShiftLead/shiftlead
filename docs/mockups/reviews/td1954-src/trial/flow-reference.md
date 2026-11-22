@@ -78,7 +78,7 @@ tests is part of `build`. A narrower read (a security review, a fact-check) is a
 |---|---|
 | a stage's key | the entry moves to that stage |
 | `merge` | the pull request is merged and the entry is finished; allowed only on `work-pushed` and `ship` |
-| `person` | the entry waits for the person, with a question on their board |
+| `person` | the entry waits for the person, with a question on their Queue |
 
 **An outcome you do not list goes to the person.** Leaving an outcome out is allowed, and is the usual way
 to hand a rare case to the person.
@@ -181,6 +181,10 @@ such as a security review, is a review stage with a brief of the person's own.
 
 `support:` sets the model for the seats every flow has: `tech-lead` (answers members' questions),
 `board-answers`, `unheld-pull-requests`, `manager` and `sweeper`. A seat left out runs on its default.
+
+11. Nothing is refused by this one: the check names each design or build stage from which a merge can be
+    reached without passing a review that always runs. Such a stage's session runs the repo's own
+    independent review before it reports `work-pushed`, so nothing merges unread.
 
 The check warns, without failing, when a review stage uses the same model as a stage whose work it reads.
 

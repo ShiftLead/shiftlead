@@ -275,6 +275,8 @@ function check(f) {
   const entered = new Set(edges.flat().map(e => e.to));
   f.stages.forEach((s, i) => { if (!entered.has(i) && !s.takes) P(`Nothing can reach ${s.name}.`, i); });
   f.stages.forEach((w, wi) => { if (WRITES.includes(w.kind)) reach(wi).forEach(k => { const r = f.stages[k]; if (r.kind === "review" && r.model === w.model) warn.push(`${r.name} reviews on ${r.model}, the same model ${w.name} writes on.`); }); });
+  const always = new Set(f.stages.map((s, i) => s.kind === "review" && !s.only ? i : -1));
+  f.stages.forEach((w, wi) => { if (!WRITES.includes(w.kind)) return; const seen = new Set([wi]), todo = [wi]; let own = false; while (todo.length) { const k = todo.pop(); own = own || outs(f.stages[k]).some(o => dest(f.stages[k], o).to === "merge"); for (const e of edges[k]) if (!seen.has(e.to) && !always.has(e.to)) { seen.add(e.to); todo.push(e.to); } } if (own) info.push(`${w.name} can reach a merge with no review that always runs, so its session runs the repo's own review first.`); });
   info.push(`${asks} outcomes go to you.`);
   info.push(`An entry comes to you after ${f.maxMoves} moves between stages, wherever it is.`);
   return { bad, warn, info, by };
@@ -392,7 +394,7 @@ function walkStart(f, kind, si) {
 function walkGo(f, res, d, label, k) {
   const w = S.walk;
   if (d.to === "done") { w.at = "done"; w.log.push(`${label}. The ${w.kind === "clock" ? "run" : "entry"} is <b>done</b>.`); return; }
-  if (d.to === "person" || !(d.to in res.by)) { w.at = "you"; w.asker = w.si; w.blocked = null; w.log.push(`${label}. ${w.kind === "clock" ? "The run stops and a question about it waits for <b>you</b> on your board" : "The entry waits for <b>you</b>, with a question on your board"}.`); return; }
+  if (d.to === "person" || !(d.to in res.by)) { w.at = "you"; w.asker = w.si; w.blocked = null; w.log.push(`${label}. ${w.kind === "clock" ? "The run stops and a question about it waits for <b>you</b> on your Queue" : "The entry waits for <b>you</b>, with a question on your Queue"}.`); return; }
   w.counts[k] = (w.counts[k] || 0) + 1; w.moves++;
   if (d.limit && w.counts[k] > d.limit) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}, for the ${ordinal(w.counts[k])} time. The limit is ${d.limit}, so the entry comes to <b>you</b>.`); return; }
   if (w.moves > f.maxMoves) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}. That is move ${w.moves}, past the total cap of ${f.maxMoves}, so the entry comes to <b>you</b>.`); return; }
