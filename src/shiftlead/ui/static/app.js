@@ -1365,6 +1365,9 @@
   // the press begins: its control and twins marked, the containers they sit in snapshotted before the mark's writes
   AO.pressBegin = (b, key) => {
     const mk = AO.pressMarkKey(b);
+    // a press again on a key still out (its controls redrawn unmarked) takes it over: the old one's timer goes
+    const old = AO.inflight[mk];
+    if (old && old.kind === "press" && old.timer) clearTimeout(old.timer);
     const pair = (b.dataset.act === "allow" || b.dataset.act === "deny") && !!b.dataset.call;
     const twins = AO.pressTwins(mk, null, pair).filter((el) => el !== b);
     const delta = AO.deltaEnded(b);

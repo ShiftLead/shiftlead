@@ -27,7 +27,9 @@ document.querySelectorAll = (sel) => document.body.querySelectorAll(sel);
 document.querySelector = (sel) => document.body.querySelector(sel);
 document.getElementById = (id) => document.body.descendants().find((e) => e.id === id) || null;
 const timers = [];
+const cleared = [];
 global.setTimeout = (fn) => { timers.push(fn); return timers.length; };
+global.clearTimeout = (id) => cleared.push(id);
 eval(fs.readFileSync(process.argv[2], "utf8"));""",
 )
 
@@ -85,7 +87,7 @@ out.kill_held_second_redraw = !!AO.inflight[mk] && st(q('[data-act="kill"]', c))
 c = swap({ noKill: true });
 out.kill_ended = !AO.inflight[mk];
 out.summary_back = q("summary", c).textContent;
-out.no_timer_left = timers.length === 1;  // the one 5 s timer was set and is cleared by the end
+out.no_timer_left = timers.length === 1 && cleared.includes(1);  // the one 5 s timer was set and cleared by the end
 
 // 2. Kill's effect drawn before its response: the mark ends at the response, not 5 s later
 clear(); c = card();
