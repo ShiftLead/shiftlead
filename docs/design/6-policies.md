@@ -3003,7 +3003,7 @@ teams:
   **After the cut-over** (§4.9d *When it runs*, TD-1153) the rule is drawn as *Holds new work* and means
   one thing: while the mark stands the home **offers no entry that has no stage record yet** (§4.9c
   *Offer*); an entry already in a stage carries on through its stages, its merge and its questions, and
-  audits and support seats are not held. The `review` line has no seat to read then and is dropped by
+  audits and built-in seats are not held. The `review` line has no seat to read then and is dropped by
   the cut-over; `prs` and `oldest` are as above, and the team's repo is its `repo` key. Until then the
   rule is as this item says it.
 

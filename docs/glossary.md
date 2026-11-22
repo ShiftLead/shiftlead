@@ -109,7 +109,7 @@ not mix:
   none is its own heading. Only the mail gate and the brief's Project block act on it. — *proposed*
   (ADR 2026-09-13); a heading on repos **decided** 2026-10-15 (Paul, TD-722).
 - **flow** — the path a ledger entry takes from filed to done, written as records: a list of **stages**, a
-  list of **audits** and a model for each **support seat**, in one file a check must pass (design §4.9c,
+  list of **audits**, in one file a check must pass (design §4.9c,
   TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `td`, `build-review`,
   `build`. *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; TD-307), reshaped 2026-11-21 (TD-1954).
 - **stage** — one step of a flow: one kind of work (`design`, `build` or `review`) on one model, done by a
@@ -128,9 +128,12 @@ not mix:
   with a brief (the standard docs, tests or code brief, or one of the person's own) that says where to look, it
   files each problem as a new entry and fixes nothing. What a hunter
   or an auditor seat did on a trigger. — *proposed* 2026-11-21 (design §4.9c *Audits start on a clock*).
-- **support seat** — one of the five seats every flow has outside its path: tech lead, board answers, pull
-  requests nobody holds, manager, sweeper. A flow gives each a model and nothing else. — *proposed* 2026-11-21
-  (design §4.9c).
+- **built-in seat** — one of the five seats that stand outside every flow's path: tech lead, board answers, pull
+  requests nobody holds, manager, sweeper. No flow or team sets them. Called a *support seat* until 2026-11-22.
+  — *proposed* 2026-11-22 (design §4.9c, §4.9d).
+- **built-in set** — a name, a model for each of the five built-in seats and a list of logins in order. A repo
+  uses one set, `default` unless it names another, and the Built-ins page sets them. — *proposed* 2026-11-22
+  (design §4.9d *The built-in seats and their page*).
 - **protected files** — the paths a repo's `.shiftlead.yml` lists under `held:`, which a review stage set to
   run *only when the work touches protected files* reads (design §4.9c *What is the repo's*). The first
   shape's **path set**, a named list a review stage picked, is read as part of the one list. — *proposed*

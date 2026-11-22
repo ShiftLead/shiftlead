@@ -102,11 +102,13 @@ reach:                                        # §4.5b *The setting*: the person
   `flow` names the one format-3 flow the team runs, by its name (§4.9c has no flow id); `schedule` names a
   `login:` of the list, as `<tool>:<name>`, where it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size`, `max` and `on_work` go (a started team takes
   work as it appears, §4.9d *When it runs*).
-  No key names a team for a repo's seats (tagging, board answers, pull requests nobody holds, the sweep):
-  they run from the first started team of the repo, by name, that can run its flow (§4.9d *The page*). `cut_over: <date>`, at the top of the file, is written once by the cut-over
+  **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `manager`,
+  `board-answers`, `unheld-pull-requests`, `sweeper`) and `logins` in order — and `repos.<repo>.builtins` names the
+  set a repo uses, `default` where absent; `builtins.default` always exists (§4.9d *The built-in seats and
+  their page*). They are written by the Built-ins page's own calls. `cut_over: <date>`, at the top of the file, is written once by the cut-over
   (TD-2056) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
-  repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a flow's support seat that runs
-  on the model and a login of the team the repo's seats run from. Whether a team is
+  repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a built-in seat that runs
+  on the model and a login of the built-in set its repo uses. Whether a team is
   started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped and a
   flow switch under way (§4.9d *When it runs*). All but the running settings are written by the team page's own calls
   (`team_new`, `team_delete`, `team_switch`, `team_set`), never by `set_settings`.
