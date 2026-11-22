@@ -151,13 +151,13 @@ const LOGINS = {
   "grok-reader": { tool: "Grok Build", acct: "SuperGrok · paul", models: ["grok-4"], state: "ok", used: 3, keep: 10, note: "week 3% used" },
 };
 const DEF = { team: "ao-grind", pending: null, teams: {
-  "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { build: 2 }, total: 6,
+  "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { build: 2 }, total: 0,
     work: [["TD-2090", "design", "14m"], ["TD-2077", "fact-check", "3m"], ["TD-2101", "build", "41m"], ["TD-2104", "build", "6m"], ["TD-2098", "review", "9m"], ["TD-2084", "you", "review", "2h"], ["TD-2071", "you", "design", "1d"]],
     set: { start: "reset", stops: "at", until: "Fri 06:00", prio: "10", onwork: "start", hold: true, holdn: "10", holdd: "2d" } },
-  "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 2, work: [], set: { start: "hand", stops: "never", until: "Fri 06:00", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } } } };
+  "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 0, work: [], set: { start: "hand", stops: "never", until: "Fri 06:00", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } } } };
 let D;
-try { D = JSON.parse(localStorage.getItem("team-proto-v4")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
-const save = (msg) => { try { localStorage.setItem("team-proto-v4", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
+try { D = JSON.parse(localStorage.getItem("team-proto-v5")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
+const save = (msg) => { try { localStorage.setItem("team-proto-v5", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
 const toast = (t) => { const e = document.getElementById("toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 2400); };
 const T = () => D.teams[D.team];
 const cap = (t, key) => t.caps[key] ?? 1;
@@ -168,7 +168,7 @@ function cannot(t, name) { const miss = flowModels(FLOWS[name]).filter(m => !pic
 function draw() {
   const t = T(), f = FLOWS[t.flow], busy = t.work.filter(w => w[1] !== "you").length;
   let h = `<div class="teams">` + Object.entries(D.teams).map(([n, x]) => `<a class="${n === D.team ? "on" : ""}" data-team="${n}">${n}${cannot(x, x.flow) ? " <i>●</i>" : ""}</a>`).join("") + `<button class="quiet" data-act="new">+ New team</button></div>`;
-  h += `<div class="head"><h1>${D.team}</h1><span class="where">works <b>${t.repo}</b> on ${t.host}</span><div class="act"><span class="live ${t.running ? "" : "off"}">${t.running ? `Running · ${busy} of ${t.total} sessions` : "Stopped"}</span><button data-act="run">${t.running ? "Wind down" : "Start"}</button></div></div>`;
+  h += `<div class="head"><h1>${t.label || D.team}</h1><button class="lnk" data-act="label" aria-label="change the label">✎</button>${t.label ? `<span class="where mono">${D.team}</span>` : ""}<span class="where">works <b>${t.repo}</b> on ${t.host}</span><div class="act"><span class="live ${t.running ? "" : "off"}">${t.running ? `Running · ${busy} ${t.total ? `of ${t.total} ` : ""}sessions` : "Stopped"}</span><button data-act="run">${t.running ? "Wind down" : "Start"}</button></div></div>`;
 
   h += `<h2>The flow it runs</h2><div class="pick"><select id="fp" aria-label="flow">` + Object.keys(FLOWS).map(n => `<option value="${n}" ${n === (D.pending || t.flow) ? "selected" : ""}>${n}${cannot(t, n) ? " (cannot run here)" : ""}</option>`).join("") + `</select><span>${f.about}</span><button class="lnk" data-act="flows">Edit on Flows</button></div>`;
   if (D.pending) h += switchPanel(t);
@@ -183,7 +183,7 @@ function draw() {
         <div class="riders">${here.map(w => `<span class="rider">${w[0]}<small>${w[2]}</small></span>`).join("")}${asked.map(w => `<span class="rider you" title="waits on you">${w[0]}<small>asked you ${w[3]} ago</small></span>`).join("")}</div></div>`; }).join("") +
       `<div class="stop end" style="--k:var(--ink)"><div class="nm">merged</div></div></div></div>`; }).join("");
   h += `<div class="aside"><h3>Beside the path</h3>` + f.audits.map(a => `<div><b>${a[0]}</b> ${a[2]}<span class="mono">${a[1]}</span></div>`).join("") + SUPPORT.map(s => `<div><b>${s[0]}</b> when needed<span class="mono">${s[1]}</span></div>`).join("") + `</div></div>`;
-  h += `<div class="total">Whole team: at most <span class="step"><button data-less="@" aria-label="one fewer session at once">−</button><b>${t.total}</b><button data-more="@" aria-label="one more session at once">+</button></span> stage and audit sessions at once. Support seats are not counted.</div>`;
+  h += `<div class="total">Whole team: <select id="tl" aria-label="team limit"><option value="0" ${t.total ? "" : "selected"}>no team limit</option><option value="1" ${t.total ? "selected" : ""}>at most</option></select>${t.total ? `<span class="step"><button data-less="@" aria-label="one fewer session at once">−</button><b>${t.total}</b><button data-more="@" aria-label="one more session at once">+</button></span> stage and audit sessions at once. Support seats are not counted.` : `the stage counts above are the only bound: up to ${f.stages.reduce((n, x) => n + cap(t, x.key), 0)} at once.`}</div>`;
 
   h += `<h2>Logins, in the order they are tried</h2><p class="lead">A session starts on the first login here that offers its stage's model and is usable right now. When a login reaches its reserve or a limit, its sessions move down the list. Logins are signed in on Tools.</p><ol class="ladder">`;
   h += t.logins.map((n, i) => { const l = LOGINS[n], used = flowModels(f).some(m => l.models.includes(m));
@@ -203,6 +203,7 @@ function draw() {
   h += `<p style="margin-top:22px"><button class="quiet" data-act="del" ${t.running || t.work.length ? "disabled" : ""}>Delete ${D.team}</button> <span style="color:var(--soft);font-size:14px">${t.running ? "Wind it down first." : t.work.length ? `${t.work.length} entries are still in its stages or waiting on you.` : "Its entries stay in the ledger."}</span></p>`;
   document.getElementById("main").innerHTML = h;
 }
+const f3 = (t) => FLOWS[t.flow].stages.reduce((n, x) => n + cap(t, x.key), 0);
 function switchPanel(t) {
   const to = FLOWS[D.pending], keys = to.stages.map(s => s.key), why = cannot(t, D.pending), nm = k => FLOWS[t.flow].stages.find(s => s.key === k).name;
   const rows = t.work.map(w => w[1] === "you" ? `<tr><td>${w[0]}</td><td>waits on you</td><td class="stay">still waits; if your answer names a stage ${D.pending} lacks, you are asked once more</td></tr>`
@@ -222,12 +223,14 @@ document.addEventListener("click", (e) => {
   if (d.act === "switch") { const keys = FLOWS[D.pending].stages.map(s => s.key); t.work = t.work.filter(w => w[1] === "you" || keys.includes(w[1])); t.flow = D.pending; D.pending = null; return save("Switched. Entries with no stage are on your Queue."); }
   if (d.act === "noswitch") { D.pending = null; return save(); }
   if (d.act === "run") { t.running = !t.running; return save(t.running ? "Started." : "Winding down: sessions finish their stage."); }
+  if (d.act === "label") { t.label = t.label ? "" : "ShiftLead builders"; return save(t.label ? "Label saved. The name ao-grind stays the same underneath." : "Label cleared."); }
   toast({ flows: "Opens this flow on Flows.", tools: "Opens Tools.", new: "New team: a name, a repo and a flow.", del: "Asks once, then removes the team." }[d.act]);
 });
 document.addEventListener("change", (e) => {
   const el = e.target, t = T();
   if (el.id === "fp") { D.pending = el.value === t.flow ? null : el.value; return save(); }
   if (el.id === "al" && el.value) { t.logins.push(el.value); return save(`${el.value} added at the end of the list.`); }
+  if (el.id === "tl") { t.total = +el.value ? f3(t) : 0; return save("Saved."); }
   if (el.dataset.set) { t.set[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; return save("Saved."); }
 });
 draw();
