@@ -107,7 +107,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   refused, not queued, looked at again on the next tick; the nudge and the seat close run at the
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
-  1. **Crash restart.** A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
+  1. **Crash restart.** (Never a session started for a stage or an audit of a format-3 flow, TD-1954: one that
+     exits is offered again by §4.9c *The home acts only where no session will*, and a clean exit after `ao stage
+     end` is no crash.) A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
      an unanswered ask addressed to it, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
      and rule 3 is the only rule that fills one, save the replay of a seat whose run never started,
      *A lost brief* below) that is `exited` by a **natural exit** — `pane` true,
