@@ -2759,8 +2759,15 @@ teams:
   as its `run_until`, and at the instant the home also clears the team's started mark, so it starts
   nothing more for the team until a Start. A stage record whose holder the stop ended is not lost
   (§4.9c *The home acts only where no session will*): it stays in its stage and is offered again at
-  the next Start, spending no offer. **Wind down** is the softer stop: it clears the mark and ends no
-  session. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
+  the next Start, spending no offer; an audit's run it killed is not counted as that audit's one loss.
+  The home writes `stopped: {at, by}` beside the mark. **Who may start a stopped team**: the person's Start starts any
+  team; *Schedule*'s start at a reset starts a team its stop time stopped and one not yet started once,
+  and never one the person wound down. A stop time is one instant and is spent once it has passed: a
+  Start after it is not stopped by it again (§4.9d *Start and Wind down*). **Rule 8's start for work and
+  `teams.<team>.on_work` are the first shape's and go at the cut-over**: a started format-3 team holds
+  no session while it has no work and takes an entry as soon as one is pickable, so no team winds down
+  for lack of work and nothing is left for the setting to decide. **Wind down** is the softer stop: it clears the mark and ends
+  no session. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
   **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile (on an adapter whose start hooks core runs, a pause line waits for a brief not yet in, §4.3 *The repo's start hooks*) when **any** of its
   reported windows reaches that window's **line**, and resume them when every window is back under
@@ -2800,6 +2807,11 @@ teams:
   it has been so for `max_age`, since a session at work reports the new window within a minute. A
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
+  **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is TD-1976's) the gate
+  reads a session's login's account where it read its profile's, and **a session is held only when no
+  login in its team's list is usable for its model**: one whose login reaches its line is moved to the
+  next usable login of the list first, and pauses, as above, only where there is none.
+
   **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
   keeps a reserve of its own*). A quota is one number per account, so its reserve is too.
   - **The key.** `usage_gate:` is keyed by the account's usage key, `<adapter>:<account>` — the profile's

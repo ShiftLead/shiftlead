@@ -96,16 +96,20 @@ reach:                                        # §4.5b *The setting*: the person
   no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`); a repo absent under `repos:` promotes by hand, is pulled (§6 *Pull*: `pull: false` is the opt-out), and has its mechanical sync PRs merged at the home (§6 *Sync*: `sync: {auto: false}` is the opt-out).
   **A team after the cut-over** (§4.9d, TD-1153; written by no code until its builds, read by none until the
   cut-over): `teams.<team>` is then the whole of a team, and gains `repo` (a registered checkout's name),
-  `host`, `logins` (login names in the order they are tried, §4.2b), `at_once` (the most sessions per stage,
+  `host`, `logins` (logins as `<tool>:<name>` in the order they are tried, §4.2b), `at_once` (the most sessions per stage,
   by stage key; absent, 1), `most` (the most stage and audit sessions for the team; absent, no team limit)
   and `label` (what the person reads in place of the name);
-  `flow` names the one format-3 flow the team runs, by its id; `schedule` names a `login:` of the list where
-  it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size` and `max` go.
+  `flow` names the one format-3 flow the team runs, by its name (§4.9c has no flow id); `schedule` names a
+  `login:` of the list, as `<tool>:<name>`, where it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size`, `max` and `on_work` go (a started team takes
+  work as it appears, §4.9d *When it runs*).
   `repos.<repo>.own_team` names the team that looks after a repo with several teams — its tech lead tags
   the untagged entries and its flow's board-answers, unheld-pull-requests and sweeper seats run — and is
   absent for a one-team repo. `cut_over: <date>`, at the top of the file, is written once by the cut-over
-  (TD-2056) and gates the team page's writes. Whether a team is started is not here: it is a mark on the
-  home's `host` record (§4.9d *When it runs*). All but the running settings are written by the team page's own calls
+  (TD-2056) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
+  repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a flow's support seat that runs
+  on its flow's model and a login of the list of the team that looks after the repo. Whether a team is
+  started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped and a
+  flow switch under way (§4.9d *When it runs*). All but the running settings are written by the team page's own calls
   (`team_new`, `team_delete`, `team_switch`, `team_set`), never by `set_settings`.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
