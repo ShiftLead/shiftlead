@@ -394,8 +394,8 @@ function walkGo(f, res, d, label, k) {
   if (d.to === "done") { w.at = "done"; w.log.push(`${label}. The ${w.kind === "clock" ? "run" : "entry"} is <b>done</b>.`); return; }
   if (d.to === "person" || !(d.to in res.by)) { w.at = "you"; w.asker = w.si; w.blocked = null; w.log.push(`${label}. ${w.kind === "clock" ? "The run stops and a question about it waits for <b>you</b> on your board" : "The entry waits for <b>you</b>, with a question on your board"}.`); return; }
   w.counts[k] = (w.counts[k] || 0) + 1; w.moves++;
-  if (d.limit && w.counts[k] > d.limit) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.log.push(`${label}, for the ${ordinal(w.counts[k])} time. The limit is ${d.limit}, so the entry comes to <b>you</b>.`); return; }
-  if (w.moves > f.maxMoves) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.log.push(`${label}. That is move ${w.moves}, past the total cap of ${f.maxMoves}, so the entry comes to <b>you</b>.`); return; }
+  if (d.limit && w.counts[k] > d.limit) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}, for the ${ordinal(w.counts[k])} time. The limit is ${d.limit}, so the entry comes to <b>you</b>.`); return; }
+  if (w.moves > f.maxMoves) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}. That is move ${w.moves}, past the total cap of ${f.maxMoves}, so the entry comes to <b>you</b>.`); return; }
   w.si = res.by[d.to]; w.at = "stage";
   const n = f.stages[w.si];
   w.log.push(`${label}. The entry moves to <b>${esc(n.name)}</b>${d.limit ? ` (${w.counts[k]} of ${d.limit})` : ""}. A fresh ${n.model} session takes it.`);
@@ -505,7 +505,7 @@ function act(el, ev) {
       else walkGo(f, check(f), elseOf(dd), "The merge is refused", `${w.si}|${w.pend}|refused`);
       break;
     }
-    case "wanswer": { const w = S.walk, on = w.blocked; w.at = "stage"; w.si = on ? check(f).by[on] : w.asker; w.blocked = null; w.counts = {}; w.moves = 0; w.log.push(on ? `You say carry on. The blocked move happens: the entry goes to <b>${esc(f.stages[w.si].name)}</b>, a fresh session reads your answer, and the counts start again.` : `You answer. The entry goes back to <b>${esc(f.stages[w.si].name)}</b>, a fresh session reads your answer, and the counts start again.`); break; }
+    case "wanswer": { const w = S.walk, on = w.blocked; w.at = "stage"; w.si = on ? check(f).by[on] : w.asker; if (on) { delete w.counts[w.blockedKey]; w.moves = 0; } w.blocked = null; w.log.push(on ? `You say carry on. The blocked move happens: the entry goes to <b>${esc(f.stages[w.si].name)}</b>, a fresh session reads your answer, and that move's count and the total start again.` : `You answer. The entry goes back to <b>${esc(f.stages[w.si].name)}</b>, and a fresh session reads your answer.`); break; }
     case "wmerged": S.walk.at = "done"; S.walk.log.push(`You merge the ${work(f)} by hand. Merged work ends its entry: <b>done</b>.`); break;
     default: return;
   }
