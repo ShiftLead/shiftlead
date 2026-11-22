@@ -1,6 +1,6 @@
 # Writing a flow
 
-A flow says how a ledger entry moves from filed to done. It is one YAML file. You write it, then run
+A flow says how a ledger entry moves from filed to merged. It is one YAML file. You write it, then run
 `flowcheck.py <file>`; the flow is usable only when the check prints `OK`.
 
 ## The idea
@@ -57,7 +57,8 @@ What the outcomes mean:
 
 - `work-pushed`: the stage's work is pushed and the pull request is open. Its checks must be green, unless
   the entry goes on to another build stage, which is expected to finish the work.
-- `not-needed` on a design stage: this entry needs no design. On a build stage: it needs no work at all.
+- `not-needed` on a design stage: this entry needs no design; send it to the build stage. On a build stage:
+  it needs no work at all; leave it out, so the person decides whether to archive the entry.
 - `design-needs-changing`: the builder found the design cannot be built as written. In a flow with no
   design stage, leave it out, so it goes to the person.
 - `ship`: the reviewer passes the pull request as it now stands.
@@ -77,7 +78,6 @@ tests is part of `build`. A narrower read (a security review, a fact-check) is a
 | a stage's key | the entry moves to that stage |
 | `merge` | the pull request is merged and the entry is finished; allowed only on `work-pushed` and `ship` |
 | `person` | the entry waits for the person, with a question on their board |
-| `done` | the entry is finished with nothing to merge; not allowed on `work-pushed` or `ship` |
 
 **An outcome you do not list goes to the person.** Leaving an outcome out is allowed, and is the usual way
 to hand a rare case to the person.
@@ -85,9 +85,10 @@ to hand a rare case to the person.
 ### Merge
 
 `ship: merge` merges the pull request with no session of its own, so no model is spent on it. A merge is
-refused when the pull request changed after its verdict, is red, or conflicts. Say where a refused merge
-goes with `{to: merge, refused: {to: build, limit: 3}}`; with plain `merge`, a refused merge goes to the
-person.
+refused when the pull request changed after its verdict, is red, conflicts, or fails the repo's own ledger
+and board checks. Say where a refused merge goes with `{to: merge, refused: {to: build, limit: 3}}`; with
+plain `merge`, a refused merge goes to the person. A refusal only the person can cure, such as a go-ahead
+the repo requires, always goes to the person and uses up no limit.
 
 ### A limit
 
@@ -95,8 +96,12 @@ person.
 instead. So "show me after three rounds of changes" is `limit: 2`, because the third is the one the person
 sees. The count is per entry and per move. A limit may sit on any move to a stage, including `refused`.
 
-`max-moves`, at the top of the file, caps the whole trip: after that many moves between stages, an entry
-goes to the person wherever it is. It is 25 when you leave it out.
+`max-moves`, at the top of the file, caps the whole trip: after that many moves from one stage to another
+(a move to the person or to `merge` does not count), the next one goes to the person instead. It is 25
+when you leave it out.
+
+A question raised by a limit or by the cap always offers *Carry on*. That answer, or one the person types
+in their own words, lets the blocked move happen and starts the counts again.
 
 ### The person
 
@@ -105,8 +110,8 @@ goes to the person wherever it is. It is 25 when you leave it out.
   (for example `ship: person`), with no `merge` anywhere.
 - When the person answers a question, the entry goes back to the stage that asked, and a fresh session
   there reads the answer. To offer answers that go elsewhere, write
-  `{to: person, answers: {"Try again": build, "Drop it": done}}`. An answer the person types in their own
-  words always goes back to the stage that asked.
+  `{to: person, answers: {"Try again": build, "A second opinion": second-read}}`; an answer goes to a stage.
+  An answer the person types in their own words goes back to the stage that asked.
 
 ## Ways in
 
@@ -152,7 +157,7 @@ Nothing can be sent to an audit.
 
 ## Rules the check enforces
 
-1. Every destination is a stage that exists, or `merge`, `person` or `done`. Only `work-pushed` and `ship`
+1. Every destination is a stage that exists, or `merge` or `person`. Only `work-pushed` and `ship`
    can go to `merge`. Nothing goes to an audit.
 2. Every outcome a stage lists belongs to its kind of work.
 3. Every loop has a limit: if an entry can travel from a stage back to the same stage without passing the
@@ -160,7 +165,7 @@ Nothing can be sent to an audit.
    part of such a route.
 4. Every pull request that can be opened can reach a `merge`, or a `work-pushed` or `ship` that goes to the
    person.
-5. `work-pushed` and `ship` never go to `done`: that would leave a pull request open for ever.
+5. No outcome goes to `done`: an entry is finished by a merge, or by the person.
 6. Each kind of new entry has exactly one way in, and it is not a review stage.
 7. Stage and audit names are unique; every stage has a `does` and a model from the lists.
 8. Every stage can be reached: by `takes`, or as some outcome's destination.

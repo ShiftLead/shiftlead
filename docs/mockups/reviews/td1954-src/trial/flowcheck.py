@@ -144,11 +144,11 @@ def check(doc):
                 a = a if a in FIXED else slug(a)
                 if a in stages:
                     st["edges"].append((where, a, "person"))
-                elif a not in ("done", "person"):
+                elif a != "person":
                     bad.append(f"{st['name']}: `{where}`: the answer {label!r} goes to `{a}`, which is not a stage (rule 1)")
         elif v == "done":
-            if o in CAN_MERGE:
-                bad.append(f"{st['name']}: `{where}: done` would leave the pull request unmerged; send it to merge, a stage or the person (rule 5)")
+            tip = "send it to merge, a stage or the person" if o in CAN_MERGE else "leave it out so the person decides, or send it to a stage"
+            bad.append(f"{st['name']}: `{where}: done` is not a destination; {tip} (rule 5)")
         elif v in audits:
             bad.append(f"{st['name']}: `{where}` goes to the audit `{v}`; an audit starts on its clock and nothing is sent to it (rule 1)")
         elif v not in stages:
