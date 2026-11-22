@@ -306,7 +306,7 @@ def test_every_swap_that_can_redraw_a_marked_control_marks_it_again():
     src = _src()
     assert "old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);" in src
     assert src.count("AO.remarkPresses(fresh);") == 2  # a session card's swap, a team summary's
-    assert "render(s); phone.render(s); AO.remarkPresses(document);" in src
+    assert "render(s); AO.remarkPresses(document); phone.render(s);" in src
     assert src.count("AO.remarkPresses(document);") == 2
     assert 'renderReports(reportsV); AO.remarkPresses($("#reportsmenu"));' in src
     assert "AO.remarkPresses(document.body);  // a press whose card went ends with it" in src

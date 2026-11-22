@@ -146,7 +146,8 @@
       {% endif %}
       <span class="grow"></span>
       {% if s.state != 'scheduled' %}
-      <details class="more">
+      {#- not drawn once the pane is gone (§4.5's exited state, §4.5a *Focus: Kill*, TD-1997): the Focus delta hides it -#}
+      <details class="more" id="fheadmore"{% if s.state == 'closed' or s.pane is sameas false %} hidden{% endif %}>
         <summary class="btn sm link" title="more">more ▾</summary>
         <div class="menu">
           {# design §4.5a **Pop out** (TD-046): this Focus in its own browser window, raised if it is open #}
