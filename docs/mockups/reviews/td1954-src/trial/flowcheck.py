@@ -6,7 +6,7 @@ import sys
 import yaml
 
 OUT = {
-    "design": ["work-pushed", "not-needed"],
+    "design": ["work-pushed", "no-design-needed"],
     "build": ["work-pushed", "design-needs-changing", "not-needed"],
     "review": ["ship", "changes-wanted"],
 }

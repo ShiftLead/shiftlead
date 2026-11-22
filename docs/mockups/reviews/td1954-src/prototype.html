@@ -136,7 +136,7 @@ pre.file { background:var(--sheet); border:1px solid var(--rule2); border-radius
 const MODELS = ["haiku", "sonnet", "opus", "fable"];
 const RSN = "a reason is given";
 const K = {
-  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent. Push the work when the repo's checks pass.", outs: ["work-pushed", "not-needed"] },
+  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent. Push the work when the repo's checks pass.", outs: ["work-pushed", "no-design-needed"] },
   build: { label: "Build", c: "--build", desc: "Writes the code, tests or documents for an entry, on the entry's branch.", brief: "Read the entry, the design it follows, and what earlier stages left on the entry's branch: their work and any review of it. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and push.", outs: ["work-pushed", "design-needs-changing", "not-needed"] },
   review: { label: "Review", c: "--review", desc: "Reads the pushed work, whatever it holds, and gives a verdict.", brief: "Read the change itself and the code or documents around it, never the author's summary alone. Where it changes code, every behaviour it changes follows a sentence in the design. Where it changes a design or another document, every claim it makes about the repo holds. Give one verdict: ship, or the changes you want and why.", outs: ["ship", "changes-wanted"] },
   hunt: { label: "Audit", c: "--find", desc: "Starts on a clock, looks for problems in the area its brief names, and files what it finds.", brief: "This stage's own brief names the area to look at and the kind of problem to look for, for example what the last ten merged pull requests changed against the documents. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: ["findings-filed", "nothing-found"] },
@@ -193,7 +193,7 @@ function builtins() {
       st("Build", "build", "opus", "any", { "work-pushed": to("review") }),
       st("Review", "review", "sonnet", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }),
     ]),
-    flow("build", true, "build and merge, nothing reviewed", [
+    flow("build", true, "build and merge; no review stage, the builder runs the repo's own review", [
       st("Build", "build", "opus", "any", { "work-pushed": mg("build", 3) }),
     ]),
   ];
@@ -215,7 +215,7 @@ function examples() {
   ];
 }
 
-const KEY = "flows-proto-v8";
+const KEY = "flows-proto-v9";
 let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false, page: "flows", briefs: [] };
 try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; S.briefs = Array.isArray(r.briefs) ? r.briefs : []; } } catch (e) { /* storage is a convenience */ }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel, briefs: S.briefs })); } catch (e) { /* ignore */ } }

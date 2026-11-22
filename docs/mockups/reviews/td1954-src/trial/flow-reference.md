@@ -46,7 +46,7 @@ Destinations use the key. Outcomes are written as keys of the stage itself.
 
 | `does` | What the session does | Outcomes |
 |---|---|---|
-| `design` | writes a design for the entry | `work-pushed`, `not-needed` |
+| `design` | writes a design for the entry | `work-pushed`, `no-design-needed` |
 | `build` | writes code, tests or documents for the entry, or continues what an earlier stage pushed | `work-pushed`, `design-needs-changing`, `not-needed` |
 | `review` | reads whatever is on the entry's pull request and gives a verdict | `ship`, `changes-wanted` |
 
@@ -57,8 +57,9 @@ What the outcomes mean:
 
 - `work-pushed`: the stage's work is pushed and the pull request is open. Its checks must be green, unless
   the entry goes on to another build stage, which is expected to finish the work.
-- `not-needed` on a design stage: this entry needs no design; send it to the build stage. On a build stage:
-  it needs no work at all; leave it out, so the person decides whether to archive the entry.
+- `no-design-needed`: this entry needs no design and can be built as it is; send it to the build stage.
+- `not-needed` (a build stage): the entry needs no work at all; leave it out, so the person decides whether
+  to archive the entry.
 - `design-needs-changing`: the builder found the design cannot be built as written. In a flow with no
   design stage, leave it out, so it goes to the person.
 - `ship`: the reviewer passes the pull request as it now stands.
