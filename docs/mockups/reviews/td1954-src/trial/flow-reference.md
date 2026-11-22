@@ -67,7 +67,8 @@ What the outcomes mean:
   review and fixes the same pull request.
 
 A design's builds are separate entries: the design files them, and each starts as a new entry of its own.
-A design is finished when its own pull request is merged.
+A design's own pull request is merged like any other; its entry then waits for those builds and is
+finished when the last of them merges.
 
 There is no merge stage, no test stage and no stage that does two kinds of work. Running and fixing the
 tests is part of `build`. A narrower read (a security review, a fact-check) is a `review` stage.
