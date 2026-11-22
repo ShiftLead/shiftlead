@@ -1486,7 +1486,8 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
     # the facts `_status` reads, as `reading` stamps them: each member's counted open work, a design with a question
     # taking in its held builds', and each held build's design (§4.4 *A design's question is asked once*, TD-2026)
     held_by = held_map(open_, boards, linked)
-    for q, work in with_held(open_work(open_, item_resolver(rs.origins)), held_by, open_).items():
+    resolve = item_resolver(rs.origins)
+    for q, work in with_held(open_work(open_, resolve), held_by, open_, resolve).items():
         open_[q]["open_work"] = work
     for b, d in held_by.items():
         open_[b]["held_by"] = d
@@ -1713,7 +1714,7 @@ def reading(
     # taking in its held builds' (§4.4 *A design's question is asked once, on the design*, TD-2026), so it is read
     # once the boards and `linked` are
     held_by = held_map(open_, boards, linked)
-    for q, work in with_held(open_work(open_, xref), held_by, open_).items():
+    for q, work in with_held(open_work(open_, xref), held_by, open_, xref).items():
         open_[q]["open_work"] = work
     for b, d in held_by.items():
         open_[b]["held_by"] = d  # the entry stamp, on every held build whatever its row's word (TD-2026)
@@ -1916,6 +1917,29 @@ def item_resolver(origins: Mapping[str, str]) -> Callable[[str], str | None]:
     return xref
 
 
+def _open_blockers(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], str | None]) -> dict[str, set[str]]:
+    """Each open entry's open `Blocked by:` ids, this repo's and a `<repo>#TD-n` `xref` resolves, by `<repo>#TD-n`."""
+    out: dict[str, set[str]] = {q: set() for q in entries}
+    for q, e in entries.items():
+        named = [qid(str(e.get("repo") or ""), str(b)) for b in e.get("blocked_ids") or []]
+        named += [x for x in map(xref, e.get("xrepo_ids") or []) if x]
+        out[q] |= {n for n in named if n in entries and n != q}
+    return out
+
+
+def _reaches(blockers: Mapping[str, Collection[str]], start: str, target: str) -> bool:
+    """Whether `start`'s open `Blocked by:` chain (`_open_blockers`) reaches `target`; a visited set guards a cycle."""
+    seen, todo = {start}, [start]
+    while todo:
+        for b in blockers.get(todo.pop(), ()):
+            if b == target:
+                return True
+            if b not in seen:
+                seen.add(b)
+                todo.append(b)
+    return False
+
+
 def open_work(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], str | None]) -> dict[str, list[str]]:
     """Each `decision (paul)` member's **counted open work** (§4.4 *The card's status*, *A `decision (paul)` member
     that still waits on open work is no need*, TD-1926): the open ids in its `Blocked by:` — this repo's, and a
@@ -1925,50 +1949,40 @@ def open_work(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], st
     gate, count for nothing. `entries` are the open entries by `<repo>#TD-n`, each with its `repo`; the result
     holds only members with some, each list in key order (`_key_sort`, this repo's before another's). One builder:
     the Queue's reading, the Inbox's `ledger_for_you` and the home's refusal of a stale press all call it."""
-    blockers: dict[str, set[str]] = {q: set() for q in entries}
+    blockers = _open_blockers(entries, xref)
     parts: dict[str, set[str]] = {q: set() for q in entries}
     for q, e in entries.items():
-        named = [qid(str(e.get("repo") or ""), str(b)) for b in e.get("blocked_ids") or []]
-        named += [x for x in map(xref, e.get("xrepo_ids") or []) if x]
-        for n in named:
-            if n in entries and n != q:
-                blockers[q].add(n)
         if e.get("part_of") and (n := qid(str(e.get("repo") or ""), str(e["part_of"]))) in entries and n != q:
             parts[n].add(q)
 
     def held(q: str) -> bool:
         return ledger_mod.decided_by(dict(entries[q]), PERSON)
 
-    def reaches(start: str, target: str) -> bool:
-        seen, todo = {start}, [start]
-        while todo:
-            for b in blockers.get(todo.pop(), ()):
-                if b == target:
-                    return True
-                if b not in seen:
-                    seen.add(b)
-                    todo.append(b)
-        return False
-
     out: dict[str, list[str]] = {}
     for q in entries:
         if not held(q):
             continue
-        counted = [w for w in blockers[q] | parts[q] if not held(w) and not reaches(w, q)]
+        counted = [w for w in blockers[q] | parts[q] if not held(w) and not _reaches(blockers, w, q)]
         if counted:
             out[q] = sorted(counted, key=lambda w: _key_sort(str(entries[w].get("key") or ""), w))
     return out
 
 
 def with_held(
-    work: Mapping[str, list[str]], held: Mapping[str, str], entries: Mapping[str, Mapping[str, Any]]
+    work: Mapping[str, list[str]],
+    held: Mapping[str, str],
+    entries: Mapping[str, Mapping[str, Any]],
+    xref: Callable[[str], str | None] | None = None,
 ) -> dict[str, list[str]]:
     """`open_work`'s result with each held build's counted open work added to its design's (§4.4 *A design's question
     is asked once, on the design*, TD-2026): `held` is `held_map`'s `{build: design}`; each design takes in its
     builds' ids as merged so far, without repeats and in key order (`_key_sort`), a design with none of its own
     getting the key; a design that is itself a held build is merged before its own design, innermost first, so an
-    outer design takes in the inner one's merged work. A build keeps its own. A copy; `work` is never written."""
+    outer design takes in the inner one's merged work. A build's id whose own open `Blocked by:` chain reaches the
+    design is not added, as `open_work` drops one reaching the member (its answer comes first, TD-2058; `xref` resolves
+    a `<repo>#TD-n` in the chain, `open_work`'s resolver). A build keeps its own. A copy; `work` is never written."""
     out = {q: list(ids) for q, ids in work.items()}
+    blockers = _open_blockers(entries, xref or (lambda _item: None))
 
     def depth(d: str) -> int:
         n, seen = 0, {d}
@@ -1982,7 +1996,7 @@ def with_held(
         got = list(out.get(d) or [])
         for b, of in held.items():
             if of == d:
-                got += [w for w in out.get(b) or () if w not in got and w != d]
+                got += [w for w in out.get(b) or () if w not in got and w != d and not _reaches(blockers, w, d)]
         if got:
             out[d] = sorted(got, key=lambda w: _key_sort(str((entries.get(w) or {}).get("key") or ""), w))
     return out

@@ -1386,7 +1386,8 @@ class InboxMixin:
         boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in readings.items()}
         # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
         held = queue_mod.held_map(opens, boards, linked)
-        work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held, opens)
+        resolve = queue_mod.item_resolver(origins)
+        work = queue_mod.with_held(queue_mod.open_work(opens, resolve), held, opens, resolve)
         return opens, work, linked
 
     def _refuse_waiting(self, qids: Iterable[str]) -> None:

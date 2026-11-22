@@ -149,3 +149,25 @@ def test_the_inbox_and_the_homes_refusal_read_the_held_builds_work(tmp_path):
     home._open_work = lambda: InboxMixin._open_work(home)
     with pytest.raises(RpcError, match="TD-001 waits on TD-004: it is asked once that closes"):
         InboxMixin._refuse_waiting(home, ["r#TD-001"])
+
+
+@pytest.mark.unit
+def test_a_held_builds_blocker_that_waits_on_the_design_is_not_its_work(tmp_path):
+    """TD-2058: as `open_work` drops a blocker whose chain reaches the member, `with_held` drops one reaching the
+    design, so the design never waits on what waits on it."""
+    entries = [
+        _entry(1, "the design", **HELD),
+        _entry(2, "build a", Priority="High", Part_of="TD-001", Blocked_by="TD-004, decision (paul)"),
+        _entry(4, "waits on the design", Priority="High", Blocked_by="TD-005"),
+        _entry(5, "waits on the design too", Priority="High", Blocked_by="TD-001"),
+    ]
+    root, r = _setup(tmp_path, entries, _ask("TD-002"))
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["open_work"] == [] and row["state"] != "waiting, then yours"
+    # the chain ending short of the design still makes it wait
+    entries[3] = _entry(5, "free", Priority="High")
+    root, r = _setup(tmp_path / "b", entries, _ask("TD-002"))
+    assert _row(_read({root: r}), "r#TD-001")["open_work"] == ["r#TD-004"]
+    work = {"r#TD-002": ["r#TD-004"]}
+    opens = {queue.qid("r", e["id"]): {**e, "repo": "r"} for e in r["ledger"]["entries"]}
+    assert queue.with_held(work, {"r#TD-002": "r#TD-001"}, opens)["r#TD-001"] == ["r#TD-004"]
