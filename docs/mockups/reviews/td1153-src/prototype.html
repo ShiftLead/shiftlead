@@ -1,0 +1,282 @@
+<title>Team Page Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: teams listed on the left; the chosen team on the right as four bands: its flow with live work, its logins in order, when it runs, the team itself. */
+:root {
+  --page:#E7EBEC; --sheet:#FAFBFB; --field:#FFFFFF; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
+  --ok:#2E8A57; --link:#2D5F86; --warn:#9A6212; --off:#9AA5AA; --bad:#B4432F; --badbg:#FBEDEA;
+  --tag:#FFF1B8; --tagrule:#E2C55A; --note:#FFF7E6; --noterule:#E7C98A;
+  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --merge:#3B8F86;
+  --sans:"IBM Plex Sans", system-ui, sans-serif; --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page:#161B1E; --sheet:#1F262A; --field:#262E33; --ink:#E4EAEC; --soft:#9AA8AF; --rule:#3B474D; --rule2:#2E383D;
+  --ok:#5CBF8A; --link:#7FB4DD; --warn:#E0A548; --off:#6C7A81; --bad:#F08A76; --badbg:#3A2420;
+  --tag:#4A4016; --tagrule:#7A6A22; --note:#332A14; --noterule:#6B5620;
+  --design:#8E8EF0; --build:#5AA9DD; --review:#DDA04A; --find:#E083B4; --merge:#62B8AE; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --page:#161B1E; --sheet:#1F262A; --field:#262E33; --ink:#E4EAEC; --soft:#9AA8AF; --rule:#3B474D; --rule2:#2E383D;
+  --ok:#5CBF8A; --link:#7FB4DD; --warn:#E0A548; --off:#6C7A81; --bad:#F08A76; --badbg:#3A2420;
+  --tag:#4A4016; --tagrule:#7A6A22; --note:#332A14; --noterule:#6B5620;
+  --design:#8E8EF0; --build:#5AA9DD; --review:#DDA04A; --find:#E083B4; --merge:#62B8AE; color-scheme:dark }
+* { box-sizing:border-box; }
+body { background:var(--page); color:var(--ink); font:15px/1.5 var(--sans); }
+.wrap { max-width:1240px; margin:0 auto; padding-block:22px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+.banner { background:var(--note); border:1px solid var(--noterule); border-radius:4px; padding:8px 12px; font-size:13px; margin-bottom:14px; }
+header.top { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:10px; }
+header.top h1 { font-size:32px; line-height:1; margin:0; font-weight:700; }
+header.top span { color:var(--soft); font-size:14px; }
+.cols { display:grid; grid-template-columns:220px minmax(0,1fr); gap:28px; margin-top:20px; }
+@media (max-width:820px) { .cols { grid-template-columns:minmax(0,1fr); } }
+.mono { font-family:var(--mono); }
+button, select, input { font:inherit; color:var(--ink); }
+button { font-size:13px; background:none; border:1px solid var(--ink); border-radius:3px; padding:3px 12px; cursor:pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid var(--link); outline-offset:1px; }
+button.quiet { border-color:var(--rule); color:var(--soft); }
+button.pri { background:var(--ink); color:var(--page); }
+button[disabled] { border-color:var(--rule); color:var(--off); background:var(--rule2); cursor:default; }
+button.ic { border-color:transparent; padding:0 5px; color:var(--off); font-size:14px; }
+button.ic:hover:not([disabled]) { color:var(--ink); }
+button.lnk { border:none; padding:0; color:var(--link); font-size:13px; text-decoration:underline; }
+select, input[type=text], input[type=number] { background:var(--field); border:1px solid var(--rule); border-radius:3px; padding:1px 6px; font-size:13px; }
+input[type=number] { width:46px; text-align:center; font-family:var(--mono); font-weight:600; }
+
+nav h4 { margin:16px 0 4px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+nav h4:first-child { margin-top:0; }
+nav a.fl { display:block; padding:5px 10px; border-radius:4px; cursor:pointer; font:500 14px var(--mono); border:1px solid transparent; }
+nav a.fl small { display:block; font:400 12.5px var(--sans); color:var(--soft); }
+nav a.fl.sel { background:var(--sheet); border-color:var(--rule); box-shadow:inset 3px 0 0 var(--ink); }
+nav a.fl .dot { color:var(--bad); }
+nav p { font-size:12.5px; color:var(--soft); margin:8px 0; line-height:1.4; }
+
+.fhead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.fhead h2 { margin:0; font-size:24px; font-weight:600; font-family:var(--mono); }
+.tagc { font-size:12.5px; border:1px solid var(--rule); border-radius:10px; padding:0 9px; color:var(--soft); background:var(--sheet); }
+.tagc.run { color:var(--ok); border-color:var(--ok); }
+.fhead .act { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+h3 { margin:26px 0 2px; font-size:17px; font-weight:600; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+h3 small { font-weight:400; font-size:13px; color:var(--soft); }
+p.lead { margin:0 0 10px; font-size:13.5px; color:var(--soft); max-width:74ch; }
+.card { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; }
+.pick { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; font-size:14px; }
+.pick select { font:600 14px var(--mono); padding:3px 8px; }
+.probs { color:var(--bad); font-size:13px; } .okk { color:var(--ok); font-size:13px; }
+
+.strip { display:grid; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); gap:8px; }
+.st { background:var(--sheet); border:1px solid var(--rule2); border-top:3px solid var(--c); border-radius:6px; padding:8px 10px 10px; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.st.err { border-color:var(--bad); border-top-color:var(--bad); }
+.st .nm { font-weight:600; font-size:15px; display:flex; gap:6px; align-items:baseline; }
+.st .nm i { font-style:normal; font-weight:400; font-size:12px; color:var(--c); margin-left:auto; }
+.st .on { font-size:12.5px; color:var(--soft); }
+.st .on b { font:600 12.5px var(--mono); color:var(--ink); }
+.st .on.no { color:var(--bad); }
+.st .cap { font-size:12.5px; color:var(--soft); display:flex; align-items:center; gap:5px; }
+.st ul { list-style:none; margin:2px 0 0; padding:5px 0 0; border-top:1px dashed var(--rule2); font-size:13px; display:grid; gap:3px; }
+.st li { display:flex; gap:6px; align-items:baseline; min-width:0; }
+.st li a { font:500 13px var(--mono); color:var(--link); }
+.st li span { color:var(--soft); font-size:12.5px; margin-left:auto; white-space:nowrap; }
+.st li.wait span { color:var(--warn); }
+.st .none { font-size:12.5px; color:var(--off); }
+.st.you { border-top-style:dashed; }
+.side { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:8px; margin-top:8px; }
+.side .card { padding:8px 12px; }
+.side h5 { margin:0 0 4px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+.row { display:grid; grid-template-columns:minmax(0,1.2fr) 62px minmax(0,1.4fr); gap:8px; font-size:13px; padding:2px 0; align-items:baseline; }
+.row .m, .m { font:600 12.5px var(--mono); }
+.row span:last-child { color:var(--soft); font-size:12.5px; }
+
+.sw { border:2px solid var(--link); border-radius:6px; background:var(--sheet); padding:10px 14px 12px; margin-bottom:10px; }
+.sw h4 { margin:0 0 4px; font-size:15px; }
+.sw table { border-collapse:collapse; font-size:13.5px; margin:4px 0 8px; }
+.sw td { padding:2px 14px 2px 0; vertical-align:baseline; }
+.sw td:first-child { font:500 13px var(--mono); }
+.sw .stay { color:var(--ok); } .sw .go { color:var(--warn); }
+.sw .btns { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.sw p { margin:4px 0; font-size:13px; color:var(--soft); max-width:76ch; }
+
+.lg { display:grid; grid-template-columns:26px 30px minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1.5fr) 30px; gap:10px; align-items:center; padding:7px 12px; border-bottom:1px solid var(--rule2); font-size:13.5px; }
+.lg:last-child { border-bottom:none; }
+.lg .ord { font:600 13px var(--mono); color:var(--soft); }
+.lg .mv { display:flex; flex-direction:column; }
+.lg .mv button { font-size:10px; line-height:1.1; padding:0 4px; }
+.lg b { font:600 13.5px var(--mono); }
+.lg small { display:block; color:var(--soft); font-size:12.5px; }
+.lg .s-ok { color:var(--ok); } .lg .s-wait { color:var(--warn); } .lg .s-bad { color:var(--bad); }
+.lg.unus b { color:var(--soft); }
+.money { font-size:12px; border:1px solid var(--warn); color:var(--warn); border-radius:3px; padding:0 5px; margin-left:6px; font-family:var(--sans); font-weight:500; }
+.addl { padding:8px 12px; font-size:13px; color:var(--soft); display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-top:1px solid var(--rule2); }
+@media (max-width:760px) { .lg { grid-template-columns:22px 26px minmax(0,1fr) 26px; } .lg .c3, .lg .c4 { grid-column:3 / 4; } }
+.need { margin-top:8px; font-size:13.5px; display:grid; gap:3px; }
+.need div { display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; }
+.need .m { min-width:64px; }
+.need .no { color:var(--bad); }
+.need small { color:var(--soft); font-size:12.5px; }
+
+.set { display:grid; grid-template-columns:170px minmax(0,300px) minmax(0,1fr); gap:6px 14px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--rule2); font-size:14px; }
+.set:last-child { border-bottom:none; }
+.set > span:last-child { font-size:12.5px; color:var(--soft); }
+.set select, .set input[type=text] { padding:3px 8px; font-size:13.5px; width:100%; }
+.set .inl { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13.5px; }
+.set .inl input[type=text] { width:64px; }
+@media (max-width:760px) { .set { grid-template-columns:minmax(0,1fr); } }
+.toast { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom, 0px)); background:var(--ink); color:var(--page); padding:6px 14px; border-radius:4px; font-size:13px; }
+</style>
+
+<div class="wrap">
+  <div class="banner">A working prototype of the team page (TD-1153). Everything here stays in this browser; nothing reaches ShiftLead. The teams, logins, entries and numbers are examples.</div>
+  <header class="top"><h1>Teams</h1><span>which flow a team runs, on which logins, how many sessions at once, and when</span></header>
+  <div class="cols"><nav id="nav"></nav><main id="main"></main></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const KC = { design: "--design", build: "--build", review: "--review" };
+const S = (name, does, model, x) => Object.assign({ name, does, model, key: name.toLowerCase().replace(/ /g, "-") }, x || {});
+const SUPPORT = [["Tech lead", "opus", "answers a session's question"], ["Board answers", "sonnet", "does what you decided on the board"], ["Pull requests nobody holds", "sonnet", "cures a red or orphaned pull request"], ["Manager", "haiku", "stalls and permissions"], ["Sweeper", "haiku", "the weekly sweep"]];
+const FLOWS = {
+  td: { own: false, about: "design, two reads and a fact-check; build, review, a protected read", stages: [S("Design", "design", "fable"), S("Sonnet read", "review", "sonnet"), S("Opus read", "review", "opus"), S("Fact-check", "review", "haiku"), S("Build", "build", "opus"), S("Review", "review", "sonnet"), S("Protected read", "review", "fable", { only: true })],
+        audits: [["Docs audit", "sonnet", "every 10 merged pull requests", "in 4 more"], ["Test audit", "sonnet", "every 6 hours", "in 2h 10m"]] },
+  "build-review": { own: false, about: "build, then one review", stages: [S("Build", "build", "opus"), S("Review", "review", "sonnet")], audits: [] },
+  build: { own: false, about: "build and merge; the builder runs the repo's own review", stages: [S("Build", "build", "opus")], audits: [] },
+  "second-opinion": { own: true, about: "yours: build, a review, then a second review on another maker's model", stages: [S("Build", "build", "opus"), S("Review", "review", "sonnet"), S("Outside read", "review", "grok-4")], audits: [["Code audit", "sonnet", "every 1 days", "tomorrow 07:00"]] },
+};
+const LOGINS = {
+  "claude-paul": { tool: "Claude Code", acct: "Max · paul", models: ["haiku", "sonnet", "opus", "fable"], state: "ok", note: "week 41% used, reserve at 80%" },
+  "claude-heather": { tool: "Claude Code", acct: "Max · heather", models: ["haiku", "sonnet", "opus", "fable"], state: "wait", note: "at its reserve until Thu 07:00" },
+  "claude-api": { tool: "Claude Code", acct: "API key · metered", models: ["haiku", "sonnet", "opus", "fable"], state: "ok", metered: true, note: "$38 of $100 this month" },
+  "gemini-reader": { tool: "Gemini CLI", acct: "free · paul", models: ["flash", "flash-lite"], state: "ok", note: "day 12% used" },
+  "grok-reader": { tool: "Grok Build", acct: "SuperGrok · paul", models: ["grok-4"], state: "ok", note: "week 3% used" },
+  "claude-scratch": { tool: "Claude Code", acct: "not signed in", models: [], state: "bad", note: "sign in on the Tools page" },
+};
+const DEF = {
+  team: "ao-grind", pending: null,
+  teams: {
+    "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { design: 1, build: 2 }, total: 6,
+      work: [["TD-2090", "design", "working 14m"], ["TD-2077", "fact-check", "working 3m"], ["TD-2101", "build", "working 41m"], ["TD-2104", "build", "working 6m"], ["TD-2098", "review", "working 9m"], ["TD-2084", "you", "asked 2h ago · from Review, at its limit"], ["TD-2071", "you", "asked 1d ago · from Design"]],
+      set: { start: "reset", until: "Fri 06:00", prio: "10", onwork: "start", hold: true, holdn: "10", holdd: "2d" } },
+    "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 2, work: [], set: { start: "hand", until: "", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } },
+  },
+};
+let D;
+try { D = JSON.parse(localStorage.getItem("team-proto-v2")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
+const save = (msg) => { try { localStorage.setItem("team-proto-v2", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
+const toast = (t) => { const e = document.getElementById("toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 2200); };
+const T = () => D.teams[D.team];
+const cap = (t, key) => t.caps[key] ?? 1;
+
+// The first usable login in the team's list that offers the model; why not, when there is none.
+function pickLogin(t, model) {
+  const offer = t.logins.filter(n => LOGINS[n].models.includes(model));
+  const hit = offer.find(n => LOGINS[n].state === "ok");
+  const skipped = offer.slice(0, hit ? offer.indexOf(hit) : offer.length);
+  return { hit, skipped, offer };
+}
+function flowModels(f) { const m = new Set(); f.stages.forEach(s => m.add(s.model)); f.audits.forEach(a => m.add(a[1])); SUPPORT.forEach(s => m.add(s[1])); return [...m]; }
+function cannot(t, name) { const miss = flowModels(FLOWS[name]).filter(m => !pickLogin(t, m).offer.length); return miss.length ? `no login in this team's list offers ${miss.join(", ")}` : ""; }
+function onLine(t, model) {
+  const p = pickLogin(t, model);
+  if (!p.offer.length) return `<div class="on no"><b>${model}</b> · no login offers it</div>`;
+  if (!p.hit) return `<div class="on no"><b>${model}</b> · waits: ${p.skipped.join(", ")} not usable now</div>`;
+  return `<div class="on"><b>${model}</b> on <b>${p.hit}</b>${LOGINS[p.hit].metered ? '<span class="money">metered</span>' : ""}${p.skipped.length ? `<br>${p.skipped.join(", ")} passed over` : ""}</div>`;
+}
+
+function draw() {
+  const t = T(), f = FLOWS[t.flow];
+  document.getElementById("nav").innerHTML = `<h4>Teams</h4>` + Object.entries(D.teams).map(([n, x]) =>
+    `<a class="fl ${n === D.team ? "sel" : ""}" data-team="${n}">${n}${cannot(x, x.flow) ? ' <span class="dot">●</span>' : ""}<small>${x.repo} · ${x.flow} · ${x.running ? x.work.filter(w => w[1] !== "you").length + " sessions" : "stopped"}</small></a>`).join("") +
+    `<p><button class="quiet" data-act="new">+ New team</button></p><p>A team is a repo, a flow and a list of logins. Its sessions are started for one entry in one stage and end with it, so a team has no members to name.</p>`;
+
+  const inFlight = t.work.filter(w => w[1] !== "you");
+  let h = `<div class="fhead"><h2>${D.team}</h2><span class="tagc">${t.repo}</span><span class="tagc">on ${t.host}</span>
+    <span class="tagc ${t.running ? "run" : ""}">${t.running ? `running · ${inFlight.length} of at most ${t.total} sessions` : "stopped"}</span>
+    <div class="act"><button data-act="run">${t.running ? "Wind down" : "Start"}</button></div></div>`;
+
+  // 1. the flow
+  h += `<h3>Flow <small>the path every entry of this team takes</small></h3>`;
+  h += `<div class="pick"><label for="fp">This team runs</label><select id="fp">` + Object.keys(FLOWS).map(n => { const why = cannot(t, n); return `<option value="${n}" ${n === (D.pending || t.flow) ? "selected" : ""}>${n}${why ? " (cannot run here)" : ""}</option>`; }).join("") +
+    `</select><span style="color:var(--soft);font-size:13px">${f.about}</span><button class="lnk" data-act="flows">Open on the Flows page</button></div>`;
+  if (D.pending) h += switchPanel(t);
+  const bad = cannot(t, t.flow);
+  if (bad) h += `<p class="probs">This team cannot run ${t.flow}: ${bad}. Add a login that offers it below, or pick another flow. Nothing new is started until then.</p>`;
+  h += `<div class="strip">` + f.stages.map(s => {
+    const here = t.work.filter(w => w[1] === s.key), p = pickLogin(t, s.model);
+    return `<div class="st ${p.offer.length ? "" : "err"}" style="--c:var(${KC[s.does]})"><div class="nm">${s.name}<i>${s.does}</i></div>${onLine(t, s.model)}
+      ${s.only ? '<div class="on">runs only for protected files</div>' : ""}<div class="cap">at most <input type="number" min="1" max="9" value="${cap(t, s.key)}" data-cap="${s.key}" aria-label="${s.name}: sessions at once"> at once</div>
+      ${here.length ? `<ul>${here.map(w => `<li><a>${w[0]}</a><span>${w[2]}</span></li>`).join("")}</ul>` : `<div class="none">nothing here now</div>`}</div>`;
+  }).join("");
+  const you = t.work.filter(w => w[1] === "you");
+  h += `<div class="st you" style="--c:var(--soft)"><div class="nm">You<i>waiting</i></div><div class="on">answered on your Queue</div>${you.length ? `<ul>${you.map(w => `<li class="wait"><a>${w[0]}</a><span>${w[2].split(" · ")[0]}</span></li>`).join("")}</ul>` : `<div class="none">nothing waits on you</div>`}</div></div>`;
+  h += `<div class="side"><div class="card"><h5>Audits, on a clock</h5>${f.audits.length ? f.audits.map(a => `<div class="row"><span>${a[0]}</span><span class="m">${a[1]}</span><span>${a[2]} · next ${a[3]}</span></div>`).join("") : `<div class="row"><span style="color:var(--off)">this flow has none</span></div>`}</div>
+    <div class="card"><h5>Support, started when needed</h5>${SUPPORT.map(s => `<div class="row"><span>${s[0]}</span><span class="m">${s[1]}</span><span>${s[2]}</span></div>`).join("")}</div></div>`;
+  h += `<div class="pick" style="margin-top:10px">Whole team: at most <input type="number" min="1" max="20" value="${t.total}" id="total" aria-label="sessions at once, whole team"> sessions at once, audits and support included.</div>`;
+
+  // 2. logins
+  h += `<h3>Logins, in order <small>saved at once</small></h3><p class="lead">Each session starts on the first login in this list that offers its stage's model and is usable right now. A session whose login reaches its reserve or a limit moves to the next one. Logins are made and signed in on the Tools page.</p><div class="card">`;
+  h += t.logins.map((n, i) => { const l = LOGINS[n], cls = { ok: "s-ok", wait: "s-wait", bad: "s-bad" }[l.state];
+    return `<div class="lg ${l.state === "ok" ? "" : "unus"}"><span class="ord">${i + 1}</span><span class="mv"><button class="ic" data-up="${i}" ${i ? "" : "disabled"} aria-label="move ${n} up">▲</button><button class="ic" data-down="${i}" ${i < t.logins.length - 1 ? "" : "disabled"} aria-label="move ${n} down">▼</button></span>
+      <span><b>${n}</b>${l.metered ? '<span class="money">metered: spends money</span>' : ""}<small>${l.tool} · ${l.acct}</small></span>
+      <span class="c3 mono" style="font-size:12.5px">${l.models.join(" · ") || "—"}</span>
+      <span class="c4 ${cls}">${l.state === "ok" ? "usable" : l.state === "wait" ? "passed over" : "not usable"}<small>${l.note}</small></span>
+      <button class="ic" data-rm="${i}" aria-label="remove ${n}">×</button></div>`; }).join("");
+  const rest = Object.keys(LOGINS).filter(n => !t.logins.includes(n));
+  h += `<div class="addl">${rest.length ? `<label for="al">Add a login</label><select id="al"><option value="">choose…</option>${rest.map(n => `<option value="${n}">${n} (${LOGINS[n].tool}: ${LOGINS[n].models.join(", ") || "not signed in"})</option>`).join("")}</select>` : "Every login on this host is in the list."}<button class="lnk" data-act="tools">Open the Tools page</button></div></div>`;
+  h += `<div class="need"><small>What ${t.flow} needs, and where each model runs now:</small>` + flowModels(f).map(m => { const p = pickLogin(t, m);
+    return `<div class="${p.offer.length ? "" : "no"}"><span class="m">${m}</span>${!p.offer.length ? "no login in the list offers it" : p.hit ? `${p.hit}${p.skipped.length ? ` <small>(${p.skipped.join(", ")} passed over)</small>` : ""}${p.offer.length > 1 + p.skipped.length ? ` <small>then ${p.offer.slice(p.offer.indexOf(p.hit) + 1).join(", ")}</small>` : ""}` : `waits: ${p.skipped.join(", ")} not usable now`}</div>`; }).join("") + `</div>`;
+
+  // 3. when it runs
+  const s = t.set, sel = (k, opts) => `<select data-set="${k}">${opts.map(o => `<option value="${o[0]}" ${s[k] === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select>`;
+  h += `<h3>When it runs <small>saved at once</small></h3><div class="card">
+    <div class="set"><span>Starts</span>${sel("start", [["hand", "when I press Start"], ["reset", "at each week's reset"]])}<span>${s.start === "reset" ? "next: Thu 07:00, read from the first login in the list" : "nothing starts it but you, or work appearing (below)"}</span></div>
+    <div class="set"><span>Stops</span><input type="text" data-set="until" value="${s.until}" placeholder="never"><span>${s.until ? "no session is started after this; those running finish their stage" : "runs until you wind it down"}</span></div>
+    <div class="set"><span>When work appears</span>${sel("onwork", [["start", "start the team"], ["ask", "ask me"], ["off", "do nothing"]])}<span>for a stopped team whose repo gains an entry it could take</span></div>
+    <div class="set"><span>Reserve priority</span><input type="text" data-set="prio" value="${s.prio}"><span>${+s.prio ? `stops ${s.prio} points before each login's reserve, so other teams keep the rest` : "runs up to each login's reserve"}</span></div>
+    <div class="set"><span>Hold new work</span><span class="inl"><input type="checkbox" data-set="hold" ${s.hold ? "checked" : ""} aria-label="hold new work"> while more than <input type="text" data-set="holdn" value="${s.holdn}"> pull requests are open, or one is older than <input type="text" data-set="holdd" value="${s.holdd}"></span><span>${s.hold ? "entries already in a stage carry on; no new entry is taken · now 4 open, oldest 19h" : "off"}</span></div></div>`;
+
+  // 4. the team
+  h += `<h3>The team</h3><div class="card">
+    <div class="set"><span>Name</span><span class="mono">${D.team}</span><span>fixed once made</span></div>
+    <div class="set"><span>Repo</span><span class="mono">${t.repo}</span><span>one team works one repo; a repo may have several teams</span></div>
+    <div class="set"><span>Runs on</span><span class="mono">${t.host}</span><span>its logins are this host's</span></div>
+    <div class="set"><span></span><span><button class="quiet" data-act="del" ${t.running ? "disabled" : ""}>Delete team</button></span><span>${t.running ? "wind it down first" : "its entries stay in the ledger"}</span></div></div>`;
+  document.getElementById("main").innerHTML = h;
+}
+
+function switchPanel(t) {
+  const to = FLOWS[D.pending], keys = to.stages.map(s => s.key), why = cannot(t, D.pending);
+  const rows = t.work.map(w => {
+    if (w[1] === "you") return `<tr><td>${w[0]}</td><td>waits on you</td><td class="stay">still waits on you; your answer picks from ${D.pending}'s stages</td></tr>`;
+    const from = FLOWS[t.flow].stages.find(s => s.key === w[1]).name;
+    return keys.includes(w[1]) ? `<tr><td>${w[0]}</td><td>in ${from}</td><td class="stay">stays in ${from}; its session carries on</td></tr>`
+      : `<tr><td>${w[0]}</td><td>in ${from}</td><td class="go">${D.pending} has no ${from}: its session is ended and the entry comes to you, to say which stage takes it</td></tr>`;
+  }).join("");
+  const n = t.work.filter(w => w[1] !== "you" && !keys.includes(w[1])).length;
+  return `<div class="sw"><h4>Switch ${D.team} from ${t.flow} to ${D.pending}?</h4>
+    ${why ? `<p class="probs">${D.team} cannot run ${D.pending}: ${why}. Add one to the list below first.</p>` : rows ? `<table>${rows}</table><p>${n ? `${n} ${n === 1 ? "entry comes" : "entries come"} to your Queue. Their pull requests stay open.` : "Nothing comes to you."} New entries start in ${D.pending} from now on. Sessions-at-once counts are kept for stages of the same name.</p>` : `<p>No entry is in a stage, so nothing moves.</p>`}
+    <div class="btns"><button class="pri" data-act="switch" ${why ? "disabled" : ""}>Switch now</button><button class="quiet" data-act="noswitch">Keep ${t.flow}</button></div></div>`;
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-team],[data-act],[data-up],[data-down],[data-rm]"); if (!b) return;
+  const t = T(), d = b.dataset;
+  if (d.team) { D.team = d.team; D.pending = null; return save(); }
+  if (d.up !== undefined || d.down !== undefined) { const i = +(d.up ?? d.down), j = d.up !== undefined ? i - 1 : i + 1; [t.logins[i], t.logins[j]] = [t.logins[j], t.logins[i]]; return save("Order saved. It takes effect at each session's start."); }
+  if (d.rm !== undefined) { const n = t.logins.splice(+d.rm, 1)[0]; return save(`${n} removed. Sessions running on it finish their stage.`); }
+  if (d.act === "switch") { const keys = FLOWS[D.pending].stages.map(s => s.key); t.work = t.work.map(w => w[1] === "you" || keys.includes(w[1]) ? w : [w[0], "you", "asked just now · " + t.flow + " → " + D.pending]); t.flow = D.pending; D.pending = null; return save("Switched."); }
+  if (d.act === "noswitch") { D.pending = null; return save(); }
+  if (d.act === "run") { t.running = !t.running; return save(t.running ? "Started." : "Winding down: sessions finish their stage, nothing new starts."); }
+  if (d.act === "flows") return toast("Opens this flow on the Flows page.");
+  if (d.act === "tools") return toast("Opens the Tools page.");
+  if (d.act === "new") return toast("New team: a name, a repo and a flow, then this page.");
+  if (d.act === "del") return toast("Asks once, then removes the team.");
+});
+document.addEventListener("change", (e) => {
+  const el = e.target, t = T();
+  if (el.id === "fp") { D.pending = el.value === t.flow ? null : el.value; return save(); }
+  if (el.id === "al" && el.value) { t.logins.push(el.value); return save(`${el.value} added at the end of the list.`); }
+  if (el.id === "total") { t.total = Math.max(1, +el.value || 1); return save("Saved."); }
+  if (el.dataset.cap) { t.caps[el.dataset.cap] = Math.max(1, +el.value || 1); return save("Saved. It applies from the next session started."); }
+  if (el.dataset.set) { t.set[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; return save("Saved."); }
+});
+draw();
+</script>
