@@ -41,10 +41,13 @@
    the field, `supervised`); of the target (whose agent the send path checks first) its `seat`'s trigger and, when the sender names a
    controller, the same own-end fields; of a reply, the replied entry's sender read the same way (TD-1116),
    fields a start writes, never a role, team or project.
-   **A flow is not on the record** (§4.9c): the host agent never reads a flow, the record gains
-   no flow or stage field, and no rule keys on a flow or on a stage's `name` — a flow compiles,
-   at a client, into fields a start already writes (`lane`, `review`, `prompt_from`), and the
-   tick reads those. `relaunch: {at, lane, review, profile}`, `sit_out: {at}` and `closed_for: {why: sit_out}` are
+   **A stage is on a record of its own, never on a session's** (§4.9c *The stage record*, TD-1954):
+   where an entry is in its flow is one file per entry on the repo's `shiftlead/state` branch,
+   written only by the end-of-stage command and the home's use of the same writer, and the tick
+   moves an entry only as §4.9c *The home acts only where no session will* lists. A session's
+   record gains no flow or stage field, and the mail gate keys on neither. Until the cut-over
+   (§4.9c *What this replaces*) a flow of the first shape compiles, at a client, into fields a
+   start already writes (`lane`, `review`, `prompt_from`), and the tick reads those. `relaunch: {at, lane, review, profile}`, `sit_out: {at}` and `closed_for: {why: sit_out}` are
    marks a person's act writes (the `relaunch` RPC, a person's own), and the tick reads them as
    marks — a restart's second trigger, a record to close and then pass over — never as a flow.
 10. A report entry the session declared is never overwritten by one the host agent derived; a

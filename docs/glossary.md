@@ -106,21 +106,39 @@ not mix:
 - **project** — a heading on repos that belong together; a repo sits in at most one, and a repo in
   none is its own heading. Only the mail gate and the brief's Project block act on it. — *proposed*
   (ADR 2026-09-13); a heading on repos **decided** 2026-10-15 (Paul, TD-722).
-- **flow** — the path a team's work takes through its roles, and the words that describe it, defined
-  once and reused by every team that lists it: an ordered list of **stages**, each a role, the lane
-  it gives and its **stage brief** (the built-in `td`: design → build → review, then the person, who
-  is no stage). A team lists the flows it may run; which one it runs now is a setting the person
-  turns, and **Apply** moves the running team onto a switch. Per team, never per entry; nothing keys on it at runtime.
-  *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; design §4.9c, TD-307).
-- **stage** — one step of a flow: a role, the lane it gives that role's members, and the stage brief
-  that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
-  A stage is not a state; its name and colour are the **stage chip** a claim in it shows on *TDs in motion* (design §4.9c *A claim's chip is its stage*). —
-  *proposed* 2026-10-04 (design §4.9c).
-- **path set** — a named list of a repo's held paths (`.shiftlead.yml` `held: {<name>: […]}`), which a review stage names as the paths it reads (design §4.9c *A review stage any seat may hold*, TD-314). — *proposed* 2026-10-04.
-- **verdict** — the word on a reader's answer to a held PR's `ask`: `pass`, `merged` or `findings`, a field of the reply and never read from its text (design §4.9c, TD-314). — *proposed* 2026-10-04.
-- **sits out** — what a member is while its team's current flow has no stage for its role but another
-  of the team's flows does: not started, or wound down at a switch, its card saying so until a flow
-  that uses it is current again. — *proposed* 2026-10-04 (design §4.9c).
+- **flow** — the path a ledger entry takes from filed to done, written as records: a list of **stages**, a
+  list of **audits** and a model for each **support seat**, in one file a check must pass (design §4.9c,
+  TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `td`, `build-review`,
+  `build`. *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; TD-307), reshaped 2026-11-21 (TD-1954).
+- **stage** — one step of a flow: one kind of work (`design`, `build` or `review`) on one model, done by a
+  fresh session each time an entry enters it, and ended by one of the kind's **outcomes**. An entry is in one
+  stage at a time; its name is the **stage chip** on *TDs in motion*, and its key is the name in lower case with
+  hyphens. — *proposed* 2026-10-04, reshaped 2026-11-21 (design §4.9c).
+- **outcome** — the word a session ends its stage with (`work-pushed`, `not-needed`, `design-needs-changing`,
+  `ship`, `changes-wanted`, or `other` when none fits), reported by `ao stage end` and checked against the facts
+  before it is taken; the flow says where each sends the entry. *Not:* ending, state. — *proposed* 2026-11-21
+  (design §4.9c, TD-1954).
+- **limit** — how many times one entry may take one move between stages before it comes to the person; a
+  flow's total cap, `max-moves`, bounds the whole trip. — *proposed* 2026-11-21 (design §4.9c).
+- **stage record** — where an entry is in its flow: one file per entry on the repo's `shiftlead/state` branch,
+  written only by the end-of-stage command and the home (design §4.9c, §4.4). — *proposed* 2026-11-21.
+- **audit** — a part of a flow that takes no entry: started on a clock (every n merged PRs, hours or days)
+  with a brief (the standard docs, tests or code brief, or one of the person's own) that says where to look, it
+  files each problem as a new entry and fixes nothing. What a hunter
+  or an auditor seat did on a trigger. — *proposed* 2026-11-21 (design §4.9c *Audits start on a clock*).
+- **support seat** — one of the five seats every flow has outside its path: tech lead, board answers, pull
+  requests nobody holds, manager, sweeper. A flow gives each a model and nothing else. — *proposed* 2026-11-21
+  (design §4.9c).
+- **protected files** — the paths a repo's `.shiftlead.yml` lists under `held:`, which a review stage set to
+  run *only when the work touches protected files* reads (design §4.9c *What is the repo's*). The first
+  shape's **path set**, a named list a review stage picked, is read as part of the one list. — *proposed*
+  2026-10-04 as path set, renamed 2026-11-21.
+- **verdict** — a review stage's word on a pull request, `ship` or `changes-wanted`, recorded on its latest
+  push and checked by the end-of-stage command (design §4.9c). Until the cut-over, the first shape's word on a
+  reader's reply, `pass`, `merged` or `findings`. — *proposed* 2026-10-04, reshaped 2026-11-21.
+- **sits out** — the first shape's word for a member whose team's current flow has no stage for its role;
+  nothing sits out under a format-3 flow, where a session is started for an entry (design §4.9c *What this
+  replaces*). — *proposed* 2026-10-04.
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile, and a **kind** (`worker`, `seat`, `manager`, `plain`) — the one fact a flow asks of it
   (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `sweeper`, `manager`,
@@ -160,7 +178,7 @@ not mix:
   do, and the slot says what would make it come. Not a state: the record is `exited` or `closed`.
   — **decided** 2026-09-21 (Paul; *empty* and *available* read as something to do). A manager on
   call reads *on call — comes when a member needs a reading* (TD-247, designed 2026-09-30).
-- **auditor** — a role for a seat with a trigger: checks one area (docs, tests) every n merged
+- **auditor** — the role of an **audit**'s session (design §4.9c); in the first shape, a role for a seat with a trigger: checks one area (docs, tests) every n merged
   PRs or every so often, files what it finds, and ends. Hunter-shaped unless its brief says
   otherwise. — *proposed* 2026-09-21 (design §4.9b *Seats with a trigger*, TD-098).
 - **sweeper** — a role for a seat with a trigger: runs its repo's stranded-work sweep once the
@@ -172,7 +190,7 @@ not mix:
   nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial; a second, on a
   Grok Build profile, is a trial of its own beside it. — *proposed* 2026-10-29 (design §4.9b *The
   fact-check*, TD-857; the second seat *A second model on trial*, TD-1550).
-- **grinder** — a role: resolves each entry it picks from its lane to a merged PR. — *proposed*.
+- **builder** — a role: the session of a build stage, which takes one entry and ends the stage with an outcome (design §4.9c, §4.8). **grinder** is its name until the cut-over: a role that resolves each entry it picks from its lane to a merged PR. — *proposed*; renamed 2026-11-21 (TD-1954).
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
 - **brief** — the job description a session is started with, written from its role's template. The template holds shiftlead's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
