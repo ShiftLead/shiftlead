@@ -808,8 +808,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      lease holds — the entry is its holder's, and a new id a live record of the repo holds such a lease on when
      the reading first finds it (a decided line its sibling claimed before the declaration, which the first
      write leaves out) is written into `lane_seen` untold, so only its release is told, as a dropped lease, and a
-     lease that lapses unreleased is not (TD-899; under a format-3 flow it must be: an entry whose
-     holder's lease lapsed with no outcome is *offered again* to a fresh session of its stage, §4.9c *What this replaces*, which is what TD-899 gains); an entry that came off the board is *has become
+     lease that lapses unreleased is not (TD-899; under a format-3 flow the lane is told nothing either: the home
+     itself offers the entry again to a fresh session of its stage, §4.9c *The home acts only where no session will*); an entry that came off the board is *has become
      pickable*, above, already. **An exited or closed member is not written to**, and its
      `lane_seen` is kept all the same: what its lane gains while it is gone is rule 8's once its
      team has wound down. A finished member closed while the team runs on — by rule 9's pass, by

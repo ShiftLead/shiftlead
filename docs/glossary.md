@@ -121,7 +121,7 @@ not mix:
 - **limit** — how many times one entry may take one move between stages before it comes to the person; a
   flow's total cap, `max-moves`, bounds the whole trip. — *proposed* 2026-11-21 (design §4.9c).
 - **stage record** — where an entry is in its flow: one file per entry on the repo's `shiftlead/state` branch,
-  written only by the end-of-stage command and the home (design §4.9c, §4.4). — *proposed* 2026-11-21.
+  written only by the home, which the end-of-stage command calls (design §4.9c, §4.4). — *proposed* 2026-11-21.
 - **audit** — a part of a flow that takes no entry: started on a clock (every n merged PRs, hours or days)
   with a brief (the standard docs, tests or code brief, or one of the person's own) that says where to look, it
   files each problem as a new entry and fixes nothing. What a hunter

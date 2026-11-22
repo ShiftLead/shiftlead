@@ -43,7 +43,7 @@
    fields a start writes, never a role, team or project.
    **A stage is on a record of its own, never on a session's** (§4.9c *The stage record*, TD-1954):
    where an entry is in its flow is one file per entry on the repo's `shiftlead/state` branch,
-   written only by the end-of-stage command and the home's use of the same writer, and the tick
+   written only by the home, which the end-of-stage command calls, and the tick
    moves an entry only as §4.9c *The home acts only where no session will* lists. A session's
    record gains no flow or stage field, and the mail gate keys on neither. Until the cut-over
    (§4.9c *What this replaces*) a flow of the first shape compiles, at a client, into fields a
