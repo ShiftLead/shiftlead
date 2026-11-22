@@ -1107,6 +1107,13 @@ def held_map(
     return out
 
 
+def held_build_words(tid: str, design: str, repo: str) -> str:
+    """A lift of a held build alone, refused (§4.4 *Go now lifts the design and its builds*, §4.10 *An `ask` that
+    lifts the person's gate*, TD-2027): *TD-a waits on TD-<design>'s question: answer it there*, the design bare in
+    the build's own repo."""
+    return f"{tid} waits on {design.removeprefix(f'{repo}#')}'s question: answer it there"
+
+
 def go_builds(held: Mapping[str, str], entries: Mapping[str, Mapping[str, Any]]) -> dict[str, list[str]]:
     """Each design with a question's held builds as bare ids in key order (`_key_sort`), `{design: [TD-a, …]}`, from
     `held_map`'s `{build: design}` (§4.4 *A design's question is asked once, on the design*, TD-2026): the `go_builds`

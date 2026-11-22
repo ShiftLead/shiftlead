@@ -208,3 +208,93 @@ def test_only_the_gates_person_lifts_it(repo):
     git(repo, "push", "-q", "origin", "main")
     with pytest.raises(board.Refused, match="only paul lifts paul's hold"):
         board.lift_on_press(repo, "TD-190")
+
+
+# -- Go now: a design's lift with its held builds (design §4.4 *Go now lifts the design and its builds*, TD-2027) ---
+
+ROUNDS = (
+    "decide 2026-11-05 (session `designer-ao-1` on kmaster) — **Should the grinders build TD-190?** Say. "
+    "Context: TD-190 decision (paul). Parts: TD-191, TD-192. Due: 2026-11-06. Answers: Go | One more round."
+)
+ROUNDS_DECIDED = ROUNDS.replace("Answers: Go | One more round.", "Answers: Go | One more round. "
+                                "Decided: One more round (by paul) (2026-11-15).")  # fmt: skip
+
+
+def _design(root: Path, items: list[str]) -> None:
+    """TD-190 a design whose builds TD-191 and TD-192 are `Part of` it, each carrying `decision (paul)`."""
+    _push(root, items, {
+        190: _entry(190, "A design"),
+        191: _entry(191, "A build", "**Part of:** TD-190\n"),
+        192: _entry(192, "Another build", "**Part of:** TD-190\n"),
+    })  # fmt: skip
+
+
+def _gated(root: Path, n: int) -> bool:
+    return "**Blocked by:** decision (paul)" in git(root, "show", f"origin/main:docs/ledger/TD-{n}.md")
+
+
+@pytest.mark.parametrize("decided", [False, True], ids=["no-line", "decided-line"])
+def test_go_now_lifts_the_design_and_each_build_in_one_commit(repo, decided):
+    """One commit lifts the design's gate and each build's, each by `plan_lift` with *go ahead*, the subject naming
+    the builds; with no line each lift's suffix is `no board item`, and a decided end-of-rounds line covering the
+    set alone is case (b), closed `— lifted.`, no suffix on any; ledgerboard's tripwire passes either way."""
+    _design(repo, [ROUNDS_DECIDED] if decided else [])
+    before = git(repo, "rev-parse", "origin/main")
+    got = board.lift_on_press(repo, "TD-190", builds=["TD-191", "TD-192"])
+    assert got["lifted"] is True and got["builds"] == ["TD-191", "TD-192"]
+    assert got["message"] == "shiftlead: lift decision (paul) on TD-190 and its builds TD-191, TD-192 (session n/a)"
+    _landed(repo)
+    assert git(repo, "rev-list", "--count", f"{before}..origin/main") == "1"
+    for n in (190, 191, 192):
+        assert not _gated(repo, n)
+        line = _lift_line(git(repo, "show", f"origin/main:docs/ledger/TD-{n}.md"))
+        assert line.endswith('answer "go ahead"' if decided else 'answer "go ahead"; no board item'), line
+    if decided:
+        assert got["closed"] == [ref_of(ROUNDS_DECIDED)] and _item(repo, ROUNDS_DECIDED).closed[1] == "lifted"
+
+
+def test_go_now_with_an_open_end_of_rounds_line_is_case_d_over_the_set(repo):
+    """Case (d) read over the set: an open undecided item covering the design and its builds alone lists no entry
+    outside the set, so it asks the hold — refused, nothing written."""
+    _design(repo, [ROUNDS])
+    head = git(repo, "rev-parse", "origin/main")
+    with pytest.raises(board.Refused, match=f"TD-190's hold is asked on {ref_of(ROUNDS)}: answer it there"):
+        board.lift_on_press(repo, "TD-190", builds=["TD-191", "TD-192"])
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+
+
+def test_go_now_claim_on_one_build_is_case_bs_holder(repo):
+    """(b)'s holder test reads a claim on any entry of the set: the caller hands it as the entry's holder."""
+    _design(repo, [ROUNDS_DECIDED])
+    with pytest.raises(board.Refused, match="is being acted on by grinder-ao-2"):
+        board.lift_on_press(
+            repo, "TD-190", entry_holder={"id": "x", "name": "grinder-ao-2"}, builds=["TD-191", "TD-192"]
+        )
+
+
+@pytest.mark.parametrize("how", ["ungated", "archived"])
+def test_go_now_whose_build_changed_at_origin_is_refused_and_writes_nothing(repo, how):
+    """A build ungated or archived at origin's head between the read and the write: `BuildsChanged`, the tree reset,
+    origin untouched; the design ungated there is `{gone: true}`."""
+    _design(repo, [])
+    led = repo / "docs" / "ledger"
+    if how == "ungated":
+        (led / "TD-192.md").write_text(_entry(192, "Another build", "**Part of:** TD-190\n").replace(
+            "**Blocked by:** decision (paul)\n", ""))  # fmt: skip
+    else:
+        (led / "archive").mkdir(exist_ok=True)
+        git(repo, "mv", "docs/ledger/TD-192.md", "docs/ledger/archive/TD-192.md")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "a build changed")
+    git(repo, "push", "-q", "origin", "main")
+    head = git(repo, "rev-parse", "origin/main")
+    with pytest.raises(board.BuildsChanged, match="TD-190's builds changed: read the card again"):
+        board.lift_on_press(repo, "TD-190", builds=["TD-191", "TD-192"])
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+    assert _gated(repo, 190) and _gated(repo, 191)
+    (led / "TD-190.md").write_text(_entry(190, "A design").replace("**Blocked by:** decision (paul)\n", ""))
+    git(repo, "commit", "-qam", "the design lifted elsewhere")
+    git(repo, "push", "-q", "origin", "main")
+    assert board.lift_on_press(repo, "TD-190", builds=["TD-191"]) == {"gone": True}
