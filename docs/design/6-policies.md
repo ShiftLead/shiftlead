@@ -494,6 +494,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      alone reads no word, and a held seat is filled on its standing cause on the next pass, its mail intact — a seat the person
      killed, `exited` rather than closed, keeps its mail through the Start as a closed one does (the Start's
      `keep_mail` asks for a held holder in either state).
+     (For a team that is not switched; a switched team's rule is *Schedule*'s *After the cut-over*.)
      A team stopped by its stop time is not started again by its schedule (`_schedule_start` starts only a team
      that reads wound down), so its seats hold until the person's Start, while one that wound down by its stop
      time is started by the schedule at a reset, which lifts the hold; a wound-down team is started by rule 8 for lane news
@@ -2736,7 +2737,14 @@ teams:
   records — never started by a person on this home, or its cards forgotten, which deletes them —
   starts nothing: **a schedule restarts a team a person once started and never invents one**, so the
   briefs a scheduled team runs are the ones its last person-pressed start read, and a brief change
-  is a person's `ao team start`. A kill or a person's Close is never undone, as rule 1 says. With
+  is a person's `ao team start`. **After the cut-over** (§4.9d *When it runs*, TD-1153) this paragraph
+  holds for a team that is not switched, and a switched team has one rule, stated here and nowhere
+  else: at the reset the schedule sets the started mark of a team that is **not started** and either
+  **has no `stopped` record** (it was never started: a switched team has no launch records to replay,
+  and its flow and briefs are read at each session's start, so nothing is invented by starting it) or
+  whose **`stopped.by` is the stop time**; it leaves alone a team that is started and one whose
+  `stopped.by` is the person, which waits for the person's Start. Either way the reset counts as
+  fired. A kill or a person's Close is never undone, as rule 1 says. With
   the ledger still empty each member runs once, declares `none`, and the team winds down again. The
   team card says it (§4.5a *starts* note); `ao schedule` (§4.7) and the Settings page's **schedule**
   field set and clear it (the field's shape is §4.5a *Settings page: Teams*; TD-1346). A rule on a **metered** profile (§4.2a) waits on that profile's own spend reading, which has no account to fall back on and is kept only while some session — anyone's — runs under that profile, so with none running a wound-down team's rule has no reset to wait for and fires nothing; the field offers no such profile. A start time for one session is **Start time**,
@@ -2760,10 +2768,12 @@ teams:
   nothing more for the team until a Start. A stage record whose holder the stop ended is not lost
   (§4.9c *The home acts only where no session will*): it stays in its stage and is offered again at
   the next Start, spending no offer; an audit's run it killed is not counted as that audit's one loss.
-  The home writes `stopped: {at, by}` beside the mark. **Who may start a stopped team**: the person's Start starts any
-  team; *Schedule*'s start at a reset starts a team its stop time stopped and one not yet started once,
-  and never one the person wound down. A stop time is one instant and is spent once it has passed: a
-  Start after it is not stopped by it again (§4.9d *Start and Wind down*). **Rule 8's start for work and
+  **The stop time writes `stopped: {at, by}` only when it clears a set mark**: an instant that passes on
+  a team that is not started is spent and writes nothing, so it never overwrites a stop the person made;
+  a Start, the person's or the schedule's, deletes `stopped`. **Who may start a stopped team** is the
+  person, always, and the schedule by the one rule *Schedule* gives (*After the cut-over*, above). A stop
+  time is one instant and is spent once it has passed: a Start after it is not stopped by it again
+  (§4.9d *Start and Wind down*). **Rule 8's start for work and
   `teams.<team>.on_work` are the first shape's and go at the cut-over**: a started format-3 team holds
   no session while it has no work and takes an entry as soon as one is pickable, so no team winds down
   for lack of work and nothing is left for the setting to decide. **Wind down** is the softer stop: it clears the mark and ends
