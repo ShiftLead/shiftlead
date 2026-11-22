@@ -3291,7 +3291,8 @@ def ledger_for_you(
     origins = {n: lb.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
     # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
     held_of = queue_mod.held_map(opens, boards, linked)
-    work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held_of, opens)
+    resolve = queue_mod.item_resolver(origins)
+    work = queue_mod.with_held(queue_mod.open_work(opens, resolve), held_of, opens, resolve)
     go = queue_mod.go_builds(held_of, opens)  # each design with a question's held builds, its row's `go_builds`
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
