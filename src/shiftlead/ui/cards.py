@@ -646,6 +646,7 @@ def view(
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
     d["start_note"] = start_note(s)  # §6 *Start time*, §4.5a **starts** note (TD-152): a scheduled record's
+    d["starting"] = starting(s, now)  # its start due, drawn as the wait from the record (§4.5 screen 6 rule 2, TD-1997)
     d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
     # §4.5a card **routed around** line (§4.9b, TD-1443): an `asks` seat the home reads unable says where its
     # questions go meanwhile; display only, gone once it is able. The why on hover.
@@ -1019,6 +1020,26 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     if node and s.get("relaunch") and s.get("state") == "idle":
         return {"text": NODE_RESTART, "full": f"{NODE_RESTART}: the tick does not restart a member on a node"}
     return None
+
+
+# how long past its `start_at` a scheduled record is drawn as starting: the tick, every 2 s, starts it well inside it
+STARTING_FOR = timedelta(seconds=20)
+
+
+def starting(s: Mapping[str, Any], now: datetime) -> bool:
+    """A scheduled record whose start is due (§4.5 screen 6 rule 2 *A press with no row*, screen 12 *Start
+    session*, TD-1997): `scheduled`, its `start_at` at most 20 s past and no `restart_ceiling` set (the tick skips a
+    ceilinged record). Its Focus page draws Start now *starting…* and its time badge off, and looks every 2 s, so the
+    wait is drawn from the record, never from the browser; 20 s on with the record still scheduled, it is pressable."""
+    if s.get("state") != "scheduled" or s.get("restart_ceiling") or not s.get("start_at"):
+        return False
+    try:
+        at = datetime.fromisoformat(str(s["start_at"]).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    return at <= now <= at + STARTING_FOR
 
 
 def restarted_view(restarts: Any, now: datetime, ceiling: Any = None) -> dict[str, str] | None:

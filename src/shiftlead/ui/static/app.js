@@ -1259,12 +1259,13 @@
     return `press:${act}:${target}${one ? `:${one}` : ""}`;
   };
   AO.pressMarked = (b) => !!b && b.getAttribute?.("aria-disabled") === "true";
-  AO.markPress = (b, key) => {
+  // `keep`: a twin that is a different control under the same key keeps its label too (a time move's Start now)
+  AO.markPress = (b, key, keep) => {
     if (!b || b.dataset.pressMark) return;
     b.dataset.pressMark = "1";
     b.setAttribute?.("aria-disabled", "true");
     b.setAttribute?.("aria-busy", "true");
-    if (b.classList?.contains("badge") || b.classList?.contains("chip")) return;  // keeps its words
+    if (keep || b.classList?.contains("badge") || b.classList?.contains("chip")) return;  // keeps its words
     const label = b.textContent || "";
     b.dataset.pressLabel = label;
     if (b.offsetWidth) b.style.minWidth = `${b.offsetWidth}px`;
@@ -1362,6 +1363,9 @@
     if (act === "start") return AO.pressContainer(b).startsWith("#card-");
     return ["grants", "uncontrol", "drop"].includes(act) && location.pathname.startsWith("/focus/");
   };
+  // a twin that is a different control under the same key: the scheduled Focus page's time badge (`data-ask`) and its
+  // Start now (`data-at="now"`) — off and `aria-busy`, its own label kept, so a time move never reads *starting…*
+  const otherShape = (el, f) => f.act === "start" && !!el.dataset.ask !== !!f.ask;
   // the press begins: its control and twins marked, the containers they sit in snapshotted before the mark's writes
   AO.pressBegin = (b, key) => {
     const mk = AO.pressMarkKey(b);
@@ -1380,7 +1384,8 @@
       });
     }
     const menu = b.closest?.("details.more");
-    const f = { kind: "press", act: b.dataset.act, pair, inMenu: !!menu, delta, conts, sums: [], answered: false, effect: false, timer: null };
+    const f = { kind: "press", act: b.dataset.act, pair, inMenu: !!menu, delta, conts, sums: [], answered: false, effect: false, timer: null,
+      ask: !!b.dataset.ask };
     AO.inflight[mk] = f;
     const focused = document.activeElement === b;
     AO.markPress(b, key);
@@ -1389,7 +1394,7 @@
       if (focused) summaryOf(b)?.focus?.({ preventScroll: true });
     }
     // each twin shows its own verb by the same order: its `data-verb`, the table, its own label with `…`
-    twins.forEach((el) => AO.markPress(el, el.dataset.act));
+    twins.forEach((el) => AO.markPress(el, el.dataset.act, otherShape(el, f)));
     return mk;
   };
   // the press ends: its key dropped, every control the page draws for it now unmarked, its menu's summary back
@@ -1449,7 +1454,7 @@
           el.textContent = el.dataset.pressVerb;
           return;
         }
-        AO.markPress(el, el.dataset.act);
+        AO.markPress(el, el.dataset.act, otherShape(el, f));
         // a redrawn menu whose entry was the pressed control carries the verb on its summary again
         if (f.inMenu && el.dataset.act === f.act && el.closest?.("details.more")) AO.markSummary(el, el.dataset.pressVerb || el.textContent, f);
       });
@@ -2274,6 +2279,27 @@
       }
       pressed(key === "board_decide" ? body.answer : undefined);
       const res = await act(id, action2 || action, body);
+      // a scheduled Focus page (§4.5 screen 6 rule 2, TD-1997), which wires no delta: its Start now and time move and
+      // its controller chips reload at the response, the reload drawing the effect — a move to now with no toast, the
+      // drawn wait its answer, the others' said once on the loaded page; its Cancel goes where Forget on its own Focus
+      // goes, and in a popped window keeps the page, says it is forgotten and looks no more
+      if (AO.scheduledId && id === AO.scheduledId) {
+        if (action === "start" || action === "uncontrol") {
+          const toNow = action === "start" && String(body.at || "").trim().toLowerCase() === "now";
+          const words = action === "start" ? (res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick")
+            : `under: ${(res.controllers || []).join(", ") || "nobody"}`;
+          if (!toNow) try { sessionStorage.setItem(`ao.focussaid.${id}`, words); } catch (e) { /* the toast is lost */ }
+          moving = true; location.reload(); return;
+        }
+        if (action === "close") {
+          clearInterval(AO.scheduledLook);  // no look reloads the forgotten record under the way out
+          if (!AO.poppedId) { moving = true; location.href = "/"; return; }
+          if (markKey) { AO.pressEnd(markKey); markKey = ""; }
+          ["#fscheduled", "#closebtn"].forEach((sel) => { const el = $(sel); if (el) el.classList.add("hidden"); });
+          AO.focusForgotten(AO.scheduledName || id);
+          return;
+        }
+      }
       if (key === "board_decide") answered(`decided: ${body.answer} · ${AO.today()}`);
       if (action === "restart") {
         // a seat at its fill ceiling: cleared, nothing started — `ao restart`'s words (§4.5a, TD-1422)
@@ -8739,6 +8765,16 @@
       gone(id) { rows = rows.filter((x) => x.id !== id); drawNeeds(); if (open === swEl) drawSwitch(); },
     };
   };
+  // a popped Focus whose record was forgotten says so and stays: the `gone` event's, and a scheduled page's Cancel
+  AO.focusForgotten = (name) => {
+    const b = $("#fbanner");
+    if (b) {
+      b.textContent = "This session was forgotten: its record is gone. Close this window when you are done with it.";
+      b.classList.remove("hidden");
+    }
+    document.title = `${name} · forgotten`;
+    AO.focusIcon({ state_class: "exited" });
+  };
   AO.focus = function (s, popped) {
     const phone = AO.phoneFocus(s, popped);
     // the terminal takes focus from ⌨ alone on a phone, so nothing raises the keyboard unasked (§4.5 *Phone layout*)
@@ -8773,13 +8809,22 @@
     // attach sets no mouse option, so tmux asks for no tracking, a plain drag selects here and
     // Shift+click grows it. The wheel and Shift+PageUp/PageDown reach tmux's history by scroll
     // messages (below); a local buffer would only ever hold stale repaints.
+    // a press that reloaded this page said its toast here, once, on this id's next load (TD-1997)
+    try {
+      const said = sessionStorage.getItem(`ao.focussaid.${id}`);
+      if (said) { sessionStorage.removeItem(`ao.focussaid.${id}`); AO.toast(said, true); }
+    } catch (e) { /* no storage: the toast is lost, the reloaded page still draws the effect */ }
     if (s.state === "scheduled") {
       // §6 *Start time*: no pane yet, so no terminal — the banner stands, and the page looks again
       // while it waits, so the session's terminal appears once the agent has started it
       // — but never under a person's hands: an open dialog (a Message… being written) or a field
-      // with the focus puts the look off until they are done
-      const busy = () => !!document.querySelector("dialog[open]") || ["INPUT", "TEXTAREA"].includes((document.activeElement || {}).tagName);
-      setInterval(() => { if (!busy()) location.reload(); }, 20000);
+      // with the focus puts the look off until they are done, nor while a press is out (TD-1997)
+      AO.scheduledId = id; AO.scheduledName = s.name;
+      const busy = () => !!document.querySelector("dialog[open]") || ["INPUT", "TEXTAREA"].includes((document.activeElement || {}).tagName)
+        || Object.keys(AO.inflight).some((k) => k.startsWith("press:"));
+      // its start due (the view's `starting`), every 2 s until a load finds it started or 20 s past it
+      const due = !!($("#fscheduled") && $("#fscheduled").dataset.starting);
+      AO.scheduledLook = setInterval(() => { if (!busy()) location.reload(); }, due ? 2000 : 20000);
       return;
     }
     // the held press's recorder (TD-1299): each of the terminal's link readers is given its `hover` / `leave`
@@ -10273,13 +10318,7 @@
         // A window never closes itself: closing what a person opened is the person's act (§4.5
         // *Pop out*). A popped one keeps saying why it is empty; a tab's banner fades as it did.
         if (!popped) banner("session removed");
-        else {
-          const b = $("#fbanner");
-          b.textContent = "This session was forgotten: its record is gone. Close this window when you are done with it.";
-          b.classList.remove("hidden");
-          document.title = `${s.name} · forgotten`;
-          AO.focusIcon({ state_class: "exited" });
-        }
+        else AO.focusForgotten(s.name);
       }
     }, `light=1&focus=${encodeURIComponent(id)}`);
   };

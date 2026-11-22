@@ -265,5 +265,10 @@ def test_focus_sets_the_icon_wherever_it_sets_the_title():
     assert titled == [
         ("document.title = AO.focusTitle(s);", "AO.focusIcon(s);"),
         ("document.title = AO.focusTitle(v);", "AO.focusIcon(v);"),
-        ("document.title = `${s.name} · forgotten`;", 'AO.focusIcon({ state_class: "exited" });'),
     ]
+    # the *forgotten* window's, shared by the `gone` event and a scheduled page's popped Cancel (TD-1997)
+    gone = js[js.index("AO.focusForgotten = (name) => {") :]
+    gone = [line.strip() for line in gone[: gone.index("\n  };\n")].splitlines() if line.strip()]
+    i = gone.index("document.title = `${name} · forgotten`;")
+    assert gone[i + 1] == 'AO.focusIcon({ state_class: "exited" });'
+    assert "else AO.focusForgotten(s.name);" in focus
