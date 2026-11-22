@@ -569,7 +569,9 @@ def test_the_row_draws_start_session_or_open_session_while_held(tmp_path, monkey
     assert (rows["TD-156"]["holder"], rows["TD-156"]["why"]) == ("", "yours")  # a closed claimer holds nothing
     html = _render(lf, tmp_path, monkeypatch)
     held, free = _row(html, "ledger:agentorc:TD-319"), _row(html, "ledger:agentorc:TD-156")
-    assert 'data-act="ledger_start" data-id="person" data-repo="agentorc" data-ref="TD-319"' in held
+    assert (
+        'data-act="ledger_start" data-verb="opening…" data-id="person" data-repo="agentorc" data-ref="TD-319"' in held
+    )
     assert ">Open session</button>" in held and ">Start session</button>" not in held
     assert (
         'data-act="ledger_start"' in free and ">Start session</button>" in free and "td-156, in a new worktree" in free

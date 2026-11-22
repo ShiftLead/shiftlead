@@ -1258,13 +1258,13 @@
       : act === "uncontrol" ? d.who || "" : act === "drop" ? d.ref || "" : "";
     return `press:${act}:${target}${one ? `:${one}` : ""}`;
   };
-  AO.pressMarked = (b) => !!b && b.getAttribute("aria-disabled") === "true";
+  AO.pressMarked = (b) => !!b && b.getAttribute?.("aria-disabled") === "true";
   AO.markPress = (b, key) => {
     if (!b || b.dataset.pressMark) return;
     b.dataset.pressMark = "1";
-    b.setAttribute("aria-disabled", "true");
-    b.setAttribute("aria-busy", "true");
-    if (b.classList.contains("badge") || b.classList.contains("chip")) return;  // keeps its words
+    b.setAttribute?.("aria-disabled", "true");
+    b.setAttribute?.("aria-busy", "true");
+    if (b.classList?.contains("badge") || b.classList?.contains("chip")) return;  // keeps its words
     const label = b.textContent || "";
     b.dataset.pressLabel = label;
     if (b.offsetWidth) b.style.minWidth = `${b.offsetWidth}px`;
@@ -1275,8 +1275,8 @@
   AO.unmarkPress = (b) => {
     if (!b || !b.dataset.pressMark) return;
     delete b.dataset.pressMark;
-    b.removeAttribute("aria-disabled");
-    b.removeAttribute("aria-busy");
+    b.removeAttribute?.("aria-disabled");
+    b.removeAttribute?.("aria-busy");
     if ("pressLabel" in b.dataset) { b.textContent = b.dataset.pressLabel; delete b.dataset.pressLabel; b.style.minWidth = ""; }
   };
   // a back or forward return draws the page unmarked: a page-moving press left its control marked as the page went
