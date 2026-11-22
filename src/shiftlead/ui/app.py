@@ -492,9 +492,9 @@ from .queue import (
     covered,
     design_link,
     filter_chips,
-    holds_of,
     item_start,
     items_n,
+    line_holds,
     picks_query,
     queue_picks,
     queue_view,
@@ -2585,7 +2585,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
             def fy_holds(b: dict[str, Any], home: str = "") -> dict[str, Any]:
                 cov = covered(b, fy_entries)
-                return {**b, "covers": cov, "holds": holds_of(b, cov, home, fy_entries, None)}
+                return {**b, "covers": cov, **line_holds(b, cov, home, fy_entries, None)}
 
             for sec, lines in (("needs", boards), ("coming", hz.get("ahead") or [])):
                 for b in lines:
