@@ -292,7 +292,9 @@ def test_the_repo_pages_for_you_draws_the_line_once_and_the_covered_rows_plain(t
     html = _client(tmp_path, monkeypatch, due=due).get("/repo/r").text
     assert html.count('data-copy="board:abc12345"') == 1, "the line is drawn once"
     holds = re.search(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S).group(1)
-    assert re.findall(r">(TD-\d+)</a>", holds) == ["TD-051", "TD-052", "TD-053"]
+    assert re.findall(r">(TD-\d+)</a>", holds) == ["TD-053"], "the held builds are what Go releases (TD-2026)"
+    rel = re.search(r'<div class="st holds releases"[^>]*>(.*?)</div>', html, re.S).group(1)
+    assert rel.startswith("Go releases") and re.findall(r">(TD-\d+)</a>", rel) == ["TD-051", "TD-052"]
     assert html.count('class="brow"') == 1, "the line's row alone draws more than the column's plain row"
     assert 'data-answer="Keep"' not in html, "no covered row draws its own answers"
     assert "Lift the hold" not in html, "nor its Lift the hold: each is the column's plain row"
@@ -355,9 +357,10 @@ def test_the_inbox_page_and_its_poll_name_a_held_member_in_a_coming_lines_holds(
     """`/inbox` and `/api/person/inbox` hand `split_later` the open entries: the line not yet due names TD-053, the
     member it covers by `Part of` alone, in its *holds* line — drawn by neither without them."""
     c = _client(tmp_path, monkeypatch, due=False)
-    assert _member_named(c.get("/inbox").text) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+    # TD-051 and TD-052, its `Parts:`, are the design's held builds: its Go releases them (TD-2026)
+    assert _member_named(c.get("/inbox").text) == ["TD-050", "TD-053"]
     poll = c.get("/api/person/inbox").json()["html"]
-    assert _member_named(" ".join(str(v) for v in poll.values())) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+    assert _member_named(" ".join(str(v) for v in poll.values())) == ["TD-050", "TD-053"]
 
 
 def test_the_queue_page_strips_a_held_members_block_on_another_card(tmp_path, monkeypatch):
