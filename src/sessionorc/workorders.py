@@ -442,10 +442,11 @@ def carried_to(reason: str) -> list[str]:
 def carried(board: ledgerboard.Board) -> list[dict[str, Any]]:
     """The closed decided items that may still hold a member (§4.4 *The boards* `carried`, *The card's status*,
     TD-1368): every closed `decide` item with a `Decided` whose `Context` names an entry, the board's closed items
-    read whole (its archive too), as `{key, ref, decided, decided_by, closed, to, at, refs, parts}`, and
+    read whole (its archive too), as `{key, ref, decided, decided_by, closed, to, at, refs, parts, gate}`, and
     `decided_delegate` and `decided_scope` for a delegated answer alone (v3.4, TD-1939) — `ref` the
     `Context`'s first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts` ids,
-    `closed` `{date, why}` (the item's `Closed` fields, ledgerboard v3.0, TD-1881: `why` '' for none), `to` the
+    `gate` the `Context`'s one gate or None (`_context_gate`, TD-2026), `closed` `{date, why}` (the item's `Closed`
+    fields, ledgerboard v3.0, TD-1881: `why` '' for none), `to` the
     reason's *carried to* or *see* ids, and `at` one index over every item of the board — the open items', then the
     closed ones' after the last open one's."""
     out: list[dict[str, Any]] = []
@@ -474,6 +475,7 @@ def carried(board: ledgerboard.Board) -> list[dict[str, Any]]:
                 "at": n,
                 "refs": refs,
                 "parts": list(it.parts),
+                "gate": ledgerboard._context_gate(it.context or "")[1],  # its Context's one gate (TD-2026)
             }
         )
     return out

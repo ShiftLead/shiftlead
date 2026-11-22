@@ -984,9 +984,10 @@ def lift_here(
 
 def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
     """Every `decide` line of the boards, open (`items`) and closed (`carried`), as one shape: `{repo, key, open,
-    decided, said, by, delegate, scope, refs, parts, closed, to, at, session}` — `decided` None for an open line not
-    yet answered, `said` its `Decided:` words, `delegate` and `scope` a delegated answer's (ledgerboard v3.4, TD-1939:
-    `by` is then the person it answered for), else None."""
+    decided, said, by, delegate, scope, refs, parts, gate, closed, to, at, session}` — `decided` None for an open line
+    not yet answered, `said` its `Decided:` words, `delegate` and `scope` a delegated answer's (ledgerboard v3.4,
+    TD-1939: `by` is then the person it answered for), else None; `gate` its `Context:`'s one gate
+    (`_context_gate`), else None (TD-2026)."""
     out: list[dict[str, Any]] = []
     for repo, bl in boards.items():
         for b in bl or ():
@@ -1002,6 +1003,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                             "said": str(d.get("text") or "") if d else "",
                             "refs": [str(r) for r in it.get("refs") or () if refs(r)],
                             "parts": [str(p) for p in it.get("parts") or ()], "closed": None, "to": [],
+                            "gate": lb._context_gate(str(it.get("context") or ""))[1],
                             "at": int(it.get("at") or 0), "session": str(it.get("session") or "")})  # fmt: skip
             for c in b.get("carried") or ():
                 if not isinstance(c, Mapping) or not isinstance(c.get("decided"), Mapping):
@@ -1011,9 +1013,88 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                             "delegate": c.get("decided_delegate"), "scope": c.get("decided_scope"),
                             "said": str(c["decided"].get("text") or ""),
                             "refs": [str(r) for r in c.get("refs") or ()],
-                            "parts": [str(p) for p in c.get("parts") or ()],
+                            "parts": [str(p) for p in c.get("parts") or ()], "gate": c.get("gate"),
                             "closed": dict(c.get("closed") or {}), "to": [str(t) for t in c.get("to") or ()],
                             "at": int(c.get("at") or 0), "session": ""})  # fmt: skip
+    return out
+
+
+def _line_order(ln: Mapping[str, Any]) -> tuple[Any, ...]:
+    """A line's place among the lines that name one entry (§4.4 *One line answers*): an undecided open line first,
+    then by `Decided:`, open before closed, the later `Closed:`, the later carried-to entry, the greater key —
+    `board_hold`'s order, with the undecided open line it never compares."""
+    closed = (ln.get("closed") or {}).get("date") or ""
+    undecided = bool(ln.get("open")) and ln.get("decided") is None
+    return (undecided, ln.get("decided") or "", bool(ln.get("open")), closed, _carried_rank(ln), ln.get("key") or "")
+
+
+def held_builds(
+    design: Mapping[str, Any],
+    entries: Mapping[str, Mapping[str, Any]],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    linked: Mapping[str, str],
+    *,
+    lines: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """A design's **held builds** (§4.4 *A design's question is asked once, on the design*, TD-2021, TD-2026), as
+    `<repo>#TD-n` in key order: for an open entry (`design`, with its `repo`) carrying `decision (paul)` whose `Owner:`
+    is not the person, the ids its **newest** `decide` line with a `Parts:` — open or closed, decided or not
+    (`_board_lines`, `_line_order`), its `Context:` naming the design alone with that gate — lists in `Parts:`, each
+    a bare id of the design's repo, open in `entries`, `Part of` the design, carrying the gate itself, not the
+    person's own, and named in the `Context:` of no open undecided line of its own. [] for any other entry. `lines`
+    is `_board_lines(boards)`, passed by a caller that reads many designs."""
+    if not ledger_mod.decided_by(dict(design), PERSON) or str(design.get("owner") or "").lower() == PERSON:
+        return []
+    repo = str(design.get("repo") or "")
+    me = qid(repo, str(design.get("id") or ""))
+    key = lb._gate_key(_GATE)
+    lines = _board_lines(boards) if lines is None else lines
+    newest: dict[str, Any] | None = None
+    for ln in lines:
+        if not ln["parts"] or not ln.get("gate") or lb._gate_key(str(ln["gate"])) != key:
+            continue
+        named = {q for r in ln["refs"] if (q := _line_qid(r, ln["repo"], linked))}
+        if named != {me}:
+            continue
+        if newest is None or _line_order(ln) > _line_order(newest):
+            newest = ln
+    if newest is None:
+        return []
+    asked = {  # the entries an open undecided line names in its own `Context:`
+        q
+        for ln in lines
+        if ln.get("open") and ln.get("decided") is None
+        for r in ln["refs"]
+        if (q := _line_qid(r, ln["repo"], linked))
+    }
+    out: list[str] = []
+    for p in newest["parts"]:
+        if "#" in p or newest["repo"] != repo:
+            continue  # one level, the design's repo alone
+        q = _line_qid(p, repo, linked)
+        e = entries.get(q or "")
+        if e is None or q == me or q in out or parent_qid(e) != me:
+            continue
+        if not ledger_mod.decided_by(dict(e), PERSON) or str(e.get("owner") or "").lower() == PERSON:
+            continue
+        if q in asked:
+            continue  # covered by an open undecided line of its own: it reads its own hold
+        out.append(str(q))
+    return sorted(out, key=lambda q: _key_sort(str(entries[q].get("key") or ""), q))
+
+
+def held_map(
+    entries: Mapping[str, Mapping[str, Any]],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    linked: Mapping[str, str],
+) -> dict[str, str]:
+    """`{build: design}` over every design with a question (§4.4 *A design's question is asked once, on the design*,
+    TD-2026): `held_builds` read for each open entry of `entries`, the one reading every reader of the set reads."""
+    lines = _board_lines(boards)
+    out: dict[str, str] = {}
+    for q, e in entries.items():
+        for b in held_builds(e, entries, boards, linked, lines=lines):
+            out.setdefault(b, q)
     return out
 
 
@@ -1522,10 +1603,6 @@ def reading(
             touch[n].add(a_q)
             up[a_q] = n
 
-    # the fact (§4.4 *The card's status*, TD-1926): a `decision (paul)` member's counted open work, on the entry,
-    # read by its rows, Lift, `_own` and `_status`'s `waits`, whatever word a row draws
-    for q, work in open_work(open_, xref).items():
-        open_[q]["open_work"] = work
     # an open member blocked past the org's reach (§4.4 *Blocked*): a decision not the person's, an id in
     # no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading holds open, or an item
     # ledgerboard cannot read
@@ -1604,6 +1681,13 @@ def reading(
         live.setdefault(str(rec.id), str(rec.id))
         live.setdefault(str(getattr(rec, "name", "") or rec.id), str(rec.id))
 
+    # the fact (§4.4 *The card's status*, TD-1926): a `decision (paul)` member's counted open work, on the entry,
+    # read by its rows, Lift, `_own` and `_status`'s `waits`, whatever word a row draws — a design with a question
+    # taking in its held builds' (§4.4 *A design's question is asked once, on the design*, TD-2026), so it is read
+    # once the boards and `linked` are
+    held_by = held_map(open_, boards, linked)
+    for q, work in with_held(open_work(open_, xref), held_by, open_).items():
+        open_[q]["open_work"] = work
     pressing = _pressing(open_, boards, linked)
     # the row each live record's restart row is homed on, where its mark passes the one reader (§4.4 *The card's
     # status*, TD-1856): the claim `holder_claims` picks, as the Inbox's `item_home` picks it — every `holds` qid is
@@ -1831,6 +1915,34 @@ def open_work(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], st
         counted = [w for w in blockers[q] | parts[q] if not held(w) and not reaches(w, q)]
         if counted:
             out[q] = sorted(counted, key=lambda w: _key_sort(str(entries[w].get("key") or ""), w))
+    return out
+
+
+def with_held(
+    work: Mapping[str, list[str]], held: Mapping[str, str], entries: Mapping[str, Mapping[str, Any]]
+) -> dict[str, list[str]]:
+    """`open_work`'s result with each held build's counted open work added to its design's (§4.4 *A design's question
+    is asked once, on the design*, TD-2026): `held` is `held_map`'s `{build: design}`; each design takes in its
+    builds' ids as merged so far, without repeats and in key order (`_key_sort`), a design with none of its own
+    getting the key; a design that is itself a held build is merged before its own design, innermost first, so an
+    outer design takes in the inner one's merged work. A build keeps its own. A copy; `work` is never written."""
+    out = {q: list(ids) for q, ids in work.items()}
+
+    def depth(d: str) -> int:
+        n, seen = 0, {d}
+        while (d := held.get(d, "")) and d not in seen:
+            seen.add(d)
+            n += 1
+        return n
+
+    designs = sorted(set(held.values()), key=lambda d: (-depth(d), d))
+    for d in designs:
+        got = list(out.get(d) or [])
+        for b, of in held.items():
+            if of == d:
+                got += [w for w in out.get(b) or () if w not in got and w != d]
+        if got:
+            out[d] = sorted(got, key=lambda w: _key_sort(str((entries.get(w) or {}).get("key") or ""), w))
     return out
 
 

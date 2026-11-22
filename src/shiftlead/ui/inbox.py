@@ -3289,7 +3289,9 @@ def ledger_for_you(
     covered = queue_mod.open_decided_covers(boards, opens, linked, person_only=True)
     # each `decision (paul)` member's counted open work (§4.4 *The card's status*, TD-1926), by the Queue's builder
     origins = {n: lb.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
-    work = queue_mod.open_work(opens, queue_mod.item_resolver(origins))
+    # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
+    held = queue_mod.held_map(opens, boards, linked)
+    work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held, opens)
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):

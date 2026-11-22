@@ -88,6 +88,7 @@ def test_carried_reads_each_closed_decided_decide_line_that_names_an_entry_with_
         "at": 2,  # one index over the board's items, the open one first
         "refs": ["TD-50"],
         "parts": [],
+        "gate": None,  # its Context's one gate (TD-2026): none here
     }
     assert (second["ref"], second["refs"], second["parts"]) == ("TD-70", ["TD-70", "TD-71"], ["TD-72", "TD-73"])
     assert (second["decided"], second["decided_by"]) == ({"text": "Not yet", "date": "2026-11-04"}, "paul")
