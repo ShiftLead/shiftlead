@@ -1,0 +1,532 @@
+<title>Flows Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a list of flows on the left; the chosen flow's stages as records on the right, with its checks beside the tabs. */
+:root {
+  --page:#E7EBEC; --sheet:#FAFBFB; --field:#FFFFFF; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
+  --ok:#2E8A57; --link:#2D5F86; --warn:#9A6212; --off:#9AA5AA; --bad:#B4432F; --badbg:#FBEDEA;
+  --tag:#FFF1B8; --tagrule:#E2C55A; --note:#FFF7E6; --noterule:#E7C98A;
+  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --merge:#3B8F86;
+  --sans:"IBM Plex Sans", system-ui, sans-serif; --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page:#161B1E; --sheet:#1F262A; --field:#262E33; --ink:#E4EAEC; --soft:#9AA8AF; --rule:#3B474D; --rule2:#2E383D;
+  --ok:#5CBF8A; --link:#7FB4DD; --warn:#E0A548; --off:#6C7A81; --bad:#F08A76; --badbg:#3A2420;
+  --tag:#4A4016; --tagrule:#7A6A22; --note:#332A14; --noterule:#6B5620;
+  --design:#8E8EF0; --build:#5AA9DD; --review:#DDA04A; --find:#E083B4; --merge:#62B8AE; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --page:#161B1E; --sheet:#1F262A; --field:#262E33; --ink:#E4EAEC; --soft:#9AA8AF; --rule:#3B474D; --rule2:#2E383D;
+  --ok:#5CBF8A; --link:#7FB4DD; --warn:#E0A548; --off:#6C7A81; --bad:#F08A76; --badbg:#3A2420;
+  --tag:#4A4016; --tagrule:#7A6A22; --note:#332A14; --noterule:#6B5620;
+  --design:#8E8EF0; --build:#5AA9DD; --review:#DDA04A; --find:#E083B4; --merge:#62B8AE; color-scheme:dark }
+* { box-sizing:border-box; }
+body { background:var(--page); color:var(--ink); font:15px/1.5 var(--sans); }
+.wrap { max-width:1240px; margin:0 auto; padding-block:22px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+.banner { background:var(--note); border:1px solid var(--noterule); border-radius:4px; padding:8px 12px; font-size:13px; margin-bottom:14px; }
+header.top { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:10px; }
+header.top h1 { font-size:32px; line-height:1; margin:0; font-weight:700; }
+header.top span { color:var(--soft); font-size:14px; }
+.cols { display:grid; grid-template-columns:220px minmax(0,1fr); gap:28px; margin-top:20px; }
+@media (max-width:820px) { .cols { grid-template-columns:minmax(0,1fr); } }
+.mono { font-family:var(--mono); }
+button, select, input { font:inherit; color:var(--ink); }
+button { font-size:13px; background:none; border:1px solid var(--ink); border-radius:3px; padding:3px 12px; cursor:pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid var(--link); outline-offset:1px; }
+button.quiet { border-color:var(--rule); color:var(--soft); }
+button.pri { background:var(--ink); color:var(--page); }
+button[disabled] { border-color:var(--rule); color:var(--off); background:var(--rule2); cursor:default; }
+button.ic { border-color:transparent; padding:0 5px; color:var(--off); font-size:14px; }
+button.ic:hover { color:var(--ink); }
+select, input[type=text], input[type=number] { background:var(--field); border:1px solid var(--rule); border-radius:3px; padding:1px 6px; font-size:13px; }
+input[type=number] { width:48px; text-align:center; font-family:var(--mono); font-weight:600; }
+.bad-f { border-color:var(--bad) !important; background:var(--badbg) !important; }
+
+nav h4 { margin:16px 0 4px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+nav h4:first-child { margin-top:0; }
+nav a.fl { display:block; padding:5px 10px; border-radius:4px; cursor:pointer; font:500 14px var(--mono); border:1px solid transparent; }
+nav a.fl small { display:block; font:400 12.5px var(--sans); color:var(--soft); }
+nav a.fl.sel { background:var(--sheet); border-color:var(--rule); box-shadow:inset 3px 0 0 var(--ink); }
+nav a.fl .dot { color:var(--bad); }
+nav .pal { display:block; font-size:13.5px; font-weight:500; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); border-radius:4px; padding:3px 8px; margin-bottom:4px; cursor:grab; }
+nav .pal i { margin-left:auto; font-style:normal; font-weight:400; font-size:12px; color:var(--off); }
+nav p { font-size:12.5px; color:var(--soft); margin:2px 0 6px; line-height:1.4; }
+nav button.new { margin-top:8px; }
+
+.fhead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.fhead h2 { margin:0; font-size:24px; font-weight:600; }
+.fhead input.fname { font:600 22px var(--sans); width:260px; max-width:100%; }
+.tagc { font-size:12.5px; border:1px solid var(--rule); border-radius:10px; padding:0 9px; color:var(--soft); background:var(--sheet); }
+.fhead .act { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.probs { color:var(--bad); font-size:13px; }
+.okk { color:var(--ok); font-size:13px; }
+.lim { display:flex; gap:18px; flex-wrap:wrap; align-items:center; font-size:13.5px; color:var(--soft); margin:10px 0 12px; }
+.tabs { display:flex; gap:4px; border-bottom:1px solid var(--rule); margin-bottom:14px; }
+.tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; padding:5px 12px; color:var(--soft); font-size:14px; }
+.tabs button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+
+.rec { display:grid; grid-template-columns:30px 230px minmax(0,1fr); background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:10px; }
+.rec.err { border-color:var(--bad); }
+.rec.over { outline:2px dashed var(--link); }
+.rec .n { display:flex; flex-direction:column; align-items:center; gap:2px; padding-top:10px; border-radius:6px 0 0 6px; color:#fff; font-weight:600; background:var(--c); }
+.rec .n button { color:#fff; opacity:.75; padding:0; font-size:11px; border:none; }
+.rec .who { padding:10px 14px 12px; border-right:1px solid var(--rule2); min-width:0; }
+.rec .nm { font-weight:600; font-size:17px; }
+.rec input.nm { width:100%; }
+.slug { display:block; margin-top:3px; font:400 12px var(--mono); color:var(--soft); }
+.rec dl { margin:8px 0 0; display:grid; grid-template-columns:52px minmax(0,1fr); gap:6px 8px; font-size:13px; align-items:center; }
+.rec dt { color:var(--soft); } .rec dd { margin:0; min-width:0; } .rec dd select { max-width:100%; }
+.m { font:600 13px var(--mono); }
+.ends { padding:6px 14px 8px; min-width:0; }
+.hrow, .erow { display:grid; grid-template-columns:150px minmax(0,1fr) 250px; gap:12px; align-items:baseline; }
+.hrow { font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--soft); padding-bottom:3px; border-bottom:1px solid var(--rule); }
+.ahead { display:flex; align-items:center; gap:8px; margin-top:7px; font-size:13px; font-weight:600; }
+.ahead .chip { border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); border-radius:3px; padding:0 8px; background:var(--field); }
+.ahead small { font-weight:400; color:var(--soft); }
+.erow { font-size:14px; padding:4px 0; border-bottom:1px dashed var(--rule2); }
+.erow .ck { font-size:13px; color:var(--soft); }
+.erow.err > span:first-child { color:var(--bad); }
+.why { grid-column:1 / -1; font-size:12.5px; color:var(--bad); }
+.to { font-size:13px; }
+.to small { display:block; color:var(--soft); font-size:12.5px; margin-top:2px; }
+.key { font:500 13px var(--mono); background:var(--tag); border:1px solid var(--tagrule); border-radius:3px; padding:0 7px; white-space:nowrap; }
+.you { border:1px dashed var(--soft); border-radius:3px; padding:0 7px; }
+.done { color:var(--ok); font-weight:600; }
+.same { color:var(--soft); }
+.ahead small { flex:1 1 180px; min-width:0; }
+button.lnk { border:none; padding:0; color:var(--link); font-size:12.5px; font-weight:400; text-decoration:underline; }
+.endsw { font-size:13px; color:var(--soft); margin:4px 0 2px; }
+.brief { background:var(--note); border:1px solid var(--noterule); border-radius:4px; padding:8px 10px; font-size:13px; margin:4px 0 6px; }
+.brief p { margin:4px 0 0; }
+.rec.open { box-shadow:0 0 0 2px var(--link); }
+nav .pal b { display:flex; font-weight:500; }
+nav .pal b i { margin-left:auto; }
+nav .pal small { display:block; font-size:12px; font-weight:400; color:var(--soft); line-height:1.35; }
+.addrow { margin-top:8px; font-size:13px; color:var(--soft); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.addstage { margin:0 0 14px; }
+@media (max-width:980px) { .rec { grid-template-columns:30px minmax(0,1fr); } .rec .who { border-right:none; border-bottom:1px solid var(--rule2); } .ends { grid-column:2; } .hrow { display:none; } .erow { grid-template-columns:minmax(0,1fr); gap:2px; } }
+
+h3 { margin:22px 0 6px; font-size:16px; font-weight:600; }
+.out { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:8px; }
+.out div { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:8px 12px; font-size:13.5px; box-shadow:inset 3px 0 0 var(--merge); }
+.out b { display:block; font-weight:600; }
+.chk { display:grid; gap:5px; font-size:14px; }
+.chk div::before { content:"✓ "; color:var(--ok); font-weight:700; }
+.chk div.no { color:var(--bad); } .chk div.no::before { content:"✗ "; color:var(--bad); }
+.chk div.wa { color:var(--warn); } .chk div.wa::before { content:"! "; color:var(--warn); }
+.chk div.i { color:var(--soft); } .chk div.i::before { content:"→ "; color:var(--soft); }
+pre.file { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:14px 16px; font:13px/1.55 var(--mono); overflow-x:auto; margin:0; }
+.walk { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:14px 16px; }
+.walk .now { font-size:15px; margin:10px 0; }
+.walk .btns { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 14px; }
+.walk ol { margin:0; padding-left:22px; font-size:13.5px; color:var(--soft); }
+.walk ol li { margin-bottom:3px; }
+.walk ol li b { color:var(--ink); font-weight:500; }
+.toast { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom, 0px)); background:var(--ink); color:var(--page); padding:6px 14px; border-radius:4px; font-size:13px; }
+</style>
+
+<div class="wrap">
+  <div class="banner">A working prototype of the Flows page (TD-1954). Everything here stays in this browser; nothing reaches ShiftLead. The model names, flows and teams are examples.</div>
+  <header class="top"><h1>Flows</h1><span>the stages an entry passes through, and where each outcome sends it</span></header>
+  <div class="cols"><nav id="nav"></nav><main id="main"></main></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const MODELS = ["haiku", "sonnet", "opus", "fable"];
+const RSN = "a reason is given";
+const K = {
+  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent. Push the work when the repo's checks pass.", outs: ["work-pushed", "no-design-needed"] },
+  build: { label: "Build", c: "--build", desc: "Writes the code, tests or documents for an entry, on the entry's branch.", brief: "Read the entry, the design it follows, and what earlier stages left on the entry's branch: their work and any review of it. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and push.", outs: ["work-pushed", "design-needs-changing", "not-needed"] },
+  review: { label: "Review", c: "--review", desc: "Reads the pushed work, whatever it holds, and gives a verdict.", brief: "Read the change itself and the code or documents around it, never the author's summary alone. Where it changes code, every behaviour it changes follows a sentence in the design. Where it changes a design or another document, every claim it makes about the repo holds. Give one verdict: ship, or the changes you want and why.", outs: ["ship", "changes-wanted"] },
+  hunt: { label: "Audit", c: "--find", desc: "Starts on a clock, looks for problems in the area its brief names, and files what it finds.", brief: "This stage's own brief names the area to look at and the kind of problem to look for, for example what the last ten merged pull requests changed against the documents. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: ["findings-filed", "nothing-found"] },
+};
+const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
+const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["clock", "nothing; it starts on a clock"]];
+const takesFor = k => k === "review" ? [""] : k === "hunt" ? ["clock"] : ["", "design-first", "other", "any"];
+const SEATS = [["tech-lead", "Tech lead", "answers members' questions, by mail"], ["board-answers", "Board answers", "acts on what you decided"], ["unheld-pull-requests", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["sweeper", "Sweeper", "when the last sweep grows old; looks for stranded work"]];
+const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const words = o => o.replace(/-/g, " ");
+const work = () => "pull request";
+function ck(f, o) {
+  if (o === "work-pushed") return "its pull request is open; its checks are green, unless a later Build stage finishes the work";
+  if (o === "ship") return "a verdict is recorded on the latest push";
+  if (o === "changes-wanted") return "a verdict is recorded";
+  if (o === "findings-filed") return "the new entries are filed";
+  return RSN;
+}
+
+const to = (k, limit) => ({ to: k, limit: limit || null });
+const mg = (k, limit) => ({ to: "merge", limit: null, else: k ? to(k, limit) : null });
+function st(name, kind, model, takes, next, only) { return { name, kind, model, takes: takes || "", only: only || "", next: next || {} }; }
+const UNITS = [["prs", "merged pull requests"], ["hours", "hours"], ["days", "days"]];
+const hunt = (name, model, n, unit, brief) => Object.assign(st(name, "hunt", model, "clock", {}), { n, unit, brief: brief || "docs" });
+const AUD = "Starts on its clock. File each real finding as an entry of its own, with how to see it. Fix nothing here. ";
+const STD = {
+  design: [["std", "Standard design brief", K.design.brief]],
+  build: [["std", "Standard build brief", K.build.brief]],
+  review: [["std", "Standard review brief", K.review.brief]],
+  hunt: [["docs", "Docs audit", AUD + "Compare what the pull requests merged since your last run changed against the documents that describe it: the design, the README and the help text. A document that no longer matches the code is a finding."], ["tests", "Tests audit", AUD + "Look at what the pull requests merged since your last run changed, and at the tests that cover it. Behaviour with no test, a test that cannot fail, and a test that is skipped are findings."], ["code", "Code audit", AUD + "Read one area of the code end to end, a different one each run. Dead code, a duplicated rule, an error that is swallowed, and anything the design says that the code does not do are findings."]],
+};
+const KLAB = { design: "Design", build: "Build", review: "Review", hunt: "Audit" };
+const briefsFor = k => STD[k].concat((S.briefs || []).filter(b => b.kind === k).map(b => [b.id, b.name, b.text]));
+const briefOf = s => briefsFor(s.kind).find(b => b[0] === s.brief) || briefsFor(s.kind)[0];
+const KINDS = ["design", "build", "review"];
+const outs = s => K[s.kind].outs.concat("other");
+const seats = () => ({ "tech-lead": "opus", "board-answers": "sonnet", "unheld-pull-requests": "sonnet", manager: "sonnet", sweeper: "sonnet" });
+const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, seats: seats(), stages });
+function builtins() {
+  return [
+    flow("td", true, "design, two reads, fact-check; build, review, protected read; two audits on a clock", [
+      st("Design", "design", "fable", "design-first", { "work-pushed": to("first-design-read") }),
+      st("First design read", "review", "sonnet", "", { ship: to("second-design-read"), "changes-wanted": to("design", 3) }),
+      st("Second design read", "review", "opus", "", { ship: to("fact-check"), "changes-wanted": to("design", 3) }),
+      st("Fact-check", "review", "sonnet", "", { ship: mg("design", 3), "changes-wanted": to("design", 3) }),
+      st("Build", "build", "opus", "other", { "work-pushed": to("review") }),
+      st("Review", "review", "sonnet", "", { ship: to("protected-read"), "changes-wanted": to("build", 3) }),
+      st("Protected read", "review", "fable", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }, "protected"),
+      hunt("Docs audit", "sonnet", 10, "prs", "docs"),
+      hunt("Test audit", "sonnet", 6, "hours", "tests"),
+    ]),
+    flow("build-review", true, "build, then a review; a ship is merged", [
+      st("Build", "build", "opus", "any", { "work-pushed": to("review") }),
+      st("Review", "review", "sonnet", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }),
+    ]),
+    flow("build", true, "build and merge; no review stage, the builder runs the repo's own review", [
+      st("Build", "build", "opus", "any", { "work-pushed": mg("build", 3) }),
+    ]),
+  ];
+}
+function examples() {
+  return [
+    flow("careful-build", false, "an example with problems to fix", [
+      st("Build", "build", "sonnet", "any", { "work-pushed": to("review"), other: to("troubleshoot", 1) }),
+      st("Review", "review", "haiku", "", { ship: mg("build", 3), "changes-wanted": to("build") }),
+      st("Troubleshoot", "build", "opus", "", { "work-pushed": to("second-read") }),
+    ]),
+    flow("tests-first", false, "an example: failing tests, then the code", [
+      st("Write tests", "build", "sonnet", "any", { "work-pushed": to("implement") }),
+      st("Implement", "build", "opus", "", { "work-pushed": to("first-read") }),
+      st("First read", "review", "haiku", "", { ship: to("second-read"), "changes-wanted": to("implement", 3) }),
+      st("Second read", "review", "fable", "", { ship: to("protected-read"), "changes-wanted": to("implement", 3) }),
+      st("Protected read", "review", "fable", "", { ship: mg("implement", 2), "changes-wanted": to("implement", 2) }, "protected"),
+    ]),
+  ];
+}
+
+const KEY = "flows-proto-v9";
+let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false, page: "flows", briefs: [] };
+try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; S.briefs = Array.isArray(r.briefs) ? r.briefs : []; } } catch (e) { /* storage is a convenience */ }
+function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel, briefs: S.briefs })); } catch (e) { /* ignore */ } }
+const cur = () => S.flows.find(f => f.id === S.sel) || S.flows[0];
+
+function dflt(o) { return ["findings-filed", "nothing-found"].includes(o) ? to("done") : to("person"); }
+function dest(s, o) { return s.next[o] || dflt(o); }
+const elseOf = d => d.else || to("person");
+
+function check(f) {
+  const bad = [], warn = [], info = [], P = (msg, s, o) => bad.push({ msg, s, o });
+  const keys = f.stages.map(s => slug(s.name)), by = {};
+  f.stages.forEach((s, i) => { const k = keys[i]; if (!k) P("A stage needs a name.", i); else if (k in by || FIXED.includes(k)) P(`The name ${s.name} is already used, or is a reserved word.`, i); else by[k] = i; });
+  if (!(Number.isInteger(f.maxMoves) && f.maxMoves >= 2)) P("The total cap is a whole number, 2 or more.");
+  if (!f.stages.length) P("A flow needs at least one stage.");
+  const takes = { "design-first": [], other: [] }, edges = f.stages.map(() => []), ends = f.stages.map(() => false);
+  let asks = 0;
+  f.stages.forEach((s, i) => {
+    if (!takesFor(s.kind).includes(s.takes)) P(`${s.name}: a ${K[s.kind].label} stage cannot take ${TAKES.find(t => t[0] === s.takes)[1]}.`, i);
+    for (const kind in takes) if (s.takes === kind || s.takes === "any") takes[kind].push(s.name);
+    const edge = (o, d, sub) => {
+      if (d.to === "person") { asks++; if (CAN_MERGE.includes(o) && !sub) ends[i] = true; }
+      else if (d.to === "done") { if (s.kind !== "hunt") P("Done is not a place a stage can send an entry. Pick a stage, you" + (CAN_MERGE.includes(o) ? ", or merge it." : "."), i, o); }
+      else if (d.to === "merge") P("Pick where the entry goes when the merge is refused.", i, o);
+      else if (!(d.to in by)) P(`Pick a stage that exists. There is no stage ${d.to}.`, i, o);
+      else if (f.stages[by[d.to]].kind === "hunt") P("An audit starts on its clock; nothing is sent to it.", i, o);
+      else edges[i].push({ o, to: by[d.to], limit: d.limit });
+    };
+    outs(s).forEach(o => {
+      const d = dest(s, o);
+      if (d.to !== "merge") return edge(o, d, false);
+      if (!CAN_MERGE.includes(o)) return P("Only pushed work or a ship verdict can be merged.", i, o);
+      ends[i] = true; edge(o, elseOf(d), true);
+    });
+  });
+  for (const kind in takes) if (takes[kind].length !== 1) P(`New entries that ${kind === "other" ? "are ready to build" : "need a design first"} need exactly one stage that takes them; ${takes[kind].length ? takes[kind].join(" and ") + " both do" : "none does"}.`);
+  f.stages.forEach((s, i) => { if (s.kind === "hunt" && !(Number.isInteger(s.n) && s.n >= 1)) P(`${s.name}: its clock needs a whole number, 1 or more.`, i); });
+  // every loop has a limit: find a cycle made only of moves without one
+  const seenLoop = new Set();
+  f.stages.forEach((s, start) => {
+    const prev = { [start]: null }, todo = [start];
+    while (todo.length) {
+      const k = todo.shift();
+      for (const e of edges[k]) if (!e.limit) {
+        if (e.to === start) {
+          const path = [start]; let p = k; while (p !== null && p !== start) { path.unshift(p); p = prev[p]; } path.unshift(start);
+          const id = [...new Set(path)].sort().join(",");
+          if (!seenLoop.has(id)) { seenLoop.add(id); P(`${path.map(j => f.stages[j].name).join(" → ")} is a loop with no limit.`, k, e.o); }
+          todo.length = 0; break;
+        }
+        if (!(e.to in prev)) { prev[e.to] = k; todo.push(e.to); }
+      }
+    }
+  });
+  const reach = k => { const seen = new Set([k]), todo = [k]; while (todo.length) for (const e of edges[todo.pop()]) if (!seen.has(e.to)) { seen.add(e.to); todo.push(e.to); } return seen; };
+  f.stages.forEach((s, i) => { if (WRITES.includes(s.kind) && ![...reach(i)].some(k => ends[k])) P(`${s.name}: its work can never reach a merge or you.`, i); });
+  const entered = new Set(edges.flat().map(e => e.to));
+  f.stages.forEach((s, i) => { if (!entered.has(i) && !s.takes) P(`Nothing can reach ${s.name}.`, i); });
+  f.stages.forEach((w, wi) => { if (WRITES.includes(w.kind)) reach(wi).forEach(k => { const r = f.stages[k]; if (r.kind === "review" && r.model === w.model) warn.push(`${r.name} reviews on ${r.model}, the same model ${w.name} writes on.`); }); });
+  const always = new Set(f.stages.map((s, i) => s.kind === "review" && !s.only ? i : -1));
+  f.stages.forEach((w, wi) => { if (!WRITES.includes(w.kind)) return; const seen = new Set([wi]), todo = [wi]; let own = false; while (todo.length) { const k = todo.pop(); own = own || outs(f.stages[k]).some(o => dest(f.stages[k], o).to === "merge"); for (const e of edges[k]) if (!seen.has(e.to) && !always.has(e.to)) { seen.add(e.to); todo.push(e.to); } } if (own) info.push(`${w.name} can reach a merge with no review that always runs, so its session runs the repo's own review first.`); });
+  info.push(`${asks} outcomes go to you.`);
+  info.push(`An entry comes to you after ${f.maxMoves} moves between stages, wherever it is.`);
+  return { bad, warn, info, by };
+}
+
+function briefYaml(s, always) {
+  const b = briefOf(s), std = STD[s.kind].some(x => x[0] === b[0]);
+  return (always || !std ? `    brief: ${std ? b[0] : slug(b[1])}\n` : "") + (s.also ? `    also: ${JSON.stringify(s.also)}\n` : "");
+}
+function briefPanel(s, si, ro) {
+  const b = briefOf(s), all = briefsFor(s.kind);
+  let h = '<div class="brief"><b>What the session is told</b> ';
+  h += ro || all.length < 2 && !S.briefs ? `<span class="same">${esc(b[1])}</span>` : `<select id="bp-${si}" data-act="bpick" data-si="${si}" aria-label="Brief">${all.map(x => `<option value="${esc(x[0])}"${x[0] === b[0] ? " selected" : ""}>${esc(x[1])}${STD[s.kind].includes(x) ? "" : " (yours)"}</option>`).join("")}</select> <button class="lnk" data-act="page" data-k="briefs">all briefs</button>`;
+  h += `<p>${esc(b[2])}</p>`;
+  if (ro) h += s.also ? `<p><b>Also:</b> ${esc(s.also)}</p>` : "";
+  else h += `<p style="margin-top:8px"><b>Also</b> <span class="same">added after the brief, for this ${s.kind === "hunt" ? "audit" : "stage"} only</span></p><textarea id="al-${si}" data-act="also" data-si="${si}" aria-label="Also" placeholder="For example: look only under docs/ and src/api/." style="width:100%;min-height:54px;font:inherit;box-sizing:border-box">${esc(s.also || "")}</textarea>`;
+  return h + "</div>";
+}
+function renderBriefs() {
+  let h = '<div class="fhead"><h2>Briefs</h2></div><p class="same" style="font-size:13.5px;margin:0 0 6px">What a session is told when it starts a stage or an audit. The standard briefs ship with ShiftLead and improve with it. A brief of your own can be picked on any stage or audit of its kind.</p>';
+  for (const k of ["design", "build", "review", "hunt"]) {
+    h += `<h3>${KLAB[k]}</h3>`;
+    STD[k].forEach(b => { h += `<div class="walk" style="margin-bottom:8px"><b>${esc(b[1])}</b> <span class="tagc">standard</span><p style="margin:6px 0 0;font-size:13.5px">${esc(b[2])}</p></div>`; });
+    S.briefs.filter(b => b.kind === k).forEach(b => {
+      const used = S.flows.reduce((n, f) => n + f.stages.filter(s => s.kind === k && s.brief === b.id).length, 0);
+      h += `<div class="walk" style="margin-bottom:8px"><input type="text" class="nm" id="bn-${b.id}" data-act="bname" data-id="${b.id}" value="${esc(b.name)}" aria-label="Brief name" style="max-width:320px"> <span class="tagc">yours</span> <span class="same" style="font-size:13px">used by ${used}</span><textarea id="bt-${b.id}" data-act="btext" data-id="${b.id}" aria-label="Brief text" style="width:100%;min-height:110px;font:inherit;box-sizing:border-box;margin-top:8px">${esc(b.text)}</textarea><div class="addrow"><button class="quiet" data-act="bdel" data-id="${b.id}">Delete</button></div></div>`;
+    });
+    h += `<p class="addstage"><button data-act="bnew" data-k="${k}">+ New ${KLAB[k].toLowerCase()} brief</button> <span class="same" style="font-size:13px">starts as a copy of the standard text</span></p>`;
+  }
+  return h;
+}
+function yaml(f) {
+  const one = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
+  const d = x => x.to === "merge" && x.else ? `{to: merge, refused: ${one(x.else)}}` : one(x);
+  let y = `format: 3\nname: ${f.name}\n` + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
+  for (const s of f.stages.filter(x => x.kind !== "hunt")) {
+    y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
+    y += briefYaml(s) + outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
+  }
+  const au = f.stages.filter(x => x.kind === "hunt");
+  if (au.length) y += "audits:\n" + au.map(s => `  - name: ${s.name}\n    model: ${s.model}\n    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n` + briefYaml(s, true)).join("");
+  const sp = SEATS.map(([k]) => k).filter(k => f.seats[k] && f.seats[k] !== seats()[k]);
+  if (sp.length) y += "support:\n" + sp.map(k => `  ${k}: ${f.seats[k]}\n`).join("");
+  return y;
+}
+
+function openIdx(f) { return Math.min(S.open === undefined ? f.stages.length - 1 : S.open, f.stages.length - 1); }
+function ordinal(n) { const v = n % 100, s = ["th", "st", "nd", "rd"]; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+function nextCell(f, s, si, o, ro, err) {
+  const d = dest(s, o);
+  if (ro) {
+    const name = x => x.to === "person" ? '<span class="you">you</span>' : x.to === "done" ? '<span class="done">done</span>' : x.to === "merge" ? '<span class="done">merge it</span>' : `→ <span class="key">Stage: ${esc(x.to)}</span>`;
+    const lim = x => x.limit ? `<small>up to <b>${x.limit}</b> times; the ${ordinal(x.limit + 1)} comes to you</small>` : "";
+    return d.to === "merge" ? `${name(d)}<small>if the merge is refused: ${name(elseOf(d))}</small>${lim(elseOf(d))}` : name(d) + lim(d);
+  }
+  const pick = (x, sub) => {
+    const opts = [["person", "you"]];
+    if (!sub) { if (CAN_MERGE.includes(o)) opts.push(["merge", "merge it"]); if (s.kind === "hunt") opts.push(["done", "done"]); }
+    f.stages.forEach((y, j) => y.kind !== "hunt" && opts.push([slug(y.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(y.name)]));
+    if (!opts.some(([v]) => v === x.to)) opts.push([x.to, (FIXED.includes(x.to) ? words(x.to) : "Stage: " + x.to) + " (missing)"]);
+    const bad = err && (sub || d.to !== "merge");
+    let h = `<select id="nx-${si}-${o}-${sub}" class="${bad ? "bad-f" : ""}" data-act="dest" data-si="${si}" data-o="${o}" data-sub="${sub}" aria-label="${sub ? "If the merge is refused" : "Next for " + words(o)}">` + opts.map(([v, t]) => `<option value="${esc(v)}"${v === x.to ? " selected" : ""}>${esc(t)}</option>`).join("") + "</select>";
+    if (!FIXED.includes(x.to)) h += `<small>up to <input type="number" min="1" id="lm-${si}-${o}-${sub}" class="${bad && !x.limit && /loop/.test(err.msg) ? "bad-f" : ""}" data-act="limit" data-si="${si}" data-o="${o}" data-sub="${sub}" value="${x.limit || ""}" aria-label="Limit"> times${x.limit ? `; the ${ordinal(x.limit + 1)} comes to you` : " (no limit)"}</small>`;
+    return h;
+  };
+  return d.to === "merge" ? pick(d, 0) + "<small>if the merge is refused:</small>" + pick(elseOf(d), 1) : pick(d, 0);
+}
+
+function renderStages(f, res) {
+  const ro = f.builtin;
+  let h = "", main = "", aud = "", num = 0;
+  f.stages.forEach((s, si) => {
+    h = "";
+    const isA = s.kind === "hunt", k = K[s.kind], errs = res.bad.filter(b => b.s === si), rowErr = o => errs.find(b => b.o === o);
+    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:var(${k.c})"><div class="n">${isA ? "" : ++num}` +
+      (ro || isA ? "" : `<button class="ic" data-act="up" data-si="${si}" aria-label="Move up" title="Move up">▲</button><button class="ic" data-act="down" data-si="${si}" aria-label="Move down" title="Move down">▼</button>`) + "</div>";
+    h += '<div class="who">' + (ro ? `<div class="nm">${esc(s.name)}</div>` : `<input type="text" class="nm" id="sn-${si}" data-act="sname" data-si="${si}" value="${esc(s.name)}" aria-label="Stage name">`) + `<span class="slug">Stage: ${esc(slug(s.name))}</span><dl>`;
+    if (!isA) h += "<dt>Does</dt><dd>" + (ro ? k.label : `<select id="sk-${si}" data-act="kind" data-si="${si}" aria-label="Kind of work">${KINDS.map(x => `<option value="${x}"${x === s.kind ? " selected" : ""}>${K[x].label}</option>`).join("")}</select>`) + "</dd>";
+    h += "<dt>Model</dt><dd>" + (ro ? `<span class="m">${s.model}</span>` : `<select id="sm-${si}" class="m" data-act="model" data-si="${si}" aria-label="Model">${MODELS.map(m => `<option${m === s.model ? " selected" : ""}>${m}</option>`).join("")}</select>`) + "</dd>";
+    const tk = TAKES.filter(t => takesFor(s.kind).includes(t[0]) || t[0] === s.takes);
+    if (s.kind === "hunt") h += "<dt>Starts</dt><dd>every " + (ro ? `<b>${s.n}</b> ${UNITS.find(u => u[0] === s.unit)[1]}` : `<input type="number" min="1" id="hn-${si}" data-act="every" data-si="${si}" value="${s.n}" aria-label="Every"> <select id="hu-${si}" data-act="unit" data-si="${si}" aria-label="Unit">${UNITS.map(([v, x]) => `<option value="${v}"${v === s.unit ? " selected" : ""}>${x}</option>`).join("")}</select>`) + "</dd>";
+    else h += "<dt>Takes</dt><dd>" + (ro || tk.length < 2 ? TAKES.find(t => t[0] === s.takes)[1] : `<select id="st-${si}" data-act="takes" data-si="${si}" aria-label="Takes">${tk.map(([v, t]) => `<option value="${v}"${v === s.takes ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>";
+    if (s.kind === "review") { const on = [["", "every time"], ["protected", "only when the work touches protected files"]]; h += "<dt>Runs</dt><dd>" + (ro ? on.find(t => t[0] === s.only)[1] : `<select id="so-${si}" data-act="only" data-si="${si}" aria-label="Runs">${on.map(([v, t]) => `<option value="${v}"${v === s.only ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>"; }
+    h += "</dl>";
+    if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove ${isA ? "audit" : "stage"}</button></div>`;
+    h += '</div><div class="ends">';
+    h += `<div class="ahead" style="--c:var(${k.c})"><span class="chip">${k.label}</span><small>${k.desc}${s.only ? " Passed without a session, counting as ship, when no protected file is touched." : ""}</small><button class="lnk" data-act="brief" data-k="${si}">${S.brief === String(si) ? "hide brief" : "brief"}</button></div>`;
+    if (S.brief === String(si)) h += briefPanel(s, si, ro);
+    h += '<div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
+    outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "other" ? ' <span class="same">(when none of the above fits)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
+    errs.filter(b => b.o === undefined).forEach(b => { h += `<div class="why" style="margin-top:6px">${esc(b.msg)}</div>`; });
+    h += "</div></div>";
+    if (isA) aud += h; else main += h;
+  });
+  h = main;
+  if (!ro) h += `<p class="addstage"><select id="addst" data-act="addstage" aria-label="Add a stage"><option value="">+ Add a stage</option>${KINDS.map(x => `<option value="${x}">${K[x].label}</option>`).join("")}</select></p>`;
+  h += '<h3>Audits</h3><p class="same" style="margin:0 0 8px;font-size:13.5px">Each starts on its own clock, looks where its brief says, and files what it finds as new entries. It takes no entry through the stages above.</p>' + (aud || '<p class="same" style="font-size:13.5px">None.</p>');
+  if (!ro) h += '<p class="addstage"><button data-act="addhunt">+ Add an audit</button></p>';
+  h += "<h3>Support</h3><p class='same' style='margin:0 0 8px;font-size:13.5px'>Built in to every flow. You choose the model each runs on.</p><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${(f.seats[k] || "sonnet")}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === (f.seats[k] || "sonnet") ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
+  return h;
+}
+
+function renderChecks(res) {
+  return '<h3>Does it flow?</h3><div class="chk">' + (res.bad.length ? res.bad.map(b => `<div class="no">${esc(b.msg)}</div>`).join("") : "<div>Every stage a Next names exists, every loop has a limit, all pushed work can reach a merge or you, and every kind of entry has one way in.</div>") +
+    res.warn.map(w => `<div class="wa">${esc(w)}</div>`).join("") + res.info.map(i => `<div class="i">${esc(i)}</div>`).join("") + "</div>";
+}
+
+function walkStart(f, kind, si) {
+  const i = kind === "clock" ? si : f.stages.findIndex(s => s.takes === kind || s.takes === "any");
+  S.walk = { kind, si: i, counts: {}, moves: 0, log: [], at: i < 0 ? "none" : "stage", asker: null, pend: null };
+  if (kind === "clock") S.walk.log.push(`The clock of <b>${esc(f.stages[i].name)}</b> comes round. A fresh ${f.stages[i].model} session starts a run; it holds no entry.`);
+  else if (i >= 0) S.walk.log.push(`A new entry starts in <b>${esc(f.stages[i].name)}</b>. A fresh ${f.stages[i].model} session takes it.`);
+}
+function walkGo(f, res, d, label, k) {
+  const w = S.walk;
+  if (d.to === "done") { w.at = "done"; w.log.push(`${label}. The ${w.kind === "clock" ? "run" : "entry"} is <b>done</b>.`); return; }
+  if (d.to === "person" || !(d.to in res.by)) { w.at = "you"; w.asker = w.si; w.blocked = null; w.log.push(`${label}. ${w.kind === "clock" ? "The run stops and a question about it waits for <b>you</b> on your Queue" : "The entry waits for <b>you</b>, with a question on your Queue"}.`); return; }
+  w.counts[k] = (w.counts[k] || 0) + 1; w.moves++;
+  if (d.limit && w.counts[k] > d.limit) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}, for the ${ordinal(w.counts[k])} time. The limit is ${d.limit}, so the entry comes to <b>you</b>.`); return; }
+  if (w.moves > f.maxMoves) { w.at = "you"; w.asker = w.si; w.blocked = d.to; w.blockedKey = k; w.log.push(`${label}. That is move ${w.moves}, past the total cap of ${f.maxMoves}, so the entry comes to <b>you</b>.`); return; }
+  w.si = res.by[d.to]; w.at = "stage";
+  const n = f.stages[w.si];
+  w.log.push(`${label}. The entry moves to <b>${esc(n.name)}</b>${d.limit ? ` (${w.counts[k]} of ${d.limit})` : ""}. A fresh ${n.model} session takes it.`);
+}
+function walkStep(f, res, o, skipped) {
+  const w = S.walk, s = f.stages[w.si], d = dest(s, o);
+  const label = skipped ? `No protected file is touched, so ${esc(s.name)} is passed without a session` : o === "other" ? `${esc(s.name)}: other` : `${esc(s.name)}: ${words(o)}`;
+  if (d.to === "merge") { w.at = "merge"; w.pend = o; w.log.push(`${label}. The merge is tried: the checks are run again on what is there now.`); return; }
+  walkGo(f, res, d, label, `${w.si}|${o}`);
+}
+function renderWalk(f, res) {
+  const w = S.walk;
+  let h = '<div class="walk"><div class="addrow" style="margin-top:0">Start a new entry: <button data-act="wstart" data-k="other">one that is ready to build</button><button data-act="wstart" data-k="design-first">one that needs a design first</button></div>' + (f.stages.some(s => s.kind === "hunt") ? '<div class="addrow">Or let an audit clock come round: ' + f.stages.map((s, i) => s.kind === "hunt" ? `<button data-act="wstart" data-k="clock" data-si="${i}">${esc(s.name)}</button>` : "").join("") + "</div>" : "");
+  if (!w) return h + '<p class="now same">Pick a kind of entry, then choose each outcome to see where the flow sends it.</p></div>';
+  if (w.at === "none") h += '<p class="now">No stage takes that kind of entry.</p>';
+  else if (w.at === "done") h += '<p class="now"><span class="done">Done.</span></p>';
+  else if (w.at === "you") h += `<p class="now">Waiting for <span class="you">you</span>.</p><div class="btns"><button data-act="wanswer">${w.blocked ? "Carry on, or answer in your own words: on to " + esc(f.stages[res.by[w.blocked]].name) : "Answer: back to " + esc(f.stages[w.asker].name)}</button><button data-act="wmerged">I merged the ${work(f)}</button></div>`;
+  else if (w.at === "merge") h += `<p class="now">Merging the ${work(f)}. It ends as:</p><div class="btns"><button data-act="wmerge" data-k="ok">merged</button><button data-act="wmerge" data-k="no">refused: it changed since the verdict, is red, or conflicts</button></div>`;
+  else {
+    const s = f.stages[w.si];
+    h += `<p class="now">In <span class="key">Stage: ${esc(slug(s.name))}</span> on <span class="m">${s.model}</span>, doing <b>${K[s.kind].label}</b>. It ends as:</p><div class="btns">` +
+      K[s.kind].outs.map(o => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") + '<button class="quiet" data-act="wout" data-o="other">other</button>' +
+      (s.only ? '<button class="quiet" data-act="wout" data-o="ship" data-skip="1">no protected file is touched</button>' : "") + "</div>";
+  }
+  return h + `<ol>${w.log.map(l => `<li>${l}</li>`).join("")}</ol><p class="same" style="font-size:13px;margin:10px 0 0">${w.moves} of ${f.maxMoves} moves used.</p></div>`;
+}
+
+function render() {
+  const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.kind === k).length;
+  const item = x => `<a class="fl${x.id === f.id ? " sel" : ""}" data-act="pick" data-id="${esc(x.id)}" tabindex="0">${esc(x.name)}${check(x).bad.length ? ' <span class="dot" title="has problems">●</span>' : ""}<small>${esc(x.blurb || "your flow")}</small></a>`;
+  let n = `<div class="tabs" style="margin:0 0 10px"><button data-act="page" data-k="flows" class="${S.page === "flows" ? "on" : ""}">Flows</button><button data-act="page" data-k="briefs" class="${S.page === "briefs" ? "on" : ""}">Briefs</button></div>` + "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
+  if (!f.builtin) n += `<h4>Kinds of stage</h4><p>Click one to add a stage${f.stages[openIdx(f)] && f.stages[openIdx(f)].kind !== "hunt" ? ` after <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it to where it belongs.</p>` + KINDS.map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${K[k].c})"><b>${K[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${K[k].desc}</small></div>`).join("");
+  document.getElementById("nav").innerHTML = n;
+  let h = '<div class="fhead">' + (f.builtin ? `<h2>${esc(f.name)}</h2><span class="tagc">built in</span>` : `<input type="text" class="fname" id="fname" data-act="fname" value="${esc(f.name)}" aria-label="Flow name"><span class="tagc">yours</span>`) + '<div class="act">';
+  h += res.bad.length ? `<span class="probs">${res.bad.length} problem${res.bad.length > 1 ? "s" : ""}</span>` : '<span class="okk">It flows</span>';
+  h += '<button data-act="copy">Copy</button>';
+  if (!f.builtin) h += (S.del ? '<button data-act="del2" class="quiet">Really delete?</button>' : '<button data-act="del" class="quiet">Delete</button>') + `<button class="pri" data-act="save"${res.bad.length ? " disabled" : ""}>Save</button>`;
+  h += '</div></div><div class="lim"><span>An entry comes to you after ' + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
+  h += '<div class="tabs">' + [["stages", "Stages"], ["walk", "Walk an entry"], ["file", "The file"]].map(([k, t]) => `<button data-act="tab" data-k="${k}" class="${S.tab === k ? "on" : ""}">${t}</button>`).join("") + "</div>";
+  h += S.tab === "file" ? `<pre class="file">${esc(yaml(f))}</pre>` : S.tab === "walk" ? renderWalk(f, res) : renderStages(f, res);
+  document.getElementById("main").innerHTML = S.page === "briefs" ? renderBriefs() : h + renderChecks(res);
+}
+
+function toast(t) { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 1800); }
+function uniqueName(base) { let n = base, i = 2; while (S.flows.some(f => f.name === n)) n = `${base}-${i++}`; return n; }
+function uniqueStage(f, base) { let n = base, i = 2; while (f.stages.some(s => slug(s.name) === slug(n))) n = `${base} ${i++}`; return n; }
+function setDest(s, o, d) { if (d.to === dflt(o).to && !d.limit && !d.else) delete s.next[o]; else s.next[o] = d; }
+function addStage(f, k, after) {
+  if (!K[k] || f.builtin) return;
+  const firstA = f.stages.findIndex(x => x.kind === "hunt"), end = firstA < 0 ? f.stages.length : firstA;
+  const at = k === "hunt" ? f.stages.length : Math.min(after + 1, end), s = k === "hunt" ? hunt(uniqueStage(f, "Audit"), "sonnet", 1, "days") : st(uniqueStage(f, K[k].label), k, "sonnet", "", {});
+  f.stages.splice(at, 0, s); S.open = at; toast(`${s.name} added`);
+}
+
+function act(el, ev) {
+  const f = cur(), d = el.dataset, si = d.si === undefined ? null : +d.si, s = si === null ? null : f.stages[si], sub = d.sub === "1";
+  S.del = d.act === "del";
+  switch (d.act) {
+    case "pick": S.page = "flows"; S.sel = d.id; S.walk = null; S.open = undefined; S.brief = null; break;
+    case "tab": S.tab = d.k; break;
+    case "copy": { const c = JSON.parse(JSON.stringify(f)); c.builtin = false; c.name = uniqueName(f.name + "-copy"); c.id = c.name + "-" + Date.now(); c.blurb = "copied from " + f.name; S.flows.push(c); S.sel = c.id; S.tab = "stages"; S.walk = null; toast("Copied. This one is yours to change."); break; }
+    case "new": { const nm = uniqueName("my-flow"), n = flow(nm + "-" + Date.now(), false, "your flow", [st("Build", "build", "sonnet", "any", {})]); n.name = nm; S.flows.push(n); S.sel = n.id; S.tab = "stages"; S.walk = null; break; }
+    case "del": break;
+    case "del2": S.flows = S.flows.filter(x => x.id !== f.id); S.sel = "td"; S.walk = null; toast("Deleted"); break;
+    case "save": persist(); toast("Saved in this browser"); return;
+    case "fname": f.name = el.value.trim() || f.name; break;
+    case "maxm": f.maxMoves = parseInt(el.value, 10); break;
+    case "sname": { const old = slug(s.name), nw = el.value.trim(); if (!nw) break; s.name = nw; const k = slug(nw); f.stages.forEach(x => Object.values(x.next).forEach(v => { if (v.to === old) v.to = k; if (v.else && v.else.to === old) v.else.to = k; })); break; }
+    case "kind": s.kind = el.value; s.next = {}; s.only = ""; if (!takesFor(s.kind).includes(s.takes)) s.takes = ""; break;
+    case "every": s.n = parseInt(el.value, 10); break;
+    case "unit": s.unit = el.value; break;
+    case "model": s.model = el.value; break;
+    case "takes": s.takes = el.value; break;
+    case "only": s.only = el.value; break;
+    case "seat": f.seats[d.k] = el.value; break;
+    case "dest": {
+      const c = dest(s, d.o), v = el.value, keep = x => FIXED.includes(v) ? null : x.limit;
+      if (sub) setDest(s, d.o, { to: "merge", limit: null, else: to(v, keep(elseOf(c))) });
+      else if (v === "merge") setDest(s, d.o, mg());
+      else setDest(s, d.o, to(v, keep(c)));
+      break;
+    }
+    case "limit": {
+      const c = dest(s, d.o), v = parseInt(el.value, 10), n = v >= 1 ? v : null;
+      if (sub) setDest(s, d.o, { to: "merge", limit: null, else: to(elseOf(c).to, n) }); else setDest(s, d.o, to(c.to, n));
+      break;
+    }
+    case "brief": S.brief = S.brief === d.k ? null : d.k; break;
+    case "page": S.page = d.k; break;
+    case "bpick": s.brief = el.value; break;
+    case "also": s.also = el.value; break;
+    case "bnew": S.briefs.push({ id: "b" + Date.now(), name: `My ${KLAB[d.k].toLowerCase()} brief`, kind: d.k, text: STD[d.k][0][2] }); break;
+    case "bname": S.briefs.find(b => b.id === d.id).name = el.value.trim() || "Unnamed"; break;
+    case "btext": S.briefs.find(b => b.id === d.id).text = el.value; break;
+    case "bdel": S.briefs = S.briefs.filter(b => b.id !== d.id); break;
+    case "palette": addStage(f, d.k, openIdx(f)); break;
+    case "addstage": addStage(f, el.value, f.stages.length - 1); break;
+    case "addhunt": addStage(f, "hunt", 0); break;
+    case "delstage": f.stages.splice(si, 1); break;
+    case "up": if (si > 0) { f.stages.splice(si - 1, 0, f.stages.splice(si, 1)[0]); S.open = si - 1; } break;
+    case "down": if (si < f.stages.length - 1 && f.stages[si + 1].kind !== "hunt") { f.stages.splice(si + 1, 0, f.stages.splice(si, 1)[0]); S.open = si + 1; } break;
+    case "wstart": walkStart(f, d.k, si); break;
+    case "wout": walkStep(f, check(f), d.o, d.skip === "1"); break;
+    case "wmerge": {
+      const w = S.walk, st0 = f.stages[w.si], dd = dest(st0, w.pend);
+      if (d.k === "ok") { w.at = "done"; w.log.push(`The ${work(f)} is merged. The entry is <b>done</b>.`); }
+      else walkGo(f, check(f), elseOf(dd), "The merge is refused", `${w.si}|${w.pend}|refused`);
+      break;
+    }
+    case "wanswer": { const w = S.walk, on = w.blocked; w.at = "stage"; w.si = on ? check(f).by[on] : w.asker; if (on) { delete w.counts[w.blockedKey]; w.moves = 0; } w.blocked = null; w.log.push(on ? `You say carry on. The blocked move happens: the entry goes to <b>${esc(f.stages[w.si].name)}</b>, a fresh session reads your answer, and that move's count and the total start again.` : `You answer. The entry goes back to <b>${esc(f.stages[w.si].name)}</b>, and a fresh session reads your answer.`); break; }
+    case "wmerged": S.walk.at = "done"; S.walk.log.push(`You merge the ${work(f)} by hand. Merged work ends its entry: <b>done</b>.`); break;
+    default: return;
+  }
+  if (!f.builtin || ["pick", "copy", "new", "del2", "bnew", "bname", "btext", "bdel"].includes(d.act)) persist();
+  render();
+  if (ev && el.id) { const again = document.getElementById(el.id); if (again) again.focus(); }
+}
+
+document.addEventListener("click", ev => {
+  const el = ev.target.closest("[data-act]");
+  if (el && !["SELECT", "INPUT", "TEXTAREA"].includes(el.tagName)) return act(el, ev);
+  const r = ev.target.closest("[data-drop]");
+  if (r && !el && !cur().builtin && S.open !== +r.dataset.drop) { S.open = +r.dataset.drop; render(); }
+});
+document.addEventListener("change", ev => { const el = ev.target.closest("[data-act]"); if (el && ["SELECT", "INPUT", "TEXTAREA"].includes(el.tagName)) act(el, ev); });
+document.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("a.fl, .pal")) act(ev.target, ev); });
+document.addEventListener("dragstart", ev => { const p = ev.target.closest && ev.target.closest("[data-pal]"); if (p) ev.dataTransfer.setData("text/plain", p.dataset.pal); });
+document.addEventListener("dragover", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r && !cur().builtin) { ev.preventDefault(); r.classList.add("over"); } });
+document.addEventListener("dragleave", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r) r.classList.remove("over"); });
+document.addEventListener("drop", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (!r) return; ev.preventDefault(); addStage(cur(), ev.dataTransfer.getData("text/plain"), +r.dataset.drop); persist(); render(); });
+render();
+</script>

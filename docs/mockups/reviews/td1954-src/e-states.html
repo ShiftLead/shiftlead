@@ -1,0 +1,143 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+.lim { display:flex; gap:22px; flex-wrap:wrap; font-size:13.5px; color:var(--soft); margin:10px 0 18px; }
+.lim b { color:var(--ink); font-weight:600; font-family:"IBM Plex Mono", monospace; }
+.rec { display:grid; grid-template-columns:34px 240px 1fr; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:10px; }
+.rec .n { display:grid; place-items:start center; padding-top:13px; border-radius:6px 0 0 6px; color:#fff; font-weight:600; }
+.rec .who { padding:11px 16px 12px; border-right:1px solid var(--rule2); }
+.rec .nm { font-weight:600; font-size:17px; }
+.key { font:500 13px "IBM Plex Mono", monospace; background:#FFF1B8; border:1px solid #E2C55A; border-radius:3px; padding:0 7px; white-space:nowrap; }
+.rec dl { margin:8px 0 0; display:grid; grid-template-columns:58px 1fr; gap:5px 8px; font-size:13px; }
+.rec dt { color:var(--soft); } .rec dd { margin:0; }
+.m { font:600 13px "IBM Plex Mono", monospace; }
+.acts a { display:inline-block; font-size:13px; font-weight:500; border:1px solid var(--rule); border-radius:3px; padding:0 8px; margin:0 4px 3px 0; background:#fff; color:var(--ink); }
+.acts a small { color:var(--soft); font-weight:400; }
+.ends { padding:7px 16px 8px; }
+.ends .h, .ends .e { display:grid; grid-template-columns:150px 1fr 215px; gap:14px; align-items:baseline; }
+.ends .h { white-space:nowrap; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--soft); padding-bottom:3px; border-bottom:1px solid var(--rule); }
+.ends .e { font-size:14px; padding:4px 0; border-bottom:1px dashed var(--rule2); }
+.ends .e:last-child { border-bottom:none; }
+.by { font-size:13px; color:var(--soft); }
+.upto { font-size:12.5px; color:var(--soft); display:block; margin-top:1px; }
+.upto b { color:var(--ink); font-weight:600; }
+.by.s { color:var(--design); }
+.to { font-size:13.5px; }
+.to .back { color:var(--bad); }
+.to small { color:var(--soft); }
+.you { font-size:13px; border:1px dashed var(--soft); border-radius:3px; padding:0 7px; }
+.done { font-size:13px; color:var(--on); font-weight:600; }
+.same { font-size:13px; color:var(--soft); }
+.all { background:none; border-style:dashed; }
+.all .n { background:var(--off); }
+.out { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+.out div { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:8px 12px; font-size:13.5px; box-shadow:inset 3px 0 0 var(--call); }
+.out b { display:block; font-weight:600; }
+.out span { color:var(--soft); font-size:13px; }
+.chk { display:grid; grid-template-columns:1fr 1fr; gap:6px 28px; font-size:14px; }
+.chk div::before { content:"✓ "; color:var(--on); font-weight:700; }
+.chk div small { color:var(--soft); }
+.chk div.i::before { content:"→ "; color:var(--soft); }
+
+:root { --page:#E7EBEC; --sheet:#FAFBFB; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
+  --on:#2E8A57; --used:#2D5F86; --keep:#C27A1A; --off:#9AA5AA; --bad:#B4432F;
+  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --call:#3B8F86; --orders:#6B7780; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font:15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width:1180px; margin:0 auto; padding:28px 24px 64px; }
+header { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:12px; }
+header h1 { font-size:34px; line-height:1; margin:0; font-weight:700; letter-spacing:-.01em; }
+header .sub { color:var(--soft); font-size:14px; }
+.cols { display:grid; grid-template-columns:210px 1fr; gap:32px; margin-top:22px; }
+mono, .mono { font-family:"IBM Plex Mono", monospace; }
+
+/* the list of flows */
+nav h4 { margin:18px 0 4px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+nav h4:first-child { margin-top:0; }
+nav a { display:block; padding:6px 10px; border-radius:4px; color:var(--ink); text-decoration:none; font:500 14px "IBM Plex Mono", monospace; }
+nav a small { display:block; font:400 12.5px "IBM Plex Sans", sans-serif; color:var(--soft); }
+nav a.sel { background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--ink); }
+nav a .warn { color:var(--bad); }
+
+/* the flow's head */
+.fhead { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+.fhead h2 { margin:0; font-size:24px; font-weight:600; }
+.fhead h2 .ed::after { content:" ✎"; font-size:14px; font-weight:400; color:var(--off); }
+.fhead .id { font:400 13px "IBM Plex Mono", monospace; color:var(--soft); }
+.fhead .tag { font-size:12.5px; border:1px solid var(--rule); border-radius:10px; padding:0 9px; color:var(--soft); background:var(--sheet); }
+.fhead .act { margin-left:auto; display:flex; gap:8px; }
+button { font:inherit; font-size:13px; color:var(--ink); background:none; border:1px solid var(--ink); border-radius:3px; padding:3px 12px; }
+button.pri { background:var(--ink); color:#fff; }
+button.quiet { border-color:var(--rule); color:var(--soft); }
+.used { color:var(--soft); font-size:14px; margin:4px 0 0; }
+.used b { color:var(--ink); font-weight:500; }
+.path { margin:14px 0 22px; font:500 14px "IBM Plex Mono", monospace; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.path span { padding:2px 10px; border-radius:3px; color:#fff; }
+.path i { font-style:normal; color:var(--soft); }
+.path .you { background:none; color:var(--ink); border:1px dashed var(--soft); }
+
+h3 { margin:26px 0 2px; font-size:16px; font-weight:600; }
+h3 + p { margin:0 0 10px; color:var(--soft); font-size:14px; max-width:74ch; }
+
+/* a step: who (left) and what it does (right) */
+.step { display:grid; grid-template-columns:34px 250px 1fr; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:10px; position:relative; }
+.step .n { display:grid; place-items:start center; padding-top:14px; border-radius:6px 0 0 6px; color:#fff; font-weight:600; }
+.step .n small { writing-mode:vertical-rl; font-weight:400; font-size:11px; opacity:.8; margin-top:8px; letter-spacing:.08em; }
+.step .who { padding:12px 16px; border-right:1px solid var(--rule2); }
+.step .who .nm { font-weight:600; font-size:17px; }
+.step .who dl { margin:8px 0 0; display:grid; grid-template-columns:62px 1fr; gap:4px 8px; font-size:13px; }
+.step .who dt { color:var(--soft); }
+.step .who dd { margin:0; }
+.sel-m { display:inline-flex; align-items:center; gap:6px; font:600 13px "IBM Plex Mono", monospace; border:1px solid var(--rule); border-radius:3px; padding:1px 8px; background:#fff; }
+.sel-m::after { content:"▾"; color:var(--soft); font-size:11px; }
+.ro .sel-m { border-color:transparent; background:none; padding-left:0; }
+.ro .sel-m::after { content:""; }
+.sel-m.bad { border-color:var(--bad); color:var(--bad); }
+.does { list-style:none; margin:0; padding:8px 14px; }
+.does li { display:grid; grid-template-columns:18px 132px 1fr auto; gap:10px; align-items:baseline; padding:5px 0; border-bottom:1px dashed var(--rule2); font-size:14px; }
+.does li:last-child { border-bottom:none; }
+.does .grip { color:var(--off); font-size:12px; cursor:grab; }
+.ro .does .grip { visibility:hidden; }
+.does .a { font-weight:600; }
+.does .d { color:var(--soft); font-size:13.5px; }
+.does .by { font-size:13px; white-space:nowrap; color:var(--soft); display:flex; gap:6px; align-items:center; }
+.does li.drop { border:1.5px dashed var(--used); border-radius:4px; color:var(--used); display:block; text-align:center; font-size:13px; padding:5px; margin-top:4px; }
+.does li.auto .a { font-weight:400; color:var(--soft); }
+.does li.auto .d { font-size:13px; }
+.x { color:var(--off); font-size:13px; }
+.ro .x { display:none; }
+.note { grid-column:2 / -1; border-top:1px solid var(--rule2); padding:6px 16px; font-size:13px; color:var(--bad); }
+.hand { margin:-4px 0 6px 17px; padding-left:28px; border-left:2px solid var(--rule); font-size:13px; color:var(--soft); height:26px; display:flex; align-items:center; }
+.addstep { margin:0 0 6px 44px; font-size:13px; color:var(--used); }
+
+/* on call */
+.call { display:grid; grid-template-columns:34px 190px 130px 1fr 150px; align-items:center; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:6px; font-size:14px; }
+.call .n { align-self:stretch; background:var(--call); border-radius:6px 0 0 6px; }
+.call > div { padding:8px 12px; }
+.call .nm { font-weight:600; }
+.call .d { color:var(--soft); font-size:13.5px; }
+.call.fixed .n { background:var(--off); }
+
+/* the foot: what is covered, the actions, where it runs */
+.foot { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:8px; }
+table { border-collapse:collapse; width:100%; font-size:13.5px; }
+td { padding:4px 8px 4px 0; border-bottom:1px solid var(--rule2); vertical-align:top; }
+td:first-child { width:22px; color:var(--on); font-weight:700; }
+td.no { color:var(--bad); }
+td:last-child { color:var(--soft); }
+.cat { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { font-size:13px; border:1px solid var(--rule); border-radius:3px; padding:2px 9px; background:var(--sheet); box-shadow:inset 3px 0 0 var(--c, var(--off)); }
+.chip.un { color:var(--soft); background:none; border-style:dashed; }
+.chip small { color:var(--soft); }
+.fixedrow { color:var(--soft); font-size:13.5px; margin:6px 0 0; max-width:none; }
+.fixedrow b { color:var(--ink); font-weight:500; }
+.runs { font-size:13.5px; }
+.runs .ok::before { content:"● "; color:var(--on); } .runs .nok::before { content:"● "; color:var(--bad); }
+nav a.back { font:400 13px "IBM Plex Sans", sans-serif; color:var(--used); padding-left:0; margin-bottom:10px; }
+nav a.pal { font:500 13.5px "IBM Plex Sans", sans-serif; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); margin-bottom:4px; padding:4px 8px; cursor:grab; }
+nav a.pal .grip { color:var(--off); font-size:11px; }
+nav a.pal i { float:right; font-style:normal; font-weight:400; font-size:12px; color:var(--off); }
+nav a.pal.need { border-color:var(--bad); }
+nav h4.needh { color:var(--bad); }
+nav p.why { font-size:12.5px; color:var(--bad); margin:2px 0 0; line-height:1.4; }
+.does li.drop.need { border-color:var(--bad); color:var(--bad); }
+.cap { margin:0 0 14px; padding:8px 12px; background:#FFF7E6; border:1px solid #E7C98A; border-radius:4px; font-size:13px; color:#5C4514; }
+</style></head><body><div class='wrap'><div class='cap'>E — the built-in flow td as records. Each stage has a model, its actions, and its outcomes: what is checked before an outcome is accepted, and where the entry goes next.</div><header><h1>Flows</h1><span class='sub'>the stages an entry passes through, and where each outcome sends it</span></header><div class='cols'><nav><h4>Built in</h4><a class="sel">td<small>design → build → second read</small></a><a>build-review<small>build → second read</small></a><a>build<small>build</small></a><h4>This install</h4><a>one-owner<small>design+build → review</small></a><h4>shiftlead (repo)</h4><a>ao-grind<small>td, two outside fact-checkers</small></a></nav><main><div class="fhead"><h2>td</h2><span class="id">format 2</span><span class="tag">built in</span><div class="act"><button>Copy</button></div></div><p class="used">Used by <b>ao-grind</b>, <b>docs</b>.</p><div class="lim"><span>A far-reaching design gets <b>6</b> rounds</span><span>A session is silent after <b>4 h</b></span></div><div class="rec "><div class="n" style="background:var(--design)">1</div><div class="who"><div class="nm">Design</div><dl><dt>Model</dt><dd class='m'>fable</dd><dt>Takes</dt><dd>a design-first entry with no stage yet</dd><dt>Does</dt><dd class='acts'><a>Design</a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>pull request open</span><span class="by">it is open and its checks are green</span><span class="to">→ <span class="key">Stage: design-rounds</span></span></div><div class="e"><span>split into parts</span><span class="by">the parts are filed</span><span class="to"><span class="same">waits for its parts</span></span></div><div class="e"><span>not needed</span><span class="by">a reason is given</span><span class="to"><span class="you">you</span></span></div></div></div><div class="rec "><div class="n" style="background:var(--review)">2</div><div class="who"><div class="nm">Design rounds</div><dl><dt>Model</dt><dd class='m'>sonnet, fable <small>in turn</small></dd><dt>Does</dt><dd class='acts'><a>Review <small>reviewers in turn</small></a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>ship</span><span class="by">each reviewer's verdict is posted on this head</span><span class="to">→ <span class="key">Stage: fact-check</span></span></div><div class="e"><span>changes wanted</span><span class="by">a verdict is posted</span><span class="to">→ <span class="key">Stage: design</span><span class="upto">up to <b>3</b> times, 6 if far-reaching, then you</span></span></div></div></div><div class="rec "><div class="n" style="background:var(--find)">3</div><div class="who"><div class="nm">Fact-check</div><dl><dt>Model</dt><dd class='m'>sonnet</dd><dt>Does</dt><dd class='acts'><a>Fact-check</a><a>Merge</a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>ship</span><span class="by">a verdict is posted on this head</span><span class="to"><span class="same">the next action, Merge</span></span></div><div class="e"><span>changes wanted</span><span class="by">a verdict is posted</span><span class="to">→ <span class="key">Stage: design</span><span class="upto">up to <b>3</b> times, then you</span></span></div><div class="e"><span>merged</span><span class="by">the pull request is merged</span><span class="to"><span class="done">done</span></span></div><div class="e"><span>cannot merge</span><span class="by">it changed since review, or is red or conflicting</span><span class="to">→ <span class="key">Stage: design</span><span class="upto">up to <b>3</b> times, then you</span></span></div></div></div><div class="rec "><div class="n" style="background:var(--build)">4</div><div class="who"><div class="nm">Build</div><dl><dt>Model</dt><dd class='m'>opus</dd><dt>Takes</dt><dd>any other entry with no stage yet</dd><dt>Does</dt><dd class='acts'><a>Build</a><a>Live checks</a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>pull request open</span><span class="by">it is open and its checks are green</span><span class="to">→ <span class="key">Stage: review</span></span></div><div class="e"><span>design needs changing</span><span class="by">a reason is given</span><span class="to"><span class="you">you</span></span></div><div class="e"><span>split into parts</span><span class="by">the parts are filed</span><span class="to"><span class="same">waits for its parts</span></span></div><div class="e"><span>not needed</span><span class="by">a reason is given</span><span class="to"><span class="you">you</span></span></div></div></div><div class="rec "><div class="n" style="background:var(--review)">5</div><div class="who"><div class="nm">Review</div><dl><dt>Model</dt><dd class='m'>sonnet</dd><dt>Does</dt><dd class='acts'><a>Review <small>every pull request</small></a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>ship</span><span class="by">a verdict is posted on this head</span><span class="to">→ <span class="key">Stage: second-read</span></span></div><div class="e"><span>changes wanted</span><span class="by">a verdict is posted</span><span class="to">→ <span class="key">Stage: build</span><span class="upto">up to <b>3</b> times, then you</span></span></div></div></div><div class="rec "><div class="n" style="background:var(--review)">6</div><div class="who"><div class="nm">Second read</div><dl><dt>Model</dt><dd class='m'>opus</dd><dt>Does</dt><dd class='acts'><a>Review <small>protected paths, skipped when none are touched</small></a><a>Merge</a></dd></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>ship</span><span class="by">a verdict is posted on this head</span><span class="to"><span class="same">the next action, Merge</span></span></div><div class="e"><span>changes wanted</span><span class="by">a verdict is posted</span><span class="to">→ <span class="key">Stage: build</span><span class="upto">up to <b>3</b> times, then you</span></span></div><div class="e"><span>merged</span><span class="by">the pull request is merged</span><span class="to"><span class="done">done</span></span></div><div class="e"><span>cannot merge</span><span class="by">it changed since review, or is red or conflicting</span><span class="to">→ <span class="key">Stage: build</span><span class="upto">up to <b>3</b> times, then you</span></span></div></div></div><div class="rec all"><div class="n" style="background:var(--off)">∗</div><div class="who"><div class="nm">Every stage</div><dl></dl></div><div class="ends"><div class="h"><span>Outcome</span><span>Checked first</span><span>Next</span></div><div class="e"><span>question</span><span class="by">a question is given</span><span class="to"><span class="you">you</span> <small>with a board item</small></span></div><div class="e"><span>stuck</span><span class="by">a reason is given</span><span class="to"><span class="you">you</span></span></div><div class="e"><span>session lost</span><span class="by">found by the home</span><span class="to"><span class="same">offered again</span></span></div><div class="e"><span>session silent for 4 h</span><span class="by">found by the home</span><span class="to"><span class="same">offered again once, then you</span></span></div></div></div><h3>Outside the flow</h3><p>These take no entry and set no stage. They are here to be given a model.</p><div class="out"><div><b>Questions</b><span class="m">opus</span> <span>answers members by mail</span></div><div><b>Board answers</b><span class="m">sonnet</span> <span>acts on what you decided</span></div><div><b>Pull requests nobody holds</b><span class="m">sonnet</span> <span>on the clock</span></div><div><b>Manager</b><span class="m">sonnet</span> <span>starts and stops sessions</span></div></div><h3>Does it flow?</h3><p></p><div class="chk"><div>Every stage a Next names exists <small>6 of 6</small></div><div>Every loop has a limit <small>4 loops</small></div><div>Every pull request opened can reach Merge</div><div>Every kind of entry has a way in <small>design-first, other</small></div><div class="i">5 outcomes go to you, and 6 more at a limit <small>none by omission</small></div><div class="i">A plain build changes stage 2 times <small>each round adds 2</small></div></div></main></div></div></body></html>

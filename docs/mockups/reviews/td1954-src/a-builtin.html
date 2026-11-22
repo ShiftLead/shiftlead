@@ -1,0 +1,105 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+:root { --page:#E7EBEC; --sheet:#FAFBFB; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
+  --on:#2E8A57; --used:#2D5F86; --keep:#C27A1A; --off:#9AA5AA; --bad:#B4432F;
+  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --call:#3B8F86; --orders:#6B7780; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font:15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width:1180px; margin:0 auto; padding:28px 24px 64px; }
+header { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:12px; }
+header h1 { font-size:34px; line-height:1; margin:0; font-weight:700; letter-spacing:-.01em; }
+header .sub { color:var(--soft); font-size:14px; }
+.cols { display:grid; grid-template-columns:210px 1fr; gap:32px; margin-top:22px; }
+mono, .mono { font-family:"IBM Plex Mono", monospace; }
+
+/* the list of flows */
+nav h4 { margin:18px 0 4px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--soft); }
+nav h4:first-child { margin-top:0; }
+nav a { display:block; padding:6px 10px; border-radius:4px; color:var(--ink); text-decoration:none; font:500 14px "IBM Plex Mono", monospace; }
+nav a small { display:block; font:400 12.5px "IBM Plex Sans", sans-serif; color:var(--soft); }
+nav a.sel { background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--ink); }
+nav a .warn { color:var(--bad); }
+
+/* the flow's head */
+.fhead { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+.fhead h2 { margin:0; font-size:24px; font-weight:600; }
+.fhead h2 .ed::after { content:" ✎"; font-size:14px; font-weight:400; color:var(--off); }
+.fhead .id { font:400 13px "IBM Plex Mono", monospace; color:var(--soft); }
+.fhead .tag { font-size:12.5px; border:1px solid var(--rule); border-radius:10px; padding:0 9px; color:var(--soft); background:var(--sheet); }
+.fhead .act { margin-left:auto; display:flex; gap:8px; }
+button { font:inherit; font-size:13px; color:var(--ink); background:none; border:1px solid var(--ink); border-radius:3px; padding:3px 12px; }
+button.pri { background:var(--ink); color:#fff; }
+button.quiet { border-color:var(--rule); color:var(--soft); }
+.used { color:var(--soft); font-size:14px; margin:4px 0 0; }
+.used b { color:var(--ink); font-weight:500; }
+.path { margin:14px 0 22px; font:500 14px "IBM Plex Mono", monospace; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.path span { padding:2px 10px; border-radius:3px; color:#fff; }
+.path i { font-style:normal; color:var(--soft); }
+.path .you { background:none; color:var(--ink); border:1px dashed var(--soft); }
+
+h3 { margin:26px 0 2px; font-size:16px; font-weight:600; }
+h3 + p { margin:0 0 10px; color:var(--soft); font-size:14px; max-width:74ch; }
+
+/* a step: who (left) and what it does (right) */
+.step { display:grid; grid-template-columns:34px 250px 1fr; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:10px; position:relative; }
+.step .n { display:grid; place-items:start center; padding-top:14px; border-radius:6px 0 0 6px; color:#fff; font-weight:600; }
+.step .n small { writing-mode:vertical-rl; font-weight:400; font-size:11px; opacity:.8; margin-top:8px; letter-spacing:.08em; }
+.step .who { padding:12px 16px; border-right:1px solid var(--rule2); }
+.step .who .nm { font-weight:600; font-size:17px; }
+.step .who dl { margin:8px 0 0; display:grid; grid-template-columns:62px 1fr; gap:4px 8px; font-size:13px; }
+.step .who dt { color:var(--soft); }
+.step .who dd { margin:0; }
+.sel-m { display:inline-flex; align-items:center; gap:6px; font:600 13px "IBM Plex Mono", monospace; border:1px solid var(--rule); border-radius:3px; padding:1px 8px; background:#fff; }
+.sel-m::after { content:"▾"; color:var(--soft); font-size:11px; }
+.ro .sel-m { border-color:transparent; background:none; padding-left:0; }
+.ro .sel-m::after { content:""; }
+.sel-m.bad { border-color:var(--bad); color:var(--bad); }
+.does { list-style:none; margin:0; padding:8px 14px; }
+.does li { display:grid; grid-template-columns:18px 132px 1fr auto; gap:10px; align-items:baseline; padding:5px 0; border-bottom:1px dashed var(--rule2); font-size:14px; }
+.does li:last-child { border-bottom:none; }
+.does .grip { color:var(--off); font-size:12px; cursor:grab; }
+.ro .does .grip { visibility:hidden; }
+.does .a { font-weight:600; }
+.does .d { color:var(--soft); font-size:13.5px; }
+.does .by { font-size:13px; white-space:nowrap; color:var(--soft); display:flex; gap:6px; align-items:center; }
+.does li.drop { border:1.5px dashed var(--used); border-radius:4px; color:var(--used); display:block; text-align:center; font-size:13px; padding:5px; margin-top:4px; }
+.does li.auto .a { font-weight:400; color:var(--soft); }
+.does li.auto .d { font-size:13px; }
+.x { color:var(--off); font-size:13px; }
+.ro .x { display:none; }
+.note { grid-column:2 / -1; border-top:1px solid var(--rule2); padding:6px 16px; font-size:13px; color:var(--bad); }
+.hand { margin:-4px 0 6px 17px; padding-left:28px; border-left:2px solid var(--rule); font-size:13px; color:var(--soft); height:26px; display:flex; align-items:center; }
+.addstep { margin:0 0 6px 44px; font-size:13px; color:var(--used); }
+
+/* on call */
+.call { display:grid; grid-template-columns:34px 190px 130px 1fr 150px; align-items:center; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; margin-bottom:6px; font-size:14px; }
+.call .n { align-self:stretch; background:var(--call); border-radius:6px 0 0 6px; }
+.call > div { padding:8px 12px; }
+.call .nm { font-weight:600; }
+.call .d { color:var(--soft); font-size:13.5px; }
+.call.fixed .n { background:var(--off); }
+
+/* the foot: what is covered, the actions, where it runs */
+.foot { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:8px; }
+table { border-collapse:collapse; width:100%; font-size:13.5px; }
+td { padding:4px 8px 4px 0; border-bottom:1px solid var(--rule2); vertical-align:top; }
+td:first-child { width:22px; color:var(--on); font-weight:700; }
+td.no { color:var(--bad); }
+td:last-child { color:var(--soft); }
+.cat { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { font-size:13px; border:1px solid var(--rule); border-radius:3px; padding:2px 9px; background:var(--sheet); box-shadow:inset 3px 0 0 var(--c, var(--off)); }
+.chip.un { color:var(--soft); background:none; border-style:dashed; }
+.chip small { color:var(--soft); }
+.fixedrow { color:var(--soft); font-size:13.5px; margin:6px 0 0; max-width:none; }
+.fixedrow b { color:var(--ink); font-weight:500; }
+.runs { font-size:13.5px; }
+.runs .ok::before { content:"● "; color:var(--on); } .runs .nok::before { content:"● "; color:var(--bad); }
+nav a.back { font:400 13px "IBM Plex Sans", sans-serif; color:var(--used); padding-left:0; margin-bottom:10px; }
+nav a.pal { font:500 13.5px "IBM Plex Sans", sans-serif; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); margin-bottom:4px; padding:4px 8px; cursor:grab; }
+nav a.pal .grip { color:var(--off); font-size:11px; }
+nav a.pal i { float:right; font-style:normal; font-weight:400; font-size:12px; color:var(--off); }
+nav a.pal.need { border-color:var(--bad); }
+nav h4.needh { color:var(--bad); }
+nav p.why { font-size:12.5px; color:var(--bad); margin:2px 0 0; line-height:1.4; }
+.does li.drop.need { border-color:var(--bad); color:var(--bad); }
+.cap { margin:0 0 14px; padding:8px 12px; background:#FFF7E6; border:1px solid #E7C98A; border-radius:4px; font-size:13px; color:#5C4514; }
+</style></head><body><div class='wrap'><div class='cap'>A — a built-in flow, read only. Nothing here is editable until it is copied.</div><header><h1>Flows</h1><span class='sub'>the path an entry takes: who does what, in what order, on which model</span></header><div class='cols'><nav><h4>Built in</h4><a class="sel">td<small>design → build → second read</small></a><a>build-review<small>build → second read</small></a><a>build<small>build</small></a><h4>This install</h4><a>one-owner<small>design+build → review</small></a><h4>shiftlead (repo)</h4><a>ao-grind<small>td, two outside fact-checkers</small></a></nav><main><div class="ro"><div class="fhead"><h2>Design, build, second read</h2><span class="id">td</span><span class="tag">built in · read only</span><div class="act"><button class="pri">Copy to edit</button></div></div><p class="used">Run by <b>ao-grind</b> (now), <b>cm-grind</b>, <b>ss-grind</b>.</p><div class="path"><span style="background:var(--design)">design</span><i>→</i><span style="background:var(--build)">build</span><i>→</i><span style="background:var(--review)">second read</span><i>→</i><span class="you">you, through the question seat</span></div><h3>Steps</h3><p>Each step is one session's sitting. It does its actions top to bottom; an action marked <i>a fresh reader</i> is handed to a new session on that model, never done by the author.</p><div class="step"><div class="n" style="background:var(--design)">1</div><div class="who"><div class="nm">Design</div><dl><dt>Model</dt><dd><span class="sel-m">opus</span></dd><dt>Takes</dt><dd>design-first entries</dd><dt>Seats</dt><dd>1</dd></dl></div><ul class="does"><li><span class="grip">⠿</span><span class="a">Design</span><span class="d">the design's sections, mockups and synopsis; files its builds</span><span class="by"> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Design rounds</span><span class="d">up to 4 rounds (6 for a wide design), then the counted verdict</span><span class="by">a fresh reader on <span class="sel-m">sonnet</span> then <span class="sel-m">fable</span> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Fact-check</span><span class="d">the whole design at round 1, each round's changes after</span><span class="by">a fresh reader on <span class="sel-m">sonnet</span> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Merge</span><span class="d">on the gate; the builds wait for your Go where the verdict asks</span><span class="by"> <span class=x>✕</span></span></li></ul></div><div class="hand">the builds it filed become pickable</div><div class="step"><div class="n" style="background:var(--build)">2</div><div class="who"><div class="nm">Build</div><dl><dt>Model</dt><dd><span class="sel-m">opus</span></dd><dt>Takes</dt><dd>every other entry</dd><dt>Seats</dt><dd>1 – 4, set on the team</dd></dl></div><ul class="does"><li><span class="grip">⠿</span><span class="a">Build</span><span class="d">the change, its tests, the PR</span><span class="by"> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Review</span><span class="d">every PR: one independent read, its evidence on the PR</span><span class="by">a fresh reader on <span class="sel-m">sonnet</span> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Merge</span><span class="d">on the gate, unless the PR touches a held path</span><span class="by"> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Board answers</span><span class="d">an answered card is carried out before any entry</span><span class="by"> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Unheld PRs</span><span class="d">a PR nobody holds: sync, red, lift, sweep, filing</span><span class="by"> <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Live checks</span><span class="d">once a build is live, confirm it on the running system</span><span class="by"> <span class=x>✕</span></span></li></ul></div><div class="hand">a PR on a held path is asked of the reader</div><div class="step"><div class="n" style="background:var(--review)">3</div><div class="who"><div class="nm">Second read</div><dl><dt>Model</dt><dd><span class="sel-m">opus</span></dd><dt>Takes</dt><dd>PRs on held paths · held by the question seat</dd></dl></div><ul class="does"><li><span class="grip">⠿</span><span class="a">Review</span><span class="d">held paths only: findings, or pass; unread after 2 h it goes to you</span><span class="by">this seat <span class=x>✕</span></span></li><li><span class="grip">⠿</span><span class="a">Merge</span><span class="d">once it passes</span><span class="by"> <span class=x>✕</span></span></li></ul></div><h3>On call</h3><p>Seats outside the path, started when their trigger fires.</p><div class="call"><div class="n"></div><div class="nm">Question seat</div><div class="d">when asked</div><div class="d">Answer · Draft an entry — passes the rest to you</div><div><span class="sel-m">opus</span></div></div><div class="call"><div class="n"></div><div class="nm">Docs audit</div><div class="d">every 10 merged PRs</div><div class="d">audits them against the docs, files findings</div><div><span class="sel-m">sonnet</span></div></div><div class="call"><div class="n"></div><div class="nm">Test audit</div><div class="d">every 10 merged PRs</div><div class="d">audits them against the tests, files findings</div><div><span class="sel-m">sonnet</span></div></div><div class="call fixed"><div class="n"></div><div class="nm">Manager</div><div class="d">every team has one</div><div class="d">stalls, permission prompts, idle with work</div><div><span class="sel-m">sonnet</span></div></div><p class="fixedrow"><b>Done by whichever step holds the work, with no model of its own:</b> take an id · claim · make the worktree · open the PR · precheck · wait for checks · archive the entry · report done · remove the worktree. <b>Done by the host:</b> settle a new entry · pull main · precheck main · promote · smoke. <b>Always the person's:</b> the last word, and anything passed up.</p><div class='foot'><div><h3>Every task has someone</h3><p></p><table><tr><td class="">✓</td><td>Merge a PR</td><td>its author; a held PR, the reader</td></tr><tr><td class="">✓</td><td>Review evidence</td><td>a fresh reader, in Design and Build</td></tr><tr><td class="">✓</td><td>Read a held path</td><td>step 3, the second Review</td></tr><tr><td class="">✓</td><td>Answer a member</td><td>the question seat</td></tr><tr><td class="">✓</td><td>Notice a stall</td><td>the manager and the host</td></tr></table></div><div><h3>Actions</h3><p>Dashed ones are not used by this flow. Each has its brief on the Actions page.</p><div class="cat"><span class="chip un" style="--c:var(--find)">Find <small>probe an area, file what is wrong</small></span><span class="chip" style="--c:var(--design)">Design <small>write the design, file its builds</small></span><span class="chip" style="--c:var(--design)">Design rounds <small>fresh readers review a design</small></span><span class="chip" style="--c:var(--review)">Fact-check <small>check a doc against the repo</small></span><span class="chip" style="--c:var(--build)">Build <small>change the code, test it</small></span><span class="chip" style="--c:var(--review)">Review <small>an independent read of a PR: every PR, or some paths</small></span><span class="chip" style="--c:var(--build)">Merge <small>the gate, then the squash</small></span><span class="chip" style="--c:var(--orders)">Board answers <small>carry out what you answered</small></span><span class="chip" style="--c:var(--orders)">Unheld PRs <small>PRs nobody holds: sync, red, lift, sweep, filing</small></span><span class="chip" style="--c:var(--orders)">Live checks <small>confirm a build on the running system</small></span><span class="chip" style="--c:var(--call)">Answer <small>members' questions</small></span><span class="chip" style="--c:var(--call)">Draft an entry <small>an entry you or another repo hand over</small></span><span class="chip" style="--c:var(--call)">Audit <small>the last n merged PRs</small></span><span class="chip un" style="--c:var(--call)">Sweep <small>stranded work</small></span></div><h3>Where it can run</h3><p class="runs"><span class="ok">ao-grind</span> — every model has a signed-in login and a smoke pass<br><span class="nok">cm-grind</span> — no smoke pass for sonnet as manager on contractmatch</p></div></div></div></main></div></div></body></html>
