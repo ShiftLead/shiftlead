@@ -930,7 +930,8 @@ def lift_ask_target(repos: Mapping[str, Mapping[str, Any]], ref: str, repo: str 
     """The entry an `ask --lift`'s `about` names (§4.10 *An `ask` that lifts the person's gate*, TD-1833), read from
     the home's repo readings (`repos`, by root) as the press reads it: `{root, name, id, entry, asked}` — `root` the
     reading's key, `entry` the open entry (with its `repo`) or None where the reading holds none open, `asked` the
-    `board:<key>` case (d) names (`lift_case_d_item`) or None. A bare `TD-n` is `repo`'s (the asker's record's repo,
+    `board:<key>` case (d) names (`lift_case_d_item`) or None, `go_builds` its held builds where it is a design with
+    a question (`go_builds`, TD-2027), else empty. A bare `TD-n` is `repo`'s (the asker's record's repo,
     as its envelope stamps it), a `<repo>#TD-n` the reading `<repo>` names. None where `ref` is no entry reference or
     names no reading the home has."""
     m = _LIFT_REF_RE.fullmatch(str(ref or "").strip())
@@ -959,7 +960,9 @@ def lift_ask_target(repos: Mapping[str, Mapping[str, Any]], ref: str, repo: str 
     boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
     held = held_map(open_, boards, open_refs(open_, rs.origins)) if e is not None else {}
     asked = lift_case_d_item(e, boards, open_, rs.origins.get(name) or name.lower(), held) if e is not None else None
-    return {"root": root, "name": name, "id": tid, "entry": e, "asked": asked}
+    # a design with a question's held builds, which the mail row's **Go now** draws and sends (TD-2027)
+    builds = list(go_builds(held, open_).get(qid(name, tid)) or ()) if e is not None else []
+    return {"root": root, "name": name, "id": tid, "entry": e, "asked": asked, "go_builds": builds}
 
 
 def lift_here(
@@ -1809,9 +1812,7 @@ def reading(
                 and not applying
                 and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
                 and not design  # a held build: its design's question lifts it (TD-2026)
-                # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift,
-                # which would lift the design alone
-                and q not in go
+                # a design with held builds draws its lift as **Go now** from the row's `go_builds` (TD-2027)
                 and lift_here(
                     e,
                     decided_lines,

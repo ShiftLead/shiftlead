@@ -49,7 +49,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
 )
-from sessionorc.queue import TD_REF, card_entries, qid, repo_roots
+from sessionorc.queue import TD_REF, card_entries, lift_ask_target, qid, repo_roots
 from sessionorc.queue import refs as _refs_of
 from sessionorc.store import kept as doing_kept
 from shiftlead import cardtext, layers, repoconfig, teamrun, teams
@@ -1197,7 +1197,20 @@ async def agent_call(method: str, **params: Any) -> Any:
     except AgentUnavailable as e:
         raise HTTPException(503, f"host agent unreachable: {e}") from e
     except AgentError as e:
-        raise HTTPException(400, str(e)) from e
+        # a refusal the home marks `conflict` is a 409: the page read is stale (Go now's builds changed, §4.4 *Go now
+        # lifts the design and its builds*, TD-2027)
+        raise HTTPException(409 if e.data.get("conflict") else 400, str(e)) from e
+
+
+def _lift_builds(body: dict[str, Any]) -> list[str]:
+    """A lift press's `builds` (§4.4 *Go now lifts the design and its builds*, TD-2027): the held builds the button
+    drew, an empty list where it drew a plain **Lift the hold** or sent none; never None, which is the CLI's."""
+    raw = body.get("builds")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(b, str) for b in raw):
+        raise HTTPException(400, "builds is a list of entry ids")
+    return [b.strip() for b in raw if b.strip()]
 
 
 async def agent_call_ignored(method: str, **params: Any) -> tuple[Any, list[str]]:
@@ -1818,6 +1831,7 @@ class Readings:
         at = datetime.now(UTC)
         here = host_name()
         handed_by = {str(h.get("id")): h for h in got.get("handed") or () if isinstance(h, dict) and h.get("id")}
+        lift_repos: dict[str, Any] | None = None  # the repo readings a lifting ask's `go_builds` reads, once
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
@@ -1853,6 +1867,15 @@ class Readings:
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
             _owing(e, records.get(e["from"]), at)
+            # a lifting `ask` about a design with a question draws its answer as **Go now** (§4.4 *Go now lifts the
+            # design and its builds*, TD-2027): the held builds its `about` names, as `lift_ask_target` reads it
+            if e.get("kind") == "ask" and e.get("lift") and e.get("about") and not e.get("orphaned"):
+                if lift_repos is None:
+                    lift_repos = {}
+                    with contextlib.suppress(Exception):
+                        lift_repos = await self.repos()
+                t = lift_ask_target(lift_repos, str(e["about"]), e.get("repo")) if lift_repos else None
+                e["go_builds"] = list((t or {}).get("go_builds") or ())
             # §4.5a *Inbox row: orphaned question* (TD-216 slice 2): its asker is gone, so the row
             # is under the name it asked by, opens nothing, and says where an answer goes — the
             # standing, from the leases the fleet this page read carries
@@ -6266,12 +6289,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # name is resolved to its checkout as a road's is
                 if not repo.startswith(("/", "~")):
                     repo = next((str(p) for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), repo)
-                got = await call("ledger_decide", repo=repo, id=ref, lift=True)
+                # **Go now** (§4.4 *Go now lifts the design and its builds*, TD-2027): the held builds the page drew,
+                # always sent, so a set that changed since is the home's 409
+                got = await call("ledger_decide", repo=repo, id=ref, lift=True, builds=_lift_builds(body))
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if lift_msg := str(body.get("lift_reply") or "").strip():
                 # a `blocked` outcome's **Lift the hold** (§4.4 *The outcome's lift and reply*, TD-1879): one request,
                 # the entry's lift and then the person's reply to the question `lift_reply` names
-                got = await call("ledger_lift_reply", repo=repo, id=ref, msg=lift_msg)
+                got = await call("ledger_lift_reply", repo=repo, id=ref, msg=lift_msg, builds=_lift_builds(body))
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if road := str(body.get("road") or ""):
                 # **Done…** / **Back to design…** (§4.5 screen 12 *any open row*, TD-905): refused here where
@@ -6431,6 +6456,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # a form's press (§4.10 *A form is filled, never pressed*, TD-1698): its index and the typed words; the
             # home puts the head back and refuses an empty fill in its own words
             more = {"form": form} if (form := _form_index(body)) is not None else {}
+            if "builds" in body:  # a lifting answer's **Go now** (§4.4 *Go now lifts the design*, TD-2027)
+                more["builds"] = _lift_builds(body)
             got = await call("msg", text=text, kind="reply", reply_to=ref, answer=answer, **more)
             if "entry" not in got:
                 # an orphaned question's answer (§4.10, TD-216): no reply entry — it went on the board

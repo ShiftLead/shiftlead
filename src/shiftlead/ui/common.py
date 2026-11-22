@@ -204,6 +204,42 @@ def lifts_hold(e: Any, answer: Any) -> str:
 templates.env.globals["lifts_hold"] = lifts_hold
 
 
+GO_SHOWN = 3  # Go now's label names this many held builds, then *and <n> more* (§4.4 *Go now lifts the design*)
+
+
+def _and(ids: list[str]) -> str:
+    return ids[0] if len(ids) == 1 else f"{', '.join(ids[:-1])} and {ids[-1]}"
+
+
+def go_now(ref: Any, builds: Any = ()) -> dict[str, Any]:
+    """What a lift button draws (design §4.4 *Board write-back*: *Go now lifts the design and its builds*, §4.5a
+    *Queue card: Go now*, TD-2027): on a design with a question (`builds`, its `go_builds`, non-empty) **Go now —
+    build TD-a, TD-b** (up to `GO_SHOWN` then *and <n> more*), its title *lifts the hold on TD-<design> and its
+    builds* and its confirm naming every entry it lifts; else **Lift the hold**, its title and confirm as before.
+    `builds` is what the press sends, so a set that grew since the page was drawn is the host agent's 409."""
+    ref = str(ref or "")
+    ids = [str(b) for b in builds or () if str(b)]
+    if not ids:
+        return {
+            "label": "Lift the hold",
+            "title": f"lifts the hold on {ref}",
+            "confirm": f"Lift the hold on {ref}? Its decision (paul) is lifted now, and the entry can be picked.",
+            "builds": [],
+        }
+    more = len(ids) - GO_SHOWN
+    shown = ", ".join(ids[:GO_SHOWN]) + (f" and {more} more" if more > 0 else "")
+    return {
+        "label": f"Go now — build {shown}",
+        "title": f"lifts the hold on {ref} and its builds",
+        "confirm": f"Go now on {ref}? The holds on {_and([ref, *ids])} are lifted now, and their lanes can pick "
+        "the builds.",
+        "builds": ids,
+    }
+
+
+templates.env.globals["go_now"] = go_now
+
+
 def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
     """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
     message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes

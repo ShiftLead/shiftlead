@@ -1466,6 +1466,12 @@
     card.dataset.status = "";
   };
   const qRecount = () => { if (typeof AO.qRecount === "function") AO.qRecount(); };
+  // **Go now**'s held builds as the button drew them (`data-builds`, §4.4 *Go now lifts the design and its builds*,
+  // TD-2027): every lift press sends them, an empty list under a plain **Lift the hold**
+  const liftBuilds = (d) => String((d && d.builds) || "").split(",").map((x) => x.trim()).filter(Boolean);
+  // the toast's words for a lift that landed: the design and the builds the home lifted with it (`builds`)
+  const liftedWords = (ref, res) => (res && Array.isArray(res.builds) && res.builds.length
+    ? `holds lifted on ${ref} and its builds ${res.builds.join(", ")}` : `hold lifted on ${ref}`);
   // the press (called before the row leaves): the row's block and card, the key taken off; null where it takes nothing
   AO.qcardOff = function (row, key) {
     const sec = row && key ? row.closest(".qsec[data-sec]") : null, card = sec && sec.closest(".qcard");
@@ -1712,6 +1718,9 @@
       // cannot make the person "say" something else under a given index, and the RPC re-checks
       // that the two agree. No confirm: a reply is mail, and a wrong press is followed by another.
       if (action === "answer") { action2 = "reply"; body = { reply_to: b.dataset.msg, answer: Number(b.dataset.index) }; }
+      // a lifting answer's **Go now** (§4.4 *Go now lifts the design and its builds*, TD-2027): the held builds the
+      // row drew ride the reply, so a set that grew since is the home's 409, never lifted unseen
+      if (action === "answer" && b.dataset.lift) body.builds = liftBuilds(b.dataset);
       if (action === "unmail") body = { msg: b.dataset.msg };
       // design §4.5a **Inbox row: identity alarm** (§4.8a): a record's list, or — with no id — the
       // host's own. A person's act; the agent refuses it to every session. The control is
@@ -1899,6 +1908,7 @@
           // one request, the entry's lift and then the plain reply on the question; a reply that fails after a
           // written lift is no refusal, so its words are the refused case's with nothing claimed unsent
           want.lift_reply = at.liftReply;
+          want.builds = liftBuilds(at);  // Go now's held builds, an empty list under a plain Lift (TD-2027)
           pressed();
           const res = await act("person", "ledger", want);
           answered();
@@ -1909,17 +1919,18 @@
             if (msgOf) { AO.pressErrs[msgOf] = AO.pressErr(words, true, atSig); delete AO.inflight[msgOf]; AO.qcardBack(msgOf); }
             refusedOn = true;
             say(words, false);
-          } else say(res.gone ? `${at.ref} is no longer held — ${at.name || "its asker"} is told` : `hold lifted on ${at.ref} — ${at.name || "its asker"} is told`, true);
+          } else say(res.gone ? `${at.ref} is no longer held — ${at.name || "its asker"} is told` : `${liftedWords(at.ref, res)} — ${at.name || "its asker"} is told`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }
         if (lifting) {
           // the fixed-words branch's lift: `lift` alone, no words (TD-1831); a tree row's ⋯ takes the `qt` path
           want.lift = true;
+          want.builds = liftBuilds(at);  // Go now's held builds, an empty list under a plain Lift (TD-2027)
           if (qt) qpressed(); else pressed();
           const res = await act("person", "ledger", want);
           if (qt) qanswered(); else answered();
-          say(res.gone ? `${at.ref} is no longer held` : `hold lifted on ${at.ref}`, true);
+          say(res.gone ? `${at.ref} is no longer held` : liftedWords(at.ref, res), true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }

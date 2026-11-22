@@ -1190,4 +1190,5 @@ def test_a_tree_rows_lift_resolves_its_bare_repo_name_and_sends_lift_alone(tmp_p
     c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos(), calls))
     got = c.post("/api/person/ledger", json={"repo": "s", "id": "TD-20", "words": "go ahead", "lift": True})
     assert got.status_code == 200
-    assert calls == [{"repo": str(checkout), "id": "TD-20", "lift": True}]
+    # an empty `builds` where the page drew a plain Lift, so a set that grew since is the home's 409 (TD-2027)
+    assert calls == [{"repo": str(checkout), "id": "TD-20", "lift": True, "builds": []}]

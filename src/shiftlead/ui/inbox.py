@@ -3380,9 +3380,7 @@ def ledger_for_you(
                 not owner
                 and applying is None
                 and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
-                # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift
-                # on its item or its `answered.lift`, which would lift the design alone
-                and not builds
+                # a design with held builds draws it as **Go now** from `go_builds` (TD-2027)
                 and me_q not in held_of  # a held build: its design's question lifts it (TD-2026)
                 and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
                 and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key, held_of)
@@ -3429,7 +3427,6 @@ def ledger_for_you(
                         questions,
                         names,
                         now,
-                        # `go_builds` is empty while the interim above stands; TD-2027 draws Go now from it
                         lift={"root": here_root, "id": e["id"], "go_builds": builds} if lift_item else None,
                     )
                     if got_q
