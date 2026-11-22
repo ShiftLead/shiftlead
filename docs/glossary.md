@@ -137,8 +137,7 @@ not mix:
   push and checked by the end-of-stage command (design §4.9c). Until the cut-over, the first shape's word on a
   reader's reply, `pass`, `merged` or `findings`. — *proposed* 2026-10-04, reshaped 2026-11-21.
 - **sits out** — the first shape's word for a member whose team's current flow has no stage for its role;
-  nothing sits out under a format-3 flow, where a session is started for an entry (design §4.9c *What this
-  replaces*). — *proposed* 2026-10-04.
+  nothing sits out under a format-3 flow, where a session is started for an entry (design §4.9c *What this replaces*). — *proposed* 2026-10-04.
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile, and a **kind** (`worker`, `seat`, `manager`, `plain`) — the one fact a flow asks of it
   (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `sweeper`, `manager`,

@@ -92,7 +92,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   rule 7), the lane and the fields above — and a restart is that record handed to `create` again,
   its prompt filled afresh from `prompt_from`, never the definition re-read (the host agent does not
   read `org.yml`, §4.9). **So a definition's later edit reaches a launch record only by a person's
-  Apply** (§4.9c *Switching*): a role's `profile:`, lane, reader or stage brief changed in `org.yml`
+  Apply** (§4.9c *What this replaces*): a role's `profile:`, lane, reader or stage brief changed in `org.yml`
   shows on the team's card as *definition changed — Apply*, and Apply rewrites the record by the
   `relaunch` RPC; until then a replay is the record as the last start or Apply wrote it (TD-619). A member's name is
   the same: one renamed or dropped in the definition is replayed under its old name until a person's
@@ -809,8 +809,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the reading first finds it (a decided line its sibling claimed before the declaration, which the first
      write leaves out) is written into `lane_seen` untold, so only its release is told, as a dropped lease, and a
      lease that lapses unreleased is not (TD-899; under a format-3 flow it must be: an entry whose
-     holder's lease lapsed with no outcome is *offered again* to a fresh session of its stage, §4.9c *The home acts
-     only where no session will*, which is what TD-899 gains); an entry that came off the board is *has become
+     holder's lease lapsed with no outcome is *offered again* to a fresh session of its stage, §4.9c *What this replaces*, which is what TD-899 gains); an entry that came off the board is *has become
      pickable*, above, already. **An exited or closed member is not written to**, and its
      `lane_seen` is kept all the same: what its lane gains while it is gone is rule 8's once its
      team has wound down. A finished member closed while the team runs on — by rule 9's pass, by
@@ -837,7 +836,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      makes the record's replay take the stored prompt instead, since one repo's layout is no file
      beside the package's template (TD-588); such a member keeps its old brief, stage-brief edits
      included, until the team's next start or Apply. A record
-     carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *Switching*) is restarted under this rule's
+     carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *What this replaces*) is restarted under this rule's
      conditions as one carrying `brief_changed` is, save that a declaration of `out_of_work` does
      not hold it back and a waiting claim still counts as in progress (§4.9c; the entry boundary
      below is the `brief` trigger's alone). The host agent knows a file and a slot and no role, template or team, and
@@ -1427,14 +1426,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      held` reads it, since the package rule runs one way) against the record's `held:` globs; a
      PR touching none is not held, and the reading ends. A held one looks for its read **in the
      mail the home holds**, link by link (`review_links`; the one-reader form is a chain of one,
-     §4.9c *The record carries the chain*): the PR is **read** when **every link whose paths it
+     §4.9c *What this replaces*): the PR is **read** when **every link whose paths it
      touches** has, on the thread of an `ask` of the record's carrying `pr: <n>` addressed to that
      link's reader — the seat, by its name, the match `ao pr held` makes (`addressed`) — a reply
      from that reader, whatever it says, since a reader answers `pass`, `merged` or `findings` and
      never stays silent (§4.9b); **or** one such thread holds a reply with the verdict `merged`,
      since only the last reader holding the PR merges it (§4.9c); **or** one holds the person's
      reply, where an ask went up past its bound and the PR became the person's, the rest of its
-     chain with it (§4.9c *The bound and the person*); for `reader: person`, the same `ask` to the
+     chain with it (§4.9c *What this replaces*); for `reader: person`, the same `ask` to the
      person, replied by the person alone. So a chain's PR merged after its first reader's `pass`
      and before its last reader's reply is a crossing, as a one-reader PR merged before its reply
      is. `held.read_by(s, pr, files)` walks `review_links` against the PR's files, `addressed` (in
