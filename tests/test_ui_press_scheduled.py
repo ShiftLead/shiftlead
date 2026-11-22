@@ -104,7 +104,7 @@ def test_a_scheduled_pages_presses_reload_or_leave_at_their_response():
     assert "moving = true; location.reload(); return;" in block
     # Cancel: where Forget goes outside a popped window; in one, the page kept, its look stopped, forgotten drawn
     assert 'if (!AO.poppedId) { moving = true; location.href = "/"; return; }' in block
-    assert "clearInterval(AO.scheduledLook);" in block
+    assert block.index("clearInterval(AO.scheduledLook);") < block.index('location.href = "/"')
     assert '["#fscheduled", "#closebtn"].forEach' in block
     assert "AO.focusForgotten(AO.scheduledName || id);" in block
     # the block sits after the request is answered, never before it leaves

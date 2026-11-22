@@ -2292,8 +2292,8 @@
           moving = true; location.reload(); return;
         }
         if (action === "close") {
+          clearInterval(AO.scheduledLook);  // no look reloads the forgotten record under the way out
           if (!AO.poppedId) { moving = true; location.href = "/"; return; }
-          clearInterval(AO.scheduledLook);
           if (markKey) { AO.pressEnd(markKey); markKey = ""; }
           ["#fscheduled", "#closebtn"].forEach((sel) => { const el = $(sel); if (el) el.classList.add("hidden"); });
           AO.focusForgotten(AO.scheduledName || id);
