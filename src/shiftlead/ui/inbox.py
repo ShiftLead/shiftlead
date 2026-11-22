@@ -3290,8 +3290,9 @@ def ledger_for_you(
     # each `decision (paul)` member's counted open work (§4.4 *The card's status*, TD-1926), by the Queue's builder
     origins = {n: lb.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
     # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
-    held = queue_mod.held_map(opens, boards, linked)
-    work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held, opens)
+    held_of = queue_mod.held_map(opens, boards, linked)
+    work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held_of, opens)
+    go = queue_mod.go_builds(held_of, opens)  # each design with a question's held builds, its row's `go_builds`
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
@@ -3368,13 +3369,18 @@ def ledger_for_you(
             # **Lift the hold** on the entry's own item and rows (§4.4 *Where Lift the hold is drawn*, TD-1829, built
             # by TD-1879): it carries the person's gate, is not theirs to do, no press is landing on it, and no open
             # undecided line asks its hold (case (d)); a session holding it clears nothing (*No holder test*)
-            fact = list(work.get(queue_mod.qid(name, str(e["id"]))) or ())
+            me_q = queue_mod.qid(name, str(e["id"]))
+            fact = list(work.get(me_q) or ())
+            builds = list(go.get(me_q) or ())
             lift_item = bool(
                 not owner
                 and applying is None
                 and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
+                # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift
+                # on its item or its `answered.lift`, which would lift the design alone
+                and not builds
                 and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
-                and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key)
+                and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key, held_of)
             )
             rows.append(
                 {
@@ -3414,11 +3420,17 @@ def ledger_for_you(
                     if ledger_mod.decided_by(dict(e), queue_mod.PERSON)
                     else "",
                     "answered": _held_answered(
-                        got_q, questions, names, now, lift={"root": here_root, "id": e["id"]} if lift_item else None
+                        got_q,
+                        questions,
+                        names,
+                        now,
+                        # `go_builds` is empty while the interim above stands; TD-2027 draws Go now from it
+                        lift={"root": here_root, "id": e["id"], "go_builds": builds} if lift_item else None,
                     )
                     if got_q
                     else None,
                     "lift_item": lift_item,
+                    "go_builds": builds,  # a design with a question's held builds, which Go now reads (TD-2026)
                     # the fact, whatever the row reads, and *waiting, then yours* where no earlier word stands — no
                     # answer, hand-off, the person's own session holding it, or press landing (TD-1926): counted
                     # nowhere, drawn grey
@@ -3501,7 +3513,7 @@ def _held_answered(
     questions: list[Mapping[str, Any]],
     names: Mapping[str, str],
     now: datetime,
-    lift: Mapping[str, str] | None = None,
+    lift: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A ledger row's `answered` (§4.5 screen 12 *Three wants*, TD-1316) from `answered_hold`'s: its asker's name,
     the question's kind, `words` — what the question's row says of the answer (`_owing`'s `answer_given`, else its
@@ -3509,9 +3521,10 @@ def _held_answered(
     (`kind: board`, TD-1368) carries `board`, the line's `{key, open, to}`, and `words` *you answered "<its
     `Decided:` words>" on the board* — a delegated one's *<delegate> answered "<words>" for you on the board
     (<scope>)* (TD-1939) — its age the `Decided:` date's; a kept-waiting one `until`, its date. A mail
-    answer's carries `lift`, `{root, id}`, where the row's `lift_item` is set (the caller passes it then): a `blocked`
-    outcome on its question draws the entry's **Lift the hold**, whose press is `ledger_lift_reply` (§4.4 *Where Lift
-    the hold is drawn*, TD-1879); the board and handed answers carry none."""
+    answer's carries `lift`, `{root, id, go_builds}` (`go_builds` a design with a question's held builds, TD-2026),
+    where the row's `lift_item` is set (the caller passes it then): a `blocked` outcome on its question draws the
+    entry's **Lift the hold**, whose press is `ledger_lift_reply` (§4.4 *Where Lift the hold is drawn*, TD-1879); the
+    board and handed answers carry none."""
     if got.get("kind") == "handed":
         # a step handed by Have a session do it (§4.5 screen 12, TD-1660): its seat and the first send's age
         asker = str(got.get("asker") or "")
@@ -3576,7 +3589,13 @@ def _held_answered(
         }
         if outcome
         else None,
-        "lift": {"root": str(lift.get("root") or ""), "id": str(lift.get("id") or "")} if lift else None,
+        "lift": {
+            "root": str(lift.get("root") or ""),
+            "id": str(lift.get("id") or ""),
+            "go_builds": [str(b) for b in lift.get("go_builds") or ()],
+        }
+        if lift
+        else None,
     }
 
 

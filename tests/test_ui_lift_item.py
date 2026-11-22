@@ -23,7 +23,7 @@ def test_lift_item_is_set_on_a_held_row_and_its_answered_handed_and_waiting_rows
     assert plain["lift_item"] is True and plain["answered"] is None
     mail = _one(repos, [_ask()])
     assert mail["lift_item"] is True
-    assert mail["answered"]["lift"] == {"root": str(tmp_path / "r"), "id": "TD-60"}
+    assert mail["answered"]["lift"] == {"root": str(tmp_path / "r"), "id": "TD-60", "go_builds": []}
     waiting = {"kind": "board", "asker": "", "closed_at": "2026-11-10", "until": "2026-11-20",
                "line": {"key": "board:0000abcd", "open": False, "said": "Not yet", "to": []}}  # fmt: skip
     monkeypatch.setattr(queue_mod, "answered_hold", lambda *a, **k: waiting)
@@ -57,7 +57,7 @@ def test_lift_item_is_unset_on_an_entry_you_own_where_case_d_holds_and_under_a_p
     assert held["held"] == "w" and held["lift_item"] is True
     seen: list[tuple] = []
 
-    def case_d(member, boards, entries, repo_key):
+    def case_d(member, boards, entries, repo_key, held=None):
         seen.append((member["repo"], member["id"], repo_key, sorted(entries)))
         return True
 

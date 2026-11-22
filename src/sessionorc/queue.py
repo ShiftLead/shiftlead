@@ -854,9 +854,10 @@ def lift_case_d(
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
     entries: Mapping[str, Mapping[str, Any]],
     repo_key: str,
+    held: Mapping[str, str] | None = None,
 ) -> bool:
-    """Whether case (d) holds for `member`: `lift_case_d_item` names an item."""
-    return lift_case_d_item(member, boards, entries, repo_key) is not None
+    """Whether case (d) holds for `member`: `lift_case_d_item` names an item (`held` as it reads it)."""
+    return lift_case_d_item(member, boards, entries, repo_key, held) is not None
 
 
 def lift_case_d_item(
@@ -864,6 +865,7 @@ def lift_case_d_item(
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
     entries: Mapping[str, Mapping[str, Any]],
     repo_key: str,
+    held: Mapping[str, str] | None = None,
 ) -> str | None:
     """The `board:<key>` of the item for which case (d) holds for `member` (an open entry with its `repo`; §4.4
     *Lift the hold is a lift on the press*, TD-1831): an open, undecided `decide` item on the entry's own repo's board
@@ -873,7 +875,9 @@ def lift_case_d_item(
     with the entry among the item's `Parts:`; the board's `People:` listing the person — and lists no other gated entry:
     no `Context:` entry (the parent, where it covers through `Part of`) nor `Parts:` id, a bare id of that repo, open in
     `entries`, not the member, and carrying `decision (<p>)`. The press refuses a lift there, so the row draws none;
-    §4.10's `ask --lift` is refused there too, naming the item (TD-1833). None where no item asks."""
+    §4.10's `ask --lift` is refused there too, naming the item (TD-1833). None where no item asks. `held` is
+    `held_map`'s `{build: design}`: on a design with a question the item is read over the set, its held builds no
+    other gated entry (§4.4 *A design's question is asked once, on the design*, TD-2026)."""
     repo = str(member.get("repo") or "")
     try:
         num = lb._num(str(member.get("id") or ""))
@@ -888,6 +892,8 @@ def lift_case_d_item(
         if "#" in ref or not lb._is_id(ref):
             return False  # a `<repo>#TD-n` never counts here, as the tripwire's shared case keeps bare ids alone
         q = qid(repo, ref.upper())
+        if held and held.get(q) == me:
+            return False  # one of the design's held builds: the item reads over the set (TD-2026)
         return q != me and q in entries and bool(ledger_mod.decided_by(dict(entries[q]), PERSON))
 
     for b in boards.get(repo) or ():
@@ -951,7 +957,8 @@ def lift_ask_target(repos: Mapping[str, Mapping[str, Any]], ref: str, repo: str 
                 open_.setdefault(qid(n, e["id"]), {**e, "repo": n})
     e = open_.get(qid(name, tid))
     boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
-    asked = lift_case_d_item(e, boards, open_, rs.origins.get(name) or name.lower()) if e is not None else None
+    held = held_map(open_, boards, open_refs(open_, rs.origins)) if e is not None else {}
+    asked = lift_case_d_item(e, boards, open_, rs.origins.get(name) or name.lower(), held) if e is not None else None
     return {"root": root, "name": name, "id": tid, "entry": e, "asked": asked}
 
 
@@ -963,12 +970,14 @@ def lift_here(
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
     entries: Mapping[str, Mapping[str, Any]],
     repo_key: str,
+    held: Mapping[str, str] | None = None,
 ) -> bool:
     """Whether a Queue row draws **Lift the hold** in its ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): the
     entry still carries `decision (paul)`, is not the person's own (`Owner:` the person: **Done** answers it), an open
     decided line covers it (`lines`, `open_decided_lines(..., person_only=True)`, the very set that hides its item),
     no holder (`line_holder`) holds any such line, the entry or another entry it covers, and case (d) does not hold
-    (`lift_case_d`). The caller clears it on a *with you*, an applying or an archived row."""
+    (`lift_case_d`, read with `held`, `held_map`'s map). The caller clears it on a *with you*, an applying or an
+    archived row."""
     if not ledger_mod.decided_by(dict(member), PERSON) or str(member.get("owner") or "").lower() == PERSON:
         return False
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
@@ -979,7 +988,7 @@ def lift_here(
         covered = [me, *sorted(q for q in cov if q != me)]
         if line_holder(str(ln.get("key") or ""), str(ln.get("session") or ""), covered, claims, live):
             return False
-    return not lift_case_d(member, boards, entries, repo_key)
+    return not lift_case_d(member, boards, entries, repo_key, held)
 
 
 def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
@@ -1095,6 +1104,16 @@ def held_map(
     for q, e in entries.items():
         for b in held_builds(e, entries, boards, linked, lines=lines):
             out.setdefault(b, q)
+    return out
+
+
+def go_builds(held: Mapping[str, str], entries: Mapping[str, Mapping[str, Any]]) -> dict[str, list[str]]:
+    """Each design with a question's held builds as bare ids in key order (`_key_sort`), `{design: [TD-a, …]}`, from
+    `held_map`'s `{build: design}` (§4.4 *A design's question is asked once, on the design*, TD-2026): the `go_builds`
+    a design's Queue row, `ledger_for_you` row and `answered.lift` carry, which **Go now** reads (TD-2027)."""
+    out: dict[str, list[str]] = {}
+    for b in sorted(held, key=lambda b: _key_sort(str((entries.get(b) or {}).get("key") or ""), b)):
+        out.setdefault(held[b], []).append(b.rpartition("#")[2])
     return out
 
 
@@ -1457,13 +1476,21 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
     in the readings. `queue` is the last reading `reading` gave, never one this wrote, so a mark that clears during
     the hold leaves the row and the card as that reading drew them. A copy; `queue` is never written."""
     rs = _Repos(repos)
-    open_: dict[str, Mapping[str, Any]] = {}
+    open_: dict[str, dict[str, Any]] = {}
     for name, r in rs.by_name.items():
         for e in r["ledger"]["entries"]:
             if isinstance(e, Mapping) and e.get("id"):
-                open_.setdefault(qid(name, e["id"]), e)
+                open_.setdefault(qid(name, e["id"]), {**e, "repo": name})
     boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
-    pressing = _pressing(open_, boards, open_refs(open_, rs.origins))
+    linked = open_refs(open_, rs.origins)
+    # the facts `_status` reads, as `reading` stamps them: each member's counted open work, a design with a question
+    # taking in its held builds', and each held build's design (§4.4 *A design's question is asked once*, TD-2026)
+    held_by = held_map(open_, boards, linked)
+    for q, work in with_held(open_work(open_, item_resolver(rs.origins)), held_by, open_).items():
+        open_[q]["open_work"] = work
+    for b, d in held_by.items():
+        open_[b]["held_by"] = d
+    pressing = _pressing(open_, boards, linked)
 
     def mark(row: Any) -> Any:
         if not isinstance(row, Mapping) or row.get("archived") or row.get("with_you"):
@@ -1688,6 +1715,9 @@ def reading(
     held_by = held_map(open_, boards, linked)
     for q, work in with_held(open_work(open_, xref), held_by, open_).items():
         open_[q]["open_work"] = work
+    for b, d in held_by.items():
+        open_[b]["held_by"] = d  # the entry stamp, on every held build whatever its row's word (TD-2026)
+    go = go_builds(held_by, open_)
     pressing = _pressing(open_, boards, linked)
     # the row each live record's restart row is homed on, where its mark passes the one reader (§4.4 *The card's
     # status*, TD-1856): the claim `holder_claims` picks, as the Inbox's `item_home` picks it — every `holds` qid is
@@ -1759,8 +1789,18 @@ def reading(
                 not mine
                 and not applying
                 and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
+                # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift,
+                # which would lift the design alone
+                and q not in go
                 and lift_here(
-                    e, decided_lines, claims, live, boards, open_, rs.origins.get(e["repo"]) or str(e["repo"]).lower()
+                    e,
+                    decided_lines,
+                    claims,
+                    live,
+                    boards,
+                    open_,
+                    rs.origins.get(e["repo"]) or str(e["repo"]).lower(),
+                    held_by,
                 )
             )
             return {
@@ -1787,6 +1827,7 @@ def reading(
                 "open_work": fact,  # the fact, whatever the word (TD-1926)
                 "then_yours": then_yours,  # the word's mark: its counted ids, a need no test of need reads
                 "lift_here": bool(lift),
+                "go_builds": list(go.get(q) or ()),  # a design with a question's held builds (TD-2026)
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -1819,6 +1860,7 @@ def reading(
             "open_work": [],
             "then_yours": None,
             "lift_here": False,
+            "go_builds": [],
             "page": "",
             "after": [],
             "blocked_open": False,
