@@ -2358,6 +2358,8 @@ def board_rows(
                     "session": str(it.get("session") or ""),
                     "refs": [str(x) for x in it.get("refs") or () if str(x).strip()],
                     "parts": [str(x) for x in it.get("parts") or () if str(x).strip()],  # what it covers (TD-1364)
+                    # the answers that lift its gate (`Lifts:`, ledgerboard v2.3): what its Go releases says (TD-2026)
+                    "lifts": [str(x) for x in it.get("lifts") or () if str(x).strip()] or None,
                     "due_error": bool(it.get("due_error")),
                     "ahead": ""
                     if board_due_now(it) and not hidden
@@ -3476,7 +3478,9 @@ def ledger_for_you(
     # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
     entries_open = {
         q: {
-            **{k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by", "key")},
+            **{k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by", "key", "owner")},
+            # its design, where it is a held build: what a covering line's Go releases (`ui.queue.releases_of`, TD-2026)
+            **({"held_by": held_of[q]} if q in held_of else {}),
             "open_work": work.get(q) or [],  # the fact, which a covering line reads (`ui.queue.line_then_yours`)
         }
         for q, e in opens.items()

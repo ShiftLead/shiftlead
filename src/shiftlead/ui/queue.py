@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 from sessionorc import board as board_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
@@ -189,7 +190,7 @@ def _item_home(
     inbox: dict[str, Any] = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if e.get("row") == "board" and index is not None:
         covers = covered(e, entries)
-        inbox = {**inbox, "covers": covers, "holds": holds_of(e, covers, "", entries, index)}
+        inbox = {**inbox, "covers": covers, **line_holds(e, covers, "", entries, index)}
     if not index:
         return inbox
     repo: str | None = None
@@ -279,7 +280,7 @@ def _item_home(
             by = "about" if ref in about else "words"
         home = {"home": "queue", "on_card": card, "on_row": row, "mentions": [], "tied": {"by": by, "ref": ref}}
         if kind == "board":
-            home |= {"covers": inbox["covers"], "holds": holds_of(e, inbox["covers"], row, entries, index)}
+            home |= {"covers": inbox["covers"], **line_holds(e, inbox["covers"], row, entries, index)}
         return home
     card, row = index[refs[0]]
     if kind == "board":
@@ -296,7 +297,7 @@ def _item_home(
         "tied": {"by": by, "ref": refs[0]},
     }
     if kind == "board":
-        home |= {"covers": inbox["covers"], "holds": holds_of(e, inbox["covers"], row, entries, index)}
+        home |= {"covers": inbox["covers"], **line_holds(e, inbox["covers"], row, entries, index)}
     return home
 
 
@@ -329,6 +330,48 @@ def holds_of(
             }
         )
     return out
+
+
+def releases_of(
+    e: Mapping[str, Any], holds: list[dict[str, Any]], entries: Mapping[str, Mapping[str, Any]] | None
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """A board line's *holds* split by what its Go releases (§4.5 screen 12 *A design's question names what Go
+    releases*, TD-2026): where the line's `Context:` names a design with a question, the held builds among `holds`
+    (`entries`' `held_by` naming that design, listed in the line's `Parts:`) are said *<label> releases TD-a, TD-b to
+    the grinders* — `<label>` the first of the line's answers ledgerboard reads as lifting (`_lifting`: one its
+    `Lifts:` lists, else *Go*), *to the grinders* where every one is `Owner: grinder`, else *to their lanes* — and
+    the rest stay `holds`. `(None, holds)` where none is a held build of the line's design or no answer lifts."""
+    if e.get("row") != "board" or not holds or not entries:
+        return None, holds
+    name = str(e.get("repo_name") or "")
+
+    def own(r: str) -> str:
+        return r if "#" in r else (f"{name}#{r}" if name else "")
+
+    m = board_context(e)
+    designs = {q for r in (_refs(m) if m else ()) if (q := own(r))}
+    parts = {q for p in e.get("parts") or () for r in _refs(str(p)) if (q := own(r))}
+    rel = [h for h in holds if h["id"] in parts and (entries.get(h["id"]) or {}).get("held_by") in designs]
+    offered = [str(a) for a in e.get("answers") or () if str(a).strip()]
+    label = next((x for x in lb._labels(offered) if lb._lifting(x, e.get("lifts"), offered)), None)
+    if not rel or label is None:
+        return None, holds
+    grinders = all(str((entries.get(h["id"]) or {}).get("owner") or "").lower() == "grinder" for h in rel)
+    keep = [h for h in holds if h not in rel]
+    return {"label": label, "to": "to the grinders" if grinders else "to their lanes", "ids": rel}, keep
+
+
+def line_holds(
+    e: Mapping[str, Any],
+    covers: list[str],
+    home_row: str,
+    entries: Mapping[str, Mapping[str, Any]] | None,
+    index: Mapping[str, tuple[str, ...]] | None,
+) -> dict[str, Any]:
+    """A board line's `holds` (`holds_of`) and, where its Go releases a design's held builds, its `releases`
+    (`releases_of`, TD-2026), those builds then out of `holds`."""
+    releases, holds = releases_of(e, holds_of(e, covers, home_row, entries, index), entries)
+    return {"holds": holds, **({"releases": releases} if releases else {})}
 
 
 def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
@@ -546,7 +589,7 @@ def split_later(
                 moved.append({**e, **home, **link, "later_section": "coming"})
             else:
                 # the Inbox's own row of a line no card holds draws its *holds* line too (TD-1380)
-                keep.append({**e, **{k: home[k] for k in ("covers", "holds") if k in home}, **link})
+                keep.append({**e, **{k: home[k] for k in ("covers", "holds", "releases") if k in home}, **link})
     # `n` here is the rows the Inbox draws, a *waiting, then yours* one among them, so its list is not hidden; the
     # rail counts through `rail_rows`, which leaves that row out (TD-1926)
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved, unshown
@@ -927,11 +970,15 @@ def attach(
     ]
     strip_rows: set[str] = set()
     strip: set[str] = set()
+    asked: set[str] = set()
     for e, sec in placed:
         # an open `act` line decided *have a session do it* covers too, whatever its section (TD-1624)
         if e.get("row") == "board" and (want_of(e, sec) in WANTS or session_asks(e)):
             strip_rows.add(str(e.get("on_row") or ""))
             strip |= set(e["covers"]) if "covers" in e else line_names(e)
+        # an open undecided line asks its design's question: the design's own *with you* item gives way (TD-2026)
+        if e.get("row") == "board" and want_of(e, sec) in WANTS and not e.get("decided"):
+            asked |= set(e["covers"]) if "covers" in e else line_names(e)
     # §4.5 screen 12 *A press is never left stranded* (TD-1843): a `blocked` outcome joined by its question's id to the
     # entry row whose `answered.lift` TD-1879 stamped draws that entry's Lift (`lift_reply`), and while it is unreplied
     # the entry's *answered — waiting on <asker>* item gives way to it (*One press, one item*); read, never computed
@@ -949,6 +996,10 @@ def attach(
             return  # a held build is no item: its design's question is (TD-2026)
         want, kind, mine = rewrite(e, sec, kind)
         card, ref = str(e.get("on_card") or ""), item_ref(e)
+        if mine and e.get("go_builds") and set(_refs(f"{e.get('name') or ''}#{e.get('id') or ''}")) & asked:
+            # a design with a question: its *with you* item gives way to the open undecided line that asks it, the
+            # line its question (§4.4 *The design's own with you item gives way*, TD-2026); its row's word stands
+            return
         if gives_way(e, want, {m for c, m in unreplied if c == card}):
             # not drawn, out of every count and the walk, its entry out of the walk's own entries (TD-1843)
             cards.setdefault(card, {}).setdefault(HIDDEN, []).append(ref)

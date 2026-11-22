@@ -1137,6 +1137,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
     — on a card, its anchor where the page draws it (`data-repo-href` the Repo page, which `app.js` follows where a
     pick hides that card); elsewhere the Repo page on the id. None when it holds nothing more. -#}
 {% macro holds_line(e) -%}
+{#- a design's question names what Go releases (§4.5 screen 12, TD-2026): its held builds, in *holds*' place -#}
+{%- if e.releases %}{% set r = e.releases %}<div class="st holds releases" title="the builds this answer releases: they wait on this question and draw none of their own">{{ r.label }} releases {% for x in r.ids %}<a class="holdsref" href="{{ x.href if mode == 'card' else x.repo_href }}" data-repo-href="{{ x.repo_href }}">{{ bare_id(x.id, own) if mode == 'card' and own and x.id else x.show }}</a>{% if not loop.last %}, {% endif %}{% endfor %} {{ r.to }}</div>{% endif %}
 {%- if e.holds %}<div class="st holds" title="the entries this line holds: its answer is theirs, and none of them draws its own question">holds {% for x in e.holds %}<a class="holdsref" href="{{ x.href if mode == 'card' else x.repo_href }}" data-repo-href="{{ x.repo_href }}">{{ bare_id(x.id, own) if mode == 'card' and own and x.id else x.show }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
 {%- endmacro %}
 
