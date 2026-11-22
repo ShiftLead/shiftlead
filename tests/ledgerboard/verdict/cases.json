@@ -1168,6 +1168,58 @@
   {
    "name": "v3_uncovered_new_decide",
    "boards": []
+  },
+  {
+   "name": "deferred: beside a live id",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside an archived Resolved id",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside an archived id with a Status word outside the vocabulary",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside an archived id with Status Built",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside another repo's id",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside a local id Superseded by another repo's id",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside two live ids",
+   "boards": []
+  },
+  {
+   "name": "deferred: covered by an open item beside a live id",
+   "boards": []
+  },
+  {
+   "name": "deferred: the board not listing pat, beside a live id",
+   "boards": []
+  },
+  {
+   "name": "deferred: a part whose parent carries the gate and a live blocker",
+   "boards": []
+  },
+  {
+   "name": "deferred: an id written twice",
+   "boards": []
+  },
+  {
+   "name": "deferred: an id in its own and its parent's lists",
+   "boards": []
+  },
+  {
+   "name": "deferred: beside a local id Superseded with no successor",
+   "boards": []
   }
  ],
  "ledger_lift": [

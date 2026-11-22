@@ -1,4 +1,4 @@
-# ledgerboard v3.4 sha256:239780508027f75852cfa687e1c880ee586853580e76edd45786e54cc2ec94a4
+# ledgerboard v3.5 sha256:0e993ce98cfa76ad95de3a53158570e903f83f1a8b8d448b2219ccdbcdb1d71c
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/__init__.py (vendored by agent-cadence as files/scripts/ledgerboard/__init__.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -7660,9 +7660,60 @@ def _sweep_item(cond: str, tid: str, ref: str, gate: str, *, ask: str = "", titl
     return out
 
 
+def _in_flight(num: int, open_: Mapping[int, str], gone: Mapping[int, dict], resolve: Resolve | None,
+               cross_open: bool, parent_of: Mapping[int, int], parts: Mapping[int, list[int]]) -> list[str]:
+    """The ids of open entry ``num``'s Blocked by in flight (v3.5, TD-150's D1), as written, each once at its first
+    place: its ``_chain()`` ends ``open`` at an id that is not the entry, one of its descendants or one of its
+    ancestors (by number, a local end only), or, with ``cross_open``, ends ``unresolved`` at another repo's id."""
+    near, todo = {num}, list(parts.get(num, ()))
+    while todo:  # descendants
+        n = todo.pop()
+        if n not in near:
+            near.add(n)
+            todo.extend(parts.get(n, ()))
+    up = parent_of.get(num)
+    while up is not None and up not in near:  # ancestors (a cycle ends the walk)
+        near.add(up)
+        up = parent_of.get(up)
+    out: list[str] = []
+    for b in parse_gates(_entries(open_[num])[0]["blocked_raw"])["ids"]:
+        if b in out:
+            continue
+        path, state, _ = _chain(b, set(open_), gone, resolve)
+        end = path[-1]
+        if (state == "open" and ("#" in end or _num(end) not in near)) or (
+                cross_open and state == "unresolved" and "#" in end):
+            out.append(b)
+    return out
+
+
+def _deferred(num: int, gate: str, open_: Mapping[int, str], gone: Mapping[int, dict], resolve: Resolve | None,
+              cross_open: bool = False) -> list[str]:
+    """Why open entry ``num``'s ``gate`` (a ``decision (<p>)``) is deferred (v3.5, TD-150; SPEC *The gate sweep*):
+    the entry's own blockers in flight (``_in_flight()``), then, when its ``Part of`` parent is open and carries the
+    same gate (``_gate_key()``), the parent's, each written ``<id> (blocks <parent>)`` (D2, one level). Empty: not
+    deferred. ``open_`` is the open entries' texts by number, ``gone`` the archived ones' ``_archived_status()``;
+    the sweep passes its resolver, the verdict none with ``cross_open`` (D4)."""
+    parent_of: dict[int, int] = {}
+    heads: dict[int, str] = {}
+    parts: dict[int, list[int]] = {}
+    for n, text in open_.items():
+        e = _entries(text)[0]
+        heads[n] = e["id"]
+        par, _ = parse_part_of(e["part_of_raw"])
+        if par:
+            parent_of[n] = _num(par)
+            parts.setdefault(_num(par), []).append(n)
+    out = _in_flight(num, open_, gone, resolve, cross_open, parent_of, parts)
+    p = parent_of.get(num)
+    if p is not None and p in open_ and _carried(open_[p], gate) is not None:
+        out += [f"{b} (blocks {heads[p]})" for b in _in_flight(p, open_, gone, resolve, cross_open, parent_of, parts)]
+    return out
+
+
 def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, today_utc: date | str,
           today_local: date | str, reask_days: int = SWEEP_REASK_DAYS, event_age_days: int = SWEEP_EVENT_AGE_DAYS,
-          repo: str = "") -> dict:
+          repo: str = "", *, resolve: Resolve | None = None) -> dict:
     """What one sweep of this repo's ledger does (v2.4, SPEC *The gate sweep*): ``{to_file: {board: [item]},
     to_close: {board: [item id]}, lifts: [{id, gate, kind, evidence}]}``, each board named as ``covers()``
     names it. It keeps no state: the boards and the ledger's Log are its state, so a second run over its own
@@ -7675,7 +7726,12 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
     ``(outcome, evidence)``; ``today_utc`` dates the Log's ages and an ``until``, ``today_local`` the boards'
     ``Decided:`` dates; ``repo`` is this repo's ``origin_path`` (else its basename). Each item filed is
     ``item_file()``'s arguments, the host adding today, its Due:, session and host. ``to_close`` lists ids (an item
-    with no id, a v2 line with no readable date, is never in it)."""
+    with no id, a v2 line with no readable date, is never in it).
+
+    ``resolve`` (v3.5, keyword-only) is ``pickable()``'s resolver for ``<repo>#TD-n`` items, called only to tell
+    whether a blocker of a decision the sweep would otherwise ask is in flight: a decision is deferred, and no
+    ``decide`` filed for it, while its entry (or a part's parent carrying the same gate) names a blocker in flight
+    (``_deferred()``). One that raises propagates."""
     today_u = date.fromisoformat(utc_day(today_utc, "today_utc"))
     if isinstance(today_local, datetime):
         today_local = today_local.date()  # the caller's own civil date: its zone is the caller's
@@ -7785,6 +7841,7 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
         for a in (answers if is_open or filing else within):
             held.update((n, key) for n in a["owed"])
 
+    gone: dict[int, dict] | None = None
     for num in sorted(open_texts):
         text = open_texts[num]
         e = _entries(text)[0]
@@ -7814,6 +7871,10 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
                 if pick is None:
                     if may_file(num, gate, "no-board", text):
                         add(own_name, num, gate, "no-board", _sweep_item("no-board", tid, tid, gate))
+                    continue
+                if gone is None:  # v3.5: the entries the sweep reads as archived, read once
+                    gone = _archived_status("\n\n".join(texts[n] for n in sorted(texts) if n not in open_texts))
+                if _deferred(num, gate, open_texts, gone, resolve):  # v3.5: a blocker in flight (TD-150)
                     continue
                 ref = tid if pick is own else f"{repo.lower()}#{tid}"
                 try:  # v3.3: the entry's own answers; the sweep never raises for them
@@ -8162,14 +8223,17 @@ def uncovered_decisions(base_tree: Mapping[str, str], head_tree: Mapping[str, st
     depends on another repo's board, which not every machine reads. A new `decide` item on this repo's board
     whose Context names a decision and none of whose answers lifts (one of its `Lifts:`, `Go` when it has none,
     never a waiting-only one) is refused: new is an id on no base item, open or closed in an archive file the tree
-    holds (v3.0; an undated v2 item matched by ``item_key()``). Refusals rest on this repo's own board alone.
+    holds (v3.0; an undated v2 item matched by ``item_key()``). An uncovered decision that is deferred (v3.5,
+    ``_deferred()`` over the head tree's ledger, with no resolver and another repo's id counted in flight) is
+    neither refused nor flagged as above: it is flagged ``decision-deferred`` alone. Refusals rest on this repo's own board alone.
     ``boards`` is ``[(origin_url, basename, Board)]`` (v3.0), each read through ``load_board()``."""
     _check_repo(repo)
     own = _tree_board(head_tree, repo)
     mine = _own_board(boards, repo)
     reads = [own, *[b for b in boards if b is not mine]]
     b_open, _, _ = _tree_ledger(base_tree)
-    h_open, _, _ = _tree_ledger(head_tree)
+    h_open, h_closed, _ = _tree_ledger(head_tree)
+    h_gone: dict[int, dict] | None = None
     people = {p.lower() for p in board_people(own[2]) or []}
     refusals: list[tuple[str, str]] = []
     flags: list[tuple[str, str]] = []
@@ -8182,6 +8246,13 @@ def uncovered_decisions(base_tree: Mapping[str, str], head_tree: Mapping[str, st
             person = GATE_DECISION_RE.match(gate).group("who").strip()
             cov = [(b, s) for b, _, s in covers(htext, gate, reads, repo) if s in COVERING]
             if any(b == _board_name(own) for b, _ in cov):
+                continue
+            if h_gone is None:
+                h_gone = _archived_status("\n\n".join(h_closed[n] for n in sorted(h_closed)))
+            why = _deferred(num, gate, h_open, h_gone, None, cross_open=True)  # v3.5 (TD-150's D4)
+            if why:
+                flags.append(("decision-deferred", f"{tid} gains {gate}, deferred behind {', '.join(why)} — the "
+                              "sweep asks it once none is in flight"))
                 continue
             if person.lower() in people:
                 refusals.append(("decision-uncovered", f"{tid} gains {gate} and no open decide item on this repo's "

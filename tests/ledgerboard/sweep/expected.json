@@ -547,6 +547,690 @@
    "error": "Refused"
   }
  },
+ "in_flight": {
+  "01 beside a live blocker": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "02 beside an archived Resolved blocker": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "03a beside a blocker Superseded by a live entry": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "03b beside a blocker Superseded by an archived Resolved entry": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "03c beside a blocker Superseded with no successor": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "04a beside an archived Dropped blocker": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "04b beside an archived blocker with a Status word outside the vocabulary": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "04c beside an archived blocker with Status Built": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "05 beside an id in neither ledger nor archive": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "06a beside another repo's id, no resolver": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "06b beside another repo's id the resolver answers open": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "06c beside another repo's id the resolver answers archived Resolved": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "06d beside another repo's id the resolver answers garbage": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "06e beside another repo's id, the resolver raising": {
+   "raised": "LookupError"
+  },
+  "07 beside a blocker Superseded by another repo's open id": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "08 two blockers, one live and one archived Resolved": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "09a the entry's own id in its Blocked by": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "09b a part of it in its Blocked by": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "09c its parent in its Blocked by": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "09d an archived blocker Superseded by a part of it": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "10 a design and its held builds, no blocker": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-510 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-510 (The design) waits on decision (pat), and no board item asked for it",
+       "question": "The design",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The design"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-511 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-511 (The first held build) waits on decision (pat), and no board item asked for it",
+       "question": "The first held build",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The first held build"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-512 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-512 (The second held build) waits on decision (pat), and no board item asked for it",
+       "question": "The second held build",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The second held build"
+     }
+    ]
+   }
+  },
+  "11 a design held by its bought round, and its held builds": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "12 a part whose parent is blocked by a live entry and carries no decision": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-521 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-521 (The part) waits on decision (pat), and no board item asked for it",
+       "question": "The part",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The part"
+     }
+    ]
+   }
+  },
+  "13 a part whose parent carries the decision and is blocked only by a sibling part": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-530 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-530 (The parent) waits on decision (pat), and no board item asked for it",
+       "question": "The parent",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The parent"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-531 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-531 (The part) waits on decision (pat), and no board item asked for it",
+       "question": "The part",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The part"
+     }
+    ]
+   }
+  },
+  "14a beside an until a later day": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "14b beside an event with no outcome": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-501 (The widget waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "The widget waits on pat",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The widget waits on pat"
+     }
+    ]
+   }
+  },
+  "15 an open decide covering the gate, a live blocker beside it": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {}
+  },
+  "16 no board lists the person, a live blocker beside it": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-501 decision (pat)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-501 has no board: no board read lists pat in its People."
+     }
+    ]
+   }
+  },
+  "17 an answer owing a lift, a live blocker beside it": {
+   "lifts": [],
+   "rerun": {
+    "lifts": [],
+    "to_close": {},
+    "to_file": {}
+   },
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-501 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-501's decision (pat) was answered with a lift on 2026-11-01, and the item was closed as lifted, but the gate was never lifted on TD-501",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-501 was answered with a lift on 2026-11-01 but still stands on TD-501: lift it."
+     }
+    ]
+   }
+  }
+ },
  "parts_problems": {
   "context-archived-no-entry": {
    "lift": {

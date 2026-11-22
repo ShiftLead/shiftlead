@@ -67,6 +67,9 @@ Fixtures, each an invented input and its expected JSON:
   ``archived``, with, where the case asks, ``covers()`` of each listed part on a one-item board holding the line,
   and the ``decide_lift()`` cross-check of a ``Go``. From v2.7, a lifting answer closed with no lift (TD-224 to
   TD-269): the ``act`` that says its lift is owed, held entries, its close, and a run's own ``reask_days``.
+  From v3.5 (TD-150), ``in_flight``: each case its own ``sweep/in_flight/<case>/`` ledger, archive and v3 board,
+  swept with its ``resolve`` and swept again once its filings and closes are made — a decision deferred behind
+  a blocker in flight.
 - ``ledger/belowheader.md`` (TD-049): a ``decision`` gate below the header block — ``check()`` gives its ℹ and
   reads on, where v2.4 raised, so the next entry's reassign note still comes.
 - ``ledger/parts.md`` (v2.1): ``Part of`` — a parent with open and with archived parts, the order,
@@ -1063,6 +1066,7 @@ def sweep_cases(L, spec: dict, root: Path = HERE) -> dict:
         **({"answers": answers_case(L, spec["answers"], files)} if "answers" in spec else {}),
         **({"delegated": {c["name"]: answers_case(L, c, files) for c in spec["delegated"]}}  # v3.4
            if "delegated" in spec and hasattr(L, "board_delegates") else {}),
+        **({"in_flight": in_flight_cases(L, spec, files)} if "in_flight" in spec else {}),  # v3.5
         **({"entry_answers": entry_answers_cases(L, spec["entry_answers"])} if "entry_answers" in spec else {}),
         "runs": runs,
         "rerun": run(first, boards_of(rerun_boards, after)),
@@ -1085,6 +1089,60 @@ def answers_case(L, c: dict, files: dict[str, str]) -> dict:
     got = L.sweep([files[c["ledger"]], ""], [(c["url"], c["basename"], board)], {}, c["today_utc"], c["today_local"],
                   repo=c["repo"])
     return {"to_file": got["to_file"], "to_close": got["to_close"], "lifts": got["lifts"]}
+
+
+def in_flight_cases(L, spec: dict, files: dict[str, str]) -> dict:
+    """A decision deferred behind its work (v3.5, TD-150): ``sweep()`` over each ``in_flight`` case's own
+    ``ledger.md``, optional ``archive.md`` and one v3 board directory ``board/``, given under the first top-level
+    board's ``url`` and ``basename``, on its one date, with the case's ``resolve`` (a map from a ``<repo>#TD-n``
+    item to the resolver's answer, an item not in it raising ``KeyError``; ``"raise"``, a callable raising
+    ``LookupError``; none, no resolver). ``rerun`` is the same sweep once the first run's items are filed
+    (``item_file()``) and its closes moved; a sweep that raises is ``{"raised": <its class name>}``."""
+    if "resolve" not in inspect.signature(L.sweep).parameters:
+        return {"missing": "the module's sweep takes no resolve — older than v3.5"}
+    top = spec["boards"][0]
+    out = {}
+    for c in spec["in_flight"]:
+        d = c["dir"]
+        fs = {k: v for k, v in files.items() if k.startswith(f"{d}/board/")}
+        ents = [files[f"{d}/ledger.md"], files.get(f"{d}/archive.md", "")]
+        r = c.get("resolve")
+        if r == "raise":
+            def resolve(item):
+                raise LookupError(item)
+        elif r is not None:
+            def resolve(item, r=r):
+                got = r[item]
+                return tuple(got) if isinstance(got, list) else got
+        else:
+            resolve = None
+
+        def run(fs, c=c, ents=ents, resolve=resolve):
+            board = L.load_board(f"{d}/board", dict_ls(fs), fs.get)
+            return L.sweep(ents, [(top["url"], top["basename"], board)], {}, c["today_utc"], c["today_local"],
+                           repo=spec["repo"], resolve=resolve)
+        try:
+            got = run(fs)
+        except LookupError as e:  # the resolver's raise propagates (one that is not a case's fails the run)
+            out[c["name"]] = {"raised": type(e).__name__}
+            continue
+        day = c["today_local"]
+        after = dict(fs)
+        name = L.origin_key(top["url"]) or top["basename"]
+        for i in sorted(got["to_close"].get(name, [])):
+            src = after.pop(f"{d}/board/{i}.md")
+            after[f"{d}/board/{L.item_path(i, day)}"] = L.edit_item(src, "done", why="swept",
+                                                                   today=date.fromisoformat(day))
+        for it in got["to_file"].get(name, []):
+            new = L.item_file(it["text"], None if it["kind"] == "fyi" else day, day, "sweep", None, it["context"],
+                              kind=it["kind"], answers=it["answers"], default=it["default"], detail=it["detail"],
+                              lifts=it["lifts"])
+            after[f"{d}/board/{L.item_id(day, hashlib.sha256(new.encode()).hexdigest()[:8])}.md"] = new
+        again = run(after)
+        out[c["name"]] = {"to_file": got["to_file"], "to_close": got["to_close"], "lifts": got["lifts"],
+                          "rerun": {"to_file": again["to_file"], "to_close": again["to_close"],
+                                    "lifts": again["lifts"]}}
+    return out
 
 
 ENTRY_ANSWERS_HEAD = ("## TD-5: An invented entry\n\n**Priority:** Medium\n**Status:** Open\n"

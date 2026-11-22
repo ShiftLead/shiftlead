@@ -1,10 +1,10 @@
 # Written by scripts/vendor_ledgerboard.sh — do not edit by hand.
-tag: v3.4
-commit: f1e077fac67d5ca7fefa8d73b5939ab5aba4e719
-file: src/sessionorc/ledgerboard/__init__.py a6fe638cd669bd168615bcdedf88d6d09a2856686cbdbc59da2c539b0c79f4fa
-file: src/sessionorc/ledgerboard/board.py c8649af018bfa593afa32ec135ec570763d3e316aa5870f3fa00216150a0bf35
-file: src/sessionorc/ledgerboard/ledger.py 68f861028fa1df51db4dec19f26b805a9a49cd8a3be468f31ca6751142e45180
-file: tests/ledgerboard/MANIFEST 6a3979d6e95a7b8c6aabde76a205dd54360754882594775f1f1c601a686a8fa8
+tag: v3.5
+commit: 48d83200de763e20ec739544e50bae48ea077f19
+file: src/sessionorc/ledgerboard/__init__.py 69a43654e62b88203a2abf2a60279c1700a2564c7edb957cb1ee4110445efb38
+file: src/sessionorc/ledgerboard/board.py c25860d4e55b4427b9bddd4b6708d038bf67842bb9934cf4d7a7e91d9d4e6318
+file: src/sessionorc/ledgerboard/ledger.py c12f6ccfefd91aeeee75f823d70a3038944accb438354cd7c8964884cd68ffdd
+file: tests/ledgerboard/MANIFEST 58b2ab96b277e4e2cf10d7052a8d5fe7288511415fcf9abb357d0e30569139f7
 file: tests/ledgerboard/board/answers.json 948b48c563f7339c52e1f2e15b2aeddc0aade48fb3fee04ddd2670d20121ca4c
 file: tests/ledgerboard/board/answers.md 3851ce1d9aec5b389e1dece6a20496b1b17ab84835a6e1e73c94f9e73c772c1f
 file: tests/ledgerboard/board/answers.v3/2026-01-05-67209175.md 2b951290c1f6663485b708fce9a31b1ca62a7ca03147d9834fc414c5b77c8e5a
@@ -5892,7 +5892,7 @@ file: tests/ledgerboard/origins/cases.json 9a461c27553a8be956dcf7abe8ba182555408
 file: tests/ledgerboard/origins/expected.json c4720db8ea45774b436443f068b5f4251d6d846bc7428f6984c29fca42754aa6
 file: tests/ledgerboard/person_text/cases.json 80141f53f4f84082d0cf9d7030c10535e780587b6248bbdeffa8bd8560ba97e1
 file: tests/ledgerboard/person_text/expected.json 77edcf35489323bb0037c1f6a1fe235d617fd2db060a108a1438409fa914d32f
-file: tests/ledgerboard/run.py 116b0f63c20f108c75be0a1de28728b66db216d6807e6d81b447f2b549f21c1c
+file: tests/ledgerboard/run.py 38df95ded772ef37d813ac21b9bfce478a6004dfa7e3f71f66b4d4259a8e1d52
 file: tests/ledgerboard/status/cases.json 32b613c546594034dd644b8ba1d5c83f04f16cac787523af299c6e7d75e38de0
 file: tests/ledgerboard/status/expected.json c8f7b0ea758e73fdea381765656efa267aa0ea58401eb0b75ed34aa862468cbf
 file: tests/ledgerboard/sweep/alpha.md 2d0184602be92c144495cbbe8132c69025771c36090d4ef45261a7901a1e853e
@@ -5901,7 +5901,7 @@ file: tests/ledgerboard/sweep/answers/ledger.md fcaff11281481e7f706e33237255e841
 file: tests/ledgerboard/sweep/archive.md 719f6d2de30e694ca2d95ebae6219748131e459b55fd39e68f017c09abce5d62
 file: tests/ledgerboard/sweep/beta.md 23d0cb0aff6e58e00397c7c4262ad9b6dda735d775f027450c540eec52a30880
 file: tests/ledgerboard/sweep/beta_archive.md 542c5639196b8c9206d7fa2179be64463f9f4b34743bcdee09eeaee1ec2a1c7f
-file: tests/ledgerboard/sweep/cases.json 5bb5f22293cc182f2a73886acdfe49a887cae2603c08787cd3d73a83d76d3958
+file: tests/ledgerboard/sweep/cases.json c7cab1a0a418a5e9e30e4a31ec208bd223bec39d230962ee719bdd4d16157cb1
 file: tests/ledgerboard/sweep/delegated/a closed delegated answer whose gate stands is owed/board/README.md ee48f6cfdd507dc6d395434dd304195d292d4115fb6d255933564acf48ae4024
 file: tests/ledgerboard/sweep/delegated/a closed delegated answer whose gate stands is owed/board/archive/2026-11/2026-10-20-0000a403.md cda87fb3eec2df7c13084a261c33cc11e1db3cf8491a577f2922dd52a124f90c
 file: tests/ledgerboard/sweep/delegated/a closed delegated answer whose gate stands is owed/ledger.md c8a4ffbe0cc1ef4a42ce42dc1d81f2ad12d228507c09bb4701ba2d21a9eb55b9
@@ -5919,8 +5919,104 @@ file: tests/ledgerboard/sweep/delegated/two delegated answers, the newer one's n
 file: tests/ledgerboard/sweep/delegated/two delegated answers, the newer one's names/board/archive/2026-11/2026-10-20-0000a405.md 92c0276c2eb7ffcdf32b90865b3e5dfaed10f45b095cee062e3050518d38e93d
 file: tests/ledgerboard/sweep/delegated/two delegated answers, the newer one's names/board/archive/2026-11/2026-10-20-0000b405.md ac583d7c58902927783cd9655a3d972fb9c7aed668486f975de8c1d514323e4b
 file: tests/ledgerboard/sweep/delegated/two delegated answers, the newer one's names/ledger.md 57beca05e5f4640d82d39a55b2a1e78b79ea77590b41e1fcb57d805102eac5d1
-file: tests/ledgerboard/sweep/expected.json 9f4ee6fc9745780258d09ef4f619bc31be7914363f7f83feb648f32f6d58a9a1
+file: tests/ledgerboard/sweep/expected.json b3916622101507144267ca4ec0f80d24ddcba9f50b44264812c5f5ffb4be92f2
 file: tests/ledgerboard/sweep/head_in_reply.md 1b47b0029cd4fd7250c755a2e277a14c2300649944cc59f5e1655b77cfa015d4
+file: tests/ledgerboard/sweep/in_flight/01 beside a live blocker/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/01 beside a live blocker/board/archive/2026-09/2026-09-10-00000001.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/01 beside a live blocker/ledger.md 65e0d2e2fe6a9d776aec5c68aa18888a36cebf30866dbf9fc6db58e1e94d7274
+file: tests/ledgerboard/sweep/in_flight/02 beside an archived Resolved blocker/archive.md 73efdc5ba06045feafd0a27f49e1e324f13d800e92a00813b9c755ec4a1f49d7
+file: tests/ledgerboard/sweep/in_flight/02 beside an archived Resolved blocker/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/02 beside an archived Resolved blocker/board/archive/2026-09/2026-09-10-00000002.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/02 beside an archived Resolved blocker/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/03a beside a blocker Superseded by a live entry/archive.md 04a9cea51f4d2b6d888cea52cd0f997f0dae91d7cd448734978fab8a81dd92d2
+file: tests/ledgerboard/sweep/in_flight/03a beside a blocker Superseded by a live entry/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/03a beside a blocker Superseded by a live entry/board/archive/2026-09/2026-09-10-00000003.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/03a beside a blocker Superseded by a live entry/ledger.md b33b611425e1ad455cd58314164210d06130615b7cfd9b3d532e200a55c3f044
+file: tests/ledgerboard/sweep/in_flight/03b beside a blocker Superseded by an archived Resolved entry/archive.md 417f3e500dd1c35271d9b4b55620442346ccc3cb74bcc701b3c2eea8f4b41599
+file: tests/ledgerboard/sweep/in_flight/03b beside a blocker Superseded by an archived Resolved entry/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/03b beside a blocker Superseded by an archived Resolved entry/board/archive/2026-09/2026-09-10-00000004.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/03b beside a blocker Superseded by an archived Resolved entry/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/03c beside a blocker Superseded with no successor/archive.md 1f7a9c027a1b95511e5ed3b75d8a70ac5bd509add5f8ad68ad199bc641092a0d
+file: tests/ledgerboard/sweep/in_flight/03c beside a blocker Superseded with no successor/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/03c beside a blocker Superseded with no successor/board/archive/2026-09/2026-09-10-00000005.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/03c beside a blocker Superseded with no successor/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/04a beside an archived Dropped blocker/archive.md 98e6e629227ee56e07356aba7112b1b84996390d885cb2715d96924ba6c326fb
+file: tests/ledgerboard/sweep/in_flight/04a beside an archived Dropped blocker/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/04a beside an archived Dropped blocker/board/archive/2026-09/2026-09-10-00000006.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/04a beside an archived Dropped blocker/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/04b beside an archived blocker with a Status word outside the vocabulary/archive.md 51c4a24586937c978122747136014b10d96ec93f8a2fc5c1682c4f4cf312dca9
+file: tests/ledgerboard/sweep/in_flight/04b beside an archived blocker with a Status word outside the vocabulary/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/04b beside an archived blocker with a Status word outside the vocabulary/board/archive/2026-09/2026-09-10-00000007.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/04b beside an archived blocker with a Status word outside the vocabulary/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/04c beside an archived blocker with Status Built/archive.md e83dc9395cbf9ca6cc140692e0d1509304b5469ec203d9f78f05d9b4ab4610e3
+file: tests/ledgerboard/sweep/in_flight/04c beside an archived blocker with Status Built/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/04c beside an archived blocker with Status Built/board/archive/2026-09/2026-09-10-00000008.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/04c beside an archived blocker with Status Built/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/05 beside an id in neither ledger nor archive/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/05 beside an id in neither ledger nor archive/board/archive/2026-09/2026-09-10-00000009.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/05 beside an id in neither ledger nor archive/ledger.md d34a4361ebda23fb9c202cc5764da93ea492d21893250cfe4273cb994441f4c9
+file: tests/ledgerboard/sweep/in_flight/06a beside another repo's id, no resolver/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/06a beside another repo's id, no resolver/board/archive/2026-09/2026-09-10-0000000a.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/06a beside another repo's id, no resolver/ledger.md 3cc7444a3a6ec5bb9d4056ec23aab3f61b661e2e80768a4ec8cb0d38e6055ab6
+file: tests/ledgerboard/sweep/in_flight/06b beside another repo's id the resolver answers open/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/06b beside another repo's id the resolver answers open/board/archive/2026-09/2026-09-10-0000000b.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/06b beside another repo's id the resolver answers open/ledger.md 3cc7444a3a6ec5bb9d4056ec23aab3f61b661e2e80768a4ec8cb0d38e6055ab6
+file: tests/ledgerboard/sweep/in_flight/06c beside another repo's id the resolver answers archived Resolved/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/06c beside another repo's id the resolver answers archived Resolved/board/archive/2026-09/2026-09-10-0000000c.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/06c beside another repo's id the resolver answers archived Resolved/ledger.md 3cc7444a3a6ec5bb9d4056ec23aab3f61b661e2e80768a4ec8cb0d38e6055ab6
+file: tests/ledgerboard/sweep/in_flight/06d beside another repo's id the resolver answers garbage/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/06d beside another repo's id the resolver answers garbage/board/archive/2026-09/2026-09-10-0000000d.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/06d beside another repo's id the resolver answers garbage/ledger.md 3cc7444a3a6ec5bb9d4056ec23aab3f61b661e2e80768a4ec8cb0d38e6055ab6
+file: tests/ledgerboard/sweep/in_flight/06e beside another repo's id, the resolver raising/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/06e beside another repo's id, the resolver raising/board/archive/2026-09/2026-09-10-0000000e.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/06e beside another repo's id, the resolver raising/ledger.md 3cc7444a3a6ec5bb9d4056ec23aab3f61b661e2e80768a4ec8cb0d38e6055ab6
+file: tests/ledgerboard/sweep/in_flight/07 beside a blocker Superseded by another repo's open id/archive.md f8b57e9416901fe386c1782ace469c8e47043170abc604564338d50ca9f577f7
+file: tests/ledgerboard/sweep/in_flight/07 beside a blocker Superseded by another repo's open id/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/07 beside a blocker Superseded by another repo's open id/board/archive/2026-09/2026-09-10-0000000f.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/07 beside a blocker Superseded by another repo's open id/ledger.md 5827006b369c275e3ecf23ad7b6e1dd722b735dc71c9a1b5ef7321f961bcc241
+file: tests/ledgerboard/sweep/in_flight/08 two blockers, one live and one archived Resolved/archive.md 72a75d569ef786c3b7e7e39da5b679185ec76aae311df9f582415b7d9c90c8ce
+file: tests/ledgerboard/sweep/in_flight/08 two blockers, one live and one archived Resolved/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/08 two blockers, one live and one archived Resolved/board/archive/2026-09/2026-09-10-00000010.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/08 two blockers, one live and one archived Resolved/ledger.md 1d0151c5f4dad9f894f621673144ab08fed7e0a5e960a0022b4dd0fdaf01a39d
+file: tests/ledgerboard/sweep/in_flight/09a the entry's own id in its Blocked by/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/09a the entry's own id in its Blocked by/board/archive/2026-09/2026-09-10-00000011.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/09a the entry's own id in its Blocked by/ledger.md 619f51242143bb06cb1b55f22e27dd9bd88f13befab724cedd59fd83e5de3bc1
+file: tests/ledgerboard/sweep/in_flight/09b a part of it in its Blocked by/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/09b a part of it in its Blocked by/board/archive/2026-09/2026-09-10-00000012.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/09b a part of it in its Blocked by/ledger.md a0b08162c812af6d5179ae81488428fbbe8f8eab94cb16f130501515f43fbfe9
+file: tests/ledgerboard/sweep/in_flight/09c its parent in its Blocked by/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/09c its parent in its Blocked by/board/archive/2026-09/2026-09-10-00000013.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/09c its parent in its Blocked by/ledger.md 1f529e78bd3e1fd40eacb244bc3bf187cf6b3fa3ba5b6640c0485ab2a6d7a50f
+file: tests/ledgerboard/sweep/in_flight/09d an archived blocker Superseded by a part of it/archive.md d137169b2030740f0cc368eff5eca2be371371ddcce467ed888ef5584a13e11f
+file: tests/ledgerboard/sweep/in_flight/09d an archived blocker Superseded by a part of it/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/09d an archived blocker Superseded by a part of it/board/archive/2026-09/2026-09-10-00000014.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/09d an archived blocker Superseded by a part of it/ledger.md 5071237ad03927c31428124d3b13ddd357d1afcb2192975362bfd35881801166
+file: tests/ledgerboard/sweep/in_flight/10 a design and its held builds, no blocker/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/10 a design and its held builds, no blocker/ledger.md fabfd60e4460fba137c3761c758255bb533454e43954fc8995b6d90819a59449
+file: tests/ledgerboard/sweep/in_flight/11 a design held by its bought round, and its held builds/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/11 a design held by its bought round, and its held builds/board/archive/2026-09/2026-09-10-00000015.md 7a9ed9471d287b41f6b382648aa43ec2912327502811698677a03e1a4c447065
+file: tests/ledgerboard/sweep/in_flight/11 a design held by its bought round, and its held builds/ledger.md ed665125aa52ed4f2c3e04f593665b90eb6c833ce0b7af949fe6468afbe33b43
+file: tests/ledgerboard/sweep/in_flight/12 a part whose parent is blocked by a live entry and carries no decision/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/12 a part whose parent is blocked by a live entry and carries no decision/board/archive/2026-09/2026-09-10-00000016.md 4cf5dd9fde117880ff5a8170726a8e0e7003f912af265e470c2845ce9f6a12e5
+file: tests/ledgerboard/sweep/in_flight/12 a part whose parent is blocked by a live entry and carries no decision/ledger.md cb9ac19149c35cf28af1e11e9bbfed9966e483e02f28f078479b6752f13dc12c
+file: tests/ledgerboard/sweep/in_flight/13 a part whose parent carries the decision and is blocked only by a sibling part/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/13 a part whose parent carries the decision and is blocked only by a sibling part/board/archive/2026-09/2026-09-10-00000017.md 441f6679aeeeb7b423d1022d8ab507455b7cdcc2aabb42d5e9fd6b9504ea65cd
+file: tests/ledgerboard/sweep/in_flight/13 a part whose parent carries the decision and is blocked only by a sibling part/ledger.md 106fd4fed97d6b43857f7b1301a7e7f76e6871ebfe2e826d6d6c6aa83844fdbc
+file: tests/ledgerboard/sweep/in_flight/14a beside an until a later day/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/14a beside an until a later day/board/archive/2026-09/2026-09-10-00000018.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/14a beside an until a later day/ledger.md f744483e00d5b1f34b053271d96397a7b77607575ee5291c6971fe7beefe4020
+file: tests/ledgerboard/sweep/in_flight/14b beside an event with no outcome/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/14b beside an event with no outcome/board/archive/2026-09/2026-09-10-00000019.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/14b beside an event with no outcome/ledger.md 310f4e6953741ee945992886a476b46a2a7d3ba5d80bed9cc9cb9588a8e74e44
+file: tests/ledgerboard/sweep/in_flight/15 an open decide covering the gate, a live blocker beside it/board/2026-10-25-00000900.md 1096c755c0bd15653039b57a569469ecb7bfd97291559360f13f2fc7a8d7490e
+file: tests/ledgerboard/sweep/in_flight/15 an open decide covering the gate, a live blocker beside it/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/15 an open decide covering the gate, a live blocker beside it/ledger.md 65e0d2e2fe6a9d776aec5c68aa18888a36cebf30866dbf9fc6db58e1e94d7274
+file: tests/ledgerboard/sweep/in_flight/16 no board lists the person, a live blocker beside it/board/README.md bce1c446350f72ba0a37f15de8497305cf3ac0c6c6411aac603bd19267771c35
+file: tests/ledgerboard/sweep/in_flight/16 no board lists the person, a live blocker beside it/board/archive/2026-09/2026-09-10-0000001a.md 9486fca322c31af00281eb2bb10f8ee9c5138638715e44c8873e9f3dd55077db
+file: tests/ledgerboard/sweep/in_flight/16 no board lists the person, a live blocker beside it/ledger.md 65e0d2e2fe6a9d776aec5c68aa18888a36cebf30866dbf9fc6db58e1e94d7274
+file: tests/ledgerboard/sweep/in_flight/17 an answer owing a lift, a live blocker beside it/board/README.md 451d73c80d99e6e9e9aa14227be94a8e05f79de001d0a40902b12853d6d6b5b7
+file: tests/ledgerboard/sweep/in_flight/17 an answer owing a lift, a live blocker beside it/board/archive/2026-11/2026-10-20-00000901.md 95a91ece563484d18f1d9f28622124c26e0adb0cdb3fba270a09939890744f69
+file: tests/ledgerboard/sweep/in_flight/17 an answer owing a lift, a live blocker beside it/ledger.md 65e0d2e2fe6a9d776aec5c68aa18888a36cebf30866dbf9fc6db58e1e94d7274
 file: tests/ledgerboard/sweep/ledger.md 66020f25ba4390bba8047834bd71d42741a6eec03cec8f7d554ae2b2585c9dca
 file: tests/ledgerboard/sweep/undated_close.md 293009aeea2efd635634c97d9e4b9b926a2a0b951fc0749a5d8493a7f842e9cc
 file: tests/ledgerboard/sweep/widgets.md a84fb0908579b8b688c9ee10bfd8489602a39abb753f61bb434350b44c1d176c
@@ -5943,7 +6039,7 @@ file: tests/ledgerboard/verdict/base/docs/user_attention/README.md b65cee8f436ec
 file: tests/ledgerboard/verdict/boards/empty.md 4f758d857f6e3399726c8d76cc440e1cab929194520ff22be50e020513e308eb
 file: tests/ledgerboard/verdict/boards/kim/2026-01-06-5ba8ee31.md 65e9f827bedc2a9c580fc00c77fe28313efcd6fcfd322a9363354539ae20076c
 file: tests/ledgerboard/verdict/boards/kim/README.md bce1c446350f72ba0a37f15de8497305cf3ac0c6c6411aac603bd19267771c35
-file: tests/ledgerboard/verdict/cases.json fead6b7335e376381d4c3f6ca93715802b2acc0665e0506826f7b5506d5cb868
+file: tests/ledgerboard/verdict/cases.json e043993bcbe84c93b4f6fb2861dcf4cf6654fba45b0d5f031e2e9b35ee9699a9
 file: tests/ledgerboard/verdict/cases/a CRLF board whose answered line drops its CR/base/docs/user_attention/2026-01-06-54236abb.md f6b2c96349835607cd708be5fabc3c3f8ec96c2b2a83cdd034751c576c67c866
 file: tests/ledgerboard/verdict/cases/a CRLF board whose answered line drops its CR/base/docs/user_attention/2026-01-06-85a7b461.md f1718f8572ee5a3797bfe65e055006a1eb397a3a6ad54b5ba6c552e804adef16
 file: tests/ledgerboard/verdict/cases/a CRLF board whose answered line drops its CR/base/docs/user_attention/2026-01-06-be7088b5.md a5370d4b414fc5b767bb06b3ff2d38a382cecaa407abc46d7e373c94b4ae01d4
@@ -6071,6 +6167,36 @@ file: tests/ledgerboard/verdict/cases/an override/head/docs/ledger/TD-130.md 37d
 file: tests/ledgerboard/verdict/cases/another repo's entry, on the board alone/head/docs/user_attention/2026-01-06-be7088b5.md a6032513d68ef70c7c0e8488b76a740acc369932e3c13766532ae528789d3c25
 file: tests/ledgerboard/verdict/cases/another repo's entry, with a ledger file/head/docs/ledger/TD-150.md 96262de6000de1670b11997adf9991dc3788e71b067b84e2796169f84b45f5d1
 file: tests/ledgerboard/verdict/cases/another repo's entry, with a ledger file/head/docs/user_attention/2026-01-06-be7088b5.md a6032513d68ef70c7c0e8488b76a740acc369932e3c13766532ae528789d3c25
+file: tests/ledgerboard/verdict/cases/deferred: a part whose parent carries the gate and a live blocker/head/docs/ledger/TD-179.md a9cefd4c4ddc2f2cc379e49ae10f2a541c355a95175996800e63d3ba7dd4939c
+file: tests/ledgerboard/verdict/cases/deferred: a part whose parent carries the gate and a live blocker/head/docs/ledger/TD-180.md abc992061e8d1c44dc1438edb8238efd563cb89501b2808941ce53d0b2f10928
+file: tests/ledgerboard/verdict/cases/deferred: a part whose parent carries the gate and a live blocker/head/docs/ledger/TD-181.md 0ce9f6f7ff87bddd76cd406f9c9664ca31be86480cf6adb41ab6c17830138b3b
+file: tests/ledgerboard/verdict/cases/deferred: an id in its own and its parent's lists/head/docs/ledger/TD-184.md 797ca59407d5bfc5c20e58d0fa9852fa2e129584d4510369975b988f167b6693
+file: tests/ledgerboard/verdict/cases/deferred: an id in its own and its parent's lists/head/docs/ledger/TD-185.md 368183bf6bf8c3145cbed283d9fb60698a9e7379a952e24c37408e326d12b9d6
+file: tests/ledgerboard/verdict/cases/deferred: an id in its own and its parent's lists/head/docs/ledger/TD-186.md 8e77a54de6541fe8ac76382e15fe427ccebd1f3cd3819adcaa9c510a249bb766
+file: tests/ledgerboard/verdict/cases/deferred: an id written twice/head/docs/ledger/TD-182.md b73b72cc001eb89e3e59583048f264e3f7ca52637bcb3da33df7a705617afcbe
+file: tests/ledgerboard/verdict/cases/deferred: an id written twice/head/docs/ledger/TD-183.md 77f08015df20a3489e2a8fb263a82cb3696bc18852af5b7d9adcf54e6ec5f0d7
+file: tests/ledgerboard/verdict/cases/deferred: beside a live id/head/docs/ledger/TD-161.md 7085be5e0a2067393e18a4e64b39051e3ba396b2e6cdbc906e75ad50a65eb3f4
+file: tests/ledgerboard/verdict/cases/deferred: beside a live id/head/docs/ledger/TD-162.md 45412f18cec6e53d5d6320247ee8fa167a20f43525c0c0cbc42946d8f1a819f3
+file: tests/ledgerboard/verdict/cases/deferred: beside a local id Superseded by another repo's id/head/docs/ledger/TD-170.md c54118b7ea5c53d44c4bc9d7794825ea207ea07e26f6c69c5f3f5954724bb1e4
+file: tests/ledgerboard/verdict/cases/deferred: beside a local id Superseded by another repo's id/head/docs/ledger/archive/TD-171.md 359c20c56c593216dfd9b71f3f769be3514a2d1076d120625661ab48b73db96f
+file: tests/ledgerboard/verdict/cases/deferred: beside a local id Superseded with no successor/head/docs/ledger/TD-187.md 9536e4c6830ffb89a50a193dbf025912eed74f91f5f59e2232a87fbdd0401469
+file: tests/ledgerboard/verdict/cases/deferred: beside a local id Superseded with no successor/head/docs/ledger/archive/TD-188.md cdc74d1e4bdaa2e787c8489c7f46b59fed7b1b245e1672e9bd11f8f87bbb30b7
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived Resolved id/head/docs/ledger/TD-163.md 78f028e2619dc10cdc51b4a06169f76a9e2929f70660cfef84c26b3d375c7e72
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived Resolved id/head/docs/ledger/archive/TD-164.md 2f3a45f555e40769184b05164f7bc6df6b4563920c5f797e70e636540a7e0fec
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived id with Status Built/head/docs/ledger/TD-167.md 184269b3ad7282ec0de80f1908a842aab8b93a77dad422229593aae7e7b789a0
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived id with Status Built/head/docs/ledger/archive/TD-168.md 573eb684ce55b07a75810dfb0bf918a308fedb59acc65482b28ce4b815d83033
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived id with a Status word outside the vocabulary/head/docs/ledger/TD-165.md dc30a86755e2d500cfc267d410a9fea18b0ecb576a205e513f09817f8d0e46f6
+file: tests/ledgerboard/verdict/cases/deferred: beside an archived id with a Status word outside the vocabulary/head/docs/ledger/archive/TD-166.md 6ff56ce24e68a5b756dcfae3aeadaff22882ab927de456739a824d00748b1dbf
+file: tests/ledgerboard/verdict/cases/deferred: beside another repo's id/head/docs/ledger/TD-169.md ce332cef04b9292e1f902ac289aae556452ad9222d665eb81e80323cc7c81f2a
+file: tests/ledgerboard/verdict/cases/deferred: beside two live ids/head/docs/ledger/TD-172.md 054389b51c7d0b507a186a024b655c5d7599ea23e2f5e9b049f6dcbaf7cba7d1
+file: tests/ledgerboard/verdict/cases/deferred: beside two live ids/head/docs/ledger/TD-173.md a870bc2652335cfdcdc384caeeb45da9c8af4b4bd8095165225edc3200f90976
+file: tests/ledgerboard/verdict/cases/deferred: beside two live ids/head/docs/ledger/TD-174.md e2a1d0adfd98da7b51b7707d8857f0c51098f794ecd3cfb71aeb17027b32cdc0
+file: tests/ledgerboard/verdict/cases/deferred: covered by an open item beside a live id/head/docs/ledger/TD-175.md 5aca44efa8427cb34a1deec46dd5fe3ec25798ea9cf4052157bbe30f8a3c8121
+file: tests/ledgerboard/verdict/cases/deferred: covered by an open item beside a live id/head/docs/ledger/TD-176.md 9fbb61970a4bc49c861c252406dba3227d40ee7cc930aeeef97b33f3abba92e5
+file: tests/ledgerboard/verdict/cases/deferred: covered by an open item beside a live id/head/docs/user_attention/2026-01-06-0000b175.md b5c843661186f7d5ff2104ec0c3e79ff6dfd5c718c4f0de104ce7816e80cede0
+file: tests/ledgerboard/verdict/cases/deferred: the board not listing pat, beside a live id/head/docs/ledger/TD-177.md 4b7df7486c711b4b9b8e1562c1c0b9742bc64709473c70ca16cc6b0a06b04dcb
+file: tests/ledgerboard/verdict/cases/deferred: the board not listing pat, beside a live id/head/docs/ledger/TD-178.md a5fd6465c577bbf5a85d10926e9c36312acff1fc8be8507e0a6eb848f4ac1a8c
+file: tests/ledgerboard/verdict/cases/deferred: the board not listing pat, beside a live id/head/docs/user_attention/README.md abb602e9aae77a88fc42d2e85680e9d2eb6f1f7c9a4e10c86b99eb3e045ea520
 file: tests/ledgerboard/verdict/cases/delegated: a # ref beside a second ref/base/docs/user_attention/2026-01-06-54236abb.md 4ed36ecb29fe1b55ed812af5140eb5f6af1d3819f440567558ba930672e75bf1
 file: tests/ledgerboard/verdict/cases/delegated: a # ref beside a second ref/base/docs/user_attention/README.md 7f91c71104c62b04801143427e46d35386905cda8b8fbd76a8dbcd79ebf030a2
 file: tests/ledgerboard/verdict/cases/delegated: a # ref beside a second ref/head/docs/user_attention/2026-01-06-54236abb.md 8ef9316bb9dd8f1ce0f947c475cf947ee826e384d5c4bfa7a8f36d6076022bd7
@@ -6379,4 +6505,4 @@ file: tests/ledgerboard/verdict/cases/v3_tripwire_lifted/head/docs/ledger/TD-112
 file: tests/ledgerboard/verdict/cases/v3_tripwire_lifted/head/docs/user_attention/archive/2026-01/2026-01-06-d6f09cf2.md 6ad4cbadc45a99702582d8adf60921bfd539d57c9240e9edc54aab5c9f91ca2c
 file: tests/ledgerboard/verdict/cases/v3_uncovered_new_decide/head/docs/ledger/TD-160.md 436b7cd40171bc314d7c9dfed75e5a8214ed88d6948e91657a441aef3fb36bcd
 file: tests/ledgerboard/verdict/cases/v3_uncovered_new_decide/head/docs/user_attention/2026-01-06-e1f76e2e.md d698b41a0de6b3d50842a95ef4bcf709b52340b50afeb8aadda18c74caad7694
-file: tests/ledgerboard/verdict/expected.json 2773c6db273b93835020f323630c13637405692ce8eac5dcbdd9e92aaaea245e
+file: tests/ledgerboard/verdict/expected.json fbe8b9895762a7d7ac32d1071220f4eae50b4bd9d7b3db757b1dbc51e342f33e
