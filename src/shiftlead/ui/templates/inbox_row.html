@@ -1671,6 +1671,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- elif ans and ans.kind == 'handed' %} <span class="st qans">handed to {{ ans.name }}{% if ans.age %} · {{ ans.age }}{% endif %}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
   {%- elif then %} <span class="st qans">waiting, then yours</span>
+  {%- elif e.held_by %} <span class="st qans">{{ e.held_word }}</span>{# a held build's word, no answers (TD-2026) #}
   {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   {{- design_link(e) }}
   <span class="grow"></span>

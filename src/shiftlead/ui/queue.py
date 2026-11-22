@@ -826,7 +826,16 @@ def asked_once(mine: Iterable[str], card: Mapping[str, Any] | None) -> list[str]
     reads that it waits; every other id as given."""
     rows = [(card or {}).get("top"), *((card or {}).get("rows") or ())]
     then = {str(r["qid"]): r["then_yours"] for r in rows if isinstance(r, Mapping) and r.get("then_yours")}
-    return [f"{m} — asked once {then[m][0]} closes" if m in then else m for m in mine]
+    # a held build ends *— asked on TD-<design>'s question* (TD-2026)
+    held = {str(r["qid"]): str(r["held_by"]) for r in rows if isinstance(r, Mapping) and r.get("held_by")}
+    return [
+        f"{m} — asked on {held[m].rpartition('#')[2]}'s question"
+        if m in held
+        else f"{m} — asked once {then[m][0]} closes"
+        if m in then
+        else m
+        for m in mine
+    ]
 
 
 def item_id(e: Mapping[str, Any]) -> str:
@@ -936,6 +945,8 @@ def attach(
     }
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
+        if e.get("row") == "ledger" and e.get("held_by"):
+            return  # a held build is no item: its design's question is (TD-2026)
         want, kind, mine = rewrite(e, sec, kind)
         card, ref = str(e.get("on_card") or ""), item_ref(e)
         if gives_way(e, want, {m for c, m in unreplied if c == card}):
@@ -1400,6 +1411,8 @@ def branch(r: Mapping[str, Any]) -> str:
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
+    if r.get("held_by"):  # *waits on TD-n's question*, read before its `needs` (TD-2026)
+        return "waiting"
     if r.get("needs") and not (r.get("with_you") or r.get("answered") or r.get("then_yours")):
         return "needs"
     if state.startswith("waits ") or state in ("waiting", "settling") or r.get("then_yours"):
@@ -1412,7 +1425,8 @@ def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
     word = (
         ""
-        if r.get("with_you") or r.get("answered") or r.get("then_yours")  # its own word, *waiting, then yours*
+        # its own word: *waiting, then yours*, a held build's *waits on TD-n's question* (TD-2026)
+        if r.get("with_you") or r.get("answered") or r.get("then_yours") or r.get("held_by")
         else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
     )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}

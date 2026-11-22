@@ -1498,7 +1498,9 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
             return row
         if (applying := pressing.get(str(row.get("qid") or ""))) is None:
             return row
-        # `restart_home` stays, so the card is still *needs you* (TD-1856); the word it replaces goes
+        # `restart_home` stays, so the card is still *needs you* (TD-1856); the word it replaces goes, a held
+        # build's with it (TD-2026)
+        row = {k: v for k, v in row.items() if k != "held_by"}
         return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying,
                 "lift_here": False, "restart_word": False}  # fmt: skip
 
@@ -1781,7 +1783,16 @@ def reading(
             # *waiting, then yours* (TD-1926): a member that would otherwise need the person and whose question waits
             # on open work; every word above keeps its place, and the row keeps its `needs`, marked
             fact = list(e.get("open_work") or ())
-            then_yours = fact if fact and needs and not mine and not answered else None
+            # a held build's word (§4.4 *A design's question is asked once, on the design*, TD-2026): in place of
+            # *your decision*, a covering line's answer, a kept-waiting *waits until* and *waiting, then yours*;
+            # yielding to *with you*, a press's mark, a hand-off and a mail answer about the build
+            design = str(e.get("held_by") or "")
+            held_word = bool(
+                design and needs and not mine and not applying and not (answered and answered.get("kind") != "board")
+            )
+            if held_word:
+                st, answered = f"waits on {design.rpartition('#')[2]}'s question", None
+            then_yours = fact if fact and needs and not mine and not answered and not held_word else None
             if then_yours:
                 st = "waiting, then yours"
             # **Lift the hold** in the row's ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): read on its own,
@@ -1790,6 +1801,7 @@ def reading(
                 not mine
                 and not applying
                 and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
+                and not design  # a held build: its design's question lifts it (TD-2026)
                 # interim (TD-2026; TD-2027 step 1 draws **Go now** there): a design with held builds draws no Lift,
                 # which would lift the design alone
                 and q not in go
@@ -1805,6 +1817,8 @@ def reading(
                 )
             )
             return {
+                # the row field, where the held word stands alone: a row that yields carries none (TD-2026)
+                **({"held_by": design} if held_word else {}),
                 "qid": q,
                 "repo": e["repo"],
                 "id": e["id"],
@@ -2206,7 +2220,8 @@ def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Ma
     entry that waits on the person (`decision (paul)`: an Owner alone holds nothing, TD-1375), else its first
     `decision (paul)` entry by key, else the top entry — by key alone, never by what is claimed, so two presses
     choose the same entry."""
-    by_key = sorted(members, key=lambda q: _key_sort(keyed[q], q))
+    # a held build is passed over, so Start session opens on its design (TD-2026)
+    by_key = sorted((q for q in members if not open_[q].get("held_by")), key=lambda q: _key_sort(keyed[q], q))
     # the gate itself, not `_own`: an entry whose question waits on open work is still the one Start opens (TD-1926)
     owned = [
         q
@@ -2246,7 +2261,11 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
     first, whatever word it reads."""
     if any(r.get("restart_home") for r in rows):
         return "needs you"
-    if any(r["needs"] and not r.get("with_you") and not r.get("answered") and not r.get("then_yours") for r in rows):
+    if any(
+        r["needs"] and not r.get("with_you") and not r.get("answered") and not r.get("then_yours")
+        and not r.get("held_by")  # a held build's word is no need (TD-2026)
+        for r in rows
+    ):  # fmt: skip
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
         return "stalled"
@@ -2261,6 +2280,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         # an open part counts as an open id its parent is blocked by (TD-1130)
         return bool(ids or e.get("parts_open")) and all(not b.startswith("decision (") for b in ids)
 
+    # a held build never makes its card wait or block: its design, always left, is read (TD-2026)
+    ents = [e for e in ents if not e.get("held_by")] or ents
     # a kind no lane takes, or an entry the home marked `no_lane` (§4.4 *An entry no lane takes is marked*, TD-1573)
     if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE or e.get("no_lane") for e in ents):
         return "blocked"
@@ -2292,7 +2313,8 @@ def _wait(
     waits for a reason of its own, the first that applies: the top entry with a gate, the earliest `until` date, an
     event (a live check whose reading says `no` adds *(not live #n)*), settling, past reach — ties by key; a cycle
     of open ids with none is read as past reach."""
-    own = {q for q in members if _own(open_[q])}
+    # a held build counts as the person's own member: it waits on its design's question (TD-2026)
+    own = {q for q in members if _own(open_[q]) or open_[q].get("held_by")}
     rest = [q for q in members if q not in own]
 
     def by_key(q: str) -> tuple[tuple[int, ...], int, str]:
@@ -2355,7 +2377,7 @@ def _wait(
     q = min(rest, key=by_key)
     while q not in seen:
         seen.append(q)
-        q = min((blockers[q] | parts[q]) - own, key=by_key)  # an open part waits as an open id does
+        q = min(counted(q) - own, key=by_key)  # an open part waits as an open id does
     loop = sorted(seen[seen.index(q) :], key=by_key)
     names = [show(x) for x in loop]
     said = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
