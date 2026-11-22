@@ -112,6 +112,7 @@ p.lead { margin:0 0 12px; color:var(--soft); max-width:70ch; font-size:15px; }
 .ladder .mv button { width:24px; height:24px; padding:0; border-radius:50%; border-color:var(--rule); color:var(--soft); font-size:11px; }
 @media (max-width:700px) { .ladder li { grid-template-columns:34px minmax(0,1fr) 76px; } .ladder .use { grid-column:2 / 4; } .ladder .mv { grid-row:1; grid-column:3; } }
 .addl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:15px; color:var(--soft); }
+.addl select { max-width:100%; min-width:0; }
 
 .tt { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; }
 .tt > div { display:grid; grid-template-columns:180px minmax(0,340px) minmax(0,1fr); gap:6px 16px; align-items:center; padding:10px 18px; border-bottom:1px solid var(--rule2); }
@@ -125,16 +126,17 @@ p.lead { margin:0 0 12px; color:var(--soft); max-width:70ch; font-size:15px; }
 </style>
 
 <div class="wrap">
-  <nav class="rail"><div class="gear">⚙ behind the gear</div><a>Settings</a><a>Tools</a><a>Flows</a><a>Briefs</a><a class="on">Teams</a>
-    <p>A team is a repo, a flow and a list of logins. Its sessions are started for one entry in one stage and end with it, so a team has no members to name.</p></nav>
-  <main><div class="note">A working prototype of the team page (TD-1153), in the layout agreed on 2026-11-21. Everything stays in this browser. Teams, logins, entries and numbers are examples.</div><div id="main"></div></main>
+  <nav class="rail"><div class="gear">⚙ behind the gear</div><a data-nav="Settings">Settings</a><a data-nav="Tools">Tools</a><a data-nav="Flows">Flows</a><a data-nav="Briefs">Briefs</a><a data-nav="teams" id="nav-teams">Teams</a><a data-nav="builtins" id="nav-builtins">Built-in seats</a>
+    <p id="railnote"></p></nav>
+  <main><div class="note">A working prototype of the team page and the Built-in seats page (TD-1153), as they are after the switch-over. Everything stays in this browser. Teams, logins, entries and numbers are examples.</div><div id="main"></div></main>
 </div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
 const KC = { design: "--design", build: "--build", review: "--review" };
 const S = (name, does, model, x) => Object.assign({ name, does, model, key: name.toLowerCase().replace(/ /g, "-") }, x || {});
-const SUPPORT = [["Tech lead", "opus"], ["Board answers", "sonnet"], ["Pull requests nobody holds", "sonnet"], ["Manager", "haiku"], ["Sweeper", "haiku"]];
+const SEATS = [["tech-lead", "Tech lead", "answers sessions' questions, tags new entries", "each team"], ["manager", "Manager", "watches a team's sessions and nudges stuck ones", "each team"], ["board-answers", "Board answers", "carries out what you decided on the board", "the repo"], ["unheld-pull-requests", "Pull requests nobody holds", "cures a red or orphaned pull request", "the repo"], ["sweeper", "Sweeper", "the periodic sweep for stranded work", "the repo"]];
+const MODELS = ["haiku", "sonnet", "opus", "fable", "flash", "flash-lite", "grok-4"];
 const FLOWS = {
   td: { about: "design with two reads and a fact-check; build, review, a protected read", stages: [S("Design", "design", "fable"), S("Sonnet read", "review", "sonnet"), S("Opus read", "review", "opus"), S("Fact-check", "review", "haiku"), S("Build", "build", "opus"), S("Review", "review", "sonnet"), S("Protected read", "review", "fable", { only: true })],
         lines: [["Entries that need a design first", ["design", "sonnet-read", "opus-read", "fact-check"]], ["Entries ready to build", ["build", "review", "protected-read"]]],
@@ -150,22 +152,49 @@ const LOGINS = {
   "gemini-reader": { tool: "Gemini CLI", acct: "free · paul", models: ["flash", "flash-lite"], state: "ok", used: 12, keep: 10, note: "day 12% used" },
   "grok-reader": { tool: "Grok Build", acct: "SuperGrok · paul", models: ["grok-4"], state: "ok", used: 3, keep: 10, note: "week 3% used" },
 };
-const DEF = { team: "ao-grind", pending: null, teams: {
+const DEF = { page: "teams", set: "default", repoSet: { shiftlead: "default", samscrape: "default" },
+  sets: { default: { label: "", models: { "tech-lead": "opus", manager: "haiku", "board-answers": "sonnet", "unheld-pull-requests": "sonnet", sweeper: "haiku" }, logins: ["claude-paul", "claude-api"] } },
+  team: "ao-grind", pending: null, teams: {
   "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { build: 2 }, total: 0,
     work: [["TD-2090", "design", "14m"], ["TD-2077", "fact-check", "3m"], ["TD-2101", "build", "41m"], ["TD-2104", "build", "6m"], ["TD-2098", "review", "9m"], ["TD-2084", "you", "review", "2h"], ["TD-2071", "you", "design", "1d"]],
-    set: { start: "reset", stops: "at", until: "Fri 06:00", prio: "10", onwork: "start", hold: true, holdn: "10", holdd: "2d" } },
-  "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 0, work: [], set: { start: "hand", stops: "never", until: "Fri 06:00", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } } } };
+    set: { start: "reset", stops: "at", until: "Fri 06:00", prio: "10", hold: true, holdn: "10", holdd: "2d" } },
+  "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 0, work: [], set: { start: "hand", stops: "never", until: "Fri 06:00", prio: "0", hold: false, holdn: "10", holdd: "2d" } } } };
 let D;
-try { D = JSON.parse(localStorage.getItem("team-proto-v5")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
-const save = (msg) => { try { localStorage.setItem("team-proto-v5", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
+try { D = JSON.parse(localStorage.getItem("team-proto-v6")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
+const save = (msg) => { try { localStorage.setItem("team-proto-v6", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
 const toast = (t) => { const e = document.getElementById("toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 2400); };
 const T = () => D.teams[D.team];
 const cap = (t, key) => t.caps[key] ?? 1;
+const curList = () => D.page === "builtins" ? D.sets[D.set].logins : T().logins;
+const setOf = (repo) => D.repoSet[repo] || "default";
+function setCannot(name) { const s = D.sets[name]; return SEATS.filter(x => !pickLogin(s, s.models[x[0]]).offer.length).map(x => `${x[1].toLowerCase()}: no login in its list offers ${s.models[x[0]]}`); }
 function pickLogin(t, model) { const offer = t.logins.filter(n => LOGINS[n].models.includes(model)); const hit = offer.find(n => LOGINS[n].state === "ok"); return { hit, offer, skipped: offer.slice(0, hit ? offer.indexOf(hit) : offer.length) }; }
-function flowModels(f) { const m = new Set(); f.stages.forEach(s => m.add(s.model)); f.audits.forEach(a => m.add(a[1])); SUPPORT.forEach(s => m.add(s[1])); return [...m]; }
+function flowModels(f) { const m = new Set(); f.stages.forEach(s => m.add(s.model)); f.audits.forEach(a => m.add(a[1])); return [...m]; }
 function cannot(t, name) { const miss = flowModels(FLOWS[name]).filter(m => !pickLogin(t, m).offer.length); return miss.length ? `no login in this team's list offers ${miss.join(", ")}` : ""; }
 
+function ladder(list, usedNote) {
+  return `<ol class="ladder">` + list.map((n, i) => { const l = LOGINS[n];
+    return `<li class="${l.state === "ok" ? "" : "skip"}"><span class="n">${i + 1}</span><span class="who"><b>${n}</b>${l.metered ? '<span class="tagm">spends money</span>' : ""}<small>${l.tool} · ${l.acct}</small><small class="mono">${l.models.join(" ")}</small></span>
+      <span class="use"><span class="${{ ok: "s-ok", wait: "s-wait", bad: "s-bad" }[l.state]}">${l.state === "ok" ? "Usable" : "Passed over"}</span><div class="gauge"><i style="width:${l.used}%"></i><u style="width:${l.keep}%"></u></div><small>${l.note}${usedNote(l)}</small></span>
+      <span class="mv"><button data-up="${i}" ${i ? "" : "disabled"} aria-label="move ${n} up">▲</button><button data-down="${i}" ${i < list.length - 1 ? "" : "disabled"} aria-label="move ${n} down">▼</button><button data-rm="${i}" aria-label="remove ${n}">×</button></span></li>`; }).join("") + `</ol>`
+    + (() => { const rest = Object.keys(LOGINS).filter(n => !list.includes(n)); return `<div class="addl">${rest.length ? `<select id="al" aria-label="add a login"><option value="">Add a login…</option>${rest.map(n => `<option value="${n}">${n} · ${LOGINS[n].tool} · ${LOGINS[n].models.join(", ")}</option>`).join("")}</select>` : "Every login on this host is in the list."}<button class="lnk" data-act="tools">Sign in a new one on Tools</button></div>`; })();
+}
+function drawSets() {
+  const s = D.sets[D.set], bad = setCannot(D.set), repos = Object.keys(D.repoSet), users = repos.filter(r => setOf(r) === D.set);
+  let h = `<div class="teams">` + Object.keys(D.sets).map(n => `<a class="${n === D.set ? "on" : ""}" data-setname="${n}">${n}${setCannot(n).length ? " <i>●</i>" : ""}</a>`).join("") + `<button class="quiet" data-act="newset">+ New set</button></div>`;
+  h += `<div class="head"><h1>${s.label || D.set}</h1><button class="lnk" data-act="setlabel" aria-label="change the label">✎</button>${s.label ? `<span class="where mono">${D.set}</span>` : ""}<span class="where">${users.length ? "used by <b>" + users.join("</b>, <b>") + "</b>" : "used by no repo"}</span></div>`;
+  if (bad.length) h += `<p class="bad">${D.set} cannot run the ${bad.join("; the ")}. That seat's work waits; no team is stopped by it.</p>`;
+  h += `<h2>The seats</h2><p class="lead">Five seats stand outside every flow. A set gives each one a model, and every team of a repo that uses the set is served by it.</p><div class="tt">` + SEATS.map(x => { const m = s.models[x[0]], pk = pickLogin(s, m);
+    return `<div><span>${x[1]}</span><span class="inl"><select data-seat="${x[0]}" aria-label="${x[1]} model">${MODELS.map(o => `<option ${o === m ? "selected" : ""}>${o}</option>`).join("")}</select><span>${!pk.offer.length ? "no login offers it" : pk.hit ? `on <b>${pk.hit}</b> now` : "waits for a usable login"}</span></span><span>${x[2]} · acts for ${x[3]}</span></div>`; }).join("") + `</div>`;
+  h += `<h2>Logins, in the order they are tried</h2><p class="lead">A built-in seat starts on the first login here that offers its model and is usable right now. This list is the set's own; no team's list is used.</p>` + ladder(s.logins, l => Object.values(s.models).some(m => l.models.includes(m)) ? "" : " · no seat here uses its models");
+  h += `<h2>Repos</h2><p class="lead">Each repo uses one set. The seats that act for a repo run while any of its teams is started.</p><div class="tt">` + repos.map(r => `<div><span>${r}</span><select data-repo="${r}" aria-label="${r} set">${Object.keys(D.sets).map(n => `<option ${n === setOf(r) ? "selected" : ""}>${n}</option>`).join("")}</select><span>${Object.entries(D.teams).filter(([, x]) => x.repo === r).map(([n, x]) => `${n} ${x.running ? "running" : "stopped"}`).join(" · ")}</span></div>`).join("") + `</div>`;
+  h += `<p style="margin-top:22px"><button class="quiet" data-act="delset" ${D.set === "default" || users.length ? "disabled" : ""}>Delete ${D.set}</button> <span style="color:var(--soft);font-size:14px">${D.set === "default" ? "The default set always exists." : users.length ? `Move ${users.join(" and ")} to another set first.` : "No repo uses it."}</span></p>`;
+  document.getElementById("main").innerHTML = h;
+}
 function draw() {
+  document.getElementById("nav-teams").className = D.page === "teams" ? "on" : ""; document.getElementById("nav-builtins").className = D.page === "builtins" ? "on" : "";
+  document.getElementById("railnote").textContent = D.page === "builtins" ? "The tech lead, manager, board answers, unheld pull requests and the sweeper are set here once, not in a flow or a team." : "A team is a repo, a flow and a list of logins. Its sessions are started for one entry in one stage and end with it, so a team has no members to name.";
+  if (D.page === "builtins") return drawSets();
   const t = T(), f = FLOWS[t.flow], busy = t.work.filter(w => w[1] !== "you").length;
   let h = `<div class="teams">` + Object.entries(D.teams).map(([n, x]) => `<a class="${n === D.team ? "on" : ""}" data-team="${n}">${n}${cannot(x, x.flow) ? " <i>●</i>" : ""}</a>`).join("") + `<button class="quiet" data-act="new">+ New team</button></div>`;
   h += `<div class="head"><h1>${t.label || D.team}</h1><button class="lnk" data-act="label" aria-label="change the label">✎</button>${t.label ? `<span class="where mono">${D.team}</span>` : ""}<span class="where">works <b>${t.repo}</b> on ${t.host}</span><div class="act"><span class="live ${t.running ? "" : "off"}">${t.running ? `Running · ${busy} ${t.total ? `of ${t.total} ` : ""}sessions` : "Stopped"}</span><button data-act="run">${t.running ? "Wind down" : "Start"}</button></div></div>`;
@@ -182,22 +211,15 @@ function draw() {
         <div class="step">at most <button data-less="${k}" aria-label="${s.name}: one fewer at once">−</button><b>${cap(t, k)}</b><button data-more="${k}" aria-label="${s.name}: one more at once">+</button> at once</div>
         <div class="riders">${here.map(w => `<span class="rider">${w[0]}<small>${w[2]}</small></span>`).join("")}${asked.map(w => `<span class="rider you" title="waits on you">${w[0]}<small>asked you ${w[3]} ago</small></span>`).join("")}</div></div>`; }).join("") +
       `<div class="stop end" style="--k:var(--ink)"><div class="nm">merged</div></div></div></div>`; }).join("");
-  h += `<div class="aside"><h3>Beside the path</h3>` + f.audits.map(a => `<div><b>${a[0]}</b> ${a[2]}<span class="mono">${a[1]}</span></div>`).join("") + SUPPORT.map(s => `<div><b>${s[0]}</b> when needed<span class="mono">${s[1]}</span></div>`).join("") + `</div></div>`;
-  h += `<div class="total">Whole team: <select id="tl" aria-label="team limit"><option value="0" ${t.total ? "" : "selected"}>no team limit</option><option value="1" ${t.total ? "selected" : ""}>at most</option></select>${t.total ? `<span class="step"><button data-less="@" aria-label="one fewer session at once">−</button><b>${t.total}</b><button data-more="@" aria-label="one more session at once">+</button></span> stage and audit sessions at once. Support seats are not counted.` : `the stage counts above are the only bound: up to ${f.stages.reduce((n, x) => n + cap(t, x.key), 0)} at once.`}</div>`;
+  h += `<div class="aside"><h3>Beside the path</h3>` + f.audits.map(a => `<div><b>${a[0]}</b> ${a[2]}<span class="mono">${a[1]}</span></div>`).join("") + `<div><b>Built-in seats</b> <button class="lnk" data-act="toset">set ${setOf(t.repo)}</button>${setCannot(setOf(t.repo)).length ? ` <span style="color:var(--bad)">cannot run the ${setCannot(setOf(t.repo))[0]}</span>` : ""}</div></div></div>`;
+  h += `<div class="total">Whole team: <select id="tl" aria-label="team limit"><option value="0" ${t.total ? "" : "selected"}>no team limit</option><option value="1" ${t.total ? "selected" : ""}>at most</option></select>${t.total ? `<span class="step"><button data-less="@" aria-label="one fewer session at once">−</button><b>${t.total}</b><button data-more="@" aria-label="one more session at once">+</button></span> stage and audit sessions at once. Built-in seats are not counted.` : `the stage counts above are the only bound: up to ${f.stages.reduce((n, x) => n + cap(t, x.key), 0)} at once.`}</div>`;
 
-  h += `<h2>Logins, in the order they are tried</h2><p class="lead">A session starts on the first login here that offers its stage's model and is usable right now. When a login reaches its reserve or a limit, its sessions move down the list. Logins are signed in on Tools.</p><ol class="ladder">`;
-  h += t.logins.map((n, i) => { const l = LOGINS[n], used = flowModels(f).some(m => l.models.includes(m));
-    return `<li class="${l.state === "ok" ? "" : "skip"}"><span class="n">${i + 1}</span><span class="who"><b>${n}</b>${l.metered ? '<span class="tagm">spends money</span>' : ""}<small>${l.tool} · ${l.acct}</small><small class="mono">${l.models.join(" ")}</small></span>
-      <span class="use"><span class="${{ ok: "s-ok", wait: "s-wait", bad: "s-bad" }[l.state]}">${l.state === "ok" ? "Usable" : "Passed over"}</span><div class="gauge"><i style="width:${l.used}%"></i><u style="width:${l.keep}%"></u></div><small>${l.note}${used ? "" : ` · ${t.flow} names none of its models, so nothing runs on it yet`}</small></span>
-      <span class="mv"><button data-up="${i}" ${i ? "" : "disabled"} aria-label="move ${n} up">▲</button><button data-down="${i}" ${i < t.logins.length - 1 ? "" : "disabled"} aria-label="move ${n} down">▼</button><button data-rm="${i}" aria-label="remove ${n}">×</button></span></li>`; }).join("") + `</ol>`;
-  const rest = Object.keys(LOGINS).filter(n => !t.logins.includes(n));
-  h += `<div class="addl">${rest.length ? `<select id="al" aria-label="add a login"><option value="">Add a login…</option>${rest.map(n => `<option value="${n}">${n} · ${LOGINS[n].tool} · ${LOGINS[n].models.join(", ")}</option>`).join("")}</select>` : "Every login on this host is in the list."}<button class="lnk" data-act="tools">Sign in a new one on Tools</button></div>`;
+  h += `<h2>Logins, in the order they are tried</h2><p class="lead">A session starts on the first login here that offers its stage's model and is usable right now. When a login reaches its reserve or a limit, its sessions move down the list. Logins are signed in on Tools.</p>` + ladder(t.logins, l => flowModels(f).some(m => l.models.includes(m)) ? "" : ` · ${t.flow} names none of its models, so nothing runs on it yet`);
 
   const s = t.set, sel = (k, opts) => `<select data-set="${k}">${opts.map(o => `<option value="${o[0]}" ${s[k] === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select>`;
   h += `<h2>When it runs</h2><div class="tt">
-    <div><span>Starts</span>${sel("start", [["hand", "when I press Start"], ["reset", "at each week's reset"]])}<span>${s.start === "reset" ? "next Thu 07:00, read from the first login" : "only you start it, or work appearing"}</span></div>
+    <div><span>Starts</span>${sel("start", [["hand", "when I press Start"], ["reset", "at each week's reset"]])}<span>${s.start === "reset" ? "next Thu 07:00, read from the first login" : "only you start it"}</span></div>
     <div><span>Stops</span><span class="inl">${sel("stops", [["never", "never"], ["at", "at"]])}${s.stops === "at" ? `<input type="text" data-set="until" value="${s.until}" style="width:120px" aria-label="stop time">` : ""}</span><span>${s.stops === "at" ? "nothing starts after this; sessions finish their stage" : "it runs until you wind it down"}</span></div>
-    <div><span>When work appears</span>${sel("onwork", [["start", "start the team"], ["ask", "ask me"], ["off", "do nothing"]])}<span>for a stopped team whose repo gains an entry it could take</span></div>
     <div><span>Leaves for other teams</span><span class="inl"><input type="text" data-set="prio" value="${s.prio}" aria-label="points left"> points of each login</span><span>${+s.prio ? `stops ${s.prio} points before each login's reserve` : "runs up to each login's reserve"}</span></div>
     <div><span>Holds new work</span><span class="inl"><input type="checkbox" data-set="hold" ${s.hold ? "checked" : ""} aria-label="hold new work"> past <input type="text" data-set="holdn" value="${s.holdn}" aria-label="open pull requests"> open pull requests, or one open <input type="text" data-set="holdd" value="${s.holdd}" aria-label="age"></span><span>${s.hold ? "now 4 open, oldest 19h · work already in a stage carries on" : "off"}</span></div></div>`;
   h += `<p style="margin-top:22px"><button class="quiet" data-act="del" ${t.running || t.work.length ? "disabled" : ""}>Delete ${D.team}</button> <span style="color:var(--soft);font-size:14px">${t.running ? "Wind it down first." : t.work.length ? `${t.work.length} entries are still in its stages or waiting on you.` : "Its entries stay in the ledger."}</span></p>`;
@@ -214,12 +236,18 @@ function switchPanel(t) {
     <div class="btns"><button class="pri" data-act="switch" ${why ? "disabled" : ""}>Switch now</button><button class="quiet" data-act="noswitch">Keep ${t.flow}</button></div></div>`;
 }
 document.addEventListener("click", (e) => {
-  const b = e.target.closest("[data-team],[data-act],[data-up],[data-down],[data-rm],[data-less],[data-more]"); if (!b || b.disabled) return;
+  const b = e.target.closest("[data-nav],[data-setname],[data-team],[data-act],[data-up],[data-down],[data-rm],[data-less],[data-more]"); if (!b || b.disabled) return;
   const t = T(), d = b.dataset;
+  if (d.nav) { if (d.nav === "teams" || d.nav === "builtins") { D.page = d.nav; D.pending = null; return save(); } return toast(`Opens ${d.nav}.`); }
+  if (d.setname) { D.set = d.setname; return save(); }
+  if (d.act === "toset") { D.page = "builtins"; D.set = setOf(t.repo); return save(); }
+  if (d.act === "newset") { let n = "second", i = 2; while (D.sets[n]) n = "set-" + (++i); D.sets[n] = { label: "", models: { ...D.sets.default.models }, logins: [] }; D.set = n; return save(`${n} made with default's models and no logins. Add one below.`); }
+  if (d.act === "delset") { delete D.sets[D.set]; D.set = "default"; return save("Set deleted."); }
+  if (d.act === "setlabel") { const s = D.sets[D.set]; s.label = s.label ? "" : "Everyday seats"; return save(s.label ? "Label saved. The name stays the same underneath." : "Label cleared."); }
   if (d.team) { D.team = d.team; D.pending = null; return save(); }
   if (d.less || d.more) { const k = d.less || d.more, by = d.more ? 1 : -1; if (k === "@") t.total = Math.max(1, t.total + by); else t.caps[k] = Math.max(1, cap(t, k) + by); return save("Saved. It applies from the next session started."); }
-  if (d.up !== undefined || d.down !== undefined) { const i = +(d.up ?? d.down), j = d.up !== undefined ? i - 1 : i + 1; [t.logins[i], t.logins[j]] = [t.logins[j], t.logins[i]]; return save("Order saved. It applies at each session's start."); }
-  if (d.rm !== undefined) { const n = t.logins.splice(+d.rm, 1)[0]; return save(`${n} removed. Sessions on it finish their stage.`); }
+  if (d.up !== undefined || d.down !== undefined) { const i = +(d.up ?? d.down), j = d.up !== undefined ? i - 1 : i + 1; const li = curList(); [li[i], li[j]] = [li[j], li[i]]; return save("Order saved. It applies at each session's start."); }
+  if (d.rm !== undefined) { const n = curList().splice(+d.rm, 1)[0]; return save(`${n} removed. Sessions on it finish what they are doing.`); }
   if (d.act === "switch") { const keys = FLOWS[D.pending].stages.map(s => s.key); t.work = t.work.filter(w => w[1] === "you" || keys.includes(w[1])); t.flow = D.pending; D.pending = null; return save("Switched. Entries with no stage are on your Queue."); }
   if (d.act === "noswitch") { D.pending = null; return save(); }
   if (d.act === "run") { t.running = !t.running; return save(t.running ? "Started." : "Winding down: sessions finish their stage."); }
@@ -229,7 +257,9 @@ document.addEventListener("click", (e) => {
 document.addEventListener("change", (e) => {
   const el = e.target, t = T();
   if (el.id === "fp") { D.pending = el.value === t.flow ? null : el.value; return save(); }
-  if (el.id === "al" && el.value) { t.logins.push(el.value); return save(`${el.value} added at the end of the list.`); }
+  if (el.dataset.seat) { D.sets[D.set].models[el.dataset.seat] = el.value; return save("Saved. It applies at the seat's next start."); }
+  if (el.dataset.repo) { D.repoSet[el.dataset.repo] = el.value; return save(`${el.dataset.repo} now uses ${el.value}.`); }
+  if (el.id === "al" && el.value) { curList().push(el.value); return save(`${el.value} added at the end of the list.`); }
   if (el.id === "tl") { t.total = +el.value ? f3(t) : 0; return save("Saved."); }
   if (el.dataset.set) { t.set[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; return save("Saved."); }
 });
