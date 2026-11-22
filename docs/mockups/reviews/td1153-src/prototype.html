@@ -118,7 +118,7 @@ p.lead { margin:0 0 10px; font-size:13.5px; color:var(--soft); max-width:74ch; }
 .set > span:last-child { font-size:12.5px; color:var(--soft); }
 .set select, .set input[type=text] { padding:3px 8px; font-size:13.5px; width:100%; }
 .set .inl { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13.5px; }
-.set .inl input[type=text] { width:64px; }
+.set .inl input[type=text] { width:64px; } .set .inl select { width:auto; }
 @media (max-width:760px) { .set { grid-template-columns:minmax(0,1fr); } }
 .toast { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom, 0px)); background:var(--ink); color:var(--page); padding:6px 14px; border-radius:4px; font-size:13px; }
 </style>
@@ -154,13 +154,13 @@ const DEF = {
   teams: {
     "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { design: 1, build: 2 }, total: 6,
       work: [["TD-2090", "design", "working 14m"], ["TD-2077", "fact-check", "working 3m"], ["TD-2101", "build", "working 41m"], ["TD-2104", "build", "working 6m"], ["TD-2098", "review", "working 9m"], ["TD-2084", "you", "asked 2h ago · from Review, at its limit"], ["TD-2071", "you", "asked 1d ago · from Design"]],
-      set: { start: "reset", until: "Fri 06:00", prio: "10", onwork: "start", hold: true, holdn: "10", holdd: "2d" } },
-    "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 2, work: [], set: { start: "hand", until: "", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } },
+      set: { start: "reset", stops: "at", until: "Fri 06:00", prio: "10", onwork: "start", hold: true, holdn: "10", holdd: "2d" } },
+    "samscrape-grind": { repo: "samscrape", host: "kmaster", running: false, flow: "build-review", logins: ["claude-paul"], caps: {}, total: 2, work: [], set: { start: "hand", stops: "never", until: "Fri 06:00", prio: "0", onwork: "ask", hold: false, holdn: "10", holdd: "2d" } },
   },
 };
 let D;
-try { D = JSON.parse(localStorage.getItem("team-proto-v2")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
-const save = (msg) => { try { localStorage.setItem("team-proto-v2", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
+try { D = JSON.parse(localStorage.getItem("team-proto-v3")) || structuredClone(DEF); } catch (e) { D = structuredClone(DEF); }
+const save = (msg) => { try { localStorage.setItem("team-proto-v3", JSON.stringify(D)); } catch (e) {} if (msg) toast(msg); draw(); };
 const toast = (t) => { const e = document.getElementById("toast"); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 2200); };
 const T = () => D.teams[D.team];
 const cap = (t, key) => t.caps[key] ?? 1;
@@ -217,7 +217,7 @@ function draw() {
     return `<div class="lg ${l.state === "ok" ? "" : "unus"}"><span class="ord">${i + 1}</span><span class="mv"><button class="ic" data-up="${i}" ${i ? "" : "disabled"} aria-label="move ${n} up">▲</button><button class="ic" data-down="${i}" ${i < t.logins.length - 1 ? "" : "disabled"} aria-label="move ${n} down">▼</button></span>
       <span><b>${n}</b>${l.metered ? '<span class="money">metered: spends money</span>' : ""}<small>${l.tool} · ${l.acct}</small></span>
       <span class="c3 mono" style="font-size:12.5px">${l.models.join(" · ") || "—"}</span>
-      <span class="c4 ${cls}">${l.state === "ok" ? "usable" : l.state === "wait" ? "passed over" : "not usable"}<small>${l.note}</small></span>
+      <span class="c4 ${cls}">${l.state === "ok" ? "usable" : l.state === "wait" ? "passed over" : "not usable"}<small>${l.note}${l.models.some(m => flowModels(f).includes(m)) || !l.models.length ? "" : ` · ${t.flow} names none of its models, so nothing runs on it yet`}</small></span>
       <button class="ic" data-rm="${i}" aria-label="remove ${n}">×</button></div>`; }).join("");
   const rest = Object.keys(LOGINS).filter(n => !t.logins.includes(n));
   h += `<div class="addl">${rest.length ? `<label for="al">Add a login</label><select id="al"><option value="">choose…</option>${rest.map(n => `<option value="${n}">${n} (${LOGINS[n].tool}: ${LOGINS[n].models.join(", ") || "not signed in"})</option>`).join("")}</select>` : "Every login on this host is in the list."}<button class="lnk" data-act="tools">Open the Tools page</button></div></div>`;
@@ -228,7 +228,7 @@ function draw() {
   const s = t.set, sel = (k, opts) => `<select data-set="${k}">${opts.map(o => `<option value="${o[0]}" ${s[k] === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select>`;
   h += `<h3>When it runs <small>saved at once</small></h3><div class="card">
     <div class="set"><span>Starts</span>${sel("start", [["hand", "when I press Start"], ["reset", "at each week's reset"]])}<span>${s.start === "reset" ? "next: Thu 07:00, read from the first login in the list" : "nothing starts it but you, or work appearing (below)"}</span></div>
-    <div class="set"><span>Stops</span><input type="text" data-set="until" value="${s.until}" placeholder="never"><span>${s.until ? "no session is started after this; those running finish their stage" : "runs until you wind it down"}</span></div>
+    <div class="set"><span>Stops</span><span class="inl">${sel("stops", [["never", "never"], ["at", "at a set time"]])}${s.stops === "at" ? `<input type="text" data-set="until" value="${s.until}" style="width:110px" aria-label="stop time">` : ""}</span><span>${s.stops === "at" ? "no session is started after this; those running finish their stage" : "runs until you wind it down"}</span></div>
     <div class="set"><span>When work appears</span>${sel("onwork", [["start", "start the team"], ["ask", "ask me"], ["off", "do nothing"]])}<span>for a stopped team whose repo gains an entry it could take</span></div>
     <div class="set"><span>Reserve priority</span><input type="text" data-set="prio" value="${s.prio}"><span>${+s.prio ? `stops ${s.prio} points before each login's reserve, so other teams keep the rest` : "runs up to each login's reserve"}</span></div>
     <div class="set"><span>Hold new work</span><span class="inl"><input type="checkbox" data-set="hold" ${s.hold ? "checked" : ""} aria-label="hold new work"> while more than <input type="text" data-set="holdn" value="${s.holdn}"> pull requests are open, or one is older than <input type="text" data-set="holdd" value="${s.holdd}"></span><span>${s.hold ? "entries already in a stage carry on; no new entry is taken · now 4 open, oldest 19h" : "off"}</span></div></div>`;
