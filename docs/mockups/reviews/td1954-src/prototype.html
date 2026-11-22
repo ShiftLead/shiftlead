@@ -144,13 +144,13 @@ const K = {
 const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
 const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["clock", "nothing; it starts on a clock"]];
 const takesFor = k => k === "review" ? [""] : k === "hunt" ? ["clock"] : ["", "design-first", "other", "any"];
-const SEATS = [["questions", "Tech lead", "answers members' questions, by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["sweeper", "Sweeper", "when the last sweep grows old; looks for stranded work"]];
+const SEATS = [["tech-lead", "Tech lead", "answers members' questions, by mail"], ["board-answers", "Board answers", "acts on what you decided"], ["unheld-pull-requests", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["sweeper", "Sweeper", "when the last sweep grows old; looks for stranded work"]];
 const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const words = o => o.replace(/-/g, " ");
-const work = f => f.carry === "branch" ? "branch" : "pull request";
+const work = () => "pull request";
 function ck(f, o) {
-  if (o === "work-pushed") return f.carry === "branch" ? "its branch is pushed and its checks are green" : "its pull request is open and its checks are green";
+  if (o === "work-pushed") return "its pull request is open; its checks are green, unless a later Build stage finishes the work";
   if (o === "ship") return "a verdict is recorded on the latest push";
   if (o === "changes-wanted") return "a verdict is recorded";
   if (o === "findings-filed") return "the new entries are filed";
@@ -174,8 +174,8 @@ const briefsFor = k => STD[k].concat((S.briefs || []).filter(b => b.kind === k).
 const briefOf = s => briefsFor(s.kind).find(b => b[0] === s.brief) || briefsFor(s.kind)[0];
 const KINDS = ["design", "build", "review"];
 const outs = s => K[s.kind].outs.concat("other");
-const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet", sweeper: "sonnet" });
-const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, carry: "pr", seats: seats(), stages });
+const seats = () => ({ "tech-lead": "opus", "board-answers": "sonnet", "unheld-pull-requests": "sonnet", manager: "sonnet", sweeper: "sonnet" });
+const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, seats: seats(), stages });
 function builtins() {
   return [
     flow("td", true, "design, two reads, fact-check; build, review, protected read; two audits on a clock", [
@@ -215,7 +215,7 @@ function examples() {
   ];
 }
 
-const KEY = "flows-proto-v7";
+const KEY = "flows-proto-v8";
 let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false, page: "flows", briefs: [] };
 try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; S.briefs = Array.isArray(r.briefs) ? r.briefs : []; } } catch (e) { /* storage is a convenience */ }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel, briefs: S.briefs })); } catch (e) { /* ignore */ } }
@@ -309,13 +309,15 @@ function renderBriefs() {
 function yaml(f) {
   const one = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
   const d = x => x.to === "merge" && x.else ? `{to: merge, refused: ${one(x.else)}}` : one(x);
-  let y = `format: 3\nname: ${f.name}\n` + (f.carry === "branch" ? "work: branches\n" : "") + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
+  let y = `format: 3\nname: ${f.name}\n` + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
   for (const s of f.stages.filter(x => x.kind !== "hunt")) {
     y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
     y += briefYaml(s) + outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
   }
   const au = f.stages.filter(x => x.kind === "hunt");
   if (au.length) y += "audits:\n" + au.map(s => `  - name: ${s.name}\n    model: ${s.model}\n    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n` + briefYaml(s, true)).join("");
+  const sp = SEATS.map(([k]) => k).filter(k => f.seats[k] && f.seats[k] !== seats()[k]);
+  if (sp.length) y += "support:\n" + sp.map(k => `  ${k}: ${f.seats[k]}\n`).join("");
   return y;
 }
 
@@ -431,7 +433,6 @@ function render() {
   h += res.bad.length ? `<span class="probs">${res.bad.length} problem${res.bad.length > 1 ? "s" : ""}</span>` : '<span class="okk">It flows</span>';
   h += '<button data-act="copy">Copy</button>';
   if (!f.builtin) h += (S.del ? '<button data-act="del2" class="quiet">Really delete?</button>' : '<button data-act="del" class="quiet">Delete</button>') + `<button class="pri" data-act="save"${res.bad.length ? " disabled" : ""}>Save</button>`;
-  const carry = [["pr", "pull requests"], ["branch", "branches, with no pull request"]];
   h += '</div></div><div class="lim"><span>An entry comes to you after ' + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
   h += '<div class="tabs">' + [["stages", "Stages"], ["walk", "Walk an entry"], ["file", "The file"]].map(([k, t]) => `<button data-act="tab" data-k="${k}" class="${S.tab === k ? "on" : ""}">${t}</button>`).join("") + "</div>";
   h += S.tab === "file" ? `<pre class="file">${esc(yaml(f))}</pre>` : S.tab === "walk" ? renderWalk(f, res) : renderStages(f, res);
@@ -462,7 +463,6 @@ function act(el, ev) {
     case "save": persist(); toast("Saved in this browser"); return;
     case "fname": f.name = el.value.trim() || f.name; break;
     case "maxm": f.maxMoves = parseInt(el.value, 10); break;
-    case "carry": f.carry = el.value; break;
     case "sname": { const old = slug(s.name), nw = el.value.trim(); if (!nw) break; s.name = nw; const k = slug(nw); f.stages.forEach(x => Object.values(x.next).forEach(v => { if (v.to === old) v.to = k; if (v.else && v.else.to === old) v.else.to = k; })); break; }
     case "kind": s.kind = el.value; s.next = {}; s.only = ""; if (!takesFor(s.kind).includes(s.takes)) s.takes = ""; break;
     case "every": s.n = parseInt(el.value, 10); break;
