@@ -48,7 +48,14 @@ def _button(html: str, label: str) -> str:
 
 def test_the_queue_rows_dots_draw_go_now_on_a_design_and_lift_the_hold_elsewhere():
     t = templates.env.from_string('{% import "queue_row.html" as q %}{{ q.menu(r) }}')
-    r = {"id": "TD-1", "repo": "s", "lift_here": True, "go_builds": ["TD-2", "TD-3"], "page": "blocked", "needs": "decision"}
+    r = {
+        "id": "TD-1",
+        "repo": "s",
+        "lift_here": True,
+        "go_builds": ["TD-2", "TD-3"],
+        "page": "blocked",
+        "needs": "decision",
+    }
     html = t.render(r=r)
     b = _button(html, "Go now — build TD-2, TD-3")
     assert 'data-builds="TD-2,TD-3"' in b and 'title="lifts the hold on TD-1 and its builds"' in b
@@ -84,7 +91,8 @@ def test_a_blocked_outcomes_lift_on_a_design_is_go_now():
 def test_the_mail_rows_lifting_answer_about_a_design_is_go_nows():
     ask = {
         "id": "m-1", "kind": "ask", "from": "ao-w", "from_name": "w", "about": "s#TD-1", "text": "May it go?",
-        "answers": ["Go — a session builds it", "Wait — nobody picks it"], "lift": ["Go"], "go_builds": ["TD-2", "TD-3"],
+        "answers": ["Go — a session builds it", "Wait — nobody picks it"], "lift": ["Go"],
+        "go_builds": ["TD-2", "TD-3"],
     }  # fmt: skip
     t = templates.env.from_string('{% from "inbox_row.html" import answers %}{{ answers(e) }}')
     html = t.render(e=ask)
@@ -102,9 +110,10 @@ def test_every_lift_press_sends_the_builds_it_drew():
 
 
 def _client(monkeypatch, tmp_path, calls: list, refuse: bool = False, inbox: list | None = None):
+    from test_ui_queue import client
+
     from sessionorc import hosts
     from sessionorc.client import AgentError
-    from test_ui_queue import client
 
     checkout = tmp_path / "s"
     checkout.mkdir(exist_ok=True)
@@ -144,7 +153,10 @@ def test_the_routes_forward_builds_and_a_conflict_is_a_409(monkeypatch, tmp_path
     got = c.post("/api/person/ledger", json={"repo": root, "id": "TD-1", "lift_reply": "m-5", "builds": []})
     assert got.status_code == 200
     assert calls[-1] == ("ledger_lift_reply", {"repo": root, "id": "TD-1", "msg": "m-5", "builds": []})
-    assert c.post("/api/person/ledger", json={"repo": "s", "id": "TD-1", "lift": True, "builds": "TD-2"}).status_code == 400
+    assert (
+        c.post("/api/person/ledger", json={"repo": "s", "id": "TD-1", "lift": True, "builds": "TD-2"}).status_code
+        == 400
+    )
     calls.clear()
     c, root = _client(monkeypatch, tmp_path, calls, refuse=True)
     got = c.post("/api/person/ledger", json={"repo": "s", "id": "TD-1", "lift": True, "builds": []})
