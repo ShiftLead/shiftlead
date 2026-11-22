@@ -3424,6 +3424,7 @@ def ledger_for_you(
                         questions,
                         names,
                         now,
+                        # `go_builds` is empty while the interim above stands; TD-2027 draws Go now from it
                         lift={"root": here_root, "id": e["id"], "go_builds": builds} if lift_item else None,
                     )
                     if got_q

@@ -93,3 +93,23 @@ def test_case_d_reads_over_the_set(tmp_path):
     assert queue.lift_case_d(design, boards, opens, "r", held) is True, "the item covers the set alone"
     t = queue.lift_ask_target({root: r}, "TD-001", "r")
     assert t is not None and t["asked"] == queue.lift_case_d_item(design, boards, opens, "r", held) is not None
+
+
+@pytest.mark.unit
+def test_lay_held_stamps_the_held_build_and_its_designs_work_on_copies(tmp_path, monkeypatch):
+    entries = [
+        _entry(1, "the design", **HELD),
+        _entry(2, "build a", Priority="High", Part_of="TD-001", Blocked_by="TD-004, decision (paul)"),
+        _entry(4, "the build's blocker", Priority="High"),
+    ]
+    root, r = _setup(tmp_path, entries, _open("TD-001 decision (paul)", decided=None, parts="TD-002"))
+    before = _read({root: r})
+    marked = queue.lay_applying(r, {"ledger:r#TD-002": {"t": {"act": "lift", "at": "x"}}}, "r")
+    seen: list[list] = []
+    real = queue._status
+    monkeypatch.setattr(queue, "_status", lambda rows, ents: seen.append(ents) or real(rows, ents))
+    queue.lay_held(before, {root: marked})
+    (ents,) = seen
+    by = {e["id"]: e for e in ents}
+    assert by["TD-002"]["held_by"] == "r#TD-001" and by["TD-001"]["open_work"] == ["r#TD-004"]
+    assert "held_by" not in marked["ledger"]["entries"][1] and "open_work" not in marked["ledger"]["entries"][0]
