@@ -8617,7 +8617,13 @@
     const nb = $("#fneeds");
     if (nb) nb.addEventListener("click", () => { if (nb.dataset.to) location.href = `/focus/${encodeURIComponent(nb.dataset.to)}`; });
     drawNeeds();
-    const shown = (el) => !!el && !el.classList.contains("hidden") && !el.hidden;
+    // shown where neither it nor an ancestor is hidden: the more ▾'s entries go with it once the pane is gone (TD-1997)
+    const shown = (el) => {
+      if (!el) return false;
+      for (let n = el; n && n !== document.body; n = n.parentElement) if (n.hidden || n.classList?.contains("hidden")) return false;
+      return true;
+    };
+    const drawnSheetLabel = (src) => (src.textContent || "").replace(/^\S\s+/, "").trim();
     // **the sheet**: the marks as chips, the acts as their own controls are drawn, the cards' rows and summaries
     const fill = () => {
       const chips = $("#fsheetchips");
@@ -8633,10 +8639,15 @@
         b.classList.toggle("hidden", !(shown(src) || back) || lead);
         // the sheet's Hand back takes the slot's warning fill, and drops it once the slot reads Take over (TD-1568)
         if (b.dataset.for === "fmodemenu") b.classList.toggle("tko", back && $("#fmodeact").classList.contains("tko"));
-        b.disabled = !!(src && src.disabled);
-        const al = $(".al", b);
-        if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
-        if (al && src && src.id === "tfit") al.textContent = src.textContent.replace(/^⤢\s*/, "").trim();  // or Cancel fit
+        // a press out on its control draws the act off, its verb for its label (§4.5 screen 6 rule 2, TD-1997)
+        const marked = AO.pressMarked(src);
+        b.disabled = !!(src && (src.disabled || marked));
+        const al = $(".al", b) || (b.classList.contains("shrow") ? $("span:not(.gl):not(.m)", b) : null);
+        if (al && !("sheetLabel" in al.dataset)) al.dataset.sheetLabel = al.textContent;
+        if (al && src && marked) al.textContent = src.dataset.pressVerb || drawnSheetLabel(src);
+        else if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
+        else if (al && src && src.id === "tfit") al.textContent = src.textContent.replace(/^⤢\s*/, "").trim();  // or Cancel fit
+        else if (al) al.textContent = al.dataset.sheetLabel;
       });
       const text = (sel) => { const e = $(sel); return e ? e.textContent.trim() : ""; };
       const checks = $$("#checks > div");
@@ -9982,6 +9993,14 @@
       renderGrants(v);
       renderStop(v);
       renderMembership(v);
+      // the more ▾, Kill with it, is not drawn once the pane is gone (§4.5's exited state, TD-1997): a Kill's mark
+      // ends at the redraw that hides it, on a shell's record as on an agent's
+      const headMore = $("#fheadmore");
+      if (headMore) {
+        const gone = AO.paneIsGone(v);
+        headMore.hidden = gone;
+        if (gone) headMore.open = false;
+      }
       if (v.agent === false) {
         // …and no checklist: Close session on any state Close is, its confirm the shell's (TD-666)
         const now = v.pane !== false && !["closed", "scheduled"].includes(v.state);
@@ -10220,7 +10239,7 @@
       d.addEventListener("toggle", () => store.set(key, d.open));
     });
     document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });
-    render(s); phone.render(s); AO.remarkPresses(document);
+    render(s); AO.remarkPresses(document); phone.render(s);
     const looked = AO.unseenLook(document, () => act(id, "seen", {}).catch(() => {}));
     looked(s);
     connectEvents((ev) => {
@@ -10233,8 +10252,9 @@
         if (!paneGone && AO.paneIsGone(ev.session)) {
           endTerm("this session's pane is gone (see the banner).");
         }
-        render(ev.session); phone.render(ev.session);
+        render(ev.session);
         AO.remarkPresses(document);  // a press out on this page marked again, ended where it draws the effect (TD-1997)
+        phone.render(ev.session);  // after the re-mark, so the sheet's proxies read it
         if (ev.session.state && ev.session.state !== mk.state) {
           // silence is counted from when the session began working, not from a quiet idle before it
           if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();
