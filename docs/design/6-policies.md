@@ -141,7 +141,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      says what it was trying. **A lost brief** (§4.1 *A launch whose hook never comes is recovered*, TD-717): a supervised record marked *no hook since launch*, a seat included, is closed by the tick and replayed once on the next tick with `why: lost-brief`, counted in `RESTART_CEILING` and not in the fill ceiling, a seat's replay repeating its fill's context; a record that came from such a replay and loses its brief again is not replayed and is the person's (*Inbox row: restart*, *brief lost twice*). At the ceiling the policy stops, writes `restart_ceiling: {at, count}`
      on the record, and the session is a person's: the card's slot says *restarts exhausted · 3 in
      2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it under *Needs you* (§4.5a **Inbox
-     row: restart**). The host agent writes no board line (§4.4's write-back acts at a person's
+     row: restart**). The host agent writes no board line, with one exception, the plain line that tells the person an
+     audit's run ended as `other` (§4.9c *Audits start on a clock*, TD-1954) (§4.4's write-back acts at a person's
      press and never on a session's behalf); the Inbox row is the person's channel, and a manager
      reads the field.
   2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`, or
