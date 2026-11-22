@@ -2819,7 +2819,7 @@ teams:
   adapter's (§4.3); the gate knows none of them by name.
   **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is TD-1976's) the gate
   reads a session's login's account where it read its profile's, and **a session is held only when no
-  login in its team's list is usable for its model**: one whose login reaches its line is moved to the
+  login in its team's list, or for a built-in seat its repo's built-in set's, is usable for its model**: one whose login reaches its line is moved to the
   next usable login of the list first, and pauses, as above, only where there is none.
 
   **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile

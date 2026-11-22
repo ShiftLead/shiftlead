@@ -132,7 +132,7 @@ not mix:
   requests nobody holds, manager, sweeper. No flow or team sets them. Called a *support seat* until 2026-11-22.
   — *proposed* 2026-11-22 (design §4.9c, §4.9d).
 - **built-in set** — a name, a model for each of the five built-in seats and a list of logins in order. A repo
-  uses one set, `default` unless it names another, and the Built-ins page sets them. — *proposed* 2026-11-22
+  uses one set, `default` unless it names another, and the Built-in seats page sets them. — *proposed* 2026-11-22
   (design §4.9d *The built-in seats and their page*).
 - **protected files** — the paths a repo's `.shiftlead.yml` lists under `held:`, which a review stage set to
   run *only when the work touches protected files* reads (design §4.9c *What is the repo's*). The first
