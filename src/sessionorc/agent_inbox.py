@@ -1382,8 +1382,12 @@ class InboxMixin:
             if isinstance(e, dict) and e.get("id")
         }
         origins = {n: ledgerboard.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
-        work = queue_mod.open_work(opens, queue_mod.item_resolver(origins))
-        return opens, work, queue_mod.open_refs(opens, {n: o for n, o in origins.items() if o})
+        linked = queue_mod.open_refs(opens, {n: o for n, o in origins.items() if o})
+        boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in readings.items()}
+        # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
+        held = queue_mod.held_map(opens, boards, linked)
+        work = queue_mod.with_held(queue_mod.open_work(opens, queue_mod.item_resolver(origins)), held, opens)
+        return opens, work, linked
 
     def _refuse_waiting(self, qids: Iterable[str]) -> None:
         """A press on a member whose question still waits on counted open work is stale (§4.4 *The card's status*,
