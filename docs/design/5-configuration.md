@@ -101,8 +101,11 @@ reach:                                        # §4.5b *The setting*: the person
   and `label` (what the person reads in place of the name);
   `flow` names the one format-3 flow the team runs, by its id; `schedule` names a `login:` of the list where
   it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size` and `max` go.
-  `repos.<repo>.tags` names the team whose tech lead tags the repo's untagged entries, drawn only where the
-  repo has more than one team. All but the running settings are written by the team page's own calls
+  `repos.<repo>.own_team` names the team that looks after a repo with several teams — its tech lead tags
+  the untagged entries and its flow's board-answers, unheld-pull-requests and sweeper seats run — and is
+  absent for a one-team repo. `cut_over: <date>`, at the top of the file, is written once by the cut-over
+  (TD-2056) and gates the team page's writes. Whether a team is started is not here: it is a mark on the
+  home's `host` record (§4.9d *When it runs*). All but the running settings are written by the team page's own calls
   (`team_new`, `team_delete`, `team_switch`, `team_set`), never by `set_settings`.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate

@@ -2754,7 +2754,13 @@ teams:
   carry it, and a moved instant moves the unattended ones with it (a session a person took over
   keeps what it carries: a move is a policy's); a session's own `ao until` is kept as the earlier of
   the two, and a Clear leaves it alone. A stop time in the past is refused when set, as `ao until`'s
-  is. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
+  is. **After the cut-over** (§4.9d *When it runs*, TD-1153) the rule is the same and reads the team's
+  sessions by their stage records and the team's name, there being no members: each takes the instant
+  as its `run_until`, and at the instant the home also clears the team's started mark, so it starts
+  nothing more for the team until a Start. A stage record whose holder the stop ended is not lost
+  (§4.9c *The home acts only where no session will*): it stays in its stage and is offered again at
+  the next Start, spending no offer. **Wind down** is the softer stop: it clears the mark and ends no
+  session. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
   **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile (on an adapter whose start hooks core runs, a pause line waits for a brief not yet in, §4.3 *The repo's start hooks*) when **any** of its
   reported windows reaches that window's **line**, and resume them when every window is back under
