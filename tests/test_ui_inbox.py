@@ -1404,7 +1404,7 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     assert "res.to.name || res.to.id" in js  # the RPC answers `to` as {id, name}, never a bare string
     # an answer, so the row goes (only Suspend and a board decide leave it standing), and a refusal names the control
     assert "AO.handRing(row); row.remove(); left = true;" in js  # a state row leaves on the press (TD-340)
-    assert 'identity_log: "Log TD"' in js and "${named[action] || action} failed" in js
+    assert 'identity_log: "Log TD"' in js and "${name} failed" in js  # a row's press: `named[action]` (TD-1997)
 
 
 # -- what the review of PR #251 found -------------------------------------------------------------

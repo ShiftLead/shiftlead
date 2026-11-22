@@ -1229,6 +1229,8 @@
     suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
     mode: "switching…",  // the held row's Hand back (§4.5a *Inbox row: held · mail waiting*, TD-1440)
+    // a press with no row (§4.5 screen 6 rule 2, TD-1997): Start now, Kill, Close, Forget, Wrap up, Message
+    start: "starting…", kill: "killing…", close: "closing…", remove: "removing…", wrapup: "sending…", message: "sending…",
   };
   const PRESS_NOT = {
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
@@ -1243,6 +1245,44 @@
     "reopen-push"];
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
   AO.pressVerb = (key) => PRESS_VERBS[key] || key;
+  // §4.5 screen 6 rule 2 *A press with no row* (TD-1997): a control in no row is itself marked in the press's frame —
+  // off (`aria-disabled`, never `disabled`, which drops keyboard focus), `aria-busy`, its width held and its label giving
+  // way to its verb (its own `data-verb`, else the table, else its label with `…`, never the wire name); a badge or a
+  // chip keeps its words. The press is held in `AO.inflight` under `press:<wire name>:<target>`, the target the
+  // session's id, else (every Queue header shares `data-id="person"`) its repo, ref, card and item, with the one prompt
+  // or chip it answers where a session draws several
+  AO.pressMarkKey = (b) => {
+    const d = b.dataset, act = d.act || "";
+    const target = d.id && d.id !== "person" ? d.id : [d.repo, d.ref, d.card, d.item].filter(Boolean).join(":");
+    const one = act === "allow" || act === "deny" ? d.call || "" : act === "grants" ? d.grant || ""
+      : act === "uncontrol" ? d.who || "" : act === "drop" ? d.ref || "" : "";
+    return `press:${act}:${target}${one ? `:${one}` : ""}`;
+  };
+  AO.pressMarked = (b) => !!b && b.getAttribute?.("aria-disabled") === "true";
+  AO.markPress = (b, key) => {
+    if (!b || b.dataset.pressMark) return;
+    b.dataset.pressMark = "1";
+    b.setAttribute?.("aria-disabled", "true");
+    b.setAttribute?.("aria-busy", "true");
+    if (b.classList?.contains("badge") || b.classList?.contains("chip")) return;  // keeps its words
+    const label = b.textContent || "";
+    b.dataset.pressLabel = label;
+    if (b.offsetWidth) b.style.minWidth = `${b.offsetWidth}px`;
+    const own = label.trim();
+    b.textContent = b.dataset.verb || PRESS_VERBS[key] || (own.endsWith("…") ? own : `${own}…`);
+  };
+  // the mark ends: only what it added comes off, the label put back as it was kept
+  AO.unmarkPress = (b) => {
+    if (!b || !b.dataset.pressMark) return;
+    delete b.dataset.pressMark;
+    b.removeAttribute?.("aria-disabled");
+    b.removeAttribute?.("aria-busy");
+    if ("pressLabel" in b.dataset) { b.textContent = b.dataset.pressLabel; delete b.dataset.pressLabel; b.style.minWidth = ""; }
+  };
+  // a back or forward return draws the page unmarked: a page-moving press left its control marked as the page went
+  window.addEventListener?.("pageshow", (ev) => {
+    if (ev.persisted) document.querySelectorAll("[data-press-mark]").forEach((b) => AO.unmarkPress(b));
+  });
   // a refused press by entry id, until that row's next press or a reload (TD-340): its words, whether anything may
   // have been sent (`sent`), the item's bar as drawn when pressed (`was`) and whether a re-read has drawn it otherwise
   // since (`changed`) — §4.5 screen 12 *A press is never left stranded*, case *refused* (TD-1843)
@@ -1524,6 +1564,8 @@
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
+    // a control whose press is in flight, or one the template draws marked, sends nothing and asks nothing (TD-1997)
+    if (AO.pressMarked(b)) { ev.preventDefault(); return; }
     // a write that rejects or throws (no clipboard outside a secure context) is refused aloud, as copyWith's (TD-1292)
     if (b.dataset.copy) {
       Promise.resolve().then(() => navigator.clipboard.writeText(b.dataset.copy)).then(
@@ -1540,6 +1582,9 @@
     const at = { ...b.dataset }, atLine = lineText(b), atItem = AO.answerItem(b);
     // the Queue card the press was on, read now: a refusal ends any hold on it (§4.5 screen 12, TD-1761)
     const atCard = (b.closest(".qcard[data-card]") || { dataset: {} }).dataset.card || "";
+    // the control's own label, read now: a refusal names it by it (TD-1997), never by its wire name
+    const atLabel = String(b.textContent || "").trim();
+    let markKey = "", moving = false;  // a no-row press's in-flight key; a press whose answer moves the page
     let refusedOn = false;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
@@ -1581,12 +1626,20 @@
     // the row as the page draws it now: a re-read while the request was out has replaced the captured node
     const fresh = () => (row && row.isConnected ? row : msgOf ? document.querySelector(`.mailrow[data-msg="${CSS.escape(msgOf)}"]`) : null);
     const pressed = (text) => {
+      // a press with no row (§4.5 screen 6 rule 2, TD-1997): the control itself, in the press's frame; a Queue card's
+      // ⋯ press keeps `qpressed`'s drawing
+      if (!row && !qt) {
+        markKey = AO.pressMarkKey(b);
+        AO.inflight[markKey] = { kind: "press" };
+        AO.markPress(b, key);
+        return;
+      }
       if (!row || !row.isConnected) return;
       // a Queue card's own state follows the press (TD-1461): taken before the row leaves; a board Reply takes nothing
       if (r4 && key !== "board_reply") AO.qcardOff(row, msgOf);
       delete AO.pressErrs[row.dataset.msg];
       AO.clearPressErr(row);
-      const verb = AO.pressVerb(key);
+      const verb = b.dataset.verb || AO.pressVerb(key);
       if (drawn) {
         // drawn in the press's frame, the row kept and not dimmed (rule 4)
         const reply = key === "board_reply";
@@ -1968,7 +2021,7 @@
         });
         if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
         const r = await got.json();
-        if (r.form) { say(`start session needs the form: ${r.why}`, true); location.href = r.form; return; }
+        if (r.form) { say(`start session needs the form: ${r.why}`, true); moving = true; location.href = r.form; return; }
         const to = `/focus/${r.focus || r.id}${AO.poppedId ? "?window=1" : ""}`;
         // an item's **Open session** puts its id on the clipboard for the person to paste, typing nothing into the
         // session (§4.5 screen 12 *Started from an item*); refused (plain http off localhost), the toast shows it
@@ -1982,6 +2035,7 @@
           say(`${b.dataset.item} copied — paste it into your session`, true);
         }
         if (!r.focus) say(`started ${r.name || r.id} on ${b.dataset.item || b.dataset.ref}`, true);
+        moving = true;
         location.href = to;
         return;
       }
@@ -1997,14 +2051,16 @@
       if (action === "resume-form") {
         pressed();
         const r = await act(id, "resume", { form: true });
+        moving = true;
         location.href = r.form || `/new`;
         return;
       }
       if (action === "resume" || action === "reopen-push") {
         pressed();
         const r = await act(id, "resume", { push: action === "reopen-push" });
-        if (r.form) { say(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
+        if (r.form) { say(`resume needs the form: ${r.why}`, true); moving = true; location.href = r.form; return; }
         say("resumed — same name, same record, its mail came with it", true);
+        moving = true;
         location.href = `/focus/${r.id}${AO.poppedId ? "?window=1" : ""}`;
         return;
       }
@@ -2055,7 +2111,7 @@
           : `restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       }
-      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
+      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) { moving = true; location.href = "/"; } }
       if (action === "allow" || action === "deny") say(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") say(`${b.dataset.ref}: dropped`, true);
       if (action === "wrapup") say("wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes", true);
@@ -2157,7 +2213,10 @@
         return;
       }
       const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here", notclear: "Not clear" };
-      say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
+      // a control is not its wire name: one carrying `data-verb` (Open session shares Start session's `ledger_start`) and
+      // a press with no row are named by their own label, read at the press (TD-1997)
+      const name = b.dataset.verb || markKey ? atLabel || named[action] || action : named[action] || action;
+      say(`${name} failed: ${e.message}`);
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
       // wrote nothing, and its toast says so in its own words
@@ -2176,6 +2235,8 @@
       if (qled && AO.inflight[qled] && !AO.inflight[qled].until) delete AO.inflight[qled];
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
+      // a no-row press ends at its answer, its key dropped; one whose answer moves the page stays marked as it goes
+      if (markKey) { delete AO.inflight[markKey]; if (!moving) AO.unmarkPress(b); }
       // a refused press draws its refusal and ends its card's hold: the values that waited are drawn with it
       if (refusedOn && atCard) document.dispatchEvent(new CustomEvent("ao:refused", { detail: { card: atCard } }));
     }
@@ -9677,7 +9738,7 @@
             ? `<button class="btn sm primary" data-act="resume" data-id="${id}"${v.resume_confirm ? ` data-confirm="${esc(v.resume_confirm)}"` : ""}>Resume</button> `
               + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
             : "")
-          + `<a class="btn sm" href="/new?${q}" data-help-key="new-here">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`
+          + `<a class="btn sm" href="/new?${q}" data-help-key="new-here">New session here</a> <button class="btn sm ghost" data-act="remove" data-verb="forgetting…" data-id="${id}">Forget</button>`
           // **Restart** where the card draws it (its `restartable`), confirming as the card's does (§4.5a *card: more ▾*)
           + (v.restartable
             ? ` <button class="btn sm" data-act="restart" data-id="${id}"${v.restart_marked ? "" : ` data-confirm="Restart ${esc(v.name || id)}? It is closed if still there and started again from its launch record, in its team."`}>Restart</button>`
