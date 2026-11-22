@@ -2972,6 +2972,13 @@ teams:
     has waited longer than the shortest `review.bound` a live member of the team carries, two
     hours where none carries one.
 
+  **After the cut-over** (§4.9d *When it runs*, TD-1153) the rule is drawn as *Holds new work* and means
+  one thing: while the mark stands the home **offers no entry that has no stage record yet** (§4.9c
+  *Offer*); an entry already in a stage carries on through its stages, its merge and its questions, and
+  audits and support seats are not held. The `review` line has no seat to read then and is dropped by
+  the cut-over; `prs` and `oldest` are as above, and the team's repo is its `repo` key. Until then the
+  rule is as this item says it.
+
   **Who reads it** is the home's tick, never the manager's round: a session's `ao repo` cannot
   see the reader's queue (§4.7), and nothing mechanical waits on a round (*Keeping a team
   running*). After every repo reading and on every tick for the queue, the home reads the
