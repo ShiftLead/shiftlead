@@ -35,7 +35,7 @@ import shutil
 import subprocess
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -423,6 +423,11 @@ def _push_refusal(cp: subprocess.CompletedProcess[str]) -> str | None:
         if m.group(1):
             return m.group(1).strip()[:200]
     return _why(cp, "git push").removeprefix("git push: ")[:200]
+
+
+class BuildsChanged(Refused):
+    """A **Go now** whose design's held builds are not as the press read them at origin's head (design §4.4 *Go now
+    lifts the design and its builds*, TD-2027): a build archived or ungated there — nothing is written."""
 
 
 class _Neighbour(Refused):
@@ -1151,17 +1156,24 @@ def _person_gate(text: str) -> str | None:
     return None
 
 
-def _lists_other(it: ledgerboard.BoardItem, tid: str, gate: str, led: Any) -> bool:
+def builds_changed(tid: str) -> str:
+    """**Go now**'s refusal where the design's held builds changed since the page was read (§4.4 *Go now lifts the
+    design and its builds*, TD-2027)."""
+    return f"{tid}'s builds changed: read the card again"
+
+
+def _lists_other(it: ledgerboard.BoardItem, tid: str | Iterable[str], gate: str, led: Any) -> bool:
     """Whether a covering item lists another entry that still carries the gate (§4.4 *The suffix*): its `Context:`
     entry (the parent, where it covers through `Part of`) or a `Parts:` id — a bare id, this repo's, never a
-    `<repo>#TD-n` — open in the tree's ledger, not the pressed entry, carrying the same gate."""
+    `<repo>#TD-n` — open in the tree's ledger, not the pressed entry, carrying the same gate. `tid` is the pressed
+    entry, or the set a **Go now** lifts (TD-2027): an entry of the set is never *another*."""
+    want = {ledgerboard._num(x) for x in ([tid] if isinstance(tid, str) else tid)}
     ref, _ = ledgerboard._item_gate(it)
-    want = ledgerboard._num(tid)
     for x in [ref, *it.parts]:
         if not x or "#" in x:
             continue
         try:
-            if ledgerboard._num(x) == want:
+            if ledgerboard._num(x) in want:
                 continue
             path, archived = led.entry_file(lb_ledger.tid_of(x))
         except (ledgerboard.Refused, ValueError):
@@ -1177,6 +1189,7 @@ def lift_on_press(
     answer: str = "go ahead",
     held: dict[str, dict[str, Any]] | None = None,
     entry_holder: dict[str, Any] | None = None,
+    builds: Iterable[str] = (),
 ) -> dict[str, Any]:
     """**Lift the hold** (design §4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829): the
     entry `id`'s `decision (<p>)` (`<p>` the home's person) lifted by ledgerboard's `plan_lift`, `answer` its Log's
@@ -1184,7 +1197,13 @@ def lift_on_press(
     item closed `— lifted.` beside it, in one commit of the host agent's tree on origin's head, landed by its own
     PR as every press's — subject and title `shiftlead: lift decision (<p>) on TD-n (session n/a)`. No work order
     is written. `held` maps each `board:<key>` a live session holds to its holder (`{id, name}`), and
-    `entry_holder` is the pressed entry's, read in case (b) alone.
+    `entry_holder` is the pressed entry's, read in case (b) alone (on a set, a claim on any entry of it).
+
+    `builds` is a design's held builds as the home read them (bare `TD-n`, key order): **Go now** (§4.4 *Go now lifts
+    the design and its builds*, TD-2027) lifts the design's gate and each build's in the one commit, each by
+    `plan_lift` with the same answer, every entry read again at origin's head (a build archived or ungated there
+    raises `BuildsChanged`, nothing written), the cases read once over the set, the suffix per entry, the subject
+    `shiftlead: lift decision (<p>) on TD-n and its builds TD-a, TD-b (session n/a)`.
 
     Returns `{gone: true}` (nothing written) where the entry is archived or no longer carries the gate, else
     `{lifted: true, commit, message, pr, suffix}`; raises `Refused` in its words — *only <p> lifts <p>'s hold*,
@@ -1192,13 +1211,15 @@ def lift_on_press(
     root = Path(root)
     try:
         tid = lb_ledger.tid_of(str(id or "").upper())
+        bids = [lb_ledger.tid_of(str(b or "").upper()) for b in builds or ()]
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
+    bids = [b for b in dict.fromkeys(bids) if b != tid]
     if shutil.which("gh") is None:
         raise unreachable("gh is not installed")
     with _EDIT:
         clock = _Clock()
-        return _twice(lambda: _lift_on_press(root, tid, answer, dict(held or {}), entry_holder, clock))
+        return _twice(lambda: _lift_on_press(root, tid, answer, dict(held or {}), entry_holder, clock, bids))
 
 
 def _lift_on_press(
@@ -1208,7 +1229,9 @@ def _lift_on_press(
     held: dict[str, dict[str, Any]],
     entry_holder: dict[str, Any] | None,
     clock: _Clock,
+    builds: list[str] | None = None,
 ) -> dict[str, Any]:
+    builds = list(builds or ())
     t, want = _tree(root, clock)
     try:
         led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
@@ -1228,6 +1251,19 @@ def _lift_on_press(
     gate = None if archived else _person_gate(text)
     if gate is None:
         return gone()
+    sets: list[tuple[str, str, str, str]] = [(tid, path, text, gate)]  # (id, file, text, gate), the design first
+    for b in builds:  # each held build read again at origin's head (§4.4 *Go now lifts the design and its builds*)
+        try:
+            bpath, barch = led.entry_file(b)
+        except ledgerboard.Refused:
+            bpath, barch = "", True
+        btext = "" if barch else (led.read(bpath) or "")
+        bgate = _person_gate(btext) if btext else None
+        if bgate is None:
+            _reset(t, want)
+            raise BuildsChanged(builds_changed(tid))
+        sets.append((b, bpath, btext, bgate))
+    tids = [x[0] for x in sets]
     p = ledgerboard.GATE_DECISION_RE.match(gate).group("who").strip()
     rel = workorders.board_rel(root)
     stub = t / rel
@@ -1242,22 +1278,26 @@ def _lift_on_press(
         raise Refused(only_lifts(p))
     url = _git(root, "remote", "get-url", "origin").stdout.strip()
     repo = ledgerboard.origin_path(url) or root.name
+    each: dict[str, list[tuple[Any, str]]] = {}  # the items covering each entry of the set
+    cov: list[tuple[Any, str]] = []  # read once over the set: an item covering two entries is one item
     try:
-        cov = [
-            (it, state) for _, it, state in ledgerboard.covers(text, gate, [(url, root.name, b)], repo)
-            if state in ("open", "decided")
-        ]  # fmt: skip
+        for x, _xp, xtext, xgate in sets:
+            got = [
+                (it, state) for _, it, state in ledgerboard.covers(xtext, xgate, [(url, root.name, b)], repo)
+                if state in ("open", "decided")
+            ]  # fmt: skip
+            each[x] = got
+            cov += [(it, st) for it, st in got if not any(it is y for y, _ in cov)]
     except ledgerboard.Refused as e:
         _reset(t, want)
         raise Refused(str(e)) from None
-    shared = [it for it, _ in cov if _lists_other(it, tid, gate, led)]
+    shared = [it for it, _ in cov if _lists_other(it, tids, gate, led)]
     alone = [(it, s) for it, s in cov if not any(it is x for x in shared)]
     asked = [it for it, s in alone if s == "open"]
     if asked:  # (d)
         _reset(t, want)
         raise Refused(f"{tid}'s hold is asked on {item_ref(asked[0])}: answer it there")
     closes = [it for it, s in alone if s == "decided"]
-    suffix = None
     if closes:  # (b)
         for it in closes:
             if (h := held.get(item_ref(it))) is not None:
@@ -1266,31 +1306,49 @@ def _lift_on_press(
         if entry_holder is not None:
             _reset(t, want)
             raise Refused(_held_words(item_ref(closes[0]), entry_holder))
-    elif shared:  # (c)
-        suffix = "shared board item left open"
-    else:  # (a)
-        suffix = "no board item"
-    plan = _plan(lb_ledger.plan_lift, led, tid, gate, by, answer=answer, suffix=suffix)
+
+    def suffix_of(x: str) -> str | None:
+        # per entry, as ledgerboard's tripwire reads each lifted entry against the board
+        mine = [it for it, _ in each.get(x) or ()]
+        if any(any(it is c for c in closes) for it in mine):
+            return None  # (b)
+        if any(any(it is c for c in shared) for it in mine):
+            return "shared board item left open"  # (c)
+        return "no board item"  # (a)
+
+    suffixes = {x: suffix_of(x) for x in tids}
     try:
-        lb_ledger.apply(plan)
+        for x, _xp, _xt, xgate in sets:
+            plan = _plan(lb_ledger.plan_lift, led, x, xgate, by, answer=answer, suffix=suffixes[x])
+            lb_ledger.apply(plan)
     except OSError as e:
         _reset(t, want)
         raise Refused(f"the ledger could not be written, and is as it was: {e}") from None
+    except Refused:
+        _reset(t, want)
+        raise
     try:
         for it in closes:
             _apply(_plan(lb_board.plan_edit, str(stub), "done", it.id, why=LIFTED, tool=TOOL))
     except Refused:
         _reset(t, want)  # the ledger's half is written already: the tree goes back whole
         raise
-    msg = f"{TOOL}: lift decision ({p}) on {tid} (session n/a)"
-    entry_rel = os.path.relpath(path, t)
+    names = f"{tid} and its builds {', '.join(builds)}" if builds else tid
+    msg = f"{TOOL}: lift decision ({p}) on {names} (session n/a)"
+    rels = [os.path.relpath(xp, t) for _x, xp, _xt, _xg in sets]
 
     def still() -> bool:
-        # origin's ledger still holds the entry open where the press found it
-        return _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0
+        # origin's ledger still holds every entry of the set open where the press found it
+        return all(_git(t, "cat-file", "-e", f"origin/{want}:{r}").returncode == 0 for r in rels)
 
-    landed = _land(root, t, want, msg, clock, still, body=LIFT_BODY, also=[entry_rel])
-    return {**landed, "lifted": True, "suffix": suffix or "", "closed": [item_ref(it) for it in closes]}
+    landed = _land(root, t, want, msg, clock, still, body=LIFT_BODY, also=rels)
+    return {
+        **landed,
+        "lifted": True,
+        "suffix": suffixes[tid] or "",
+        "closed": [item_ref(it) for it in closes],
+        **({"builds": list(builds)} if builds else {}),
+    }
 
 
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------

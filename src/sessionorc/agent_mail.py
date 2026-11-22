@@ -284,6 +284,16 @@ def handed_list(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _builds(raw: Any) -> list[str] | None:
+    """A page's `builds` (§4.4 *Go now lifts the design and its builds*, TD-2027) as a list of ids, None where none
+    was sent; anything but a list of strings is refused."""
+    if raw is None:
+        return None
+    if not isinstance(raw, list | tuple) or not all(isinstance(x, str) for x in raw):
+        raise RpcError("builds is a list of entry ids (design §4.4 Go now)")
+    return [str(x).strip().upper() for x in raw]
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -316,6 +326,7 @@ class MailMixin:
         form: Any = None,
         lift: Any = None,
         lift_first: Any = None,
+        builds: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -337,7 +348,10 @@ class MailMixin:
         form, and a reply whose first paragraph is an offered form unfilled, are refused with *<head> needs its
         words*, and a form is never a steer's `default` nor an answer marked ` (default)`. `lift` is the labels of an
         `ask`'s answers that lift its `about` entry's `decision (<p>)` on the person's press (§4.10 *An `ask` that
-        lifts the person's gate*, TD-1833): such an ask is put to the person directly, never to a team or a repo."""
+        lifts the person's gate*, TD-1833): such an ask is put to the person directly, never to a team or a repo.
+        `builds` is the held builds a page drew on a lifting answer's **Go now** (§4.4 *Go now lifts the design and its
+        builds*, TD-2027): honoured only on a reply that lifts, dropped on an orphaned ask's answer, refused on any
+        other; a reply that lifts with none (`ao msg`'s) lifts the set as read at the answer."""
         if lift_first is not None:
             # §4.4 *The outcome's lift and reply* (TD-1879): the home's own input, which `ledger_lift_reply` alone
             # passes — named here so the dispatcher's skew rule never drops it into a plain reply
@@ -396,6 +410,7 @@ class MailMixin:
                 routed,
                 form=form,
                 lift=lift,
+                builds=builds,
             )
         except RpcError as e:
             if key:
@@ -477,6 +492,9 @@ class MailMixin:
             raise RpcError(f"{tid} is yours to do: its Done answers it")
         if t["asked"]:
             raise RpcError(f"{tid}'s hold is asked on {t['asked']}: answer it there")
+        held = self._open_work()[3]  # a held build's hold is asked on its design's question (TD-2027)
+        if design := held.get(queue_mod.qid(t["name"], tid)):
+            raise RpcError(queue_mod.held_build_words(tid, design, t["name"]))
         return kept
 
     async def _lifting_reply(self, call: dict[str, Any], replied: MailEntry, label: str) -> dict[str, Any]:
@@ -496,7 +514,9 @@ class MailMixin:
                     f"{replied.about} names no entry of a repo this home reads: nothing is lifted {LIFT_SECTION}"
                 )
             ref = f"{t['name']}#{t['id']}"
-            done = await self._press_lift(t["root"], t["id"], answer=label, asker=replied.from_)
+            done = await self._press_lift(
+                t["root"], t["id"], answer=label, asker=replied.from_, builds=_builds(call.get("builds"))
+            )
             mark = {"lifted_before": ref} if done.get("gone") else {"lifted": ref}
             try:
                 return await self._msg(**call, _lifting=mark)
@@ -520,7 +540,12 @@ class MailMixin:
         box["held"] = True
         try:
             await self._msg(**call, _dry=True)
-            done = await self._press_lift(str(box.get("root") or ""), str(box.get("id") or ""), asker=replied.from_)
+            done = await self._press_lift(
+                str(box.get("root") or ""),
+                str(box.get("id") or ""),
+                asker=replied.from_,
+                builds=_builds(box.get("builds")),
+            )
             box["gone" if done.get("gone") else "landed"] = True
             return await self._msg(**call)
         finally:
@@ -1340,6 +1365,7 @@ class MailMixin:
         form: Any = None,
         lift: Any = None,
         lift_first: dict[str, Any] | None = None,
+        builds: Any = None,
         _dry: bool = False,
         _lifting: dict[str, str] | None = None,
     ) -> dict[str, Any]:
@@ -1579,6 +1605,9 @@ class MailMixin:
             and (label := mail.answer_labels([replied.answers[picked]])[0]) in replied.lift
         ):
             return await self._lifting_reply(call, replied, label)
+        if builds is not None and _lifting is None and not _dry:
+            # Go now's builds ride a lifting answer alone (§4.4 *Go now lifts the design and its builds*, TD-2027)
+            raise RpcError("builds rides only on an answer that lifts the hold (design §4.4 Go now)")
         # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
         reads_pr = kind == "reply" and replied is not None and replied.kind == "ask" and replied.pr is not None
         three = " | ".join(VERDICTS)

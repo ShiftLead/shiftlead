@@ -43,6 +43,7 @@ from sessionorc.agent_common import (
     _prune_tallies,
     log,
 )
+from sessionorc.agent_mail import _builds as agent_mail_builds
 from sessionorc.agent_mail import seat_able
 from sessionorc.models import (
     ATTENTION_KINDS,
@@ -1165,6 +1166,7 @@ class InboxMixin:
         form: int | None = None,
         lift: bool = False,
         caller: Any = None,
+        builds: list[str] | None = None,
     ) -> dict[str, Any]:
         """The person's answer to a ledger entry that waits on them (design §4.5 screen 6 *The ledger's
         entries that wait on you*, §4.5a *Inbox row: ledger entry*, TD-565): one of its answers by
@@ -1177,6 +1179,9 @@ class InboxMixin:
         gate stands while its session acts on the line (§4.4 *Every other answer leaves the gate standing*). `lift`
         is **Lift the hold**'s press alone (§4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829):
         it writes no line and lifts the gate itself (`_press_lift`), refused beside a `road`, an `answer` or `go`.
+        `builds` is the held builds a page's **Go now** drew (an empty list where it drew a plain **Lift the hold**,
+        §4.4 *Go now lifts the design and its builds*, TD-2027), taken with `lift` alone; none (the CLI) lifts the set
+        as the home reads it.
         The repo's work orders are read again
         once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
         design…** (`design`) on any open row (`_ledger_road`, TD-905). A person's session passes for a road
@@ -1198,7 +1203,9 @@ class InboxMixin:
         if lift:
             if road or answer is not None or go or form is not None:
                 raise RpcError("Lift the hold is a press of its own: it takes no answer, Go with it or road")
-            return await self._press_lift(root, str(id or "").strip().upper())
+            return await self._press_lift(root, str(id or "").strip().upper(), builds=agent_mail_builds(builds))
+        if builds is not None:
+            raise RpcError("builds is Go now's, a lift's: it takes lift")
         if road:
             return await self._ledger_road(root, name, view, str(id or "").strip().upper(), road, words, caller)
         e = next(
@@ -1256,7 +1263,13 @@ class InboxMixin:
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
 
     async def _press_lift(
-        self, root: str, id: str, *, answer: str = "go ahead", asker: str | None = None
+        self,
+        root: str,
+        id: str,
+        *,
+        answer: str = "go ahead",
+        asker: str | None = None,
+        builds: Iterable[str] | None = None,
     ) -> dict[str, Any]:
         """The one lift every lifting road calls (§4.4 *The press's checks*, TD-1829, built by TD-1831): **Lift the
         hold**'s press (`ledger_decide`'s `lift`), §4.10's lifting answer (`answer` the label) and the outcome's
@@ -1266,13 +1279,23 @@ class InboxMixin:
         person is refused, *yours to do*, which its **Done** answers. The claims are read through `held_claims`
         (the records of `asker`, a record id, left out) and handed to the write (`board.lift_on_press`), which runs
         under the entry's key in a thread, inside the press's applying mark (act *lift*), the board re-read after.
-        Returns `{repo, id, lifted: true}` on a lift."""
+        Returns `{repo, id, lifted: true}` on a lift.
+
+        **Every lifting road lifts the set** (§4.4 *Go now lifts the design and its builds*, TD-2027): the design's held
+        builds are read here, from `_open_work`'s one `held_map`, so a lift of a design with a question is never of the
+        design alone. In order, before anything is written: the design's `gone`; a lift on a held build alone is
+        refused, *TD-a waits on TD-<design>'s question: answer it there* (`conflict`, the UI's 409); `builds`, where a
+        page sent them, differing from the set read is refused, *TD-<design>'s builds changed: read the card again*
+        (`conflict`); then the refusals over every entry of the set (the person's own, TD-1926's *waits on TD-m*), any
+        one refusing whole. The claims (case (b)'s holder) are read over the set, and the in-flight key and the
+        applying mark cover every entry of it."""
         view = self._repos.get(root) or {}
         name = str(view.get("name") or Path(root).name)
         key = f"ledger:{root}:{id}"
         if key in self._board_adding:
             raise RpcError(f"{id} is already being decided")
         self._board_adding.add(key)
+        keys = [key]  # the in-flight keys: the pressed entry's, then each held build's
         try:
             e = next(
                 (
@@ -1284,10 +1307,26 @@ class InboxMixin:
             )
             if e is None or not ledger_mod.decided_by(e, ledger_mod.PERSON_OWNER):
                 return {"repo": root, "id": id, "gone": True}
-            if str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
-                raise RpcError(f"{id} is yours to do: its Done answers it")
+            me = queue_mod.qid(name, id)
+            opens, work, _linked, heldmap = self._open_work()
+            if design := heldmap.get(me):  # a held build alone (a stale page, the CLI)
+                raise RpcError(queue_mod.held_build_words(id, design, name), conflict=True)
+            go = queue_mod.go_builds(heldmap, opens).get(me) or []
+            if builds is not None and [str(b).strip().upper() for b in builds] != go:
+                raise RpcError(board_mod.builds_changed(id), conflict=True)
+            qids = [me, *(queue_mod.qid(name, b) for b in go)]
+            for b in go:
+                k = f"ledger:{root}:{b}"
+                if k in self._board_adding:
+                    raise RpcError(f"{b} is already being decided")
+            for q in qids:
+                if str((opens.get(q) or e).get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+                    raise RpcError(f"{q.rpartition('#')[2]} is yours to do: its Done answers it")
             # among the press's own checks, before anything is written: a lifting reply is refused whole (TD-1926)
-            self._refuse_waiting([queue_mod.qid(name, id)])
+            self._refuse_waiting(qids, work)
+            for b in go:
+                keys.append(f"ledger:{root}:{b}")
+                self._board_adding.add(keys[-1])
             graph = self._graph()
             records = [r for r in graph.values() if asker is None or str(r.id) != asker]
             claims = queue_mod.held_claims(records, self._repos, datetime.now(UTC))
@@ -1297,12 +1336,16 @@ class InboxMixin:
                 return {"id": sid, "name": str(getattr(rec, "name", "") or sid)}
 
             held = {ref: holder(sid) for ref, sid in claims.items() if ref.startswith(workorders.PREFIX)}
-            mine = claims.get(queue_mod.qid(name, id))
-            async with self._applying_mark(root, f"ledger:{queue_mod.qid(name, id)}", "lift"):  # TD-1508
+            mine = next((c for q in qids if (c := claims.get(q))), None)  # (b)'s holder, over the set
+            async with contextlib.AsyncExitStack() as marks:
+                for q in qids:  # the applying lift covers every entry of the set, so each held build yields to it
+                    await marks.enter_async_context(self._applying_mark(root, f"ledger:{q}", "lift"))  # TD-1508
                 try:
                     done = await asyncio.to_thread(
-                        board_mod.lift_on_press, root, id, answer, held, holder(mine) if mine else None
+                        board_mod.lift_on_press, root, id, answer, held, holder(mine) if mine else None, go
                     )
+                except board_mod.BuildsChanged as err:
+                    raise RpcError(str(err), conflict=True) from None
                 except board_mod.Refused as err:
                     raise RpcError(str(err)) from None
                 if done.get("gone"):
@@ -1310,16 +1353,21 @@ class InboxMixin:
                 log.info("board %s: %s", root, done.get("message"))
                 await self._reread_board(root)
         finally:
-            self._board_adding.discard(key)
-        return {"repo": root, "id": id, "lifted": True}
+            for k in keys:
+                self._board_adding.discard(k)
+        return {"repo": root, "id": id, "lifted": True, **({"builds": go} if go else {})}
 
-    async def rpc_ledger_lift_reply(self, repo: str, id: str, msg: str, caller: Any = None) -> dict[str, Any]:
+    async def rpc_ledger_lift_reply(
+        self, repo: str, id: str, msg: str, caller: Any = None, builds: list[str] | None = None
+    ) -> dict[str, Any]:
         """A `blocked` outcome's **Lift the hold** (§4.4 *The outcome's lift and reply*, TD-1829, built by TD-1879):
         one request, the entry's lift and then the person's plain reply to the question `msg`, through `_msg`'s
         `lift_first`. A person's own act. Refused unless `msg`'s outcome is `blocked` and unreplied, and unless
         `{repo, id}` is the entry the home itself links to `msg` as `queue._mail_hold` does (*reload the Queue*).
         Returns the reply's result with `{repo, id, lifted}` or `{gone}`; a reply that fails after a written lift
-        returns `{repo, id, lifted: true, failed: <the bare reason>}`, never a refusal, since the hold is lifted."""
+        returns `{repo, id, lifted: true, failed: <the bare reason>}`, never a refusal, since the hold is lifted.
+        `builds` is the held builds the page drew (§4.4 *Go now lifts the design and its builds*, TD-2027), carried in
+        `lift_first`'s dict to `_press_lift`: a set that changed since is refused."""
         agent_common.person_only(caller, "lift the hold and reply", "§4.4", self._graph())
         mid = str(msg or "").strip()
         tid = str(id or "").strip().upper()
@@ -1333,6 +1381,8 @@ class InboxMixin:
         if root is None or self._lift_reply_target(q) != (root, tid):
             raise RpcError(f"{tid} is not the entry {mid} is about as the home reads it now: reload the Queue")
         box: dict[str, Any] = {"root": root, "id": tid}
+        if builds is not None:  # the held builds the page's Lift drew (§4.4 *Go now lifts the design*, TD-2027)
+            box["builds"] = agent_mail_builds(builds)
         try:
             got = await self._msg(PERSON, "Lift the hold", None, "reply", None, mid, None, None, lift_first=box)
         except Exception as err:  # noqa: BLE001 — a written lift stands, being the person's press: said, never lost
@@ -1370,10 +1420,13 @@ class InboxMixin:
         got = readings.get(name)
         return (got[0], tid.upper()) if got else None
 
-    def _open_work(self) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str]]:
+    def _open_work(
+        self,
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str], dict[str, str]]:
         """The open entries of every reading the home holds by `<repo>#TD-n`, each `decision (paul)` member's counted
         open work over them (`queue.open_work`, the one builder the Queue and the Inbox read, §4.4 *The card's
-        status*, TD-1926), and the index a line's refs link through."""
+        status*, TD-1926), the index a line's refs link through, and the `held_map` read with them (`{build:
+        design}`, TD-2026), which `_press_lift` and `_refuse_waiting` read (TD-2027)."""
         readings = {str(r.get("name") or Path(root).name): r for root, r in self._repos.items() if isinstance(r, dict)}
         opens = {
             queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
@@ -1388,13 +1441,15 @@ class InboxMixin:
         held = queue_mod.held_map(opens, boards, linked)
         resolve = queue_mod.item_resolver(origins)
         work = queue_mod.with_held(queue_mod.open_work(opens, resolve), held, opens, resolve)
-        return opens, work, linked
+        return opens, work, linked, held
 
-    def _refuse_waiting(self, qids: Iterable[str]) -> None:
+    def _refuse_waiting(self, qids: Iterable[str], work: Mapping[str, list[str]] | None = None) -> None:
         """A press on a member whose question still waits on counted open work is stale (§4.4 *The card's status*,
         TD-1926): refused before anything is written, *TD-n waits on TD-m: it is asked once that closes*, TD-m the
-        member's first counted id (bare in the member's own repo)."""
-        _, work, _ = self._open_work()
+        member's first counted id (bare in the member's own repo). `work` is the counted work a caller already read
+        (`_press_lift`'s one reading, TD-2027), else read here."""
+        if work is None:
+            _, work, _, _ = self._open_work()
         for q in qids:
             if counted := work.get(q):
                 repo, _, tid = q.partition("#")
@@ -1406,7 +1461,7 @@ class InboxMixin:
         id ending with it) else its words, in the board of `root`; none where no open line is found."""
         view = self._repos.get(root) or {}
         name = str(view.get("name") or Path(root).name)
-        opens, _, linked = self._open_work()
+        opens, _, linked, _ = self._open_work()
         want = key.removeprefix("board:").strip()
         for b in (view.get("boards") or {}).get("boards") or ():
             for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
