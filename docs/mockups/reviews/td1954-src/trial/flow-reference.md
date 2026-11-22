@@ -26,13 +26,17 @@ stages:
     does: build                # design, build or review
     model: sonnet              # haiku, sonnet, opus or fable (cheapest to strongest)
     takes: other               # optional: which NEW entries start here (see "Ways in")
+    brief: security-review     # optional: a brief of the person's own, in place of the standard one
+    also: Look hardest at src/auth.   # optional: text added after the brief, for this stage only
     work-pushed: review        # an outcome of this stage, and where it goes
     other: {to: troubleshoot, limit: 1}
 audits:                        # optional: see "Audits"
   - name: Docs audit
     model: sonnet
     every: 10 merged-pull-requests
-    brief: docs/briefs/docs-audit.md
+    brief: docs                # docs, tests or code, or the name of a brief of the person's own
+support:                       # optional: the model each built-in seat runs on
+  tech-lead: opus
 ```
 
 A stage's **key** is its name in lower case with spaces as hyphens: `Second read` is `second-read`.
@@ -130,7 +134,8 @@ nothing. Each audit has:
 
 - `name`, `model`
 - `every`: `<n> merged-pull-requests`, `<n> hours` or `<n> days` (always the plural: `1 days`)
-- `brief`: the path of the file that says where to look and what for
+- `brief`: `docs`, `tests` or `code` (the standard audit briefs), or the name of a brief of the person's own
+- `also`: optional text added after the brief, such as which folders to look in
 
 Nothing can be sent to an audit.
 
@@ -161,6 +166,15 @@ Nothing can be sent to an audit.
 8. Every stage can be reached: by `takes`, or as some outcome's destination.
 9. `max-moves`, when given, is a whole number of 2 or more.
 10. Every audit has a name, a model, an `every` and a `brief`.
+
+## Briefs and the built-in seats
+
+Each kind of stage has a standard brief, which is what the session is told. A stage may name a brief of the
+person's own with `brief:`, and may add text after whichever brief it uses with `also:`. A narrower read,
+such as a security review, is a review stage with a brief of the person's own.
+
+`support:` sets the model for the seats every flow has: `tech-lead` (answers members' questions),
+`board-answers`, `unheld-pull-requests`, `manager` and `sweeper`. A seat left out runs on its default.
 
 The check warns, without failing, when a review stage uses the same model as a stage whose work it reads.
 

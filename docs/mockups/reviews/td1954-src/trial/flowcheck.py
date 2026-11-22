@@ -14,7 +14,8 @@ MODELS = ("haiku", "sonnet", "opus", "fable")
 FIXED = ("person", "done", "merge")
 CAN_MERGE = ("work-pushed", "ship")
 WRITES = ("design", "build")
-STAGE_KEYS = ("name", "does", "model", "takes", "only-when")
+SUPPORT = ("tech-lead", "board-answers", "unheld-pull-requests", "manager", "sweeper")
+STAGE_KEYS = ("name", "does", "model", "takes", "only-when", "brief", "also")
 EVERY = re.compile(r"^([1-9]\d*) (merged-pull-requests|hours|days)$")
 
 
@@ -27,8 +28,11 @@ def check(doc):
     if not isinstance(doc, dict) or not isinstance(doc.get("stages"), list) or not doc["stages"]:
         return ["the file needs a `stages:` list with at least one stage"], info
     for k in doc:
-        if k not in ("format", "name", "stages", "audits", "max-moves"):
+        if k not in ("format", "name", "stages", "audits", "support", "max-moves"):
             bad.append(f"unknown key at the top: `{k}`")
+    for seat, model in (doc.get("support") or {}).items():
+        if seat not in SUPPORT or model not in MODELS:
+            bad.append(f"support: `{seat}: {model}` must be one of {', '.join(SUPPORT)} with a model from the list")
     if doc.get("format") != 3:
         bad.append("`format: 3` is required")
     mm = doc.get("max-moves", 25)
@@ -42,14 +46,14 @@ def check(doc):
             continue
         nm = a["name"]
         for k in a:
-            if k not in ("name", "model", "every", "brief"):
-                bad.append(f"{nm}: unknown key `{k}`; an audit has name, model, every and brief (rule 10)")
+            if k not in ("name", "model", "every", "brief", "also"):
+                bad.append(f"{nm}: unknown key `{k}`; an audit has name, model, every, brief and also (rule 10)")
         if a.get("model") not in MODELS:
             bad.append(f"{nm}: model must be one of {', '.join(MODELS)} (rule 10)")
         if not EVERY.match(str(a.get("every", ""))):
             bad.append(f"{nm}: `every` is written like `10 merged-pull-requests`, `6 hours` or `1 days` (rule 10)")
         if not a.get("brief"):
-            bad.append(f"{nm}: an audit needs a `brief:` that says where it looks (rule 10)")
+            bad.append(f"{nm}: an audit needs a `brief:`: docs, tests, code, or the name of a brief of your own (rule 10)")
         if slug(nm) in audits or slug(nm) in FIXED:
             bad.append(f"{nm}: the name is already used, or is a reserved word (rule 7)")
         audits[slug(nm)] = nm

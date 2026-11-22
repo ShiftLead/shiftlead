@@ -161,7 +161,17 @@ const to = (k, limit) => ({ to: k, limit: limit || null });
 const mg = (k, limit) => ({ to: "merge", limit: null, else: k ? to(k, limit) : null });
 function st(name, kind, model, takes, next, only) { return { name, kind, model, takes: takes || "", only: only || "", next: next || {} }; }
 const UNITS = [["prs", "merged pull requests"], ["hours", "hours"], ["days", "days"]];
-const hunt = (name, model, n, unit) => Object.assign(st(name, "hunt", model, "clock", {}), { n, unit });
+const hunt = (name, model, n, unit, brief) => Object.assign(st(name, "hunt", model, "clock", {}), { n, unit, brief: brief || "docs" });
+const AUD = "Starts on its clock. File each real finding as an entry of its own, with how to see it. Fix nothing here. ";
+const STD = {
+  design: [["std", "Standard design brief", K.design.brief]],
+  build: [["std", "Standard build brief", K.build.brief]],
+  review: [["std", "Standard review brief", K.review.brief]],
+  hunt: [["docs", "Docs audit", AUD + "Compare what the pull requests merged since your last run changed against the documents that describe it: the design, the README and the help text. A document that no longer matches the code is a finding."], ["tests", "Tests audit", AUD + "Look at what the pull requests merged since your last run changed, and at the tests that cover it. Behaviour with no test, a test that cannot fail, and a test that is skipped are findings."], ["code", "Code audit", AUD + "Read one area of the code end to end, a different one each run. Dead code, a duplicated rule, an error that is swallowed, and anything the design says that the code does not do are findings."]],
+};
+const KLAB = { design: "Design", build: "Build", review: "Review", hunt: "Audit" };
+const briefsFor = k => STD[k].concat((S.briefs || []).filter(b => b.kind === k).map(b => [b.id, b.name, b.text]));
+const briefOf = s => briefsFor(s.kind).find(b => b[0] === s.brief) || briefsFor(s.kind)[0];
 const KINDS = ["design", "build", "review"];
 const outs = s => K[s.kind].outs.concat("other");
 const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet", sweeper: "sonnet" });
@@ -176,8 +186,8 @@ function builtins() {
       st("Build", "build", "opus", "other", { "work-pushed": to("review") }),
       st("Review", "review", "sonnet", "", { ship: to("protected-read"), "changes-wanted": to("build", 3) }),
       st("Protected read", "review", "fable", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }, "protected"),
-      hunt("Docs audit", "sonnet", 10, "prs"),
-      hunt("Test audit", "sonnet", 6, "hours"),
+      hunt("Docs audit", "sonnet", 10, "prs", "docs"),
+      hunt("Test audit", "sonnet", 6, "hours", "tests"),
     ]),
     flow("build-review", true, "build, then a review; a ship is merged", [
       st("Build", "build", "opus", "any", { "work-pushed": to("review") }),
@@ -205,10 +215,10 @@ function examples() {
   ];
 }
 
-const KEY = "flows-proto-v6";
-let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false };
-try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
-function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
+const KEY = "flows-proto-v7";
+let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false, page: "flows", briefs: [] };
+try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; S.briefs = Array.isArray(r.briefs) ? r.briefs : []; } } catch (e) { /* storage is a convenience */ }
+function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel, briefs: S.briefs })); } catch (e) { /* ignore */ } }
 const cur = () => S.flows.find(f => f.id === S.sel) || S.flows[0];
 
 function dflt(o) { return ["findings-filed", "nothing-found"].includes(o) ? to("done") : to("person"); }
@@ -270,16 +280,42 @@ function check(f) {
   return { bad, warn, info, by };
 }
 
+function briefYaml(s, always) {
+  const b = briefOf(s), std = STD[s.kind].some(x => x[0] === b[0]);
+  return (always || !std ? `    brief: ${std ? b[0] : slug(b[1])}\n` : "") + (s.also ? `    also: ${JSON.stringify(s.also)}\n` : "");
+}
+function briefPanel(s, si, ro) {
+  const b = briefOf(s), all = briefsFor(s.kind);
+  let h = '<div class="brief"><b>What the session is told</b> ';
+  h += ro || all.length < 2 && !S.briefs ? `<span class="same">${esc(b[1])}</span>` : `<select id="bp-${si}" data-act="bpick" data-si="${si}" aria-label="Brief">${all.map(x => `<option value="${esc(x[0])}"${x[0] === b[0] ? " selected" : ""}>${esc(x[1])}${STD[s.kind].includes(x) ? "" : " (yours)"}</option>`).join("")}</select> <button class="lnk" data-act="page" data-k="briefs">all briefs</button>`;
+  h += `<p>${esc(b[2])}</p>`;
+  if (ro) h += s.also ? `<p><b>Also:</b> ${esc(s.also)}</p>` : "";
+  else h += `<p style="margin-top:8px"><b>Also</b> <span class="same">added after the brief, for this ${s.kind === "hunt" ? "audit" : "stage"} only</span></p><textarea id="al-${si}" data-act="also" data-si="${si}" aria-label="Also" placeholder="For example: look only under docs/ and src/api/." style="width:100%;min-height:54px;font:inherit;box-sizing:border-box">${esc(s.also || "")}</textarea>`;
+  return h + "</div>";
+}
+function renderBriefs() {
+  let h = '<div class="fhead"><h2>Briefs</h2></div><p class="same" style="font-size:13.5px;margin:0 0 6px">What a session is told when it starts a stage or an audit. The standard briefs ship with ShiftLead and improve with it. A brief of your own can be picked on any stage or audit of its kind.</p>';
+  for (const k of ["design", "build", "review", "hunt"]) {
+    h += `<h3>${KLAB[k]}</h3>`;
+    STD[k].forEach(b => { h += `<div class="walk" style="margin-bottom:8px"><b>${esc(b[1])}</b> <span class="tagc">standard</span><p style="margin:6px 0 0;font-size:13.5px">${esc(b[2])}</p></div>`; });
+    S.briefs.filter(b => b.kind === k).forEach(b => {
+      const used = S.flows.reduce((n, f) => n + f.stages.filter(s => s.kind === k && s.brief === b.id).length, 0);
+      h += `<div class="walk" style="margin-bottom:8px"><input type="text" class="nm" id="bn-${b.id}" data-act="bname" data-id="${b.id}" value="${esc(b.name)}" aria-label="Brief name" style="max-width:320px"> <span class="tagc">yours</span> <span class="same" style="font-size:13px">used by ${used}</span><textarea id="bt-${b.id}" data-act="btext" data-id="${b.id}" aria-label="Brief text" style="width:100%;min-height:110px;font:inherit;box-sizing:border-box;margin-top:8px">${esc(b.text)}</textarea><div class="addrow"><button class="quiet" data-act="bdel" data-id="${b.id}">Delete</button></div></div>`;
+    });
+    h += `<p class="addstage"><button data-act="bnew" data-k="${k}">+ New ${KLAB[k].toLowerCase()} brief</button> <span class="same" style="font-size:13px">starts as a copy of the standard text</span></p>`;
+  }
+  return h;
+}
 function yaml(f) {
   const one = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
   const d = x => x.to === "merge" && x.else ? `{to: merge, refused: ${one(x.else)}}` : one(x);
   let y = `format: 3\nname: ${f.name}\n` + (f.carry === "branch" ? "work: branches\n" : "") + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
   for (const s of f.stages.filter(x => x.kind !== "hunt")) {
     y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
-    y += outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
+    y += briefYaml(s) + outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
   }
   const au = f.stages.filter(x => x.kind === "hunt");
-  if (au.length) y += "audits:\n" + au.map(s => `  - name: ${s.name}\n    model: ${s.model}\n    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n    brief: docs/briefs/${slug(s.name)}.md\n`).join("");
+  if (au.length) y += "audits:\n" + au.map(s => `  - name: ${s.name}\n    model: ${s.model}\n    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n` + briefYaml(s, true)).join("");
   return y;
 }
 
@@ -325,7 +361,7 @@ function renderStages(f, res) {
     if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove ${isA ? "audit" : "stage"}</button></div>`;
     h += '</div><div class="ends">';
     h += `<div class="ahead" style="--c:var(${k.c})"><span class="chip">${k.label}</span><small>${k.desc}${s.only ? " Passed without a session, counting as ship, when no protected file is touched." : ""}</small><button class="lnk" data-act="brief" data-k="${si}">${S.brief === String(si) ? "hide brief" : "brief"}</button></div>`;
-    if (S.brief === String(si)) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept on the Actions page, where a brief of your own can replace them</span><p>${k.brief}</p></div>`;
+    if (S.brief === String(si)) h += briefPanel(s, si, ro);
     h += '<div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
     outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "other" ? ' <span class="same">(when none of the above fits)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
     errs.filter(b => b.o === undefined).forEach(b => { h += `<div class="why" style="margin-top:6px">${esc(b.msg)}</div>`; });
@@ -388,7 +424,7 @@ function renderWalk(f, res) {
 function render() {
   const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.kind === k).length;
   const item = x => `<a class="fl${x.id === f.id ? " sel" : ""}" data-act="pick" data-id="${esc(x.id)}" tabindex="0">${esc(x.name)}${check(x).bad.length ? ' <span class="dot" title="has problems">●</span>' : ""}<small>${esc(x.blurb || "your flow")}</small></a>`;
-  let n = "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
+  let n = `<div class="tabs" style="margin:0 0 10px"><button data-act="page" data-k="flows" class="${S.page === "flows" ? "on" : ""}">Flows</button><button data-act="page" data-k="briefs" class="${S.page === "briefs" ? "on" : ""}">Briefs</button></div>` + "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
   if (!f.builtin) n += `<h4>Kinds of stage</h4><p>Click one to add a stage${f.stages[openIdx(f)] && f.stages[openIdx(f)].kind !== "hunt" ? ` after <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it to where it belongs.</p>` + KINDS.map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${K[k].c})"><b>${K[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${K[k].desc}</small></div>`).join("");
   document.getElementById("nav").innerHTML = n;
   let h = '<div class="fhead">' + (f.builtin ? `<h2>${esc(f.name)}</h2><span class="tagc">built in</span>` : `<input type="text" class="fname" id="fname" data-act="fname" value="${esc(f.name)}" aria-label="Flow name"><span class="tagc">yours</span>`) + '<div class="act">';
@@ -399,7 +435,7 @@ function render() {
   h += '</div></div><div class="lim"><span>An entry comes to you after ' + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
   h += '<div class="tabs">' + [["stages", "Stages"], ["walk", "Walk an entry"], ["file", "The file"]].map(([k, t]) => `<button data-act="tab" data-k="${k}" class="${S.tab === k ? "on" : ""}">${t}</button>`).join("") + "</div>";
   h += S.tab === "file" ? `<pre class="file">${esc(yaml(f))}</pre>` : S.tab === "walk" ? renderWalk(f, res) : renderStages(f, res);
-  document.getElementById("main").innerHTML = h + renderChecks(res);
+  document.getElementById("main").innerHTML = S.page === "briefs" ? renderBriefs() : h + renderChecks(res);
 }
 
 function toast(t) { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 1800); }
@@ -417,7 +453,7 @@ function act(el, ev) {
   const f = cur(), d = el.dataset, si = d.si === undefined ? null : +d.si, s = si === null ? null : f.stages[si], sub = d.sub === "1";
   S.del = d.act === "del";
   switch (d.act) {
-    case "pick": S.sel = d.id; S.walk = null; S.open = undefined; S.brief = null; break;
+    case "pick": S.page = "flows"; S.sel = d.id; S.walk = null; S.open = undefined; S.brief = null; break;
     case "tab": S.tab = d.k; break;
     case "copy": { const c = JSON.parse(JSON.stringify(f)); c.builtin = false; c.name = uniqueName(f.name + "-copy"); c.id = c.name + "-" + Date.now(); c.blurb = "copied from " + f.name; S.flows.push(c); S.sel = c.id; S.tab = "stages"; S.walk = null; toast("Copied. This one is yours to change."); break; }
     case "new": { const nm = uniqueName("my-flow"), n = flow(nm + "-" + Date.now(), false, "your flow", [st("Build", "build", "sonnet", "any", {})]); n.name = nm; S.flows.push(n); S.sel = n.id; S.tab = "stages"; S.walk = null; break; }
@@ -448,6 +484,13 @@ function act(el, ev) {
       break;
     }
     case "brief": S.brief = S.brief === d.k ? null : d.k; break;
+    case "page": S.page = d.k; break;
+    case "bpick": s.brief = el.value; break;
+    case "also": s.also = el.value; break;
+    case "bnew": S.briefs.push({ id: "b" + Date.now(), name: `My ${KLAB[d.k].toLowerCase()} brief`, kind: d.k, text: STD[d.k][0][2] }); break;
+    case "bname": S.briefs.find(b => b.id === d.id).name = el.value.trim() || "Unnamed"; break;
+    case "btext": S.briefs.find(b => b.id === d.id).text = el.value; break;
+    case "bdel": S.briefs = S.briefs.filter(b => b.id !== d.id); break;
     case "palette": addStage(f, d.k, openIdx(f)); break;
     case "addstage": addStage(f, el.value, f.stages.length - 1); break;
     case "addhunt": addStage(f, "hunt", 0); break;
@@ -466,18 +509,18 @@ function act(el, ev) {
     case "wmerged": S.walk.at = "done"; S.walk.log.push(`You merge the ${work(f)} by hand. Merged work ends its entry: <b>done</b>.`); break;
     default: return;
   }
-  if (!f.builtin || ["pick", "copy", "new", "del2"].includes(d.act)) persist();
+  if (!f.builtin || ["pick", "copy", "new", "del2", "bnew", "bname", "btext", "bdel"].includes(d.act)) persist();
   render();
   if (ev && el.id) { const again = document.getElementById(el.id); if (again) again.focus(); }
 }
 
 document.addEventListener("click", ev => {
   const el = ev.target.closest("[data-act]");
-  if (el && !["SELECT", "INPUT"].includes(el.tagName)) return act(el, ev);
+  if (el && !["SELECT", "INPUT", "TEXTAREA"].includes(el.tagName)) return act(el, ev);
   const r = ev.target.closest("[data-drop]");
   if (r && !el && !cur().builtin && S.open !== +r.dataset.drop) { S.open = +r.dataset.drop; render(); }
 });
-document.addEventListener("change", ev => { const el = ev.target.closest("[data-act]"); if (el && ["SELECT", "INPUT"].includes(el.tagName)) act(el, ev); });
+document.addEventListener("change", ev => { const el = ev.target.closest("[data-act]"); if (el && ["SELECT", "INPUT", "TEXTAREA"].includes(el.tagName)) act(el, ev); });
 document.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("a.fl, .pal")) act(ev.target, ev); });
 document.addEventListener("dragstart", ev => { const p = ev.target.closest && ev.target.closest("[data-pal]"); if (p) ev.dataTransfer.setData("text/plain", p.dataset.pal); });
 document.addEventListener("dragover", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r && !cur().builtin) { ev.preventDefault(); r.classList.add("over"); } });
