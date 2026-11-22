@@ -342,8 +342,9 @@ def plan(
 ) -> dict[str, Any]:
     """The sweep's plan for the repo at `root`: `sweep()`'s `{to_file, to_close, lifts}` with `repo`, `base`,
     `boards` (each board read, by its sweep name) and `checks`. With `host` (`{repo, visibility, host_file}`,
-    the home's) each `host-log` gate is answered by the home's own reader run (`host_log_rows`). Raises
-    SweepError when it cannot be made."""
+    the home's) each `host-log` gate is answered by the home's own reader run (`host_log_rows`). Another repo's
+    id in an entry's Blocked by is resolved over `root` and `others` (`ledger.Registry`), so a decision waiting
+    on open work there is deferred. Raises SweepError when it cannot be made."""
     base = ledger_mod.default_ref(root)
     if base is None:
         raise SweepError("no origin/<default>")
@@ -376,8 +377,11 @@ def plan(
     if host is not None:
         rows = host_log_rows(root, base, text, rows, host)
     results = {(r["id"], r["name"]): (r.get("outcome"), r.get("evidence")) for r in rows if r.get("outcome")}
+    # The resolver the home passes pickable(): a decision whose entry waits on another repo's open entry
+    # (`<repo>#TD-n`) is deferred, not asked (ledgerboard v3.5, TD-150; TD-1977).
+    resolve = ledger_mod.Registry([str(root), *(str(o) for o in others)])
     try:
-        out = lb.sweep([text, archive or ""], boards, results, today_utc, today_local, repo=repo)
+        out = lb.sweep([text, archive or ""], boards, results, today_utc, today_local, repo=repo, resolve=resolve)
     except lb.Refused as e:
         raise SweepError(f"sweep() refused: {e}") from None
     return {

@@ -785,6 +785,126 @@
    "flags": [],
    "refusals": []
   },
+  "deferred: a part whose parent carries the gate and a live blocker": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-179 gains decision (pat), deferred behind TD-181 (blocks TD-180) — the sweep asks it once none is in flight"
+    ],
+    [
+     "decision-deferred",
+     "TD-180 gains decision (pat), deferred behind TD-181 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: an id in its own and its parent's lists": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-184 gains decision (pat), deferred behind TD-186, TD-186 (blocks TD-185) — the sweep asks it once none is in flight"
+    ],
+    [
+     "decision-deferred",
+     "TD-185 gains decision (pat), deferred behind TD-186 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: an id written twice": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-182 gains decision (pat), deferred behind TD-183 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: beside a live id": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-161 gains decision (pat), deferred behind TD-162 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: beside a local id Superseded by another repo's id": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-170 gains decision (pat), deferred behind TD-171 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: beside a local id Superseded with no successor": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-187 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "deferred: beside an archived Resolved id": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-163 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "deferred: beside an archived id with Status Built": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-167 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "deferred: beside an archived id with a Status word outside the vocabulary": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-165 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "deferred: beside another repo's id": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-169 gains decision (pat), deferred behind acme/other#TD-7 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: beside two live ids": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-172 gains decision (pat), deferred behind TD-173, TD-174 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
+  "deferred: covered by an open item beside a live id": {
+   "flags": [],
+   "refusals": []
+  },
+  "deferred: the board not listing pat, beside a live id": {
+   "flags": [
+    [
+     "decision-deferred",
+     "TD-177 gains decision (pat), deferred behind TD-178 — the sweep asks it once none is in flight"
+    ]
+   ],
+   "refusals": []
+  },
   "old_form_rewrite_gained": {
    "flags": [],
    "refusals": [

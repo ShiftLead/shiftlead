@@ -1237,5 +1237,207 @@
    "today_utc": "2026-11-03",
    "today_local": "2026-11-03"
   }
+ ],
+ "in_flight": [
+  {
+   "name": "01 beside a live blocker",
+   "dir": "in_flight/01 beside a live blocker",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "02 beside an archived Resolved blocker",
+   "dir": "in_flight/02 beside an archived Resolved blocker",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "03a beside a blocker Superseded by a live entry",
+   "dir": "in_flight/03a beside a blocker Superseded by a live entry",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "03b beside a blocker Superseded by an archived Resolved entry",
+   "dir": "in_flight/03b beside a blocker Superseded by an archived Resolved entry",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "03c beside a blocker Superseded with no successor",
+   "dir": "in_flight/03c beside a blocker Superseded with no successor",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "04a beside an archived Dropped blocker",
+   "dir": "in_flight/04a beside an archived Dropped blocker",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "04b beside an archived blocker with a Status word outside the vocabulary",
+   "dir": "in_flight/04b beside an archived blocker with a Status word outside the vocabulary",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "04c beside an archived blocker with Status Built",
+   "dir": "in_flight/04c beside an archived blocker with Status Built",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "05 beside an id in neither ledger nor archive",
+   "dir": "in_flight/05 beside an id in neither ledger nor archive",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "06a beside another repo's id, no resolver",
+   "dir": "in_flight/06a beside another repo's id, no resolver",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "06b beside another repo's id the resolver answers open",
+   "dir": "in_flight/06b beside another repo's id the resolver answers open",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "resolve": {
+    "acme/other#TD-7": [
+     "open",
+     "live"
+    ]
+   }
+  },
+  {
+   "name": "06c beside another repo's id the resolver answers archived Resolved",
+   "dir": "in_flight/06c beside another repo's id the resolver answers archived Resolved",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "resolve": {
+    "acme/other#TD-7": {
+     "state": "archived",
+     "why": "",
+     "status": "Resolved 2026-10-01"
+    }
+   }
+  },
+  {
+   "name": "06d beside another repo's id the resolver answers garbage",
+   "dir": "in_flight/06d beside another repo's id the resolver answers garbage",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "resolve": {
+    "acme/other#TD-7": [
+     "maybe",
+     "?"
+    ]
+   }
+  },
+  {
+   "name": "06e beside another repo's id, the resolver raising",
+   "dir": "in_flight/06e beside another repo's id, the resolver raising",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "resolve": "raise"
+  },
+  {
+   "name": "07 beside a blocker Superseded by another repo's open id",
+   "dir": "in_flight/07 beside a blocker Superseded by another repo's open id",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "resolve": {
+    "acme/other#TD-8": [
+     "open",
+     "live"
+    ]
+   }
+  },
+  {
+   "name": "08 two blockers, one live and one archived Resolved",
+   "dir": "in_flight/08 two blockers, one live and one archived Resolved",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "09a the entry's own id in its Blocked by",
+   "dir": "in_flight/09a the entry's own id in its Blocked by",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "09b a part of it in its Blocked by",
+   "dir": "in_flight/09b a part of it in its Blocked by",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "09c its parent in its Blocked by",
+   "dir": "in_flight/09c its parent in its Blocked by",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "09d an archived blocker Superseded by a part of it",
+   "dir": "in_flight/09d an archived blocker Superseded by a part of it",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "10 a design and its held builds, no blocker",
+   "dir": "in_flight/10 a design and its held builds, no blocker",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "11 a design held by its bought round, and its held builds",
+   "dir": "in_flight/11 a design held by its bought round, and its held builds",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "12 a part whose parent is blocked by a live entry and carries no decision",
+   "dir": "in_flight/12 a part whose parent is blocked by a live entry and carries no decision",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "13 a part whose parent carries the decision and is blocked only by a sibling part",
+   "dir": "in_flight/13 a part whose parent carries the decision and is blocked only by a sibling part",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "14a beside an until a later day",
+   "dir": "in_flight/14a beside an until a later day",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "14b beside an event with no outcome",
+   "dir": "in_flight/14b beside an event with no outcome",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "15 an open decide covering the gate, a live blocker beside it",
+   "dir": "in_flight/15 an open decide covering the gate, a live blocker beside it",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "16 no board lists the person, a live blocker beside it",
+   "dir": "in_flight/16 no board lists the person, a live blocker beside it",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "17 an answer owing a lift, a live blocker beside it",
+   "dir": "in_flight/17 an answer owing a lift, a live blocker beside it",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  }
  ]
 }

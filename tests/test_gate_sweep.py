@@ -281,6 +281,63 @@ def other(repo, tmp_path):
     return root, x
 
 
+WAITS = """## TD-9: Waits on the person and on another repo's work
+
+**Priority:** Low
+**Added:** 2026-11-01
+**Status:** Open
+**Blocked by:** x#TD-3, decision (paul)
+
+**Why:** w.
+
+**Ask:** Should it go once x's work lands?
+
+**Fix:** f.
+"""
+X_WORK = """## TD-3: Work in x
+
+**Priority:** Low
+**Added:** 2026-11-01
+**Status:** {status}
+
+**Why:** w.
+
+**Fix:** f.
+"""
+
+
+def _commit_push(root: Path, msg: str) -> None:
+    _git("-C", str(root), "add", "-A")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", msg)
+    _git("-C", str(root), "push", "-q", "origin", "main")
+
+
+def _filed(p: dict, tid: str) -> list:
+    return [i for items in p["to_file"].values() for i in items if tid in json.dumps(i)]
+
+
+def test_a_decision_waiting_on_another_repos_open_entry_is_deferred_until_it_is_archived(other):
+    """TD-1977 (ledgerboard v3.5, TD-150): the home's sweep resolves `<repo>#TD-n` over the registered repos, so a
+    decision whose entry also waits on open work in another repo is not asked; once that work is archived it is."""
+    root, x = other
+    write_board(root, BOARD)  # the person's board is this repo's own again
+    (root / "docs" / "ledger" / "TD-9.md").write_text(WAITS)
+    _commit_push(root, "TD-9")
+    (x / "docs" / "ledger").mkdir(parents=True)
+    (x / "docs" / "ledger" / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n")
+    (x / "docs" / "ledger" / "TD-3.md").write_text(X_WORK.format(status="Open"))
+    _commit_push(x, "TD-3")
+    p = gatesweep.plan(root, [x], today_utc=UTC, today_local=LOCAL)
+    assert _filed(p, "TD-8"), "an uncovered decision with nothing in flight is still asked"
+    assert not _filed(p, "TD-9"), f"x#TD-3 is open, so TD-9's decision waits: {p['to_file']}"
+    (x / "docs" / "ledger" / "TD-3.md").unlink()
+    (x / "docs" / "ledger" / "archive").mkdir()
+    (x / "docs" / "ledger" / "archive" / "TD-3.md").write_text(X_WORK.format(status="Done"))
+    _commit_push(x, "archive TD-3")
+    p = gatesweep.plan(root, [x], today_utc=UTC, today_local=LOCAL)
+    assert _filed(p, "TD-9"), f"x#TD-3 is archived, so TD-9's decision is asked: {p['to_file']}"
+
+
 def _forge(root: Path) -> dict:
     return json.loads((root.parent / f"{root.name}-origin.git" / "fake-gh.json").read_text())
 
