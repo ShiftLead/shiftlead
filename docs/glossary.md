@@ -195,6 +195,7 @@ not mix:
   Grok Build profile, is a trial of its own beside it. — *proposed* 2026-10-29 (design §4.9b *The
   fact-check*, TD-857; the second seat *A second model on trial*, TD-1550).
 - **builder** — a role: the session of a build stage, which takes one entry and ends the stage with an outcome (design §4.9c, §4.8). **grinder** is its name until the cut-over: a role that resolves each entry it picks from its lane to a merged PR. — *proposed*; renamed 2026-11-21 (TD-1954).
+- **cut-over** — the moment the switch-over window writes its marker `cut_over` in `settings.yml`; before it the first shape is what runs, after it logins, format-3 flows and teams as settings are (design §4.9e). **The window** is the one run of `ao switch-over move` on a home, with every team stopped; **the removal build** (TD-2056) takes the first shape's code out afterwards.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
 - **brief** — the job description a session is started with, written from its role's template. The template holds shiftlead's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.

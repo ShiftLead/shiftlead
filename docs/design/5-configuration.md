@@ -105,8 +105,8 @@ reach:                                        # §4.5b *The setting*: the person
   **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `manager`,
   `board-answers`, `unheld-pull-requests`, `sweeper`) and `logins` in order — and `repos.<repo>.builtins` names the
   set a repo uses, `default` where absent; `builtins.default` always exists (§4.9d *The built-in seats and
-  their page*). They are written by the Built-in seats page's own calls and, for `builtins.default`, by the cut-over's move; absent, `default` reads as the package's models and an empty list. `cut_over: <date>`, at the top of the file, is written once by the cut-over
-  (TD-2056) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
+  their page*). They are written by the Built-in seats page's own calls and, for `builtins.default`, by the window's move (§4.9e); absent, `default` reads as the package's models and an empty list. `cut_over: <date>`, at the top of the file, is written once by the window
+  (§4.9e) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
   repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a built-in seat that runs
   on the model and a login of the built-in set its repo uses. Whether a team is
   started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped and a

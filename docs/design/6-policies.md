@@ -2817,7 +2817,7 @@ teams:
   it has been so for `max_age`, since a session at work reports the new window within a minute. A
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
-  **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is TD-1976's) the gate
+  **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is §4.9e's, TD-1976) the gate
   reads a session's login's account where it read its profile's, and **a session is held only when no
   login in its team's list, or for a built-in seat its repo's built-in set's, is usable for its model**: one whose login reaches its line is moved to the
   next usable login of the list first, and pauses, as above, only where there is none.
