@@ -45,17 +45,21 @@
   {%- set names = [] %}
   {%- if not r.archived %}
     {#- **Lift the hold** first, where the reading's `lift_here` is set (§4.4 *Where Lift the hold is drawn*, TD-1831) #}
-    {%- if r.lift_here %}{% set _ = names.append('Lift the hold') %}{% endif %}
+    {%- if r.lift_here %}{% set _ = names.append('Go now' if r.go_builds else 'Lift the hold') %}{% endif %}
     {%- if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}{% set _ = names.append('Back to design…') %}{% endif %}
     {%- if r.needs != 'owner' and not r.builds_open %}{% set _ = names.append('Done…') %}{% endif %}
   {%- endif %}
   {%- set _ = names.append('Open') %}
   {%- call dots(names) %}
-    {%- if r.lift_here and not r.archived %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ r.id }}" data-confirm="Lift the hold on {{ r.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>{% endif %}
+    {%- if r.lift_here and not r.archived %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" {{ go_attrs(r.id, r.go_builds) }}>{{ go_now(r.id, r.go_builds).label }}</button>{% endif %}
     {{- controls(r, in_menu=True) }}
     <a href="/repo/{{ r.repo }}#{{ r.id }}" role="menuitem" title="{{ r.id }} on the {{ r.repo }} Repo page">Open</a>
   {%- endcall %}
 {%- endif %}{% endmacro %}
+
+{#- a lift button's title, confirm and `data-builds` (§4.4 *Go now lifts the design and its builds*, TD-2027): on a
+    design with a question **Go now**'s, its press sending the held builds the page drew (`common.go_now`) #}
+{% macro go_attrs(ref, builds) %}{% set g = go_now(ref, builds) %} data-builds="{{ g.builds | join(',') }}" title="{{ g.title }}" data-confirm="{{ g.confirm }}"{% endmacro %}
 
 {% macro holder(h) %}{% if h %}<a class="qpill mono" href="/focus/{{ h.id }}" title="holds it: {{ h.name }}">{{ h.name }}</a>{% endif %}{% endmacro %}
 

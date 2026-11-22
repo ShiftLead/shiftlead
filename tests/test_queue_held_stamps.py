@@ -1,8 +1,8 @@
 """TD-2026 slice 2, design §4.4 *A design's question is asked once, on the design* (TD-2021): each held build carries
 `held_by` (its design) on its entry, and a design with a question `go_builds` (its held builds, in key order) on its
 Queue row, its `ledger_for_you` row and its `answered.lift`; case (d) reads over the set (its held builds no other
-gated entry), through `held_map`'s map threaded to `lift_here`, `ledger_for_you` and `lift_ask_target`; and, as an
-interim TD-2027 step 1 removes, a design with held builds draws no **Lift the hold**, which would lift it alone."""
+gated entry), through `held_map`'s map threaded to `lift_here`, `ledger_for_you` and `lift_ask_target`; and a design
+with held builds draws its lift, as **Go now** (TD-2027 step 1, which removed TD-2026's interim)."""
 
 from __future__ import annotations
 
@@ -49,22 +49,24 @@ def test_the_design_row_carries_go_builds_and_each_build_its_design(tmp_path):
 
 
 @pytest.mark.unit
-def test_interim_no_lift_here_on_a_design_with_held_builds(tmp_path):
+def test_go_now_lift_here_on_a_design_with_held_builds(tmp_path):
     entries = [_entry(1, "the design", **HELD), _entry(2, "build a", **PART)]
     root, r = _setup(tmp_path, entries, _open("TD-001 decision (paul)", decided=GO, parts="TD-002"))
-    assert _row(_read({root: r}), "r#TD-001")["lift_here"] is False, "Go now (TD-2027) is drawn there, not a Lift"
-    # the same answered line with no Parts: no held build, and the design's row draws its Lift as before
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["lift_here"] is True and row["go_builds"] == ["TD-002"], "drawn as Go now (TD-2027)"
+    assert _row(_read({root: r}), "r#TD-002")["lift_here"] is False, "a held build draws no lift of its own"
+    # the same answered line with no Parts: no held build, and the design's row draws its plain Lift
     root, r = _setup(tmp_path / "b", entries, _open("TD-001 decision (paul)", decided=GO))
     row = _row(_read({root: r}), "r#TD-001")
     assert row["lift_here"] is True and row["go_builds"] == []
 
 
 @pytest.mark.unit
-def test_interim_no_lift_item_on_a_design_with_held_builds_and_its_go_builds(tmp_path):
+def test_go_now_lift_item_on_a_design_with_held_builds_and_its_go_builds(tmp_path):
     entries = [_entry(1, "the design", **HELD), _entry(2, "build a", **PART)]
     root, r = _setup(tmp_path, entries, _closed_line("TD-002"))
     row = _ledger_row(r, root, "TD-001")
-    assert row["go_builds"] == ["TD-002"] and row["lift_item"] is False
+    assert row["go_builds"] == ["TD-002"] and row["lift_item"] is True, "drawn as Go now (TD-2027)"
     root, r = _setup(tmp_path / "b", entries, _closed_line(""))
     row = _ledger_row(r, root, "TD-001")
     assert row["go_builds"] == [] and row["lift_item"] is True
