@@ -135,13 +135,11 @@ def test_a_press_with_no_row_is_marked_by_pressed_and_ends_at_its_answer():
     h = _handler()
     body = h[h.index("const pressed = (text) => {") :]
     nor = body[: body.index("if (!row || !row.isConnected) return;")]
-    assert (
-        "if (!row && !qt) {" in nor
-        and "AO.markPress(b, key);" in nor
-        and 'AO.inflight[markKey] = { kind: "press" };' in nor
-    )
+    assert "if (!row && !qt) {" in nor and "markKey = AO.pressBegin(b, key);" in nor
     fin = h[h.rindex("} finally {") :]
-    assert "if (markKey) { delete AO.inflight[markKey]; if (!moving) AO.unmarkPress(b); }" in fin
+    # slice 2 (test_ui_press_twins): a delta-ended press ends at the redraw that draws its effect, a refusal at once
+    assert "if (markKey && !moving) AO.pressAnswered(markKey, refusedOn);" in fin
+    assert "else if (markKey) delete AO.inflight[markKey];" in fin
 
 
 def test_a_press_whose_answer_moves_the_page_stays_marked():

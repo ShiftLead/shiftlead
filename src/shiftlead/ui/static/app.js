@@ -1269,7 +1269,8 @@
     b.dataset.pressLabel = label;
     if (b.offsetWidth) b.style.minWidth = `${b.offsetWidth}px`;
     const own = label.trim();
-    b.textContent = b.dataset.verb || PRESS_VERBS[key] || (own.endsWith("…") ? own : `${own}…`);
+    b.dataset.pressVerb = b.dataset.verb || PRESS_VERBS[key] || (own.endsWith("…") ? own : `${own}…`);
+    b.textContent = b.dataset.pressVerb;
   };
   // the mark ends: only what it added comes off, the label put back as it was kept
   AO.unmarkPress = (b) => {
@@ -1277,12 +1278,180 @@
     delete b.dataset.pressMark;
     b.removeAttribute?.("aria-disabled");
     b.removeAttribute?.("aria-busy");
-    if ("pressLabel" in b.dataset) { b.textContent = b.dataset.pressLabel; delete b.dataset.pressLabel; b.style.minWidth = ""; }
+    // a label the page wrote while the press was out (a mode switch's new state) stands: the kept one comes back only
+    // over the mark's own verb
+    if ("pressLabel" in b.dataset) {
+      if (!("pressVerb" in b.dataset) || b.textContent === b.dataset.pressVerb) b.textContent = b.dataset.pressLabel;
+      delete b.dataset.pressLabel; b.style.minWidth = "";
+    }
+    delete b.dataset.pressVerb;
   };
   // a back or forward return draws the page unmarked: a page-moving press left its control marked as the page went
   window.addEventListener?.("pageshow", (ev) => {
-    if (ev.persisted) document.querySelectorAll("[data-press-mark]").forEach((b) => AO.unmarkPress(b));
+    if (ev.persisted) {
+      document.querySelectorAll("[data-press-mark]").forEach((b) => AO.unmarkPress(b));
+      document.querySelectorAll("[data-press-summary]").forEach((s) => AO.unmarkSummary(s));
+    }
   });
+  // §4.5 screen 6 rule 2's twins (TD-1997): every control on the page with the press's `data-act` and target is
+  // marked with it, and the other half of an Allow/Deny pair — the same call's, never another prompt's
+  AO.pressTwinKey = (b) => {
+    const k = AO.pressMarkKey(b);
+    return k.replace(/^press:(allow|deny):/, "press:allow|deny:");
+  };
+  // an Allow or Deny with an empty `data-call` keys by the session alone: only its own act is its twin then (`pair`)
+  AO.pressTwins = (key, root, pair) => {
+    const tk = key.replace(/^press:(allow|deny):/, "press:allow|deny:");
+    const r = root || document;
+    const all = r.querySelectorAll ? Array.from(r.querySelectorAll("[data-act]")) : [];
+    return all.filter((el) => (pair ? AO.pressTwinKey(el) === tk : AO.pressMarkKey(el) === key));
+  };
+  // a control inside a `details.more` menu puts its verb on the menu's `summary`, kept openable (`aria-busy` only)
+  const summaryOf = (el) => {
+    const m = el.closest?.("details.more");
+    return (m && m.children && Array.from(m.children).find((c) => c.tagName === "SUMMARY")) || null;
+  };
+  AO.markSummary = (b, verb, f) => {
+    const s = summaryOf(b);
+    if (s && f && !f.sums.includes(s)) f.sums.push(s);
+    if (!s || "pressSummary" in s.dataset) return;
+    s.dataset.pressSummary = s.textContent;
+    if (s.offsetWidth) s.style.minWidth = `${s.offsetWidth}px`;
+    s.setAttribute("aria-busy", "true");
+    s.textContent = verb;
+  };
+  AO.unmarkSummary = (s) => {
+    if (!s || !("pressSummary" in s.dataset)) return;
+    s.textContent = s.dataset.pressSummary; delete s.dataset.pressSummary;
+    s.removeAttribute("aria-busy"); s.style.minWidth = "";
+  };
+  // the containers a press's effect is drawn in: a session card, a team summary, the Focus page (its Reports' Drop
+  // in `#reportsmenu`, which the `repos` event redraws apart from `render()`)
+  AO.pressContainer = (el) => {
+    for (let n = el; n && n !== document; n = n.parentElement) {
+      const id = n.id || "";
+      if ((id.startsWith("card-") && n.classList?.contains("card")) || (id.startsWith("tsum-") && n.classList?.contains("tsum"))
+        || id === "reportsmenu") return `#${id}`;
+    }
+    return location.pathname.startsWith("/focus/") ? "focus" : "";
+  };
+  AO.pressRoot = (sel) => (sel === "focus" ? document : document.getElementById(sel.slice(1)));
+  const shownIn = (el, root) => {
+    for (let n = el; n && n !== root && n !== document; n = n.parentElement) {
+      if (n.hidden || n.classList?.contains("hidden")) return false;
+    }
+    return true;
+  };
+  // a control as the page last drew it — its mark's own writes (`aria-*`, the verb in place of the label) never read
+  const drawnLabel = (el) => (el.dataset.pressMark && "pressLabel" in el.dataset && el.textContent === el.dataset.pressVerb
+    ? el.dataset.pressLabel : el.textContent || "");
+  const slotOf = (el) => (el.id ? `#${el.id}`
+    : `${el.dataset.act}|${AO.pressMarkKey(el)}|${el.dataset.via || ""}|${el.closest("details.more") ? 1 : 0}`);
+  const snapOf = (el, root) => ({
+    label: drawnLabel(el).trim(), unattended: el.dataset.unattended || "", on: el.classList.contains("on"),
+    off: el.classList.contains("off"), live: !el.disabled && shownIn(el, root),
+  });
+  const slotted = (els) => {
+    const n = {};
+    return els.map((el) => { const s = slotOf(el); n[s] = (n[s] || 0) + 1; return [`${s}#${n[s]}`, el]; });
+  };
+  // the presses whose effect an `/events` delta draws: their mark ends at the first redraw that draws it
+  AO.deltaEnded = (b) => {
+    const act = b.dataset.act;
+    if (["kill", "close", "mode", "allow", "deny", "restart"].includes(act)) return true;
+    if (act === "start") return AO.pressContainer(b).startsWith("#card-");
+    return ["grants", "uncontrol", "drop"].includes(act) && location.pathname.startsWith("/focus/");
+  };
+  // the press begins: its control and twins marked, the containers they sit in snapshotted before the mark's writes
+  AO.pressBegin = (b, key) => {
+    const mk = AO.pressMarkKey(b);
+    const pair = (b.dataset.act === "allow" || b.dataset.act === "deny") && !!b.dataset.call;
+    const twins = AO.pressTwins(mk, null, pair).filter((el) => el !== b);
+    const delta = AO.deltaEnded(b);
+    const conts = {};
+    if (delta) {
+      [b, ...twins].forEach((el) => { const c = AO.pressContainer(el); if (c) conts[c] = null; });
+      Object.keys(conts).forEach((c) => {
+        const root = AO.pressRoot(c);
+        conts[c] = Object.fromEntries(slotted(AO.pressTwins(mk, root, pair)).map(([s, el]) => [s, snapOf(el, root)]));
+      });
+    }
+    const menu = b.closest?.("details.more");
+    const f = { kind: "press", act: b.dataset.act, pair, inMenu: !!menu, delta, conts, sums: [], answered: false, effect: false, timer: null };
+    AO.inflight[mk] = f;
+    const focused = document.activeElement === b;
+    AO.markPress(b, key);
+    if (menu) {
+      AO.markSummary(b, b.dataset.pressVerb || b.textContent, f);
+      if (focused) summaryOf(b)?.focus?.({ preventScroll: true });
+    }
+    // each twin shows its own verb by the same order: its `data-verb`, the table, its own label with `…`
+    twins.forEach((el) => AO.markPress(el, el.dataset.act));
+    return mk;
+  };
+  // the press ends: its key dropped, every control the page draws for it now unmarked, its menu's summary back
+  AO.pressEnd = (mk) => {
+    const f = AO.inflight[mk];
+    if (!f || f.kind !== "press") return;
+    if (f.timer) clearTimeout(f.timer);
+    delete AO.inflight[mk];
+    AO.pressTwins(mk, null, f.pair).forEach((el) => AO.unmarkPress(el));
+    f.sums.forEach((s) => AO.unmarkSummary(s));  // its menu's summary, though the entry itself has gone
+  };
+  // the answer: a refusal, or a press that is not delta-ended, ends the mark here; a delta-ended one ends now if a
+  // redraw since the press drew its effect, else at the first one after, or 5 s on
+  AO.pressAnswered = (mk, refused) => {
+    const f = AO.inflight[mk];
+    if (!f || f.kind !== "press") return;
+    f.answered = true;
+    const gone = f.delta && Object.keys(f.conts).length && Object.keys(f.conts).every((c) => !AO.pressRoot(c));
+    if (refused || !f.delta || f.effect || gone) { AO.pressEnd(mk); return; }
+    f.timer = setTimeout(() => AO.pressEnd(mk), 5000);
+  };
+  // did this redraw draw the press's effect? Read against the press's snapshot of the container, each control
+  // matched again by its slot, before the re-mark refreshes the kept label
+  const effectIn = (f, snap, root, mk) => {
+    const now = Object.fromEntries(slotted(AO.pressTwins(mk, root, f.pair)));
+    return Object.entries(snap).some(([slot, was]) => {
+      const el = now[slot];
+      if (f.act === "grants") return !!el && el.classList.contains("off") !== was.off;
+      if (f.act === "mode") {
+        return !el || !shownIn(el, root) || drawnLabel(el).trim() !== was.label
+          || (el.dataset.unattended || "") !== was.unattended || el.classList.contains("on") !== was.on;
+      }
+      return was.live && (!el || el.disabled || !shownIn(el, root));
+    });
+  };
+  // §4.5 screen 6 rule 2 (TD-1997): after a swap that can redraw a marked control, every press in flight marks its
+  // controls under `root` again, and a delta-ended press whose container this is reads whether the redraw drew its
+  // effect. A held container taken off the page ends its press.
+  AO.remarkPresses = (root) => {
+    if (!root) return;
+    const sel = root === document ? "focus" : root.id ? `#${root.id}` : "";  // a root of no id only re-marks
+    Object.entries(AO.inflight).forEach(([mk, f]) => {
+      if (!f || f.kind !== "press") return;
+      if (f.delta && sel && f.conts[sel] && !f.effect) {
+        if (effectIn(f, f.conts[sel], root, mk)) {
+          if (f.answered) { AO.pressEnd(mk); return; }
+          f.effect = true;
+        }
+      }
+      if (f.delta && Object.keys(f.conts).length && Object.keys(f.conts).every((c) => !AO.pressRoot(c))) {
+        AO.pressEnd(mk); return;
+      }
+      AO.pressTwins(mk, root, f.pair).forEach((el) => {
+        // a control whose text the delta has just written takes that text as its kept label, then the verb again
+        if (el.dataset.pressMark && "pressLabel" in el.dataset && el.textContent !== el.dataset.pressVerb) {
+          el.dataset.pressLabel = el.textContent;
+          el.textContent = el.dataset.pressVerb;
+          return;
+        }
+        AO.markPress(el, el.dataset.act);
+        // a redrawn menu whose entry was the pressed control carries the verb on its summary again
+        if (f.inMenu && el.dataset.act === f.act && el.closest?.("details.more")) AO.markSummary(el, el.dataset.pressVerb || el.textContent, f);
+      });
+    });
+  };
   // a refused press by entry id, until that row's next press or a reload (TD-340): its words, whether anything may
   // have been sent (`sent`), the item's bar as drawn when pressed (`was`) and whether a re-read has drawn it otherwise
   // since (`changed`) — §4.5 screen 12 *A press is never left stranded*, case *refused* (TD-1843)
@@ -1629,9 +1798,7 @@
       // a press with no row (§4.5 screen 6 rule 2, TD-1997): the control itself, in the press's frame; a Queue card's
       // ⋯ press keeps `qpressed`'s drawing
       if (!row && !qt) {
-        markKey = AO.pressMarkKey(b);
-        AO.inflight[markKey] = { kind: "press" };
-        AO.markPress(b, key);
+        markKey = AO.pressBegin(b, key);
         return;
       }
       if (!row || !row.isConnected) return;
@@ -2236,7 +2403,10 @@
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
       // a no-row press ends at its answer, its key dropped; one whose answer moves the page stays marked as it goes
-      if (markKey) { delete AO.inflight[markKey]; if (!moving) AO.unmarkPress(b); }
+      // a delta-ended one (kill, close, mode, a card's start, allow, deny, restart; the Focus page's grants, uncontrol
+      // and drop) ends at the first redraw that draws its effect, or 5 s on; a refusal ends any at once
+      if (markKey && !moving) AO.pressAnswered(markKey, refusedOn);
+      else if (markKey) delete AO.inflight[markKey];
       // a refused press draws its refusal and ends its card's hold: the values that waited are drawn with it
       if (refusedOn && atCard) document.dispatchEvent(new CustomEvent("ao:refused", { detail: { card: atCard } }));
     }
@@ -3125,6 +3295,7 @@
         if (sum) {
           const kept = AO.denyWhys(sum);
           sum.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
+          AO.remarkPresses(fresh);  // a press out on it marked again, ended where it draws the effect (TD-1997)
         }
         else { const h = $(".ghead", sec); if (h) h.after(fresh); else sec.prepend(fresh); }
       } else if (sum) sum.remove();
@@ -3187,6 +3358,7 @@
         old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
         if (ring) fresh.focus({ preventScroll: true });
         const d = menu && $("details.more", fresh); if (d) d.open = true;
+        AO.remarkPresses(fresh);  // a press out on it marked again, ended where it draws the effect (TD-1997)
       }
       else if (!repo || (cut(ev.groups) || []).some((g) => (g.ids || []).includes(ev.id))) {
         // syncGroups below moves it into its own group; with no grid yet (a repo's first strip), the box holds it
@@ -3203,6 +3375,7 @@
       layout();
     } else if (ev.event === "gone") {
       const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
+      AO.remarkPresses(document.body);  // a press whose card went ends with it (TD-1997)
       if (ev.groups !== undefined) sync(ev.groups);
       if (ev.rollup !== undefined) AO.swapRollup(ev.rollup);
       layout();
@@ -4448,7 +4621,7 @@
         const kept = AO.denyWhys(el), errs = AO.rowErrs(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
-        AO.restoreRowErrs(el, errs);
+        AO.restoreRowErrs(el, errs); AO.remarkPresses(el);
         AO.reopenFolds(el);
         if (landed) $$(".mailrow", el).forEach((r) => r.classList.toggle("landed", r.dataset.msg === landed));
         if (ring) {
@@ -4463,7 +4636,7 @@
     if (hz && typeof got.html.horizon === "string" && AO.maySwapSection(hz, document.activeElement)) {
       const errs = AO.rowErrs(hz);
       hz.innerHTML = got.html.horizon;
-      AO.restoreRowErrs(hz, errs);
+      AO.restoreRowErrs(hz, errs); AO.remarkPresses(hz);
       AO.reopenFolds(hz);
     }
     // the ledger's entries that wait on you (TD-368, TD-565): put back whole when they changed, their
@@ -4474,7 +4647,7 @@
     if (lf && AO.maySwapSection(lf, lring ? null : lon)) {
       const errs = AO.rowErrs(lf), at = lring ? $$(".mailrow", lf).indexOf(lring) : -1;
       if (AO.ledgerSwap(lf, got.html.ledger)) {
-        AO.restoreRowErrs(lf, errs);
+        AO.restoreRowErrs(lf, errs); AO.remarkPresses(lf);
         AO.reopenFolds(lf);
         if (lring) {
           const rows = $$(".mailrow", lf), back = rows.find((r) => r.dataset.msg === lring.dataset.msg) || rows[at] || rows[rows.length - 1];
@@ -5821,7 +5994,7 @@
       if (gone) { if (back) { patch(); return; } location.href = top ? `/queue#${encodeURIComponent(top)}` : "/queue"; return; }
       const menus = AO.openMenus(lists), errs = AO.rowErrs(lists), whys = AO.denyWhys(lists);
       lists.innerHTML = readingHtml;
-      AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
+      AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.remarkPresses(lists); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
       AO.restoreDenyWhys(lists, whys);
       openFolds(lists);
       cardLinks();
@@ -6591,7 +6764,7 @@
           if (a && b && quiet(a) && !a.querySelector(Q_UNITS)) swapIn(a, b, `part:${el.dataset.card}:${sel}`);
         });
       }
-      if (n !== el || !same) { AO.restoreRowErrs(n, errs); AO.reopenFolds(n); }
+      if (n !== el || !same) { AO.restoreRowErrs(n, errs); AO.remarkPresses(n); AO.reopenFolds(n); }
       return n;
     }
     // a re-read's draw: values patched, *gone* marked, the difference counted in the bar; nothing moves
@@ -6730,7 +6903,7 @@
         if (!prev && q) tops.set(q, k.node);
       });
       AO.qcardReapply(lists);  // a card's press still out (TD-1461), before the item's own keep takes a left row out
-      AO.restoreRowErrs(lists, errs);
+      AO.restoreRowErrs(lists, errs); AO.remarkPresses(lists);
       AO.restoreDenyWhys(lists, whys);  // a reason typed in *why?*, and its focus (TD-1808)
       const back = ring && $(`.mailrow[data-msg="${CSS.escape(ring)}"]`, lists);
       if (back) back.focus({ preventScroll: true });
@@ -6962,7 +7135,7 @@
           const kept = AO.denyWhys(lists), open = $$(".secinfo:not([hidden])", lists).map((el) => el.id);
           const errs = AO.rowErrs(lists);  // as the Inbox's swap (rule 4, TD-1321)
           lists.innerHTML = await res.text();
-          AO.restoreRowErrs(lists, errs);
+          AO.restoreRowErrs(lists, errs); AO.remarkPresses(lists);
           // the title line and the seams come with the lists (`part=1`): swapped in place, above the cards
           const head = $("#repohead", lists), was = $("#repohead", box);
           if (head && was && was !== head) was.replaceWith(head);
@@ -10044,7 +10217,7 @@
       d.addEventListener("toggle", () => store.set(key, d.open));
     });
     document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });
-    render(s); phone.render(s);
+    render(s); phone.render(s); AO.remarkPresses(document);
     const looked = AO.unseenLook(document, () => act(id, "seen", {}).catch(() => {}));
     looked(s);
     connectEvents((ev) => {
@@ -10058,6 +10231,7 @@
           endTerm("this session's pane is gone (see the banner).");
         }
         render(ev.session); phone.render(ev.session);
+        AO.remarkPresses(document);  // a press out on this page marked again, ended where it draws the effect (TD-1997)
         if (ev.session.state && ev.session.state !== mk.state) {
           // silence is counted from when the session began working, not from a quiet idle before it
           if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();
@@ -10070,7 +10244,7 @@
         // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617);
         // a light stream sends the marks alone, `null` for a repo dropped (TD-670)
         if (ev.pr_marks) prMarks[ev.root] = ev.pr_marks; else delete prMarks[ev.root];
-        if (reportsV && reportsV.pr_repo === ev.root) renderReports(reportsV);
+        if (reportsV && reportsV.pr_repo === ev.root) { renderReports(reportsV); AO.remarkPresses($("#reportsmenu")); }
       }
       if (ev.event === "gone" && ev.id === id) {
         // A window never closes itself: closing what a person opened is the person's act (§4.5
