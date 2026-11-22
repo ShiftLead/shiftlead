@@ -67,3 +67,5 @@
 - [Decided in the filing PR](decided-in-the-filing-pr.md) — a decide answered before the filing PR merges: `board_edit.py decide --expect "- [ ] decide …"`, then drop the board item; ledger.py refuses bold paragraph openers
 - [Board changes: close and add](board-changes-close-and-add.md) — a changed decide item is `done` then `add`; never restore the board file; an archiving `done` is its own commit (#3447, 2026-11-11)
 - [Review rounds count once the design holds](review-rounds-count-once-the-design-holds.md) — reads while Paul still reshapes a design are not the capped rounds; round 1 starts when he says it is settled (TD-1953, 2026-11-18)
+- [Review what is written after the last round](review-what-is-written-after-the-last-round.md) — fixes, build entries and board questions written after a READY round get a round of their own (TD-1954 rounds 7–9, 2026-11-21)
+- [Flows builds wait for the team page design](flows-builds-wait-for-the-team-page-design.md) — Paul holds TD-2047–TD-2055 until TD-1153 is designed, so the designs agree before building (2026-11-21)
