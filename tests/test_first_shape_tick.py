@@ -67,6 +67,26 @@ async def test_a_settings_file_that_breaks_after_the_marker_keeps_the_rules_off(
     assert agent._first_shape_off
 
 
+async def test_a_new_agent_on_a_broken_file_keeps_the_rules_off(agent):
+    await park_ticks(agent)
+    _mark()
+    agent._read_cut_over()
+    _mark("cut_over: [unclosed\n")
+    again = type(agent)(tmux=agent.tmux)  # the restart: nothing of the first run's memory, before its first tick
+    assert again._first_shape_off
+
+
+async def test_a_marker_taken_away_is_remembered_as_gone(agent):
+    await park_ticks(agent)
+    _mark()
+    agent._read_cut_over()
+    _mark("{}\n")
+    agent._read_cut_over()
+    assert not agent._first_shape_off
+    _mark("cut_over: [unclosed\n")
+    assert not type(agent)(tmux=agent.tmux)._first_shape_off
+
+
 async def test_the_wound_down_marks_go_at_the_marker_and_none_is_written(agent, monkeypatch):
     await park_ticks(agent)
     agent._host_rec["teams"] = {

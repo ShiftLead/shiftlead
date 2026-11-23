@@ -336,9 +336,22 @@ class TickMixin:
 
     def _read_cut_over(self) -> None:
         """Whether the first shape's rules are off this tick (§4.9e *What decides which shape runs*). A file that does
-        not read keeps the last reading, so a typo after the cut-over never turns the lanes back on."""
-        if (doc := settings_mod.read()) is not None:
-            self._first_shape_off = teamstore.cut_over(doc) is not None
+        not read keeps the last reading, which `host.json` holds across a restart, so a typo after the cut-over never
+        turns the lanes back on. A failed write stays on the record, for the tick's own save to carry."""
+        if (doc := settings_mod.read()) is None:
+            return
+        off = teamstore.cut_over(doc) is not None
+        if off == self._first_shape_off:
+            return
+        self._first_shape_off = off
+        if off:
+            self._host_rec["first_shape_off"] = True
+        else:
+            self._host_rec.pop("first_shape_off", None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.warning("could not write first_shape_off to %s", self.host_store.path)
 
     async def _setup_notes(self) -> None:
         """What a machine needs a person for before an adapter's sessions can run (design §4.3 *The person
