@@ -295,7 +295,7 @@ def test_the_person_s_own_words_fill_the_form_and_lift(repo):
     assert "decision (paul)" not in entry.split("**Why:**")[0] and "split it in two" in entry
 
 
-def test_only_the_stage_end_call_reads_the_store_so_far():
+def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
     src = Path(stagerecord.__file__).parent
-    users = [p.name for p in src.rglob("*.py") if p.name != "stagerecord.py" and "stagerecord" in p.read_text()]
-    assert users == ["stage_end.py"]
+    users = sorted(p.name for p in src.rglob("*.py") if p.name != "stagerecord.py" and "stagerecord" in p.read_text())
+    assert users == ["flow_save.py", "stage_end.py"]

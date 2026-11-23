@@ -264,7 +264,7 @@ from sessionorc.agent_serve import ServeMixin
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_shape import ShapeMixin
 from sessionorc.agent_spend import SpendMixin
-from sessionorc.agent_stage import StageMixin
+from sessionorc.agent_stage import FLOW, StageMixin, home_call
 from sessionorc.agent_sync import SyncMixin
 from sessionorc.agent_tick import FILLED_FOR, TickMixin
 from sessionorc.agent_wake import WakeMixin
@@ -4224,6 +4224,31 @@ class HostAgent(
             return briefs_mod.delete(name, version) if delete else briefs_mod.save(name, kind, text, version)
         except briefs_mod.BriefError as e:
             raise RpcError(str(e)) from None
+
+    async def rpc_flow_save(
+        self,
+        name: str = "",
+        text: str = "",
+        version: str | None = None,
+        renames: dict[str, str] | None = None,
+        delete: bool = False,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """The Flows page's **Save** and **Delete** (§4.5a *Flows page*, TD-2054), a person's own act: `version` is
+        what the page read, none for a new flow; `renames` maps each renamed stage's old name to its new one."""
+        agent_common.person_only(caller, "save a flow", "§4.9c *The Flows page*", self._graph())
+        got = await asyncio.to_thread(
+            home_call(FLOW).call,
+            name=name,
+            text=text,
+            version=version,
+            renames=renames,
+            delete=delete,
+            roots=hosts.local_host().repos(),
+        )
+        if "refused" in got:
+            raise RpcError(str(got["refused"]))
+        return got
 
     def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
         self.tmux.ensure_server()

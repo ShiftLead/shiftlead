@@ -256,6 +256,7 @@ PERSON_ONLY = frozenset(
         "tools_install",
         "tools_check",
         "brief_save",
+        "flow_save",
         "login_label",
         "account_label",
         "login_note",

@@ -84,6 +84,7 @@ HOME_EDITS = frozenset(
         "ci_rerun",
         "witness_press",
         "brief_save",
+        "flow_save",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
