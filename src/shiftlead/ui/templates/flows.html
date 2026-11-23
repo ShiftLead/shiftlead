@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Flows · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{# design §4.9c *The Flows page*, §4.5a *Flows page* (TD-2054): `flows.js` draws the page from this one read, the check
+   and the file are the host agent's (`flow_check`), and Save and Delete go through `flow_save`. #}
+{% block body %}
+{% set rail_on = "Flows" %}<div class="setarea">{% include "settings_rail.html" %}
+<div class="page inboxpage flowspage" id="flowspage" data-help-new="{{ help_title('flows-new') }}" data-help-copy="{{ help_title('flows-copy') }}" data-help-delete="{{ help_title('flows-delete') }}" data-help-save="{{ help_title('flows-save') }}">
+  <div class="row gap wrap toolshead"><span class="h1">Flows</span><span class="note">the stages an entry passes through, and where each outcome sends it</span></div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — the flows cannot be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/flows">Retry</a></div>
+  {% if why %}<div class="note warn">{{ why }}</div>{% endif %}
+  <div class="note warn" id="flowsaid" role="alert" hidden></div>
+  <div class="flcols"><nav class="fllist" id="fllist" aria-label="Flows"></nav><div class="flmain" id="flmain"></div></div>
+</div></div>
+<script type="application/json" id="flowsdata">{{ data|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ static_url('flows.js') }}"></script>{% endblock %}

@@ -227,6 +227,89 @@ def running(name: str, roots: Iterable[str | Path]) -> list[str]:
     return sorted(t.name for t in org.teams.values() if name in {*t.flows, t.flow})
 
 
+class _Dumper(yaml.SafeDumper):
+    """Writes a destination on one line, as the built-ins do."""
+
+
+class _Inline(dict):
+    pass
+
+
+_Dumper.add_representer(_Inline, lambda d, v: d.represent_mapping("tag:yaml.org,2002:map", v.items(), flow_style=True))
+
+
+def _inline(value: Any) -> Any:
+    return _Inline({k: _inline(v) for k, v in value.items()}) if isinstance(value, Mapping) else value
+
+
+def render(doc: Mapping[str, Any]) -> str:
+    """The `flow.yml` Save would write for the page's flow: top keys in the file's order, each destination inline."""
+    out: dict[str, Any] = {k: doc[k] for k in flow3.TOP_KEYS if k in doc}
+    out.update({k: v for k, v in doc.items() if k not in out})
+    for group in ("stages", "audits"):
+        if isinstance(out.get(group), list):
+            out[group] = [
+                {k: _inline(v) for k, v in row.items()} if isinstance(row, Mapping) else row for row in out[group]
+            ]
+    return yaml.dump(out, Dumper=_Dumper, sort_keys=False, allow_unicode=True, default_flow_style=False, width=1000)
+
+
+def checked(name: str, doc: Any, version: str | None = None) -> dict[str, Any]:
+    """§4.9c's check of the flow the page holds, with the text Save would write: what **The file** shows, what Save
+    sends, and the words each row draws. Writes nothing."""
+    if not isinstance(doc, Mapping):
+        return {"text": "", "problems": ["the page sent no flow"], "info": []}
+    text = render({**doc, "name": name})
+    try:
+        path = _path(name)
+    except FlowError as e:
+        return {"text": text, "problems": [str(e)], "info": []}
+    got = flow3.check_text(text, place="org", flow_dir=path.parent)
+    problems = list(got.problems)
+    if version is None and path.parent.exists():
+        problems.append(f"a flow named {name} already exists")
+    return {"text": text, "problems": problems, "info": list(got.info)}
+
+
+def _row(name: str, place: str, d: Path, root: Path | None = None) -> dict[str, Any]:
+    text = _read(d / flow3.FILE) or ""
+    row: dict[str, Any] = {"name": name, "place": place, "text": text, "doc": None, "info": [], "problems": []}
+    if root is not None:
+        row["repo"] = root.name
+    if flow3.is_format3(text):
+        got = flow3.check_text(
+            text, place={"builtin": "package", "own": "org"}.get(place, place), flow_dir=d, repo_root=root
+        )
+        row.update(doc=repoconfig.parse_yaml(text), problems=list(got.problems), info=list(got.info))
+    if place == "own":
+        row["version"] = briefs.version_of(text)
+    return row
+
+
+def listing(roots: Iterable[str | Path]) -> dict[str, Any]:
+    """What the Flows page draws (§4.9c): the format-3 built-ins, then the person's flows, then each repo's, with the
+    models and briefs its picks offer. A first-shape flow has no `doc` and is shown read-only; a shadowed one is left
+    out, since no team can run it."""
+    where = [Path(r).expanduser() for r in roots]
+    rows = [_row(name, "builtin", flow3.PACKAGE_DIR / name) for name in flow3.BUILTIN]
+    org = (paths.home() / "flows").resolve()
+    for seen in flowdefs.visible(where):
+        if seen["source"] == "package" or seen.get("shadowed"):
+            continue
+        d = Path(seen["source"])
+        own = d.resolve().parent == org
+        row = _row(seen["name"], "own" if own else "repo", d, None if own else d.parent.parent.parent)
+        if row["doc"] is None:
+            row["problems"] = list(seen.get("problems") or [])
+        rows.append(row)
+    return {
+        "flows": rows,
+        "models": list(flow3.model_families()),
+        "briefs": {kind: flow3.offered(kind) for kind in briefs.KINDS},
+        "max_moves": flow3.MAX_MOVES,
+    }
+
+
 def call(
     *,
     name: str,

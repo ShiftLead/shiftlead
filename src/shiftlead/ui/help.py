@@ -1008,6 +1008,42 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "flows-new",
+        "+ New flow",
+        "Flows page",
+        (
+            "Makes a flow of your own with one build stage that takes every new entry. Nothing is written until "
+            "you press Save."
+        ),
+    ),
+    Help(
+        "flows-copy",
+        "Copy",
+        "Flows page",
+        (
+            "Makes a flow of your own from the one shown, which is how a built-in is changed. Nothing is written "
+            "until you press Save."
+        ),
+    ),
+    Help(
+        "flows-delete",
+        "Delete",
+        "Flows page",
+        (
+            "Removes this flow of your own, on a second press. It is refused while a team runs the flow, and the "
+            "refusal names the team."
+        ),
+    ),
+    Help(
+        "flows-save",
+        "Save",
+        "Flows page",
+        (
+            "Writes this flow to its file under the org's flows. It stays disabled while the check finds a "
+            "problem, and a renamed stage takes its entries with it."
+        ),
+    ),
+    Help(
         "tools-add-login",
         "+ Add login",
         "Tools page",
@@ -1176,6 +1212,10 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "tools-settings",
             "briefs-new",
             "briefs-delete",
+            "flows-new",
+            "flows-copy",
+            "flows-delete",
+            "flows-save",
             "tools-add-login",
             "tools-add-found",
             "tools-keep-back",
