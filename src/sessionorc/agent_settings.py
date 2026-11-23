@@ -506,6 +506,12 @@ class SettingsMixin:
                 "(design §5 settings.yml)"
             )
         doc = settings_mod.load()
+        if (
+            teamstore.cut_over(doc)  # §4.9e: the first shape's writes end at the marker
+            and isinstance(teams, dict)
+            and any(isinstance(f, dict) and set(f) & set(teamstore.FIRST_SHAPE_KEYS) for f in teams.values())
+        ):
+            raise RpcError(teamstore.GONE)
         before = copy.deepcopy(doc)
         before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}

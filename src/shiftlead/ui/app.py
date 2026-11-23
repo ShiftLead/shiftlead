@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from markupsafe import Markup
 
 from sessionorc import board as board_mod
-from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
+from sessionorc import gitinfo, hosts, mail, naming, paths, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import settings as settings_mod
@@ -4522,6 +4522,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
 
 
+def _first_shape_gone() -> None:
+    """Refuse a first-shape team control after the cut-over (§4.9e *What decides which shape runs*)."""
+    if teamstore.cut_over(settings_mod.read() or {}):
+        raise HTTPException(409, teamstore.GONE)
+
+
 def _team_http(e: Exception) -> HTTPException:
     """One mapping for every way a start or a stop can fail, so the strip reports the agent's
     own message the way every other control does — a toast (design §4.5 "Errors"); New session's member
@@ -4597,6 +4603,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str, request: Request):
+        _first_shape_gone()
         body: Any = {}
         if request.headers.get("content-type", "").startswith("application/json"):
             with contextlib.suppress(ValueError):  # a body that is not JSON reads as none, never a 500
@@ -4624,6 +4631,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `ao team flow <team> --apply` does — the sit-outs, the starts and the relaunches — a person's
         own, and not on a node, as Start is not. The flows are read again after it, so the next
         delta draws what it left."""
+        _first_shape_gone()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
@@ -4641,6 +4649,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
     # is the clients'). A repo-defined team is read here and edited by PR.
     @app.get("/api/teams/{name}/members")
     async def api_team_members(name: str):
+        _first_shape_gone()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
@@ -4659,6 +4668,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/teams/{name}/members")
     async def api_team_members_edit(name: str, request: Request):
+        _first_shape_gone()
         body = await request.json()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
