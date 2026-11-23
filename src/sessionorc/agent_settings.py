@@ -30,12 +30,14 @@ from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
 from sessionorc import usage as usage_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     RpcError,
     _parse,
     _usage_key,
     log,
 )
+from sessionorc.agent_stage import TEAM, home_call
 from sessionorc.models import (
     PERSON,
     Session,
@@ -599,6 +601,33 @@ class SettingsMixin:
             raise RpcError(str(e)) from None
         await self._team_store_saved(before, doc)
         return {"team": team, "change": words, "version": teamstore.version(doc, str(team))}
+
+    def _team_head(self, team: str) -> dict[str, Any]:
+        """A team's head from the records the home holds (§4.9d *The page*): running with its live count, else wound
+        down or stopped, `by` saying who stopped it (`person`, `until`, `other`)."""
+        records = [r for r in self._graph().values() if r.team == team]
+        live = sum(r.state not in work_mod.DEAD for r in work_mod.crew(records))
+        wound = work_mod.team_wound_down(records) is not None
+        stopped = None if wound else work_mod.team_stopped(records)
+        word = "running" if live else "wound down" if wound else "stopped"
+        return {"word": word, "sessions": live, "by": (stopped or {}).get("by")}
+
+    async def rpc_team_show(self, team: str = "", caller: Any = None) -> dict[str, Any]:
+        """`ao team show <team>` (design §4.9d *Controls and verbs*, TD-2060): what the team page shows, read only. The
+        logins are this host's `tools` read with the team's reserve added; the body is `shiftlead.team_show`."""
+        name = str(team or "")
+        doc = settings_mod.load()
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        rows = teamstore.login_rows(read, gate["accounts"], settings_mod.team_extra(doc, name))
+        return await asyncio.to_thread(
+            home_call(TEAM).call,
+            team=name,
+            doc=doc,
+            rows=rows,
+            head=self._team_head(name),
+            here=hosts.local_host().name,
+            roots=hosts.local_host().repos(),
+        )
 
     async def _rekey_teams(self, flow: str, renames: dict[str, str]) -> None:
         """A flow save's renamed stages, carried to the numbers of each team on that flow (§4.9d, TD-2060)."""

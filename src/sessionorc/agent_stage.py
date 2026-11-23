@@ -18,6 +18,7 @@ from sessionorc.models import lane_refs
 GROUP = "shiftlead.home_calls"
 NAME = "stage"
 FLOW = "flow"
+TEAM = "team"
 
 
 def home_call(name: str) -> Any:

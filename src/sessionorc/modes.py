@@ -122,8 +122,21 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # `briefs`: the person's own, the home's files (§4.9c *Where a brief lives*, TD-2055)
 # `stage_show`: an entry's stage record, which the home alone writes (§4.9c, TD-2050)
 # `flows`, `flow_check`: the Flows page's reads of the org's flows, the home's files (§4.9c, TD-2054)
+# `team_show`: what the team page shows, from the home's settings and stage records (§4.9d, TD-2060)
 HOME_READS = frozenset(
-    {"repos", "doing_log", "queue", "shape", "seats", "pr_wait", "briefs", "stage_show", "flows", "flow_check"}
+    {
+        "repos",
+        "doing_log",
+        "queue",
+        "shape",
+        "seats",
+        "pr_wait",
+        "briefs",
+        "stage_show",
+        "flows",
+        "flow_check",
+        "team_show",
+    }
 )
 # The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
 # a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own

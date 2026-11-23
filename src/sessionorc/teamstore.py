@@ -11,9 +11,11 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from sessionorc import logins
+from sessionorc import settings as settings_mod
 
 STORE_KEYS = ("label", "repo", "host", "logins", "at_once", "most")
 SET_KEYS = ("label", "logins", "at_once", "most")  # what `team_set` writes; `repo` and `host` never change
@@ -147,6 +149,40 @@ def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[st
             entry["at_once"] = now
             changed.append(str(team))
     return changed
+
+
+def _at_reserve(entry: Mapping[str, Any] | None, extra: int, now: datetime) -> bool:
+    """Whether an account's `gate` entry is at its reserve, the team's `reserve` added (§6 *Usage gate*). A metered
+    account is at it once a window's spend reaches its amount; a window the gate has no number for is never over."""
+    rows = [r for r in (entry or {}).get("windows") or () if isinstance(r, Mapping)]
+    if any(r.get("metered") and isinstance(r.get("pct"), int | float) and r["pct"] >= 100 for r in rows):
+        return True
+    plain = [dict(r) for r in rows if not r.get("metered") and r.get("reserve") is not None]
+    by_label = {str(r.get("label")): r["reserve"] for r in plain}
+    return settings_mod.crossed(settings_mod.lines(by_label, plain, now, extra)) is not None
+
+
+def login_rows(
+    read: Mapping[str, Any], accounts: Mapping[str, Any], extra: int = 0, now: datetime | None = None
+) -> dict[str, dict[str, Any]]:
+    """`pick`'s rows from the host's `tools` read and the `gate` reply's `accounts`, by login key: each login's
+    `state`, `account`, `pin`, its account's model `models`, and `at_reserve` with the team's `extra` added."""
+    when = now or datetime.now(UTC)
+    out: dict[str, dict[str, Any]] = {}
+    for card in read.get("tools") or ():
+        by_key = {str(a.get("key")): a for a in card.get("accounts") or ()}
+        for lg in card.get("logins") or ():
+            account = lg.get("account")
+            held = by_key.get(str(account)) or {}
+            out[logins.key(str(card.get("adapter")), str(lg.get("name")))] = {
+                "label": lg.get("label"),
+                "state": lg.get("state"),
+                "account": account,
+                "pin": lg.get("pin"),
+                "models": list((held.get("models") or {}).get("families") or ()),
+                "at_reserve": _at_reserve(accounts.get(str(account)), extra, when) if account else False,
+            }
+    return out
 
 
 def offers(row: Mapping[str, Any], model: str) -> bool:

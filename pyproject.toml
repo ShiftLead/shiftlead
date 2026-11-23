@@ -40,6 +40,7 @@ table = "shiftlead.adapters.known:KNOWN_TOOLS"
 [project.entry-points."shiftlead.home_calls"]
 stage = "shiftlead.stage_end"
 flow = "shiftlead.flow_save"
+team = "shiftlead.team_show"
 
 [build-system]
 requires = ["pdm-backend"]
