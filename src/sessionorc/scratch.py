@@ -34,13 +34,39 @@ def parent(root: str | Path) -> Path:
     return Path(root) / f"shiftlead-{os.getuid()}"
 
 
-def check_root(root: str | Path) -> None:
-    """Refused at the host agent's start (§4.6): a `scratch_root` longer than `MAX_ROOT` bytes."""
+def check_root(root: str | Path, name: str = "scratch_root") -> None:
+    """Refused at the host agent's start (§4.6): a `scratch_root` or `seat_root` longer than `MAX_ROOT` bytes."""
     if len(os.fsencode(str(root))) > MAX_ROOT:
         raise ScratchError(
-            f"scratch_root {str(root)!r} is longer than {MAX_ROOT} bytes: a scratch home's socket under it "
+            f"{name} {str(root)!r} is longer than {MAX_ROOT} bytes: a scratch home's socket under it "
             "would not bind (design §4.6 A session's scratch)"
         )
+
+
+def check_seat_root(seat: str | Path, root: str | Path, transcript_roots: list[Path]) -> None:
+    """Refused at the host agent's start (§4.6 *Temporary space is a pool of its own*, TD-2082): a `seat_root` past
+    the length, overlapping `scratch_root` without being equal to it as written, or overlapping a transcript store.
+    Its directory is never made here, so a mount missing after a reboot stops no host agent."""
+    check_root(seat, "seat_root")
+    if str(seat) != str(root) and overlaps(seat, root):
+        raise ScratchError(
+            f"seat_root {str(seat)!r} overlaps scratch_root {str(root)!r} without being equal to it: refused "
+            "(design §4.6 Temporary space is a pool of its own)"
+        )
+    check_transcripts(seat, transcript_roots, "seat_root")
+
+
+def root_of(given: str | None, roots: tuple[str, ...]) -> str | None:
+    """The root whose `shiftlead-<uid>/` holds `given` straight under it, of `roots`; None for neither (§4.6)."""
+    if not given:
+        return None
+    return next((r for r in roots if r and Path(given).parent == parent(r)), None)
+
+
+def has_reading(root: str | Path) -> bool:
+    """Whether a `seat_root` has a reading (§4.6): a mount point, or its `shiftlead-<uid>/` exists. Otherwise it is
+    *not mounted*, and neither the sweep nor `ao disk` reads it or makes anything there."""
+    return os.path.ismount(root) or os.path.lexists(parent(root))
 
 
 def overlaps(a: str | Path, b: str | Path) -> bool:
@@ -53,13 +79,13 @@ def overlaps(a: str | Path, b: str | Path) -> bool:
     return False
 
 
-def check_transcripts(root: str | Path, transcript_roots: list[Path]) -> None:
-    """Refused at the host agent's start (§4.6, §9 invariant 16, TD-1945): a `scratch_root` inside, or holding, a
-    tool's transcript store, which the disk sweep would otherwise weigh as scratch."""
+def check_transcripts(root: str | Path, transcript_roots: list[Path], name: str = "scratch_root") -> None:
+    """Refused at the host agent's start (§4.6, §9 invariant 16, TD-1945): a `scratch_root` or `seat_root` inside, or
+    holding, a tool's transcript store, which the disk sweep would otherwise weigh as scratch."""
     for t in transcript_roots:
         if overlaps(root, t):
             raise ScratchError(
-                f"scratch_root {str(root)!r} is inside or holds {str(t)!r}, where a tool keeps its transcripts: "
+                f"{name} {str(root)!r} is inside or holds {str(t)!r}, where a tool keeps its transcripts: "
                 "refused (design §4.6 A session's scratch, §9 invariant 16)"
             )
 

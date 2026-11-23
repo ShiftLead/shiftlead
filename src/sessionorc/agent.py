@@ -1128,7 +1128,7 @@ class HostAgent(
         # §4.6 *A session's scratch* (TD-1944): a `scratch_root` past 48 bytes, or a `shiftlead-<uid>/` that is a
         # symlink or another uid's, stops the start, as nothing a session puts there could be trusted; so does one
         # inside or holding a tool's transcript store (§9 invariant 16, TD-1945), which the disk sweep must never weigh
-        await asyncio.to_thread(_check_scratch_root, _scratch_root())
+        await asyncio.to_thread(_check_scratch_root, _scratch_root(), _seat_root())
         sock.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
@@ -1970,7 +1970,7 @@ class HostAgent(
             # handed one, or a Resume's of the name's own conversation, kept where it may be; else a new one
             if scratch is None and isinstance(holder, Session) and resume and holder.adapter_id == resume:
                 scratch = holder.scratch
-            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder)
+            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder, bool(unattended))
             previous_run, freed = await self._take_name(holder)
             model_env = await asyncio.to_thread(agent_common.model_env, adapter, spec.model, directory)
             # read after the supersede, so the id it freed is not `taken` and gets reused
@@ -2497,15 +2497,26 @@ class HostAgent(
             )
         return holder
 
-    def _run_scratch(self, given: str | None, holder: Session | str | None) -> str:
+    def _run_scratch(self, given: str | None, holder: Session | str | None, unattended: bool = False) -> str:
         """The run's scratch directory (design §4.6 *A session's scratch*, TD-1944): `given` — the old run's,
-        handed by a restart or carried by a Resume — kept where it lies under this host's `shiftlead-<uid>/`
+        handed by a restart or carried by a Resume — kept where it lies under either root's `shiftlead-<uid>/`
         and its `owner.json` names `holder`'s record and this home (made again, empty, where it is gone);
-        else a new one. Off the loop: it touches the disk."""
-        root, home = _scratch_root(), paths.home()
+        else a new one, an `unattended` run's under `seat_root` where set (*Temporary space is a pool of its
+        own*, TD-2082). A carried path in a pool that cannot be used fails only a run that belongs in that
+        pool; any other gets a new directory in its own. Off the loop: it touches the disk."""
+        root, seat, home = _scratch_root(), _seat_root(), paths.home()
+        pool = seat if unattended and seat else root
         record = holder.id if isinstance(holder, Session) else ""
         try:
-            return (record and scratch_mod.kept(root, given, record, home)) or scratch_mod.make(root, record, home)
+            carried = scratch_mod.root_of(given, (root, seat)) if record else None
+            if carried:
+                try:
+                    if path := scratch_mod.kept(carried, given, record, home):
+                        return path
+                except (scratch_mod.ScratchError, OSError):
+                    if carried == pool:
+                        raise
+            return scratch_mod.make(pool, record, home)
         except (scratch_mod.ScratchError, OSError) as e:
             raise RpcError(f"no scratch directory for the run: {e}") from None
 
@@ -5319,19 +5330,27 @@ class HostAgent(
         return self._remote_stores[host]
 
 
-def _check_scratch_root(root: str) -> None:
-    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made."""
+def _check_scratch_root(root: str, seat: str = "") -> None:
+    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made;
+    a `seat_root`'s length and overlaps, its directory left alone (TD-2082)."""
     scratch_mod.check_root(root)
     roots, blind = adapters.transcript_roots()
     if blind:
         log.warning("transcript roots unread for %s: the scratch_root check covers the rest", ", ".join(blind))
     scratch_mod.check_transcripts(root, roots)
+    if seat:
+        scratch_mod.check_seat_root(seat, root, roots)
     scratch_mod.ensure_parent(root)
 
 
 def _scratch_root() -> str:
     """This host's `scratch_root` (§4.6), the default where a reading of the host carries none."""
     return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
+
+
+def _seat_root() -> str:
+    """This host's `seat_root` (§4.6, TD-2082), '' where unset or a reading of the host carries none."""
+    return getattr(hosts.local_host(), "seat_root", "") or ""
 
 
 async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:

@@ -3837,6 +3837,23 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             )
         for w in e.get("warnings") or []:
             out.append(f"  ⚠ {free.get('path')}: {w}")
+        seat = e.get("seat_free") or {}  # §4.6 *Temporary space is a pool of its own*, TD-2082
+        if seat.get("not_mounted"):
+            out.append(f"  free under {seat.get('path')} (seats): not mounted")
+        elif "error" in seat:
+            out.append(f"  free under {seat.get('path')} (seats): unreadable — {seat['error']}")
+        elif seat:
+            inodes = (
+                f", {seat.get('inodes_free', 0):,} of {seat['inodes_total']:,} inodes"
+                if seat.get("inodes_total")
+                else ""
+            )
+            out.append(
+                f"  free under {seat.get('path')} (seats): {_bytes(seat.get('bytes_free'))} of "
+                f"{_bytes(seat.get('bytes_total'))}{inodes}"
+            )
+        for w in e.get("seat_warnings") or []:
+            out.append(f"  ⚠ {seat.get('path')}: {w}")
     return out
 
 

@@ -15,8 +15,9 @@ local:
   runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 turns the age rule off
   runs_keep_mb: 2000       # past this, ended runs' logs and attachment folders go oldest first (§4.6); 0 no bound
   scratch_root: /tmp       # each run's scratch directory goes under <this>/shiftlead-<uid>/ (§4.6); at most 48 bytes
+  seat_root: /aot          # unattended runs' scratch goes here instead (§4.6 Temporary space); unset: scratch_root
   scratch_keep_hours: 24   # an ended record's scratch is removed this long after it ended (§4.6 The disk sweep)
-  worktree_keep_days: 7    # a landed, clean, idle worktree untouched this long is removed (§4.6 The disk sweep)
+  worktree_keep_days: 7   # a landed, clean, idle worktree untouched this long is removed (§4.6 The disk sweep)
   cache_keep_days: 14      # an agent-cadence tree no repo pins, fetched this long ago, is removed (§4.6)
 ```
 
@@ -94,6 +95,8 @@ class Host:
     cache_keep_days: int = DEFAULT_CACHE_KEEP_DAYS
     # §4.6 *A session's scratch* (TD-1944): read at each create, so a test may patch the default
     scratch_root: str = field(default_factory=lambda: DEFAULT_SCRATCH_ROOT)
+    # §4.6 *Temporary space is a pool of its own* (TD-2082): '' = unset, every run under `scratch_root`
+    seat_root: str = ""
     # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
     identity: str = ""
     # design §4.4a *A node that carries no person*: false on an agents-only node
@@ -244,6 +247,12 @@ def _root(v: object) -> str:
     return os.path.abspath(os.path.expanduser(v.strip()))  # a relative root would give a relative TMPDIR
 
 
+def _seat_root(v: object) -> str:
+    """`seat_root` (§4.6, TD-2082): as `_root` reads a path, but empty or not a string is unset (''), never the
+    default, since unset means no pool of its own."""
+    return _root(v) if isinstance(v, str) and v.strip() else ""
+
+
 def local_host() -> Host:
     """The host this process runs on, from the file's `local` entry; with no file, the machine's
     short hostname stands in for both name fields."""
@@ -261,6 +270,7 @@ def local_host() -> Host:
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
         runs_keep_mb=_days(data.get("runs_keep_mb"), DEFAULT_RUNS_KEEP_MB),
         scratch_root=_root(data.get("scratch_root")),
+        seat_root=_seat_root(data.get("seat_root")),
         scratch_keep_hours=_days(data.get("scratch_keep_hours"), DEFAULT_SCRATCH_KEEP_HOURS),
         worktree_keep_days=_days(data.get("worktree_keep_days"), DEFAULT_WORKTREE_KEEP_DAYS),
         cache_keep_days=_days(data.get("cache_keep_days"), DEFAULT_CACHE_KEEP_DAYS),
