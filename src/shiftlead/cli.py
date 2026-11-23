@@ -4632,7 +4632,7 @@ def cmd_td_add(args: argparse.Namespace) -> int:
             priority=args.priority,
         )
         return emit(args, got, lambda: _entry_prose(got, got.get("to"), "handed to"))
-    if teams.first_shape_off():  # the host agent resolves a built-in tech lead; no team definition is read (§4.9e)
+    if teamstore.first_shape_off():  # the host agent resolves a built-in tech lead; no team definition is read (§4.9e)
         got = call_sync(
             "entry_add",
             repo=root,

@@ -29,7 +29,6 @@ from typing import Any
 
 from sessionorc import brief as brief_mod
 from sessionorc import naming, teamstore
-from sessionorc import settings as settings_mod
 from sessionorc.models import REVIEW_BOUND
 
 # The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`), kept in `sessionorc.models` since the
@@ -634,11 +633,6 @@ def entry_teams(org: orgmod.Org, root: str, host: str, declared: Collection[str]
     return sorted(out, key=key)
 
 
-def first_shape_off() -> bool:
-    """Whether the switch-over's marker is written (§4.9e *What decides which shape runs*)."""
-    return teamstore.cut_over(settings_mod.read() or {}) is not None
-
-
 def builtin_servicing(
     records: Iterable[Mapping[str, Any]], root: str, declared: Collection[str] = ()
 ) -> list[dict[str, str]]:
@@ -669,7 +663,11 @@ def entry_servicing(
     records: Iterable[Mapping[str, Any]],
 ) -> list[dict[str, str]]:
     """Who an entry for `root` is handed to: the built-in tech leads after the cut-over, else `entry_teams`."""
-    return builtin_servicing(records, root, declared) if first_shape_off() else entry_teams(org, root, host, declared)
+    return (
+        builtin_servicing(records, root, declared)
+        if teamstore.first_shape_off()
+        else entry_teams(org, root, host, declared)
+    )
 
 
 def stale_teams(declared: Collection[str], defs: Collection[str], entries: Collection[Any]) -> list[dict[str, Any]]:

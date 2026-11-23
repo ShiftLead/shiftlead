@@ -81,3 +81,13 @@ def test_no_road_is_refused_for_want_of_a_team_after_the_marker(roots, tmp_path)
     _mark(tmp_path)
     for road in ("done", "design", "session"):
         assert ui.road_refusal(org, nobody, road, "kmaster") == ""
+
+
+def test_an_unreadable_settings_file_keeps_the_road_open_on_the_last_reading(roots, tmp_path, monkeypatch):  # noqa: F811
+    org, _ = ui.org_here()
+    nobody = str((tmp_path / "unserved").resolve())
+    monkeypatch.setattr(ui.teamstore.settings_mod, "read", lambda: None)
+    monkeypatch.setattr(
+        ui.teamstore, "HostStore", lambda: type("H", (), {"load": lambda self: {"first_shape_off": True}})()
+    )
+    assert ui.road_refusal(org, nobody, "session", "kmaster") == ""

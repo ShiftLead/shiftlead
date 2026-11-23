@@ -594,7 +594,7 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
     the button's draw and its stale press's 409, so they never disagree. A team that has never run reads as
     any other. The home reads no `org.yml`, so the page says it. After the cut-over no team or lane is read, so no
     road is refused for lack of one: a decided line is a job's, and rule 13 reports one nobody holds (§4.9e)."""
-    if teams.first_shape_off():
+    if teamstore.first_shape_off():
         return ""
     want = Path(root).expanduser().resolve()
     serving = [
@@ -637,7 +637,7 @@ def doer_target(
         return None
     kind, name = parsed
     records = list(records)
-    off = teams.first_shape_off()
+    off = teamstore.first_shape_off()
     roots = {str(Path(r).expanduser().resolve()): Path(r).name for r in hosts.local_host().repos()}
     team = ""
     if kind == "team" and off:
@@ -1389,7 +1389,7 @@ async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str
         # 2. the doer resolved, by the function the draw reads
         org, _notes = await asyncio.to_thread(org_here)
         declared = await declared_teams(facts)
-        records = await call("list") if await asyncio.to_thread(teams.first_shape_off) else []
+        records = await call("list") if await asyncio.to_thread(teamstore.first_shape_off) else []
         target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared, records)
         if target is None:
             return await fallback(f"{doer} does not resolve to a techlead seat")
@@ -1699,7 +1699,7 @@ class Readings:
         org, host = await self.defs(), host_name()
         boards_of = repo_boards(org, host)
         fleet: list[dict[str, Any]] = []
-        if await asyncio.to_thread(teams.first_shape_off):  # a Doer then resolves to a built-in tech lead (§4.9e)
+        if await asyncio.to_thread(teamstore.first_shape_off):  # a Doer then resolves to a built-in tech lead (§4.9e)
             with contextlib.suppress(Exception):  # no list: a doer reads as unresolved, drawn by the lane test
                 fleet = await self.call("list")
         hands = doer_hands(org, host, declared_of(repos), fleet)
@@ -3741,7 +3741,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
         root = str(Path(root).expanduser().resolve())
         org, _notes = await asyncio.to_thread(org_here)
-        off = await asyncio.to_thread(teams.first_shape_off)  # no team definition is read after the cut-over (§4.9e)
+        # no team definition is read after the cut-over (§4.9e)
+        off = await asyncio.to_thread(teamstore.first_shape_off)
         team = "" if off else repo_teams(org, host_name()).get(root, "")
         try:
             place, node_cfg = await entry_place(org, team, type_, repo, root, name)
