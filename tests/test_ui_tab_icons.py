@@ -40,6 +40,7 @@ ICON = {
     "flows.html": "page-settings",
     "briefs.html": "page-settings",
     "team.html": "page-settings",
+    "builtins.html": "page-settings",
     "new.html": "page-new",
     "transcript.html": "page-transcript",
     "focus.html": "state-",
