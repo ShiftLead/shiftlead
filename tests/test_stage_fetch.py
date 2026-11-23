@@ -394,12 +394,19 @@ def test_an_unchanged_flow_writes_nothing() -> None:
         (None, [], ("the flow could not be read",)),
         ("a: [", [], ("the flow could not be read",)),
         ("- a list", [], ("the flow could not be read",)),
+        ("[" * 5000, [], ("the flow could not be read",)),
+        ("", [], ("the flow could not be read",)),
     ],
 )
 def test_a_flow_that_fails_keeps_the_last_good_copy(current: str | None, problems: list[str], told: tuple) -> None:
     got = team_flow(current, problems, OLD_FLOW)
     assert got is not None and got.doc["stages"][0]["name"] == "Build"
     assert got.put is None and got.was is None and got.problems == told
+
+
+def test_a_passing_flow_over_an_unreadable_copy_replaces_it() -> None:
+    got = team_flow(NEW_FLOW, [], "a: [")
+    assert got is not None and got.was is None and got.put == NEW_FLOW
 
 
 @pytest.mark.parametrize("kept", [None, "", "a: ["])

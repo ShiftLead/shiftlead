@@ -138,7 +138,7 @@ def _flow_doc(text: str | None) -> Mapping[str, Any] | None:
         return None
     try:
         doc = repoconfig.parse_yaml(text)
-    except (yaml.YAMLError, ValueError):
+    except (yaml.YAMLError, ValueError, RecursionError):  # a file nested past the parser's depth is unreadable too
         return None
     return doc if isinstance(doc, Mapping) else None
 
