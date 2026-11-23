@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 from test_ui_press_draw import APP_JS, PROBE
@@ -525,3 +526,21 @@ def test_completed_and_other_work_lines_patch_by_key_and_count_nothing():
     assert 'data-other="1" data-key="{{ o.ref }}"' in t.read_text()
     m = JS[JS.index("AO.qModel = function") :]
     assert ".qgroup .qcard[data-card]" in m[: m.index("\n  };\n")]  # lines are no cards: the bar never counts them
+
+
+def test_the_bar_floats_only_while_something_waits_td2117():
+    """The bar follows the scroll while a part counts and the page is live; its box never changes (§4.5 screen 12)."""
+    static = Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static"
+    css, js = (static / "app.css").read_text(), (static / "app.js").read_text()
+    rule = css[css.index(".qbar.qwaits {") :].split("}", 1)[0]
+    assert "position: sticky" in rule and "top: var(--barh)" in rule and "z-index: 20" in rule
+    assert "padding" not in rule and "border" not in rule and "margin" not in rule  # nothing under it moves
+    assert "min-height: 26px" in css[css.index(".qbar {") :].split("}", 1)[0]  # Refresh coming or going moves nothing
+    assert "html:has(.topbar.away) .qbar.qwaits { top: 0; }" in css
+    assert "html:has(.qbar.qwaits) { scroll-padding-top:" in css
+    assert "html:has(.qbar.qwaits):has(.topbar.away) { scroll-padding-top:" in css
+    # both pages' bars: on with a part, off when up to date (the same call) and when not live
+    assert js.count("AO.qbarFloat(bar, !!parts.length);") == 2
+    assert js.count('bar.classList.add("notlive");\n      AO.qbarFloat(bar, false);') == 2
+    # a card hidden behind the floating bar does not count as in view
+    assert "const edge = AO.qbarEdge(bar);" in js and "b.bottom > edge && b.top < window.innerHeight" in js

@@ -805,6 +805,19 @@
     return anchorY - y > 4 ? { away: false, anchorY: y } : { away: true, anchorY: Math.max(anchorY, y) };
   };
   AO.barDecide = function () {};  // a page without a bar (a popped-out Focus) has nothing to decide
+  // the Queue's and a card page's bar follows the scroll while something waits (§4.5 screen 12 *The page holds still*,
+  // TD-2117); `--qbarh` is its height, which the scroll padding reads only while it floats
+  AO.qbarFloat = function (bar, on) {
+    const put = () => document.documentElement.style.setProperty("--qbarh", `${bar.offsetHeight}px`);
+    bar.classList.toggle("qwaits", on);
+    if (on) put();
+    if (!bar.dataset.qbarSized && window.ResizeObserver) {
+      bar.dataset.qbarSized = "1";
+      new window.ResizeObserver(() => { if (bar.classList.contains("qwaits")) put(); }).observe(bar);
+    }
+  };
+  // where a card starts to count as in view: under the following bar and its 5 px edge, else the viewport's top
+  AO.qbarEdge = (bar) => (bar && bar.classList.contains("qwaits") ? bar.getBoundingClientRect().bottom + 5 : 0);
   // `--barh` follows the bar's height (the scroll padding and every rail's `top` read it); on a wide screen
   // `decide` returns at once, so a window narrowed into a phone's width mid-session is already wired.
   AO.holdBar = function () {
@@ -6008,10 +6021,12 @@
       });
       refreshBtn.hidden = !parts.length;
       refreshBtn.disabled = boxOpen();
+      AO.qbarFloat(bar, !!parts.length);
     }
     function notLive(why) {
       if (!bar) return;
       bar.classList.add("notlive");
+      AO.qbarFloat(bar, false);
       $(".qbarlive", bar).textContent = "not live";
       barWords.textContent = why || `— last read ${readAt ? AO.qAge(Date.now() - readAt) : "never"}`;
     }
@@ -6898,11 +6913,13 @@
         barWords.appendChild(sp);
       });
       refreshBtn.hidden = !parts.length;
+      AO.qbarFloat(bar, !!parts.length);
     }
     // a reading that fails is not a reading: the bar says how old the last one is, and nothing is drawn
     function notLive() {
       if (!bar) return;
       bar.classList.add("notlive");
+      AO.qbarFloat(bar, false);
       $(".qbarlive", bar).textContent = "not live";
       barWords.textContent = `— last read ${readAt ? AO.qAge(Date.now() - readAt) : "never"}`;
     }
@@ -6924,7 +6941,8 @@
       opts = opts || {};
       const atTop = window.scrollY <= 0;
       const before = drawnCards();
-      const inView = before.filter((c) => { const b = c.getBoundingClientRect(); return b.bottom > 0 && b.top < window.innerHeight; });
+      const edge = AO.qbarEdge(bar);
+      const inView = before.filter((c) => { const b = c.getBoundingClientRect(); return b.bottom > edge && b.top < window.innerHeight; });
       const anchorIds = inView.length ? before.slice(before.indexOf(inView[0])).map((c) => c.dataset.card) : [];
       const was = new Map();
       firstById(before).forEach((c, id) => was.set(id, c.getBoundingClientRect().top));
