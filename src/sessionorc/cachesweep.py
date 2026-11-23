@@ -19,7 +19,7 @@ import os
 import re
 import shutil
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 COMMIT = re.compile(r"[0-9a-f]{40}")
 PIN_FILE = "docs/cadence.toml"
 GIT_STEP = 20.0
+NODE_ASIDE = re.compile(r"\.tmp-sweep-[0-9a-f]{40}-\d+")
 
 
 def cache_dir() -> Path:
@@ -245,4 +246,98 @@ def sweep_trees(
                     log.warning("could not remove agent-cadence tree %s: %s", tree, err)
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
+    return removed
+
+
+def node_pins(base: set[str] | None, checkout: str | Path) -> set[str] | None:
+    """The commits a node's shipped trees keep: the home's pins and those of the node's devcontainer checkout, None
+    where either cannot be read."""
+    if base is None:
+        return None
+    own = pins([checkout])
+    return None if own is None else base | own
+
+
+def sweep_node_trees(
+    directory: Path,
+    pinned: Callable[[], set[str] | None],
+    keep_days: float,
+    now_s: float,
+    tally: Any = None,
+    dry: bool = False,
+    deadline: float | None = None,
+) -> list[str]:
+    """One container node's `cadence/` directory (§4.6 *A node's shipped trees*, TD-2116), holding `<commit>/` directly:
+    every tree is listed, and one no pin names past `keep_days` is renamed aside, made writable and removed, `pinned`
+    read again just before each rename. No pin read removes none that pass. It takes no lock: only `ship_cadence` and
+    this pass write here, and a ship's commit is pinned. A `.ship-*` is never read; an aside a dead pass left goes.
+    Returns the removed paths (`dry`: those it would remove, nothing touched)."""
+    removed: list[str] = []
+    try:
+        entries = sorted(os.scandir(directory), key=lambda e: e.name)
+    except FileNotFoundError:
+        return removed
+    except OSError:
+        if tally is not None:
+            tally.unlisted = True
+        return removed
+    if keep_days > 0 and not dry:
+        for e in entries:
+            if NODE_ASIDE.fullmatch(e.name) and not e.is_symlink() and e.is_dir(follow_symlinks=False):
+                with contextlib.suppress(OSError):
+                    _writable(Path(e.path))
+                shutil.rmtree(e.path, ignore_errors=True)
+    held = pinned() if keep_days > 0 else None
+    for e in entries:
+        if not COMMIT.fullmatch(e.name) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
+            continue
+        if deadline is not None and time.monotonic() > deadline:
+            if tally is not None:
+                tally.unlisted = True
+            break
+        if tally is not None:
+            if not tally.known(e.path):
+                tally.measure(e.path, deadline=diskbook.deadline())
+            tally.list(e.path)
+        if keep_days <= 0:
+            continue
+        tree = Path(e.path)
+        try:
+            if now_s - _newest_write(tree) < keep_days * 86400:
+                continue
+        except OSError:
+            continue
+        if held is not None and e.name in held:
+            if tally is not None:
+                tally.keep(e.path, "pinned")
+            continue
+        if held is None:
+            continue
+        if dry:
+            removed.append(e.path)
+            if tally is not None:
+                tally.gone(e.path)
+            continue
+        held = pinned()  # a pin that moved since keeps its tree
+        if held is None:
+            continue
+        if e.name in held:
+            if tally is not None:
+                tally.keep(e.path, "pinned")
+            continue
+        aside = directory / f".tmp-sweep-{e.name}-{os.getpid()}"
+        try:
+            os.rename(tree, aside)
+            _writable(aside)
+        except OSError as err:
+            log.warning("could not remove node tree %s: %s", tree, err)
+            continue
+        shutil.rmtree(aside, ignore_errors=True)
+        if aside.exists():
+            log.warning("node tree %s was moved aside but not wholly removed", tree)
+            continue
+        removed.append(str(tree))
+        if tally is not None:
+            tally.gone(tree)
+        log.info("removed shipped agent-cadence tree %s (no pin names it)", tree)
     return removed

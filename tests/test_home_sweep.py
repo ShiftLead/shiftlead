@@ -5,6 +5,8 @@ never read."""
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +16,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import agent as agent_mod
+from sessionorc import board as board_mod
 from sessionorc import diskbook, homesweep, hosts, paths
 from sessionorc.models import NODE_OWNED, SAME_SESSION, Session
 
@@ -179,3 +182,168 @@ async def test_the_pass_counts_the_home_kind_and_the_dry_run_names_it(agent):
     tallied = agent._prune_runs(datetime.now(UTC), set())
     assert not f.exists() and tallied["home"]["removed"] == 1
     assert hosts.local_host().runs_keep_days > 0
+
+
+GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "t",
+    "GIT_AUTHOR_EMAIL": "t@example.invalid",
+    "GIT_COMMITTER_NAME": "t",
+    "GIT_COMMITTER_EMAIL": "t@example.invalid",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
+
+
+def git(d: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(d), *args], env=GIT_ENV, check=True, capture_output=True, text=True).stdout
+
+
+def aged(path: Path, days: float = 30) -> None:
+    when = time.time() - days * DAY
+    for d, dirs, files in os.walk(path, topdown=False):
+        for n in files + dirs:
+            os.utime(os.path.join(d, n), (when, when), follow_symlinks=False)
+        os.utime(d, (when, when))
+
+
+def board_tree(tmp_path: Path, name: str = "gone") -> tuple[Path, Path, Path]:
+    """(home, the repo, its board tree), a real linked worktree at `boards/<name>/tree`, written 30 days ago."""
+    home, repo = tmp_path / "home", tmp_path / "src" / name
+    repo.mkdir(parents=True)
+    git(repo, "init", "-q", "-b", "main")
+    (repo / "f").write_text("x")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "c")
+    tree = home / "boards" / name / "tree"
+    tree.parent.mkdir(parents=True)
+    git(repo, "worktree", "add", "-q", "--detach", str(tree))
+    aged(tree)
+    return home, repo, tree
+
+
+def boards(home: Path, names: list[str], dry: bool = False, keep: int = 14, transcripts=()) -> diskbook.Tally:
+    t = diskbook.Tally()
+    pairs = [(f"/r/{n}", {"root": f"/r/{n}"}) for n in names]
+    homesweep.sweep(home, keep, time.time(), list, t, dry=dry, repos=lambda: list(pairs), transcripts=transcripts)
+    return t
+
+
+@pytest.mark.unit
+def test_an_unregistered_repo_s_board_tree_goes_with_its_registration(tmp_path):
+    home, repo, tree = board_tree(tmp_path)
+    t = boards(home, ["other"])
+    assert not tree.exists() and not tree.parent.exists() and str(tree) in t.gone_paths
+    assert str(tree) not in git(repo, "worktree", "list", "--porcelain")
+
+
+@pytest.mark.unit
+def test_a_registered_repo_s_board_tree_is_kept_and_named(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    t = boards(home, ["gone"])
+    assert tree.exists() and (str(tree), homesweep.REGISTERED) in t.kept
+
+
+@pytest.mark.unit
+def test_a_reading_s_root_keeps_a_board_tree_under_another_key(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    t = diskbook.Tally()
+    homesweep.sweep(home, 14, time.time(), list, t, repos=lambda: [("/k/alias", {"root": "/r/gone"})])
+    assert tree.exists() and (str(tree), homesweep.REGISTERED) in t.kept
+
+
+@pytest.mark.unit
+def test_a_home_with_no_registered_repo_removes_no_board_tree(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    t = boards(home, [])
+    assert tree.exists() and str(tree) in t.listed and not t.gone_paths
+
+
+@pytest.mark.unit
+def test_a_board_tree_mid_press_is_kept_busy(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    with board_mod._EDIT:
+        t = boards(home, ["other"])
+    assert tree.exists() and (str(tree), homesweep.BUSY) in t.kept
+
+
+@pytest.mark.unit
+def test_a_repo_registered_since_the_weigh_keeps_its_board_tree(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    reads = iter([[("/r/other", {})], [("/r/gone", {})]])
+    t = diskbook.Tally()
+    homesweep.sweep(home, 14, time.time(), list, t, repos=lambda: next(reads))
+    assert tree.exists() and (str(tree), homesweep.REGISTERED) in t.kept
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("kind", ["no .git", "a directory", "another path", "not a worktree"])
+def test_a_tree_whose_git_is_not_a_board_tree_s_is_kept(tmp_path, kind):
+    home, repo, tree = board_tree(tmp_path)
+    dot = tree / ".git"
+    if kind == "no .git":
+        dot.unlink()
+    elif kind == "a directory":
+        dot.unlink()
+        dot.mkdir()
+    elif kind == "another path":
+        (repo / ".git" / "worktrees" / "tree" / "gitdir").write_text(str(tmp_path / "elsewhere" / ".git") + "\n")
+    else:
+        dot.write_text(f"gitdir: {repo / '.git'}\n")
+    aged(tree)
+    t = boards(home, ["other"])
+    assert tree.exists() and (str(tree), homesweep.NOT_BOARD) in t.kept
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("gone", ["repo", "registration"])
+def test_a_board_tree_whose_repo_or_registration_is_gone_goes_as_a_directory(tmp_path, gone):
+    home, repo, tree = board_tree(tmp_path)
+    shutil.rmtree(repo if gone == "repo" else repo / ".git" / "worktrees")
+    t = boards(home, ["other"])
+    assert not tree.exists() and str(tree) in t.gone_paths
+
+
+@pytest.mark.unit
+def test_a_locked_worktree_is_kept_as_not_removed(tmp_path):
+    home, repo, tree = board_tree(tmp_path)
+    git(repo, "worktree", "lock", str(tree))
+    aged(tree)
+    t = boards(home, ["other"])
+    assert tree.exists() and (str(tree), homesweep.NOT_REMOVED) in t.kept
+
+
+@pytest.mark.unit
+def test_a_young_board_tree_stays_and_keeps_no_reason(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    aged(tree, 1)
+    t = boards(home, ["other"])
+    assert tree.exists() and not t.kept and str(tree) in t.listed
+
+
+@pytest.mark.unit
+def test_a_dry_run_counts_a_board_tree_and_removes_nothing_even_mid_press(tmp_path):
+    home, _repo, tree = board_tree(tmp_path)
+    with board_mod._EDIT:
+        t = boards(home, ["other"], dry=True)
+    assert tree.exists() and str(tree) in t.gone_paths
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("named", [False, True], ids=["store not named", "store inside"])
+def test_a_board_tree_that_could_hold_a_transcript_store_is_kept(tmp_path, named):
+    home, _repo, tree = board_tree(tmp_path)
+    t = boards(home, ["other"], transcripts=[tree / "projects"] if named else None)
+    assert tree.exists() and (str(tree), homesweep.HOLDS_TRANSCRIPTS) in t.kept
+
+
+@pytest.mark.unit
+def test_a_link_at_a_board_s_tree_is_never_followed(tmp_path):
+    home = tmp_path / "home"
+    target = tmp_path / "precious"
+    target.mkdir()
+    (target / "f").write_text("x")
+    (home / "boards" / "gone").mkdir(parents=True)
+    (home / "boards" / "gone" / "tree").symlink_to(target)
+    t = boards(home, ["other"])
+    assert (target / "f").exists() and not t.listed

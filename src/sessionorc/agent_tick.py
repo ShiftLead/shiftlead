@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import copy
 import dataclasses
+import functools
 import hashlib
 import json
 import os
@@ -25,6 +26,7 @@ from sessionorc import (
     adapters,
     agent_common,
     cachesweep,
+    containers,
     diskbook,
     gitinfo,
     homesweep,
@@ -6103,7 +6105,8 @@ class TickMixin:
         if not late("worktrees"):
             self._sweep_worktrees(now, tallies["worktrees"], dry=dry, deadline=deadline)
         if not late("home"):
-            try:  # §4.6 *home files*, TD-2115
+            try:  # §4.6 *home files*, TD-2115; the board trees, TD-2116
+                troots, blind = adapters.transcript_roots()
                 homesweep.sweep(
                     paths.home(),
                     hosts.local_host().runs_keep_days,
@@ -6112,6 +6115,8 @@ class TickMixin:
                     tallies["home"],
                     dry=dry,
                     deadline=deadline,
+                    repos=lambda: list(self._repos.items()),
+                    transcripts=None if blind else troots,
                 )
             except Exception:  # noqa: BLE001 — the home rule never stops the rest of the sweep
                 tallies["home"].unlisted = True
@@ -6201,6 +6206,16 @@ class TickMixin:
                 )
             elif tally is not None:
                 cachesweep.tally_trees(tally)  # no pin read, none removed: the trees are still held
+            for node in containers.container_nodes().values():  # §4.6 *A node's shipped trees*, TD-2116
+                cachesweep.sweep_node_trees(
+                    node.node_dir / "cadence",
+                    functools.partial(cachesweep.node_pins, pinned, node.devcontainer),
+                    hosts.local_host().cache_keep_days,
+                    now.timestamp(),
+                    tally=tally,
+                    dry=dry,
+                    deadline=deadline,
+                )
         except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
             if tally is not None:
                 tally.unlisted = True
