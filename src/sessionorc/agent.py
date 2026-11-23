@@ -580,6 +580,16 @@ TOOLS_POLL_SECONDS = 5.0
 TOOLS_FULL_RETRY_SECONDS = 60.0
 
 
+def _keep_file(path: Path) -> bool:
+    """Whether a Resume can keep this context file: its modification time set to now first, so a disk sweep reading it
+    next sees it young (§4.6 *home files*, TD-2115), and a failed `utime` read as gone."""
+    try:
+        os.utime(path)
+    except OSError:
+        return False
+    return path.is_file()
+
+
 class HostAgent(
     ServeMixin,
     TickMixin,
@@ -758,6 +768,9 @@ class HostAgent(
         self.person_inbox: list[MailEntry] = self.person_store.load()
         self.person_store.on_save = self._inbox_changed
         for s in self.sessions.values():
+            # a record from before `context_id` (§4.6 *home files*, TD-2115): idempotent, unsaved until its next save
+            if s.adapter_id and not s.context_id and adapters.takes_start_context(s.adapter):
+                s.context_id = s.adapter_id
             # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
             # written before that would otherwise show needs-you until the next hook event.
             if s.pending and s.pending.kind == "prompt":
@@ -1576,12 +1589,13 @@ class HostAgent(
     async def rpc_get(self, id: str) -> dict[str, Any]:
         s = self._find(id)
         v = self._view(s, bookkeeping=True)  # one record: its tallies and wakes ride along
-        if not v.get("start_context") and s.adapter_id and adapters.start_context_system(s.adapter):
+        conversation = s.context_id or s.adapter_id  # after a `/clear`, the file the launch named (§4.6, TD-2115)
+        if not v.get("start_context") and conversation and adapters.start_context_system(s.adapter):
             # a moved brief is in the conversation's context file, never on the record: Focus shows it from
             # there, in this reply's copy alone (§4.3 *The shared text goes in the system prompt*, TD-1669)
             told = None
             with contextlib.suppress(OSError, ValueError):
-                text = await asyncio.to_thread(paths.context_file(s.adapter_id).read_text, encoding="utf-8")
+                text = await asyncio.to_thread(paths.context_file(conversation).read_text, encoding="utf-8")
                 told = text.partition("\n\n")[2].strip() or None  # the preface holds no blank line
             if told:
                 v["start_context"] = told
@@ -2065,6 +2079,7 @@ class HostAgent(
                 confidence=ad.state_source,
                 run_log=str(run_log),
                 adapter_id=spec.adapter_id,
+                context_id=spec.adapter_id if getattr(ad, "start_context", False) else None,
                 capabilities=grants,
                 controllers=members,
                 lane=references,
@@ -2121,8 +2136,9 @@ class HostAgent(
                     await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
                 except (OSError, RpcError) as e:  # the session exists: its create stands, the draft unclaimed
                     log.warning("create %s: could not claim %s: %s", s.id, draft_dir.name, e)
-            if isinstance(holder, Session) and holder.adapter_id != s.adapter_id:
-                self._drop_context(holder.adapter_id, holder)  # replaced in place, never forgotten
+            if isinstance(holder, Session):  # replaced in place, never forgotten
+                for held in {holder.adapter_id, holder.context_id} - {s.adapter_id, s.context_id}:
+                    self._drop_context(held, holder)
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
@@ -2274,7 +2290,7 @@ class HostAgent(
             if not (system and start_context is None):
                 return prompt, {"start_context": mail.start_context_file_text(start_context)}
             with contextlib.suppress(ValueError):  # an id that cannot name a file has no file to keep
-                if await asyncio.to_thread(paths.context_file(resume).is_file):
+                if await asyncio.to_thread(_keep_file, paths.context_file(resume)):
                     return prompt, {"keep_context": True}
             carried = self._carried_launch(resume, holder)
             if carried.get("prompt_from") and isinstance(carried.get("prompt"), str) and not carried.get("argv"):

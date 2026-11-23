@@ -74,7 +74,8 @@ def launch_dir() -> Path:
 
 def context_file(conversation: str) -> Path:
     """A conversation's start context, by file rather than in the argv (design §4.1 *No prose in the
-    argv*, TD-339): written by the adapter at each launch, removed with the last record holding it.
+    argv*, TD-339): written by the adapter at each launch, removed with the last record holding it,
+    or by the disk sweep past `runs_keep_days` once no record names it (§4.6 *home files*, TD-2115).
     The id is the tool's, or a resume's as given: one that is not a plain file name is refused."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", conversation):
         raise ValueError(f"conversation id {conversation!r} cannot name a file")

@@ -93,6 +93,7 @@ NOTE_ENDS = ("lapsed", "go_with_it", "declined", "not_clear")
 # every field of `Session` is in one and only one of the three.
 NODE_OWNED = frozenset(
     {
+        "context_id",
         "identity_alarms",
         "state",
         "since",
@@ -1145,6 +1146,9 @@ class Session:
     repo: str | None = None
     worktree: str | None = None
     adapter_id: str | None = None  # the tool's own session id (Claude Code uuid) once known
+    # the conversation whose start-context file the launch named (§4.6 *home files*, TD-2115): a `/clear` moves
+    # `adapter_id` and leaves this, since the pane's environment still names that file
+    context_id: str | None = None
     # the file the tool writes the conversation to, on this record's host (design §4.2, TD-578): set
     # with `adapter_id` from the hook, so a page links it without a read; None where none is reported
     transcript: str | None = None

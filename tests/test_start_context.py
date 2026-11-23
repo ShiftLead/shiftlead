@@ -6,14 +6,18 @@ the launch record — and a resume that gives none carries the conversation's ow
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
 from _stubs import HookFedStub
 
-from sessionorc import adapters, mail, paths
+from sessionorc import adapters, diskbook, homesweep, mail, paths
 from sessionorc.adapters import LaunchSpec
+from sessionorc.agent import HostAgent
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import Session
 
 
 class ContextStub(HookFedStub):
@@ -288,3 +292,52 @@ async def test_a_resume_with_neither_file_nor_launch_record_writes_the_preface(a
         assert sysstub.launches[-1]["start_context"] == mail.BRIEF_PREFACE
         assert sysstub.launches[-1]["keep_context"] is False
         assert (await c.call("get", id=s["id"])).get("start_context") is None  # nothing after the preface: no row
+
+
+async def test_a_create_names_its_context_file_and_a_clear_leaves_it(agent, sysstub, tmp_path):
+    """§4.6 *home files* (TD-2115): `context_id` is the conversation the launch named; a `/clear` moves `adapter_id`
+    alone, and Focus and the disk sweep both still read the file."""
+    async with LocalClient() as c:
+        s = await c.call(
+            "create", name="g", dir=str(tmp_path), adapter="sysstub", supervised=True, prompt=BRIEF, prompt_from=MADE
+        )
+        rec = agent.sessions[s["id"]]
+        conv = rec.adapter_id
+        assert rec.context_id == conv
+        rec.adapter_id = "after-clear"
+        assert (await c.call("get", id=s["id"]))["start_context"] == BRIEF
+        old = time.time() - 60 * 86400
+        os.utime(paths.context_file(conv), (old, old))
+        tally = diskbook.Tally()
+        homesweep.sweep(paths.home(), 14, time.time(), lambda: list(agent.sessions.values()), tally)
+        assert paths.context_file(conv).exists()
+        assert (str(paths.context_file(conv)), "live record") in tally.kept
+
+
+async def test_a_replace_in_place_drops_both_of_the_holder_s_files(agent, sysstub, tmp_path):
+    async with LocalClient() as c:
+        s = await c.call(
+            "create", name="g", dir=str(tmp_path), adapter="sysstub", supervised=True, prompt=BRIEF, prompt_from=MADE
+        )
+        rec = agent.sessions[s["id"]]
+        first = paths.context_file(rec.adapter_id)
+        cleared = paths.context_file("after-clear")
+        cleared.write_text("x")
+        rec.context_id, rec.adapter_id = rec.adapter_id, "after-clear"
+        await c.call("kill", id=s["id"])
+        await c.call("create", name="g", dir=str(tmp_path), adapter="sysstub", prompt=BRIEF, prompt_from=MADE)
+        assert not first.exists() and not cleared.exists()
+
+
+async def test_a_record_from_before_the_field_gets_it_at_load(agent, sysstub, tmp_path):
+    base = {"kind": "interactive", "dir": str(tmp_path), "host": agent.host}  # a hostless record is saved at load
+    known = Session(id="old-known", name="k", adapter="sysstub", adapter_id="conv", **base)
+    stranger = Session(id="old-stranger", name="s", adapter="not-on-this-host", adapter_id="conv2", **base)
+    plain = Session(id="old-shell", name="p", adapter="shell", adapter_id="conv3", **base)
+    for r in (known, stranger, plain):
+        agent.store.save(r)
+    again = HostAgent(tmux=agent.tmux)
+    assert again.sessions["old-known"].context_id == "conv"
+    assert again.sessions["old-stranger"].context_id is None
+    assert again.sessions["old-shell"].context_id is None
+    assert json.loads(agent.store.path("old-known").read_text()).get("context_id") is None  # unsaved
