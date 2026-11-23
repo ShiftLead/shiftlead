@@ -5,10 +5,12 @@ write. The record is read again under that lock and the choice made again, so an
 home's reading is never overwritten: the act is simply not made, and the next pass reads afresh.
 
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
-`mark-waiting`, `rewrite-flow`) and those that put a question to the person (`merged-entry-open`, `pr-closed`,
-`stage-gone`, `gate-again`), the person's answer, and the pass; `sweep_closed` removes a closed record after its thirty
-days. Every other case returns `Made(False, …)` and writes nothing. A write that takes a record from its holder names
-that session in `Made.end`, for the caller to end outside the lock. Nothing calls this yet.
+`mark-waiting`, `rewrite-flow`, `re-enter`) and those that put a question to the person (`merged-entry-open`,
+`pr-closed`, `stage-gone`, `gate-again`), the person's answer, the pass, and the record's half of offering again (the
+holder cleared, the offer counted, or a second loss sent to the person); the next pass's offer starts the session.
+`sweep_closed` removes a closed record after its thirty days. Every other case returns `Made(False, …)` and writes
+nothing. A write that takes a record from its holder names that session in `Made.end`, for the caller to end outside
+the lock. Nothing calls this yet.
 """
 
 from __future__ import annotations
@@ -80,6 +82,37 @@ def _rewrite_flow(store: StageStore, record: dict[str, Any], _s: Reading, doc: d
     return Made(True)
 
 
+def _way_in(doc: dict[str, Any], design: bool) -> str | None:
+    """The key of the stage that takes an entry of this kind (§4.9c *Ways in*)."""
+    kind = "design-first" if design else "other"
+    for st in doc.get("stages") or []:
+        if isinstance(st, dict) and st.get("takes") in (kind, "any"):
+            return flow3.key_of(st["name"])
+    return None
+
+
+def _re_enter(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any]) -> Made:
+    """A record that has made no move, whose stage its flow lacks: it enters again by the way in for its kind, keeping
+    its branch and pull request."""
+    to, name = _way_in(doc, s.design), doc.get("name")
+    if to is None or not name:
+        return Made(False, "the flow has no stage that takes this entry")
+    record.setdefault("history", []).append(
+        {
+            "from": record["stage"],
+            "outcome": "re-enter",
+            "reason": "its stage left the flow",
+            "by": "home",
+            "to": to,
+            "head": None,
+            "at": _now(),
+        }
+    )
+    record.update(flow=name, stage=to, holder=None, offers=0, entered_at=_now())
+    store.put_entry(record, f"re-entered at {to}")
+    return Made(True)
+
+
 def _ask(
     store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
 ) -> Made:
@@ -107,12 +140,17 @@ def _merged_open(store: StageStore, record: dict[str, Any], s: Reading, doc: dic
     return _ask(store, record, s, person, ask, context, {ARCHIVE: {"archive": True}})
 
 
-def _pr_closed(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+def _back(record: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
+    """The answer that starts the record's stage again, or the flow's stages where it has left the flow."""
     key = str(record["stage"])
     stage = _stage_or_none(doc, key)
-    back = {f"Back to {stage['name']} — a session starts this stage again": key} if stage else _to_stages(doc)
+    return {f"Back to {stage['name']} — a session starts this stage again": key} if stage else _to_stages(doc)
+
+
+def _pr_closed(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
     ask = "Its pull request was closed without merging, what next?"
-    return _ask(store, record, s, person, ask, f"Pull request {record.get('pr')} was closed unmerged.", back)
+    context = f"Pull request {record.get('pr')} was closed unmerged."
+    return _ask(store, record, s, person, ask, context, _back(record, doc))
 
 
 def _stage_gone(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
@@ -145,6 +183,7 @@ _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, A
     "wait-for-parts": _wait_for_parts,
     "mark-waiting": _mark_waiting,
     "rewrite-flow": _rewrite_flow,
+    "re-enter": _re_enter,
 }
 
 
@@ -217,6 +256,22 @@ def _pass(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, 
     return Made(True)
 
 
+def _offer_again(
+    store: StageStore, record: dict[str, Any], act: Act, s: Reading, doc: dict[str, Any], person: str
+) -> Made:
+    """Act 4's write. A second loss goes to the person; any other clears the holder, and a loss that happened while
+    the team ran counts the offer the next pass makes. A holder ended by a Stop or a hold leaves the count as it is."""
+    if act.case == "to-person":
+        ask = "Two sessions in a row were lost on this entry, what next?"
+        context = f"The sessions holding it in the stage {record['stage']} ended or went silent twice."
+        return _ask(store, record, s, person, ask, context, _back(record, doc))
+    record["holder"] = None
+    if act.counted:
+        record["offers"] = int(record.get("offers") or 0) + 1
+    store.put_entry(record, f"offered again: {act.case}")
+    return Made(True)
+
+
 def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any], person: str) -> Made:
     """Write `act` on `tid`'s record, if a fresh read under the lock still chooses it."""
     with store.locked():
@@ -230,6 +285,8 @@ def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any],
             got = _answer(store, record, s, doc, person)
         elif act.name == "pass":
             got = _pass(store, record, s, doc, person)
+        elif act.name == "offer-again":
+            got = _offer_again(store, record, act, s, doc, person)
         elif act.name == "reconcile" and act.case in _ASKS:
             got = _ASKS[act.case](store, record, s, doc, person)
         elif act.name == "reconcile" and act.case in _RECONCILE:
