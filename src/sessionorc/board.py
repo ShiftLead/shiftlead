@@ -503,11 +503,13 @@ def _tree(root: Path, clock: _Clock) -> tuple[Path, str]:
                 why = _why(cp, "git worktree add")
                 continue
         cp = _git(t, "reset", "-q", "--hard", f"origin/{want}", timeout=clock.left("tree"))
+        step = "git reset"
         if cp.returncode == 0:  # a write a crash cut short left its new files, which a reset keeps
+            step = "git clean"
             cp = _git(t, "clean", "-fdq", timeout=clock.left("tree"))
         if cp.returncode == 0:
             return t, want
-        why = _why(cp, "git reset")
+        why = _why(cp, step)
         _drop_tree(root, t)
     raise Refused(f"the board's own tree {t} cannot be made or reset ({why}): the edit was not made")
 
