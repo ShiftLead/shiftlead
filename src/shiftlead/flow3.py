@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, cadence, paths
+from sessionorc import adapters, briefs, cadence, paths
 from shiftlead import repoconfig
 
 FORMAT = 3
@@ -41,17 +41,8 @@ AUDIT_KEYS = ("name", "model", "every", "brief", "also")
 TAKES = ("design-first", "other", "any")
 MAX_MOVES = 25
 EVERY = re.compile(r"[1-9]\d* (merged-pull-requests|hours|days)")
-# the standard briefs (§4.9c *What a stage's session is told*), each with its kind
-STANDARD = {
-    "design": "design",
-    "build": "build",
-    "review": "review",
-    "docs": "audit",
-    "tests": "audit",
-    "code": "audit",
-}
-BRIEF_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-KIND_LINE = re.compile(r"kind:\s*([a-z]+)")
+STANDARD = briefs.STANDARD  # the standard briefs, each with its kind (§4.9c *What a stage's session is told*)
+BRIEF_NAME = briefs.NAME
 
 Reader = Callable[[Path], "str | None"]
 
@@ -97,22 +88,24 @@ def _read(path: Path) -> str | None:
         return None
 
 
-def org_briefs() -> Path:
-    """The org's own briefs, beside its flows (§4.9c *Where a brief lives*)."""
-    return paths.home() / "briefs"
+org_briefs = briefs.org_dir
+brief_kind = briefs.kind_of
 
 
-def brief_kind(text: str) -> str | None:
-    """A person's brief's kind: the `kind:` line of its front matter (§4.9c *Where a brief lives*), or None."""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None
-    for line in lines[1:]:
-        if line.strip() == "---":
-            return None
-        if m := KIND_LINE.fullmatch(line.strip()):
-            return m.group(1)
-    return None
+def standard_briefs() -> list[dict[str, Any]]:
+    """The standard briefs as the Briefs page draws them, read-only (§4.5a *Briefs page*)."""
+    return [
+        {"name": name, "kind": kind, "text": briefs.body_of(_read(STANDARD_DIR / f"{name}.md") or "")}
+        for name, kind in STANDARD.items()
+    ]
+
+
+def offered(kind: str) -> list[dict[str, Any]]:
+    """The briefs a stage or audit of `kind` may pick (§4.9c): the standard ones of that kind, then the person's own."""
+    return [
+        *({**b, "source": "standard"} for b in standard_briefs() if b["kind"] == kind),
+        *({**b, "source": "own"} for b in briefs.own() if b["kind"] == kind),
+    ]
 
 
 def _brief_problem(name: Any, kind: str, place: str, flow_dir: Path | None, read: Reader) -> str | None:

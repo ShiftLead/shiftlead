@@ -990,6 +990,24 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "briefs-new",
+        "+ New brief",
+        "Briefs page",
+        (
+            "Opens an empty brief of your own: a name, a kind and its text. Save keeps it as a Markdown file beside "
+            "the org's flows, and the Flows page offers it to stages or audits of that kind only."
+        ),
+    ),
+    Help(
+        "briefs-delete",
+        "Delete",
+        "Briefs page",
+        (
+            "Removes this brief of your own. It is refused while a flow names the brief, and the refusal names the "
+            "flow; change that flow first."
+        ),
+    ),
+    Help(
         "tools-add-login",
         "+ Add login",
         "Tools page",
@@ -1156,6 +1174,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "tools-note",
             "tools-forget",
             "tools-settings",
+            "briefs-new",
+            "briefs-delete",
             "tools-add-login",
             "tools-add-found",
             "tools-keep-back",

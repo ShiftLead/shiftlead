@@ -6262,6 +6262,31 @@
     return ok;
   };
 
+  // The Briefs page (design §4.5a *Briefs page*, TD-2055): + New brief, and each own brief's Save and Delete through
+  // `brief_save`; a refusal is the host agent's words, in place.
+  AO.briefs = function () {
+    const page = $("#briefspage"); if (!page) return;
+    const said = $("#briefssaid", page);
+    const save = async (body) => {
+      const r = await fetch("/api/briefs/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} said.textContent = t; said.hidden = false; return false; }
+      return true;
+    };
+    const add = $("#briefnew", page), blank = $("#briefblank", page);
+    if (add && blank) add.addEventListener("click", () => { blank.hidden = false; $("[name=name]", blank).focus(); });
+    $$("form.briefform", page).forEach((f) => {
+      f.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const body = { name: f.elements.name.value.trim(), kind: f.elements.kind.value, text: f.elements.text.value, version: f.dataset.version || null };
+        if (await save(body)) location.reload();
+      });
+      const del = $("[data-brief-delete]", f);
+      if (del) del.addEventListener("click", async () => {
+        if (await save({ name: f.elements.name.value, version: f.dataset.version, delete: true })) location.reload();
+      });
+    });
+  };
+
   // The Tools page (design §4.2b *The page*, §4.5 screen 14, TD-1973): **Check again** reads this host's tools again
   // and draws the page afresh; **Install** opens the tool's install shell (TD-1972) and goes to its Focus, where the
   // install line waits typed for the person's Enter. A refusal is the host agent's words, in place.

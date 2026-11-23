@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Briefs · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{# design §4.9c *Every stage and every audit picks one brief from a list*, *Where a brief lives*, §4.5a *Briefs page*
+   (TD-2055): the standard briefs read-only, and the person's own, each a name, a kind and its text, saved through
+   `brief_save`. #}
+{% macro brief_form(b, kinds) %}
+<form class="briefform" data-version="{{ b.version or '' }}">
+  <div class="row gap wrap">
+    <label>name <input class="mono" name="name" value="{{ b.name or '' }}" required pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"{% if b.name %} readonly{% endif %}></label>
+    <label>kind <select name="kind">{% for k in kinds %}<option{% if b.kind == k %} selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <span class="grow"></span>
+    <button class="btn sm" type="submit">Save</button>
+    {%- if b.name %}<button class="btn sm ghost" type="button" data-brief-delete title="{{ help_title('briefs-delete') }}">Delete</button>{% endif %}
+  </div>
+  <textarea class="mono" name="text" rows="10" required aria-label="the brief's text">{{ b.text or '' }}</textarea>
+</form>
+{% endmacro %}
+{% block body %}
+{% set rail_on = "Briefs" %}<div class="setarea">{% include "settings_rail.html" %}
+<div class="page inboxpage briefspage" id="briefspage">
+  <div class="row gap wrap toolshead"><span class="h1">Briefs</span><span class="grow"></span>
+    <button class="btn sm" type="button" id="briefnew" title="{{ help_title('briefs-new') }}"{% if agent_down %} disabled{% endif %}>+ New brief</button></div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — your briefs cannot be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/briefs">Retry</a></div>
+  {% if why %}<div class="note warn">{{ why }}</div>{% endif %}
+  <div class="note warn" id="briefssaid" role="alert" hidden></div>
+  <div class="card" id="briefblank" hidden>{{ brief_form({}, kinds) }}</div>
+  <h2>Your briefs</h2>
+  {% for b in own %}<div class="card" data-brief="{{ b.name }}">{{ brief_form(b, kinds) }}{% if not b.kind %}<div class="note toolwarn">this file names no kind, so no stage is offered it</div>{% endif %}</div>
+  {% else %}<div class="note">None yet.</div>{% endfor %}
+  <h2>Standard briefs</h2>
+  {% for b in standard %}<details class="card" data-standard="{{ b.name }}"><summary><span class="mono">{{ b.name }}</span> <span class="note">{{ b.kind }}</span></summary><pre class="mono briefbody">{{ b.text }}</pre></details>{% endfor %}
+</div></div>
+{% endblock %}
+{% block scripts %}<script>AO.briefs();</script>{% endblock %}

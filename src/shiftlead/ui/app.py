@@ -52,7 +52,7 @@ from sessionorc.models import (
 from sessionorc.queue import TD_REF, card_entries, lift_ask_target, qid, repo_roots
 from sessionorc.queue import refs as _refs_of
 from sessionorc.store import kept as doing_kept
-from shiftlead import cardtext, layers, repoconfig, teamrun, teams
+from shiftlead import cardtext, flow3, layers, repoconfig, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
 from shiftlead import review as reviewmod
@@ -5276,6 +5276,46 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "usage": {} if agent_down else await chip_usage(call),
                 "build_chip": None if agent_down else await chip_build(call),
             },
+        )
+
+    @app.get("/briefs", response_class=HTMLResponse)
+    async def briefs_page(request: Request):
+        """§4.5a *Briefs page* (TD-2055): the standard briefs read-only, and the person's own with Save and Delete."""
+        agent_down, own, why = False, [], ""
+        try:
+            own = (await call("briefs")).get("briefs") or []
+        except HTTPException as e:
+            agent_down = e.status_code == 503
+            why = "" if agent_down else f"the host agent did not serve the briefs: {e.detail}"
+        return templates.TemplateResponse(
+            request,
+            "briefs.html",
+            {
+                "standard": flow3.standard_briefs(),
+                "own": own,
+                "kinds": ("design", "build", "review", "audit"),
+                "why": why,
+                "agent_down": agent_down,
+                "host": host_name(),
+                "active": "Settings",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
+    @app.post("/api/briefs/save")
+    async def briefs_save(request: Request):
+        """§4.5a *Briefs page*: **Save** and **Delete**, through `brief_save`, the person's own act (TD-2055)."""
+        b = await body_of(request)
+        version = b.get("version") or None
+        return await call(
+            "brief_save",
+            name=str(b.get("name") or ""),
+            kind=str(b.get("kind") or ""),
+            text=str(b.get("text") or ""),
+            version=str(version) if version else None,
+            delete=b.get("delete") is True,
         )
 
     @app.post("/api/tools/check")
