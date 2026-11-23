@@ -72,3 +72,12 @@ def test_td_add_sends_no_first_shape_teams_after_the_marker(cli_world, capsys, m
     assert cli.main(["td", "add", "--repo", "shiftlead", "a", "word"]) == 0
     assert len(sent) == 1 and "teams" not in sent[0]
     assert "handed to ao-web-techlead" in capsys.readouterr().out
+
+
+def test_no_road_is_refused_for_want_of_a_team_after_the_marker(roots, tmp_path):  # noqa: F811
+    org, _ = ui.org_here()
+    nobody = str((tmp_path / "unserved").resolve())
+    assert "no team services" in ui.road_refusal(org, nobody, "session", "kmaster")
+    _mark(tmp_path)
+    for road in ("done", "design", "session"):
+        assert ui.road_refusal(org, nobody, road, "kmaster") == ""

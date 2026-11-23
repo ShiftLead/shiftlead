@@ -592,7 +592,10 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
     **Have a session do it** on an `act` line of that checkout's board (§4.5 screen 12 *Three verbs: Have a
     session do it*, TD-1624): the same read with `free-pick`, so nobody would take the work — one function for
     the button's draw and its stale press's 409, so they never disagree. A team that has never run reads as
-    any other. The home reads no `org.yml`, so the page says it."""
+    any other. The home reads no `org.yml`, so the page says it. After the cut-over no team or lane is read, so no
+    road is refused for lack of one: a decided line is a job's, and rule 13 reports one nobody holds (§4.9e)."""
+    if teams.first_shape_off():
+        return ""
     want = Path(root).expanduser().resolve()
     serving = [
         t for t in org.teams.values() if (p := org.checkout(t.repo, host)) and Path(p).expanduser().resolve() == want
@@ -3738,7 +3741,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
         root = str(Path(root).expanduser().resolve())
         org, _notes = await asyncio.to_thread(org_here)
-        team = repo_teams(org, host_name()).get(root, "")
+        off = await asyncio.to_thread(teams.first_shape_off)  # no team definition is read after the cut-over (§4.9e)
+        team = "" if off else repo_teams(org, host_name()).get(root, "")
         try:
             place, node_cfg = await entry_place(org, team, type_, repo, root, name)
         except ValueError as e:
