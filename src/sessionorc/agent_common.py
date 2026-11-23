@@ -783,7 +783,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat", "review", "context_bound", "prompt_from", "start_context", "run_only", "scale",
+    "seat", "builtin", "review", "context_bound", "prompt_from", "start_context", "run_only", "scale",
 )  # fmt: skip
 
 

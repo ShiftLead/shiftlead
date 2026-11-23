@@ -1692,6 +1692,7 @@ class HostAgent(
         supervised: bool = False,
         run_only: bool | None = None,  # None, not False: a launch record keeps it only where it was set
         seat: dict[str, Any] | None = None,
+        builtin: str | None = None,
         scale: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
         context_bound: int | None = None,
@@ -1917,6 +1918,8 @@ class HostAgent(
                 # conversation, never a record of another name that held it — so the record and the launch
                 # record below carry it, as `supervised` is carried; a `seat` the call gives wins
                 seat = dict(holder.seat)
+            if builtin is None and resume and isinstance(holder, Session) and holder.adapter_id == resume:
+                builtin = holder.builtin  # a built-in seat stays one when it is resumed, as its `seat` does (§4.9d)
             if (
                 scale is None
                 and resume
@@ -2081,6 +2084,7 @@ class HostAgent(
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
                 run_only=bool(run_only),
                 seat=dict(seat) if seat else None,
+                builtin=builtin,
                 scale=extra,
                 review=reading,
                 context_bound=bound,
@@ -2203,6 +2207,7 @@ class HostAgent(
             supervised=True,  # it is started by the tick's replay, as any supervised record is restarted
             by_person=None if self.mode == "node" else False,  # supervised: a team's (§4.10, TD-1069)
             seat=dict(given["seat"]) if given.get("seat") else None,
+            builtin=given.get("builtin"),
             scale=given["extra"],
             review=given["reading"],
             context_bound=given["bound"],

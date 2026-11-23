@@ -12,6 +12,7 @@ from conftest import park_ticks
 
 from sessionorc import paths
 from sessionorc.agent_common import RpcError
+from sessionorc.client import LocalClient
 from sessionorc.models import Session
 
 PER_RECORD = (
@@ -234,3 +235,28 @@ async def test_a_press_of_start_after_the_marker_starts_nobody(agent, monkeypatc
     monkeypatch.setattr(agent, "_work_start", AsyncMock(side_effect=AssertionError("started a team after the marker")))
     got = await agent.rpc_work_start(team="g")
     assert got == {"team": "g", "started": False, "ids": [], "held": None}
+
+
+@pytest.mark.parametrize("why", ["crash", "seat_due"])
+async def test_a_built_in_seat_keeps_its_mark_across_a_replay(agent, tmp_path, why):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        made = await person.call(
+            "create",
+            name="lead",
+            dir=str(tmp_path),
+            adapter="shell",
+            unattended=True,
+            supervised=True,
+            seat={"trigger": "asks"},
+            builtin="techlead",
+        )
+        sid = made["id"]
+        assert agent._read_launch(sid)["builtin"] == "techlead"
+        _mark()
+        agent._read_cut_over()
+        agent.sessions[sid].set_state("exited", confidence="hook")
+        await agent._replay(agent.sessions[sid], why, keep_mail=True)
+        assert agent.sessions[sid].builtin == "techlead"
+        assert agent._rules_reach(agent.sessions[sid])
+        await person.call("kill", id=sid)
