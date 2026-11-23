@@ -6,11 +6,13 @@
   if (!page) return;
   const data = JSON.parse(document.getElementById("flowsdata").textContent);
   const OUT = {
+    __proto__: null,
     design: ["work-pushed", "no-design-needed"],
     build: ["work-pushed", "design-needs-changing", "not-needed"],
     review: ["ship", "changes-wanted"],
   };
   const KIND = {
+    __proto__: null,
     design: ["Design", "Writes the design for an entry and files the builds it needs."],
     build: ["Build", "Writes the code, tests or documents for an entry, on the entry's branch."],
     review: ["Review", "Reads the pushed work, whatever it holds, and gives a verdict."],
@@ -54,7 +56,7 @@
     if (typeof v === "string") return { to: FIXED.includes(v) ? v : keyOf(v) };
     const to = typeof v.to === "string" ? (FIXED.includes(v.to) ? v.to : keyOf(v.to)) : "person";
     const d = { to };
-    if (v.limit) d.limit = v.limit;
+    if (Number.isInteger(v.limit) && v.limit > 0) d.limit = v.limit; // the file's value reaches innerHTML only as a number
     if (v.answers) d.answers = v.answers;
     if (v.refused !== undefined) d.refused = nd(v.refused);
     return d;
@@ -78,7 +80,7 @@
 
   // ---- the check is the host agent's
   function ask() {
-    clearTimeout(S.timer); S.pending = true;
+    clearTimeout(S.timer); S.pending = true; S.seq++; // a reply already on its way is for the flow before this edit
     S.timer = setTimeout(run, 200);
   }
   async function run() {
@@ -244,7 +246,7 @@
     if (f.doc) h += `<div class="note">→ ${asks} outcome${asks === 1 ? " goes" : "s go"} to you.</div><div class="note">→ An entry comes to you after ${capOf(f)} moves between stages, wherever it is.</div>`;
     return `${h}</div>`;
   }
-  const capOf = (f) => (f.doc && f.doc["max-moves"] !== undefined ? f.doc["max-moves"] : data.max_moves || 25);
+  const capOf = (f) => (f.doc && Number.isInteger(f.doc["max-moves"]) ? f.doc["max-moves"] : data.max_moves || 25);
 
   // ---- Walk an entry: a simulation in the page, writing nothing (§4.5a)
   function walkStart(f, kind, ai) {
@@ -330,13 +332,16 @@
   }
   async function save(f) {
     if (S.pending || (S.check && S.check.problems.length)) return;
+    // What was sent is what is recorded: the person may edit, or pick another flow, while the reply is on its way.
+    const { text, info } = S.check, name = f.name, keys = stagesOf(f).map((s) => [s, keyOf(s.name)]);
     try {
-      const got = await post("/api/flows/save", { name: f.name, text: S.check.text, version: f.version || null, renames: renames(f) });
-      f.version = got.version; f.text = S.check.text; f.problems = []; f.info = S.check.info;
-      const was = S.sel; remember(f); S.sel = idOf(f);
-      if (was !== S.sel) S.sel = idOf(f);
-      say(got.moved ? `Saved. ${got.moved} ${got.moved === 1 ? "entry" : "entries"} moved to the renamed stage.` : "");
-    } catch (e) { say(e.message); }
+      const got = await post("/api/flows/save", { name, text, version: f.version || null, renames: renames(f) });
+      const shown = S.sel === idOf(f);
+      f.version = got.version; f.text = text; f.problems = []; f.info = info;
+      if (f.name !== name) { f.name = name; f.doc.name = name; if (shown) { S.sel = idOf(f); ask(); } }
+      keys.forEach(([s, k]) => { s.$was = k; });
+      if (shown) say(got.moved ? `Saved. ${got.moved} ${got.moved === 1 ? "entry" : "entries"} moved to the renamed stage.` : "");
+    } catch (e) { if (S.sel === idOf(f)) say(e.message); }
     render();
   }
   async function del(f) {
