@@ -1187,6 +1187,13 @@ def cmd_org(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _first_shape_gone(args: argparse.Namespace) -> int | None:
+    """The exit of a first-shape team verb after the cut-over (§4.9e *What decides which shape runs*), else None."""
+    if teamstore.cut_over(settings_mod.read() or {}):
+        return fail(args, teamstore.GONE, 1)
+    return None
+
+
 def cmd_team_start(args: argparse.Namespace) -> int:
     """`ao team start <name>` (design §4.9): the sequence itself lives in `shiftlead.teamrun`, which
     the Sessions page's **Teams** strip runs too, so the two cannot drift — every check before any
@@ -2842,6 +2849,8 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     """`ao team on-work <team> ask|start|off` (design §4.7, §6 rule 8, TD-227): what the home does
     when the team has wound down and its lanes gain work — the Inbox row, the start itself, or
     nothing — written to `teams.<team>.on_work` through `set_settings`, a person's own."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -2859,6 +2868,8 @@ def cmd_team_size(args: argparse.Namespace) -> int:
     Members dialog's **− / +**), refused for a line the definition does not name, below 0, below what
     a listed flow needs, and where a step up's next name is another line's. Prints *grinder-ao: 3 (file
     says 2)* and what it started or wound down."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -2875,6 +2886,8 @@ def cmd_team_max(args: argparse.Namespace) -> int:
     """`ao team max <team> <name> <n>` and `ao team max <team> off|on` (design §4.7, §4.9 *Scaling with the work*,
     TD-1545): the line's or seat's ceiling written to `teams.<team>.max.<name>`, or the team's `max: off`, or the
     whole key removed, through `set_settings` (`teamrun.set_max`) — a person's own, refused to a session."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     if os.environ.get("SHIFTLEAD_SESSION"):
         return fail(args, "ao team max writes a person's setting: refused to a session (design §4.7)", 1)
     if args.line in ("off", "on") and args.n is None:
@@ -2897,6 +2910,8 @@ def cmd_team_add(args: argparse.Namespace) -> int:
     member line's next member started for this run alone — never replayed after it, and no file or setting
     written — or with `--keep` the line's size one higher as `ao team size` writes it; refused on a team that
     is not running, and to a session. Prints the name it started."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     if os.environ.get("SHIFTLEAD_SESSION"):
         return fail(args, "ao team add starts a member: a person's own, refused to a session (design §4.7)", 1)
     try:
@@ -2918,6 +2933,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     `--apply`, after the write where a flow is named, applies the definition as it reads now: the
     sit-outs, the starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per
     member, and one per PR already asked of a reader, which stays its (*What a switch leaves alone*)."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -3432,6 +3449,9 @@ def cmd_pr(args: argparse.Namespace) -> int:
 
     if args.action == "wait":
         return _pr_wait(args)
+    if teamstore.cut_over(settings_mod.read() or {}):  # §4.9e: no reader chain runs after the marker
+        got = {"pr": args.n, "held": False, "paths": [], "text": teamstore.NO_PR_HELD}
+        return emit(args, got, lambda: print(f"PR #{args.n}: {teamstore.NO_PR_HELD}"))
     sid = _own_session(args)
     if sid is None:
         return 2

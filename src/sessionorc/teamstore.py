@@ -22,6 +22,9 @@ SET_KEYS = ("label", "logins", "at_once", "most")  # what `team_set` writes; `re
 LABEL_MAX = 60
 BEFORE = "after the switch-over"
 STALE = "changed since this page read it — reload"
+GONE = "this went at the switch-over: use the team page"  # a first-shape verb or control, §4.9e
+NO_PR_HELD = "no pull request is held after the switch-over"  # `ao pr held`'s answer, §4.9e
+FIRST_SHAPE_KEYS = ("on_work", "flow", "size", "max")  # `settings.yml` team keys only the first shape's verbs write
 
 
 class TeamError(ValueError):
