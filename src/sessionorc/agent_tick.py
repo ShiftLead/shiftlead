@@ -2834,7 +2834,8 @@ class TickMixin:
                 # worked on a copy and written back only when the pass ends, so a surprise mid-way loses no reset
                 rec = copy.deepcopy(before)
                 rule = (conf.get(team) or {}).get("schedule")
-                if not rule:
+                # a rule naming a login (a switched team's, §4.9d) has no firing until TD-2065 builds it
+                if not rule or not rule.get("profile"):
                     rec.pop("schedule_next", None)  # cleared: nothing upcoming; `schedule_fired` stays, a fact
                 else:
                     await self._schedule_team(team, rule, rec, by_team.get(team) or [], now)

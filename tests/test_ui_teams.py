@@ -8,6 +8,7 @@ back as the agent's own message, and that the page renders what §4.5a's row des
 
 from __future__ import annotations
 
+import json
 import pathlib
 import time
 from datetime import UTC, datetime, timedelta
@@ -1461,6 +1462,60 @@ def test_a_switched_teams_page_draws_its_running_rows_and_saves_them(world, clie
     assert next(p for m, p in fleet.calls if m == "set_settings") == {"teams": {"solo": {"reserve": 7}}}
     assert client.post("/api/settings/teams", json={"team": "solo", "on_work": "ask"}).status_code == 400
     assert client.post("/api/settings/teams", json={"team": "nobody", "reserve": 7}).status_code == 400
+
+
+def _sw(*rows, **more):
+    return {"logins": [{"login": k, "shown": k[2:], "metered": m, "windows": w} for k, m, w in rows], **more}
+
+
+def test_a_standing_schedule_can_always_be_turned_off():
+    """§4.9d *When it runs* (TD-2091): an empty list, an all-metered list and a node team start nothing, and the rule
+    that stands on each can still be cleared; with no rule, none of them offers the switch."""
+    rule, m = {"start": "reset", "window": "week"}, ("c:m", True, [])
+    for sw in (_sw(), _sw(m), _sw(("c:a", False, ["week"]), on_node=True)):
+        assert (setmod.switched_schedule(rule, sw)["on"], setmod.switched_schedule(rule, sw)["can"]) == (True, True)
+        assert setmod.switched_schedule(None, sw)["can"] is False
+
+
+def test_the_starts_row_of_a_switched_team():
+    """§4.9d *When it runs* (TD-2091): the rule's login, the first by default, and what the row says when it moved."""
+    a, b, m = ("c:a", False, ["week"]), ("c:b", False, ["week", "5h"]), ("c:m", True, [])
+    off = setmod.switched_schedule(None, _sw(m, a, b))
+    assert (off["on"], off["can"], off["profile"], off["window"], off["was"]) == (False, True, "c:a", "week", "null")
+    assert [o["disabled"] for o in off["options"]] == [True, False, False]
+    rule = {"start": "reset", "login": "c:b", "window": "5h"}
+    on = setmod.switched_schedule(rule, _sw(a, b))
+    assert on["profile"] == "c:b" and json.loads(on["was"]) == rule and on["starts"] == "at the reset of b's 5h"
+    assert setmod.switched_schedule(rule, _sw(a))["starts"] == "the schedule now reads a"
+    assert "starts nothing" in setmod.switched_schedule(rule, _sw())["starts"]
+    assert "is metered" in setmod.switched_schedule(rule, _sw(m, a))["starts"]
+    assert setmod.switched_schedule(None, _sw(("c:n", False, [])))["window"] == "week", "no reading: it saves"
+    node = setmod.switched_schedule(None, _sw(a, on_node=True))
+    assert node["can"] is False and node["starts"] == "a node's logins are not read here"
+
+
+def test_a_switched_teams_page_draws_starts_and_saves_a_login(world, client, monkeypatch):
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    rule = {"start": "reset", "login": "claude:b", "window": "week"}
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {"solo": {"schedule": rule}}, "labels": {}, "switched_teams": {"solo": "shiftlead"}}
+        if method == "team_show":
+            return _switched_show()
+        if method == "tools":
+            return _switched_tools()
+        if method == "set_settings":
+            fleet.calls.append((method, params))
+            return {"teams": {}}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    band = client.get("/teams/solo").text.split('<div class="h2">When it runs</div>')[1]
+    assert "Starts" in band and 'data-who="login"' in band and "at the reset of b&#39;s week" in band
+    assert client.post("/api/settings/teams", json={"team": "solo", "schedule": rule}).status_code == 200
+    assert next(p for m, p in fleet.calls if m == "set_settings") == {"teams": {"solo": {"schedule": rule}}}
 
 
 def test_a_switched_teams_balance_reads_its_own_repo_with_no_live_session():

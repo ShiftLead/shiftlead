@@ -620,8 +620,9 @@ def live_cap(doc: dict[str, Any], host: str, default: int | None = None) -> int 
 # -- teams, repos, person (§5, TD-146)-------------------------------------------------------------
 
 TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow", "size", "max")
-# a team's `schedule` (§6 *Schedule*, TD-133): the start, and the profile and window whose reset it is
-SCHEDULE_KEYS = frozenset({"start", "profile", "window"})
+# a team's `schedule` (§6 *Schedule*, TD-133): the start, and the profile and window whose reset it is; a switched
+# team's names a login of its list in the profile's place, and none means the first (§4.9d *When it runs*, TD-2091)
+SCHEDULE_KEYS = frozenset({"start", "profile", "login", "window"})
 ON_WORK = (
     "ask",
     "start",
@@ -730,8 +731,10 @@ def instant(value: Any) -> str:
     return t.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
-    """One team's settings: `schedule` (§6 *Schedule*: `{start: reset, profile, window}`), `until` (an
+def parse_team(value: Any, drop: bool = False, switched: bool | None = None) -> dict[str, Any]:
+    """One team's settings: `schedule` (§6 *Schedule*: `{start: reset, profile, window}`; for a switched team
+    `{start: reset, login?, window}`, §4.9d *When it runs*: `switched`, or on the reader's side the entry's own `repo`
+    key, says which), `until` (an
     instant, §6 *Team stop time*) and `reserve` (a flat percent added to the profile's reserve
     for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*),
     `on_work` (§6 rule 8: `ask`, `start` or `off`) and `flow` (§4.9c: the name of the flow the team
@@ -739,6 +742,12 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     `size` (§4.9 *A team's size*: `{<member line>: <n ≥ 0>}`, the whole map replaced; the client names the
     lines), and `max` (§4.9 *Scaling with the work*, td-max: a map validated as `size`'s, keyed by a member line's
     or a seat's name, or the string `off`, none for the team; `off` as one name's value is refused)."""
+
+    by_login = bool(
+        switched
+        if switched is not None
+        else drop and isinstance(value, dict) and isinstance(value.get("repo"), str) and value["repo"].strip()
+    )
 
     def schedule(v: Any) -> dict[str, str]:
         # §6 *Schedule* (TD-133): `{start: reset, profile, window}` — the one start designed is at a window's
@@ -751,12 +760,21 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             )
         if v.get("start") != "reset":
             raise ValueError(f"schedule.start is reset, the one start designed (§6 *Schedule*), not {v.get('start')!r}")
+        if "login" in v and not by_login:
+            raise ValueError("schedule.login is a switched team's; this team's schedule names a profile (§4.9d)")
+        if "profile" in v and by_login and not drop:
+            raise ValueError("schedule.profile: a switched team's schedule names a login of its list (§4.9d)")
         out = {"start": "reset"}
-        for key in ("profile", "window"):
+        for key in ("window",) if by_login and "profile" not in v else ("profile", "window"):
             word = v.get(key).strip() if isinstance(v.get(key), str) else ""
             if not word:
                 raise ValueError(f"schedule.{key} is needed: the profile and the window whose reset starts the team")
             out[key] = word
+        if by_login and v.get("login") not in (None, ""):  # empty: the page's rule on an empty list, none named
+            word = v["login"].strip() if isinstance(v["login"], str) else ""
+            if ":" not in word:
+                raise ValueError(f"schedule.login is a login as <tool>:<name>, not {v['login']!r}")
+            out["login"] = word
         return out
 
     def on_work(v: Any) -> str:

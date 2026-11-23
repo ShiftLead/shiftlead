@@ -10600,8 +10600,8 @@
   };
   // **schedule**'s part of the team card's Save body: the rule whole, null off — and nothing where it did not
   // move from the drawn one (`was`, the row's JSON), so an unmoved Save writes nothing
-  AO.scheduleBody = function (was, on, profile, window) {
-    const rule = on ? { start: "reset", profile, window: String(window || "").trim() } : null;
+  AO.scheduleBody = function (was, on, profile, window, who = "profile") {  // a switched team's rule names a login
+    const rule = on ? { start: "reset", [who]: profile, window: String(window || "").trim() } : null;
     return JSON.stringify(rule) === was ? {} : { schedule: rule };
   };
   // **board items shown** (§4.5a, TD-220 slice 4): the pick and its number as `person.inbox.board_show`
@@ -10719,7 +10719,7 @@
         if (row) { const bal = AO.balanceOf(f); if (JSON.stringify(bal) !== row.dataset.was) body.balance = bal; }
         // **schedule** (§6 *Schedule*, TD-1346): the rule whole, written only when it moved; off is null
         const sr = $(".setschedule", f);
-        if (sr) Object.assign(body, AO.scheduleBody(sr.dataset.was, f.elements.schedule_on.checked, f.elements.schedule_profile.value, f.elements.schedule_window.value));
+        if (sr) Object.assign(body, AO.scheduleBody(sr.dataset.was, f.elements.schedule_on.checked, f.elements.schedule_profile.value, f.elements.schedule_window.value, sr.dataset.who));
         // **flow** (§4.9c): written only when the pick moved, and nothing more (TD-356)
         const fl = f.elements.flow; if (fl && fl.value !== fl.dataset.was) body.flow = fl.value;
         return ["teams", body];

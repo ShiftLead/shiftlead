@@ -5504,6 +5504,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 notes = [*notes, f"the team could not be read: {show.detail}"]
             else:
                 switched = setmod.switched_team(show, None if isinstance(tools, HTTPException) else tools)
+                rule = ((got.get("teams") or {}).get(team) or {}).get("schedule")
+                switched["schedule"] = setmod.switched_schedule(rule, switched)
         # the tabs' cannot-run dots (§4.9d *The page*), the cheap read `ao org` makes; one unread draws no dot
         shows = await asyncio.gather(*(read("team_show", team=x, entries=False) for x in held))
         dots = {
@@ -5859,7 +5861,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if "schedule" in body:
             rule = body.get("schedule")
             if rule is not None and not isinstance(rule, dict):
-                raise HTTPException(400, "schedule is {start: reset, profile, window}, or null for off")
+                raise HTTPException(400, "schedule is {start: reset, profile or login, window}, or null for off")
             change["schedule"] = rule
         flow = str(body.get("flow") or "") if "flow" in body else None
         if not change and flow is None:
