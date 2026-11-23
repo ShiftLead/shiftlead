@@ -22,6 +22,7 @@ from shiftlead.stage_fetch import (
     protected_at,
     rows_of,
     sessions_read,
+    team_flow,
 )
 from shiftlead.stage_read import EntryLedger
 
@@ -363,3 +364,44 @@ def test_only_a_snapshotted_node_counts_as_read(repo: Path) -> None:
     record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@down"}
     assert got.read_nodes == {"up"}
     assert facts_on(pass_read(repo, sessions=got.sessions, read_nodes=got.read_nodes), "TD-7", record) is None
+
+
+OLD_FLOW = "name: f\nstages:\n- name: Build\n"
+NEW_FLOW = "name: f\nstages:\n- name: Make\n"
+
+
+def test_a_passing_flow_runs_and_is_to_replace_the_copy_after_the_pass() -> None:
+    got = team_flow(NEW_FLOW, [], OLD_FLOW)
+    assert got is not None and got.doc["stages"][0]["name"] == "Make"
+    assert got.was is not None and got.was["stages"][0]["name"] == "Build"
+    assert got.put == NEW_FLOW and not got.problems
+
+
+def test_a_first_passing_flow_has_nothing_it_replaces() -> None:
+    got = team_flow(NEW_FLOW, [], None)
+    assert got is not None and got.was is None and got.put == NEW_FLOW
+
+
+def test_an_unchanged_flow_writes_nothing() -> None:
+    got = team_flow(OLD_FLOW, [], OLD_FLOW)
+    assert got is not None and got.was is None and got.put is None
+
+
+@pytest.mark.parametrize(
+    ("current", "problems", "told"),
+    [
+        (NEW_FLOW, ["a stage has no way out"], ("a stage has no way out",)),
+        (None, [], ("the flow could not be read",)),
+        ("a: [", [], ("the flow could not be read",)),
+        ("- a list", [], ("the flow could not be read",)),
+    ],
+)
+def test_a_flow_that_fails_keeps_the_last_good_copy(current: str | None, problems: list[str], told: tuple) -> None:
+    got = team_flow(current, problems, OLD_FLOW)
+    assert got is not None and got.doc["stages"][0]["name"] == "Build"
+    assert got.put is None and got.was is None and got.problems == told
+
+
+@pytest.mark.parametrize("kept", [None, "", "a: ["])
+def test_no_passing_flow_and_no_good_copy_is_no_reading(kept: str | None) -> None:
+    assert team_flow(NEW_FLOW, ["broken"], kept) is None
