@@ -40,6 +40,7 @@ from sessionorc.agent_common import (
     read_checkout,
     stat_dir,
 )
+from sessionorc.agent_stage import stage_calls
 from sessionorc.gitinfo import branch_exists
 from sessionorc.models import (
     NotTheSameSession,
@@ -267,7 +268,8 @@ class LinkMixin:
         a checkout's own files read here (a team's brief on a machine node, TD-057 step 4b.3); and
         `repos`, this node's registry (the home's `host_repos`, §4.9, TD-229); `shot`, one look's screenshot
         from it (the home's `host_shot`, TD-300); `branch`, whether a checkout here has a local branch
-        (the home's `host_branch`, Add entry's name test, TD-1064). Beside them what the
+        (the home's `host_branch`, Add entry's name test, TD-1064); `stage_worktree`, a stage session's
+        branch, heads and origin (the home's `stage_end`, TD-2085). Beside them what the
         home hands down: `read`, `intent`, `settings`, `usage` and `usage_reading`."""
         if method == "ping":
             return "pong"
@@ -320,6 +322,12 @@ class LinkMixin:
         if method == "branch":  # the home's `host_branch` (§4.4a, TD-1064)
             d, name = (str(params.get(k) or "") for k in ("dir", "name"))
             return {"exists": await asyncio.to_thread(branch_exists, d, name)}
+        if method == "stage_worktree":  # a stage session's worktree here, for the home's `stage_end` (§4.4a, TD-2085)
+            try:
+                reading = stage_calls().worktree_reading
+            except RpcError as e:
+                raise link.LinkError(str(e)) from None
+            return await asyncio.to_thread(reading, str(params.get("dir") or ""))
         raise link.LinkError(f"unknown link method {method!r}")
 
     async def _take_settings(self, doc: Any) -> None:

@@ -7,10 +7,12 @@ session holds, a thread for the blocking work, and the claim released once the m
 from __future__ import annotations
 
 import asyncio
+import time
 from importlib.metadata import entry_points
 from typing import Any
 
-from sessionorc.agent_common import RpcError, log
+from sessionorc.agent_common import ACT_TIMEOUT, RpcError, log
+from sessionorc.agent_ids import origin_key
 from sessionorc.models import lane_refs
 
 GROUP = "shiftlead.home_calls"
@@ -50,25 +52,43 @@ class StageMixin:
         s = self._find(id)  # type: ignore[attr-defined]
         if not self._is_self(s, caller):  # type: ignore[attr-defined]
             raise RpcError("this entry is not yours: a stage is ended by the session that holds it")
-        if s.host != self.host:  # type: ignore[attr-defined]
-            raise RpcError(f"{s.id} runs on {s.host}: the home cannot read that worktree yet, so its stage cannot end")
         tid = self._stage_entry(s)
         calls = stage_calls()
+        root, seen = await self._stage_place(s)
+        address = self._address(s)  # type: ignore[attr-defined]
         got = await asyncio.to_thread(
             calls.call,
-            root=s.repo or s.dir,
+            root=root,
             directory=s.dir,
             team=s.team,
             tid=tid,
-            caller=s.id,
+            caller=address,
             outcome=outcome,
             reason=reason,
+            seen=seen,
         )
         if "refused" in got:
             raise RpcError(str(got["refused"]))
         if any(e.ref == tid and e.status == "claimed" for e in s.progress):
-            await self.rpc_progress(s.id, ref=tid, status="done", caller=caller)  # type: ignore[attr-defined]
+            await self.rpc_progress(address, ref=tid, status="done", caller=caller)  # type: ignore[attr-defined]
         return got
+
+    async def _stage_place(self, s: Any) -> tuple[str, dict[str, Any] | None]:
+        """`(the home's checkout of s's repo, s's worktree as its node read it)`; for a session here, its own repo and
+        None. A node's paths mean nothing here, so its repo is found by origin among the home's registered checkouts."""
+        if s.host == self.host:  # type: ignore[attr-defined]
+            return s.repo or s.dir, None
+        seen = await self._ask_node(s.host, "stage_worktree", dir=s.dir)  # type: ignore[attr-defined]
+        if not isinstance(seen, dict):
+            raise RpcError(f"{s.host} answered with no reading of {s.dir}")
+        if "refused" in seen:
+            raise RpcError(f"{s.host}: {seen['refused']}")
+        if not seen.get("origin"):
+            raise RpcError(f"{s.dir} on {s.host} has no origin remote: the home cannot find its repo")
+        root, _key, _name = await self._ids_repo(  # type: ignore[attr-defined]
+            origin_key(str(seen["origin"])), time.monotonic() + ACT_TIMEOUT
+        )
+        return root, seen
 
     async def rpc_stage_show(
         self, id: str | None = None, entry: str | None = None, repo: str | None = None
@@ -77,7 +97,8 @@ class StageMixin:
         there is no session: it names the entry, and `repo` is the registered checkout it was run in (§4.7)."""
         if id:
             s = self._find(id)  # type: ignore[attr-defined]
-            tid, root = entry or self._stage_entry(s), s.repo or s.dir
+            tid = entry or self._stage_entry(s)
+            root, _seen = await self._stage_place(s)
         else:
             from sessionorc.agent import _registered_checkout  # the agent imports this mixin
 
