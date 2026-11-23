@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from sessionorc.models import Session
-from shiftlead import stage_fetch
+from shiftlead import stage_fetch, stage_work
 from shiftlead.stage_fetch import (
     EntryOn,
     RepoFacts,
@@ -20,6 +20,7 @@ from shiftlead.stage_fetch import (
     files_at,
     ledger_read,
     protected_at,
+    rows_of,
 )
 from shiftlead.stage_read import EntryLedger
 
@@ -302,3 +303,36 @@ def test_no_files_are_asked_of_the_forge_where_they_decide_nothing(
     record = {"tid": "TD-7", "stage": stage, "flow": "f", "pr": 5}
     got = facts_on(pass_read(repo, rows=rows, protected=protected), "TD-7", record)
     assert got is not None and got.read_at is None and got.files is None
+
+
+def no_read(n: int) -> None:
+    pytest.fail(f"read #{n} by its number")
+
+
+def test_an_open_rows_marks_survive_its_copy_in_the_recent_read() -> None:
+    opened = {"number": 5, "state": "open", "fork": True, "filing": False, "filing_head": "a", "head": "a"}
+    recent = {"number": 5, "state": "open", "head": "a"}
+    assert rows_of({"open": [opened], "recent": [recent]}, [5], no_read) == (opened,)
+
+
+def test_a_merge_in_the_later_read_hides_the_stale_open_row() -> None:
+    opened = {"number": 5, "state": "open", "head": "a"}
+    merged = {"number": 5, "state": "merged", "head": "a"}
+    assert rows_of({"open": [opened], "recent": [merged]}, [5], no_read) == (merged,)
+
+
+def test_a_pull_request_opened_between_the_reads_is_kept_and_unread_as_filing() -> None:
+    recent = {"number": 6, "state": "open", "branch": "td7-a", "head": "b"}
+    got = rows_of({"open": [], "recent": [recent]}, [], no_read)
+    assert got == (recent,)
+    assert stage_work.entry_work("TD-7", got).state == "unread"
+
+
+def test_a_record_pull_request_outside_the_reads_is_read_by_number() -> None:
+    row = {"number": 9, "state": "merged"}
+    assert rows_of({"open": [], "recent": []}, [9], lambda n: row if n == 9 else None) == (row,)
+
+
+@pytest.mark.parametrize("prs", [None, {"error": "gh failed", "open": [{"number": 5, "state": "open"}]}])
+def test_a_failed_reading_is_no_rows(prs: dict | None) -> None:
+    assert rows_of(prs, [5], no_read) is None
