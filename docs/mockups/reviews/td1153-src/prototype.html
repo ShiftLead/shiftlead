@@ -135,7 +135,7 @@ p.lead { margin:0 0 12px; color:var(--soft); max-width:70ch; font-size:15px; }
 <script>
 const KC = { design: "--design", build: "--build", review: "--review" };
 const S = (name, does, model, x) => Object.assign({ name, does, model, key: name.toLowerCase().replace(/ /g, "-") }, x || {});
-const SEATS = [["tech-lead", "Tech lead", "answers sessions' questions, tags new entries", "each team"], ["manager", "Manager", "watches a team's sessions and nudges stuck ones", "each team"], ["board-answers", "Board answers", "carries out what you decided on the board", "the repo"], ["unheld-pull-requests", "Pull requests nobody holds", "cures a red or orphaned pull request", "the repo"], ["sweeper", "Sweeper", "the periodic sweep for stranded work", "the repo"]];
+const SEATS = [["tech-lead", "Tech lead", "answers sessions' questions, tags new entries", "each team"], ["prompts", "Prompts", "answers a session's permission prompt where there is no director", "the repo"], ["board-answers", "Board answers", "carries out what you decided on the board", "the repo"], ["unheld-pull-requests", "Pull requests nobody holds", "cures a red or orphaned pull request", "the repo"], ["sweeper", "Sweeper", "the periodic sweep for stranded work", "the repo"]];
 const MODELS = ["haiku", "sonnet", "opus", "fable", "flash", "flash-lite", "grok-4"];
 const FLOWS = {
   td: { about: "design with two reads and a fact-check; build, review, a protected read", stages: [S("Design", "design", "fable"), S("Sonnet read", "review", "sonnet"), S("Opus read", "review", "opus"), S("Fact-check", "review", "haiku"), S("Build", "build", "opus"), S("Review", "review", "sonnet"), S("Protected read", "review", "fable", { only: true })],
@@ -153,7 +153,7 @@ const LOGINS = {
   "grok-reader": { tool: "Grok Build", acct: "SuperGrok · paul", models: ["grok-4"], state: "ok", used: 3, keep: 10, note: "week 3% used" },
 };
 const DEF = { page: "teams", set: "default", repoSet: { shiftlead: "default", samscrape: "default" },
-  sets: { default: { label: "", models: { "tech-lead": "opus", manager: "haiku", "board-answers": "sonnet", "unheld-pull-requests": "sonnet", sweeper: "haiku" }, logins: ["claude-paul", "claude-api"] } },
+  sets: { default: { label: "", models: { "tech-lead": "opus", prompts: "haiku", "board-answers": "sonnet", "unheld-pull-requests": "sonnet", sweeper: "haiku" }, logins: ["claude-paul", "claude-api"] } },
   team: "ao-grind", pending: null, teams: {
   "ao-grind": { repo: "shiftlead", host: "kmaster", running: true, flow: "td", logins: ["claude-heather", "claude-paul", "claude-api"], caps: { build: 2 }, total: 0,
     work: [["TD-2090", "design", "14m"], ["TD-2077", "fact-check", "3m"], ["TD-2101", "build", "41m"], ["TD-2104", "build", "6m"], ["TD-2098", "review", "9m"], ["TD-2084", "you", "review", "2h"], ["TD-2071", "you", "design", "1d"]],
@@ -193,7 +193,7 @@ function drawSets() {
 }
 function draw() {
   document.getElementById("nav-teams").className = D.page === "teams" ? "on" : ""; document.getElementById("nav-builtins").className = D.page === "builtins" ? "on" : "";
-  document.getElementById("railnote").textContent = D.page === "builtins" ? "The tech lead, manager, board answers, unheld pull requests and the sweeper are set here once, not in a flow or a team." : "A team is a repo, a flow and a list of logins. Its sessions are started for one entry in one stage and end with it, so a team has no members to name.";
+  document.getElementById("railnote").textContent = D.page === "builtins" ? "The tech lead, prompts seat, board answers, unheld pull requests and the sweeper are set here once, not in a flow or a team." : "A team is a repo, a flow and a list of logins. Its sessions are started for one entry in one stage and end with it, so a team has no members to name.";
   if (D.page === "builtins") return drawSets();
   const t = T(), f = FLOWS[t.flow], busy = t.work.filter(w => w[1] !== "you").length;
   let h = `<div class="teams">` + Object.entries(D.teams).map(([n, x]) => `<a class="${n === D.team ? "on" : ""}" data-team="${n}">${n}${cannot(x, x.flow) ? " <i>●</i>" : ""}</a>`).join("") + `<button class="quiet" data-act="new">+ New team</button></div>`;

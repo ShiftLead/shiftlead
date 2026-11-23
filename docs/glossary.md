@@ -58,7 +58,12 @@ not mix:
   to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it has acted;
   the lifecycle jobs are the host agent's tick (§6 rules 1–12). A **standing** manager is the
   other shape, rounding on `ao wait`, asked for with `on_call: false`; on call is the default from the
-  build (Paul, 2026-10-01).
+  build (Paul, 2026-10-01). **After the cut-over there is no manager** (design §4.9d *How each one
+  runs*, TD-1976): a lost or silent session is the home's to notice, a question the techlead's, and a
+  permission prompt the director's or the **prompts seat**'s — a built-in seat, one per repo, written only
+  where the org has no director. A **job** is what the two built-in seats *board answers* and *pull requests
+  nobody holds* run: one decided board line or one pull request, with a record and a holder as an entry in a
+  stage has.
 - **techlead** — the technical go-between of TD-075: a session that answers technical
   questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
   optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
@@ -110,7 +115,7 @@ not mix:
   (ADR 2026-09-13); a heading on repos **decided** 2026-10-15 (Paul, TD-722).
 - **flow** — the path a ledger entry takes from filed to done, written as records: a list of **stages**, a
   list of **audits**, in one file a check must pass (design §4.9c,
-  TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `td`, `build-review`,
+  TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `design-wise` (the first shape's `td`), `build-review`,
   `build`. *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; TD-307), reshaped 2026-11-21 (TD-1954).
 - **stage** — one step of a flow: one kind of work (`design`, `build` or `review`) on one model, done by a
   fresh session each time an entry enters it, and ended by one of the kind's **outcomes**. An entry is in one
@@ -194,7 +199,8 @@ not mix:
   nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial; a second, on a
   Grok Build profile, is a trial of its own beside it. — *proposed* 2026-10-29 (design §4.9b *The
   fact-check*, TD-857; the second seat *A second model on trial*, TD-1550).
-- **builder** — a role: the session of a build stage, which takes one entry and ends the stage with an outcome (design §4.9c, §4.8). **grinder** is its name until the cut-over: a role that resolves each entry it picks from its lane to a merged PR. — *proposed*; renamed 2026-11-21 (TD-1954).
+- **builder** — a role: the session of a build stage, which takes one entry and ends the stage with an outcome (design §4.9c, §4.8). **grinder** is its name until the removal build that follows the cut-over: a role that resolves each entry it picks from its lane to a merged PR. — *proposed*; renamed 2026-11-21 (TD-1954).
+- **cut-over** — the moment the switch-over window writes its marker `cut_over` in `settings.yml`; before it the first shape is what runs, after it logins, format-3 flows and teams as settings are (design §4.9e). **The window** is the one run of `ao switch-over move` on a home, with every team stopped; **the removal build** (TD-2056) takes the first shape's code out afterwards.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
 - **brief** — the job description a session is started with, written from its role's template. The template holds shiftlead's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.

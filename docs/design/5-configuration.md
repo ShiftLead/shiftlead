@@ -102,11 +102,11 @@ reach:                                        # §4.5b *The setting*: the person
   `flow` names the one format-3 flow the team runs, by its name (§4.9c has no flow id); `schedule` names a
   `login:` of the list, as `<tool>:<name>`, where it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size`, `max` and `on_work` go (a started team takes
   work as it appears, §4.9d *When it runs*).
-  **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `manager`,
+  **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `prompts`,
   `board-answers`, `unheld-pull-requests`, `sweeper`) and `logins` in order — and `repos.<repo>.builtins` names the
   set a repo uses, `default` where absent; `builtins.default` always exists (§4.9d *The built-in seats and
-  their page*). They are written by the Built-in seats page's own calls and, for `builtins.default`, by the cut-over's move; absent, `default` reads as the package's models and an empty list. `cut_over: <date>`, at the top of the file, is written once by the cut-over
-  (TD-2056) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
+  their page*). They are written by the Built-in seats page's own calls and, for `builtins.default`, by the window's move (§4.9e); absent, `default` reads as the package's models and an empty list. `cut_over: <date>`, at the top of the file, is written once by the window
+  (§4.9e) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
   repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a built-in seat that runs
   on the model and a login of the built-in set its repo uses. Whether a team is
   started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped and a
@@ -460,7 +460,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
-  exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent:
+  exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent (after the cut-over the host agent reads its `director:` and `projects:` alone, and `director:` holds `model` and `logins` in place of `profile`, §4.9d *How each one runs*, §4.9e):
 
 ```yaml
 projects:                                    # §4.9: headings on repos (TD-722); a repo in at most one, a repo in none its own heading

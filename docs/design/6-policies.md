@@ -107,7 +107,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   refused, not queued, looked at again on the next tick; the nudge and the seat close run at the
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
-  1. **Crash restart.** (Never a session started for a stage or an audit of a format-3 flow, TD-1954: one that
+  1. **Crash restart.** (Never a session whose record is marked `moving`, §4.9e *A session moves down the list*. Never a session started for a stage or an audit of a format-3 flow, TD-1954: one that
      exits is offered again by §4.9c *The home acts only where no session will*, and a clean exit after `ao stage
      end` is no crash.) A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
      an unanswered ask addressed to it, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
@@ -141,8 +141,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      says what it was trying. **A lost brief** (§4.1 *A launch whose hook never comes is recovered*, TD-717): a supervised record marked *no hook since launch*, a seat included, is closed by the tick and replayed once on the next tick with `why: lost-brief`, counted in `RESTART_CEILING` and not in the fill ceiling, a seat's replay repeating its fill's context; a record that came from such a replay and loses its brief again is not replayed and is the person's (*Inbox row: restart*, *brief lost twice*). At the ceiling the policy stops, writes `restart_ceiling: {at, count}`
      on the record, and the session is a person's: the card's slot says *restarts exhausted · 3 in
      2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it under *Needs you* (§4.5a **Inbox
-     row: restart**). The host agent writes no board line, with one exception, the plain line that tells the person an
-     audit's run ended as `other` (§4.9c *Audits start on a clock*, TD-1954) (§4.4's write-back acts at a person's
+     row: restart**). The host agent writes no board line, with two exceptions, the plain line that tells the person an
+     audit's run ended as `other` (§4.9c *Audits start on a clock*, TD-1954) and the one that brings a job to the person (§4.9d *How each one runs*, TD-1976) (§4.4's write-back acts at a person's
      press and never on a session's behalf); the Inbox row is the person's channel, and a manager
      reads the field.
   2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`, or
@@ -228,7 +228,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      words**: *its restart row's Restart, or `ao restart <id>`* is what it writes beside a member it
      puts on the board, and the press is the person's. Restart, not *Resume with changes…*, is a
      supervised member's way back into its team's run (§4.9a *One member back, today*).
-  3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
+  3. **Seats.** (After the cut-over this rule fills three built-in seats and the director alone, their records written by the home, no manager among them, and `TECHLEAD_FILL_CEILING` (25) bounding a tech lead's fills where `FILL_CEILING` (six) bounds the others': §4.9d *How each one runs*, §4.9e *What decides which shape runs*.) `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b) — each member of a pool as a seat of its own, its `seat`
      also carrying `pool` and `rank` (§4.9b *A seat as an ordered pool*, TD-1476), so this rule fills a member
      only when mail waits on it — and the tick computes **`seat_due: {at,
@@ -2817,7 +2817,7 @@ teams:
   it has been so for `max_age`, since a session at work reports the new window within a minute. A
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
-  **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is TD-1976's) the gate
+  **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is §4.9e's, TD-1976) the gate
   reads a session's login's account where it read its profile's, and **a session is held only when no
   login in its team's list, or for a built-in seat its repo's built-in set's, is usable for its model**: one whose login reaches its line is moved to the
   next usable login of the list first, and pauses, as above, only where there is none.

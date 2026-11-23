@@ -44,6 +44,7 @@ grep the directory, read a section by its file.
 - **§4.9b** [The techlead: a go-between for what would reach the person (TD-075)](design/4.9b-techlead.md) — the techlead seat: what it reads, what it answers, and what still reaches the person.
 - **§4.9c** [Flows: the path an entry takes through a team](design/4.9c-flows.md) — the path an entry takes through a team: flows, stages, `held:` and the review.
 - **§4.9d** [Teams: the flow a team runs, its logins and when it runs](design/4.9d-teams.md) — the team page (designed, TD-1153): a team as a repo, a flow and a list of logins; sessions at once, a flow switch, the settings area.
+- **§4.9e** [The switch-over: one window from profiles and members to logins and flows](design/4.9e-switch-over.md) — the switch-over (designed, TD-1976): three commands and an answers file, the window's steps, work in flight, going back, and the launch on a login.
 - **§4.10** [Messages between sessions](design/4.10-messages.md) — mail between sessions and to the person: kinds, bounds, outcomes, threads, looks.
 - **§5** [Configuration](design/5-configuration.md) — the settings file, the repo's `.shiftlead.yml`, and where each setting lives.
 - **§6** [Policies (the tdgrind supervisor, generalized)](design/6-policies.md) — the tick's policies: usage gates, run windows, restarts, promote, balance.
