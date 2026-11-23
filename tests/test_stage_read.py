@@ -27,6 +27,7 @@ from shiftlead.stage_read import (
     pickable_on,
     reading_on,
     renumbered_on,
+    rows_for,
     team_moved_on,
 )
 
@@ -564,3 +565,23 @@ def test_an_entry_with_no_record_reads_its_work_and_pickable():
     row = {"number": 8, "state": "open", "branch": "td9-x", "head": "h", "filing_head": "h", "filing": False}
     got = reading_on(None, facts(rows=(row,), held={8}, entry=open_entry()))
     assert got.work.state == "wait" and got.pickable is True
+
+
+# -- the rows the forge reading is given -----------------------------------------------------------------------------
+
+
+def test_the_later_read_comes_first_so_a_stale_open_row_never_hides_a_merge():
+    rows = rows_for([[pr_row(4, "merged")], [pr_row(4), pr_row(5)]], [4], lambda n: pytest.fail(f"read {n}"))
+    assert [(r["number"], r["state"]) for r in rows] == [(4, "merged"), (5, "open")]
+    assert forge_on("TD-7", 4, rows) == EntryForge("merged", None)
+
+
+def test_a_record_s_pull_request_outside_the_rows_is_read_by_its_number():
+    asked = []
+    rows = rows_for([[pr_row(5)]], [4, 4, 5], lambda n: asked.append(n) or pr_row(n, "merged"))
+    assert asked == [4]
+    assert forge_on("TD-7", 4, rows) == EntryForge("merged", None)
+
+
+def test_a_pull_request_that_cannot_be_read_is_no_reading_of_its_entry():
+    assert forge_on("TD-7", 4, rows_for([[pr_row(5)]], [4], lambda _n: None)) is None

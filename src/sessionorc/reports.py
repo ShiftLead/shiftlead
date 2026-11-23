@@ -1083,6 +1083,39 @@ def _gitlab_reading(directory: Path | str, where: str, now: datetime, timeout: f
     return {"open": open_, "forge": "gitlab", "unread": GITLAB_UNREAD, "at": now.isoformat()}
 
 
+def pr_state_row(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, Any] | None:
+    """One pull request's row by its number, whatever its state, on GitHub or GitLab (design §4.9c, TD-2051): `number`,
+    `title`, `state` (`open`, `merged` or `closed`) and an open one's `head`. The repo's rows hold only a window of the
+    closed ones, and GitLab's only the open ones. None: it could not be read, or is in a state with no such word (a
+    GitLab merge request `locked` while it merges)."""
+    forge, where = forge_of(git_origin(directory))
+    if forge == "github":
+        try:
+            cp = subprocess.run(
+                ["gh", "pr", "view", str(pr), "--json", "number,title,state,headRefOid"],
+                capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+            )  # fmt: skip
+            got = json.loads(cp.stdout or "null") if cp.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            return None
+        number, head = "number", "headRefOid"
+    elif forge == "gitlab":
+        host, _, path = where.partition("/")
+        got, why = _glab_api(directory, host, f"projects/{quote(path, safe='')}/merge_requests/{int(pr)}", timeout)
+        if why is not None:
+            return None
+        number, head = "iid", "sha"
+    else:
+        return None
+    if not isinstance(got, dict) or got.get(number) != pr:
+        return None
+    state = {"opened": "open"}.get(str(got.get("state")).lower(), str(got.get("state")).lower())
+    if state not in ("open", "merged", "closed"):
+        return None
+    row = {"number": pr, "title": str(got.get("title") or ""), "state": state}
+    return {**row, "head": str(got.get(head) or "")} if state == "open" else row
+
+
 def pr_reading(
     directory: Path | str,
     now: datetime,
