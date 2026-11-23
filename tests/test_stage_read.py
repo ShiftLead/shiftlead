@@ -12,6 +12,7 @@ from sessionorc.models import Pending, ProgressEntry, Session
 from shiftlead.stage_acts import Holder
 from shiftlead.stage_read import (
     EntryAnswer,
+    EntryFacts,
     EntryFlow,
     EntryForge,
     EntryLedger,
@@ -24,6 +25,7 @@ from shiftlead.stage_read import (
     ledger_on,
     nothing_to_read_on,
     pickable_on,
+    reading_on,
     renumbered_on,
     team_moved_on,
 )
@@ -493,3 +495,72 @@ def test_an_ended_session_and_a_closed_pull_request_hold_nothing():
     claim = ProgressEntry(ref="pr:1", status="claimed")
     assert held_on([{"number": 1, "state": "open"}], [live_record(state="exited", progress=[claim])]) == frozenset()
     assert held_on([{"number": 1, "state": "closed"}], [live_record(progress=[claim])]) == frozenset()
+
+
+READ_AT = datetime(2026, 11, 23, 12, tzinfo=UTC)
+ONE_STAGE = {"name": "f", "stages": [{"name": "build", "does": "build"}]}
+LIVE = {"stage": "build", "flow": "f", "team": "t", "pr": 7, "holder": "s1"}
+
+
+def facts(**over) -> EntryFacts:
+    base = {
+        "tid": "TD-9",
+        "person": "paul",
+        "team": "t",
+        "now": READ_AT,
+        "doc": ONE_STAGE,
+        "ledger": EntryLedger("open"),
+    }
+    return EntryFacts(**{"text": entry(), **base, **over})
+
+
+def test_a_renumbered_entry_reads_only_its_new_id():
+    got = reading_on(LIVE, facts(ledger=None, renumbered_to="TD-10", merge_running=True))
+    assert (got.renumbered_to, got.merge_running) == ("TD-10", True)
+
+
+def test_an_entry_in_neither_file_is_no_reading():
+    assert reading_on(LIVE, facts(ledger=None)) is None
+
+
+def test_an_archived_entry_needs_no_forge_row():
+    assert reading_on(LIVE, facts(ledger=EntryLedger("archived"), rows=())).entry == "archived"
+
+
+@pytest.mark.parametrize("text", [None, "not an entry"])
+def test_a_missing_or_unreadable_text_is_no_reading(text):
+    assert reading_on(LIVE, facts(text=text, rows=({"number": 7, "state": "open"},))) is None
+
+
+def test_a_record_whose_pull_request_the_rows_lack_is_no_reading():
+    assert reading_on(LIVE, facts(rows=())) is None
+
+
+def test_a_live_record_reads_its_pull_request_flow_and_holder():
+    rows = ({"number": 7, "state": "open", "head": "abc"},)
+    got = reading_on(LIVE, facts(rows=rows, session=None, named="other", teams=("t", "other")))
+    assert (got.pr_state, got.head, got.team_moved, got.stage_known, got.flow_current) == (
+        "open",
+        "abc",
+        True,
+        True,
+        True,
+    )
+    assert got.holder == Holder(ended=True)
+
+
+def test_a_record_with_no_holder_reads_none():
+    rows = ({"number": 7, "state": "open", "head": "abc"},)
+    assert reading_on({**LIVE, "holder": None}, facts(rows=rows)).holder is None
+
+
+def test_a_closed_record_does_not_ask_the_forge_for_its_old_pull_request():
+    closed = {**LIVE, "closed_at": "2026-11-20T00:00:00Z", "holder": None}
+    got = reading_on(closed, facts(rows=()))
+    assert got is not None and got.pr_state is None
+
+
+def test_an_entry_with_no_record_reads_its_work_and_pickable():
+    row = {"number": 8, "state": "open", "branch": "td9-x", "head": "h", "filing_head": "h", "filing": False}
+    got = reading_on(None, facts(rows=(row,), held={8}, entry=open_entry()))
+    assert got.work.state == "wait" and got.pickable is True

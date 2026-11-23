@@ -23,14 +23,17 @@ entry's `Team:` line now names another team, and `carried_on` whether the work a
 a review, so only a whole reading of its files at its current head that touches no protected file says so.
 
 `pickable_on` reads whether an entry with no record may be offered (§4.9c *Ways in*), and `held_on` which open pull
-requests a live session holds, the `held` that `stage_work.entry_work` is given. The tick's wiring calls all eleven;
-none writes anything.
+requests a live session holds, the `held` that `stage_work.entry_work` is given.
+
+`reading_on` puts them together into the one `Reading` of an entry, from what the tick's wiring has fetched, or None
+where any part is no reading of it this pass. None of these writes anything.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Collection, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, NamedTuple
@@ -40,7 +43,8 @@ from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, suba
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
 from shiftlead.flow3 import key_of
-from shiftlead.stage_acts import Holder
+from shiftlead.stage_acts import Holder, Reading
+from shiftlead.stage_work import EntryWork, entry_work
 
 _ASKED = re.compile(r"asked by the stage record: (\S+)")
 _ENTRY_FILE = re.compile(r"(TD-\d+)\.md")
@@ -284,4 +288,92 @@ def holder_on(s: Session | None, tid: str, now: datetime, *, open_ask: bool = Fa
         idle_for=_idle_for(s, now),
         waiting=open_ask or busy or any(p.kind != "permission" for p in open_prompts),
         permission=permission,
+    )
+
+
+@dataclass(frozen=True)
+class EntryFacts:
+    """What the tick's wiring fetched for one entry.
+
+    `ledger` is `ledger_on`'s answer and `renumbered_to` `renumbered_on`'s. `text` is the entry's own file, `entry` its
+    row in the repo's reading, `named` its `Team:` line and `teams` the repo's teams. `doc` is the team's copy of the
+    flow and `was` the flow the record was written under. `rows` are the repo's pull requests, `held` is `held_on`'s
+    answer and `session` the holder's record. `may_start` and `within_size` are TD-2065's.
+    """
+
+    tid: str
+    person: str
+    team: str
+    now: datetime
+    doc: Mapping[str, Any]
+    ledger: EntryLedger | None = None
+    renumbered_to: str | None = None
+    text: str | None = None
+    entry: dict[str, Any] | None = None
+    named: str | None = None
+    teams: Collection[str] = ()
+    rows: tuple[Mapping[str, Any], ...] = ()
+    held: Collection[int] = ()
+    branches: Collection[str] = ()
+    was: Mapping[str, Any] | None = None
+    session: Session | None = None
+    open_ask: bool = False
+    read_at: str | None = None
+    files: Collection[str] | None = None
+    protected: Collection[str] | None = None
+    merge_running: bool = False
+    may_start: bool = False
+    within_size: bool = False
+
+
+def reading_on(record: Mapping[str, Any] | None, f: EntryFacts) -> Reading | None:
+    """The `Reading` of `f.tid` for `stage_acts.choose`. None: the entry is in neither file and was not renumbered, its
+    text is missing or unreadable, or the rows do not hold the record's pull request, so the caller acts on nothing this
+    pass. A closed record is read as no record is: what it once named is not asked of the forge."""
+    if f.renumbered_to:
+        return Reading(renumbered_to=f.renumbered_to, merge_running=f.merge_running)
+    if f.ledger is None:
+        return None
+    if f.ledger.entry == "archived":
+        return Reading(entry="archived", merge_running=f.merge_running)
+    if f.text is None:
+        return None
+    try:
+        answer = answer_on(f.text, f.person)
+    except ledgerboard.Refused:
+        return None
+    live = record if record is not None and not record.get("closed_at") else None
+    forge = forge_on(f.tid, live.get("pr") if live else None, f.rows)
+    if forge is None:
+        return None
+    common = {
+        "design": f.ledger.design,
+        "open_parts": f.ledger.open_parts,
+        "had_parts": f.ledger.had_parts,
+        "archive_open": forge.archive_open,
+        "merge_running": f.merge_running,
+        "gate": answer.gate,
+        "lifted": answer.lifted,
+        "lifted_for": answer.lifted_for,
+        "may_start": f.may_start,
+        "within_size": f.within_size,
+    }
+    if live is None:
+        return Reading(
+            pickable=f.entry is not None and pickable_on(f.entry, f.team),
+            work=entry_work(f.tid, f.rows, held=f.held),
+            carried_open=record is not None and carried_on(record, f.text, f.rows, f.branches),
+            **common,
+        )
+    flow = flow_on(live, f.doc, f.was)
+    return Reading(
+        pr_state=forge.pr_state,
+        head=forge.head,
+        team_moved=team_moved_on(live.get("team"), f.named, f.teams),
+        stage_known=flow.stage_known,
+        flow_current=flow.flow_current,
+        nothing_to_read=nothing_to_read_on(live, f.doc, forge.head, f.read_at, f.files, f.protected),
+        holder=holder_on(f.session, f.tid, f.now, open_ask=f.open_ask) if live.get("holder") else None,
+        work=EntryWork("none"),
+        **common,
     )
