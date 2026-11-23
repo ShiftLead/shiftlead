@@ -1424,6 +1424,74 @@ def test_the_switched_team_page_draws_from_team_show_and_a_press_is_team_set(wor
     assert sent == {"team": "solo", "at_once": {"gone": None}, "version": "v1"}
 
 
+def test_a_switched_teams_page_draws_its_running_rows_and_saves_them(world, client, monkeypatch):
+    """§4.9d *When it runs* (TD-2091): no *When work appears*, no reader's-queue line, no *after the switch-over*
+    in the band; each row saves through `set_settings`, for a team held only in `settings.yml`."""
+    _tmp_path, fleet = world
+    plain = fleet.handle
+
+    def handle(method, params):
+        if method == "settings":
+            teams = {"solo": {"reserve": 5, "balance": {"prs": 4, "review": True}}}
+            return {"teams": teams, "labels": {}, "switched_teams": {"solo": "shiftlead"}}
+        if method == "team_show":
+            return _switched_show()
+        if method == "tools":
+            return _switched_tools()
+        if method == "set_settings":
+            fleet.calls.append((method, params))
+            return {"teams": {}}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/solo").text
+    band = page.split('<div class="h2">When it runs</div>')[1]
+    for row in ("Stops", "Reserve priority", "Holds new work"):
+        assert row in band
+    assert "When work appears" not in band and "after the switch-over" not in band
+    assert "queue past its bound" not in band and "reader's queue" not in band and "no live member" not in band
+    assert client.post("/api/settings/teams", json={"team": "solo", "reserve": 7}).status_code == 200
+    assert next(p for m, p in fleet.calls if m == "set_settings") == {"teams": {"solo": {"reserve": 7}}}
+    assert client.post("/api/settings/teams", json={"team": "solo", "on_work": "ask"}).status_code == 400
+    assert client.post("/api/settings/teams", json={"team": "nobody", "reserve": 7}).status_code == 400
+
+
+def test_a_switched_teams_balance_reads_its_own_repo_with_no_live_session():
+    """§6 *Balance*, after the cut-over: the numbers are the `repo` key's, and the reader's-queue line is gone."""
+    prs = {"open": [{"created": "2026-01-01T00:00:00Z"}, {"created": "2026-01-02T00:00:00Z"}]}
+    readings = {"/r/mine": {"name": "mine", "prs": prs}, "/r/other": {"name": "other", "prs": {"open": [{}] * 9}}}
+    got = setmod.balance_card("solo", {"prs": 1, "review": True}, [], readings, root="/r/mine")
+    assert got["now"][0] == "open PRs: 2 (line 1) — over" and len(got["now"]) == 2
+    assert not got["review"] and "review" not in got["was"]
+    assert setmod.balance_card("solo", {"prs": 1}, [], readings, root="")["now"][0].startswith("open PRs: could not")
+    assert len(setmod.balance_card("solo", {"prs": 1}, [], readings)["now"]) == 3  # a first-shape team keeps its three
+
+
+def test_a_switched_team_that_cannot_run_has_a_dot_on_its_tab(world, client, monkeypatch):
+    """§4.9d *The page*: the dot is on the tab of the team that cannot run, read the cheap way, on any team's page."""
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    why = "solo cannot run build: no login in its list offers fable"
+    asked = []
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead", "duo": "shiftlead"}}
+        if method == "team_show":
+            asked.append(params)
+            return _switched_show(cannot_run=why if params["team"] == "solo" else None)
+        if method == "tools":
+            return _switched_tools()
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/duo").text
+    tabs = page.split('class="row wrap teamtabs"')[1].split("</div>")[0]
+    assert tabs.count('class="teamdot"') == 1 and f'title="{why}"' in tabs
+    assert tabs.index("teamdot") > tabs.index('href="/teams/solo"') and tabs.index("teamdot") < tabs.index(">solo<") + 1
+    assert {"team": "solo", "entries": False} in [{k: p.get(k) for k in ("team", "entries")} for p in asked]
+
+
 def test_a_team_held_only_in_settings_is_not_called_missing_while_the_agent_is_away(world, client, monkeypatch):
     _tmp_path, fleet = world
     plain = fleet.handle

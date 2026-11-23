@@ -1604,6 +1604,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .teamtabs { gap: 2px; border-bottom: 2px solid var(--fg); align-items: flex-end; }
 .teamtab { padding: 6px 14px; border-radius: 6px 6px 0 0; color: var(--muted); text-decoration: none; font-family: var(--mono, monospace); }
 .teamtab.on { background: var(--fg); color: var(--bg); }
+.teamdot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--scraped); }
 .teamstate { color: var(--muted); font-weight: 600; }
 .teamstate.running { color: var(--ok, #1f8a4c); }
 @media (max-width: 720px) {

@@ -343,6 +343,7 @@ def balance_card(
     sessions: list[dict[str, Any]] | None,
     repos: Mapping[str, Any] | None,
     host: Mapping[str, Any] | None = None,
+    root: str | None = None,
 ) -> dict[str, Any]:
     """**balance** on a team's card (§4.5a *Settings page: Teams*, §6 *Balance*, TD-239): the switch,
     the three fields as `settings.yml` holds them — a line not drawn is an empty field — and under
@@ -350,13 +351,15 @@ def balance_card(
     what it would have done today. `was` is the value as the form would send it, which is how the
     page tells a Save that moved it from one that did not. `mark` is the card's **over its line**
     note while the home's mark stands — from the `repos` reading and the home's `host` read, whose
-    `balance` carries a mark with no `repo` too (TD-330)."""
+    `balance` carries a mark with no `repo` too (TD-330). `root` is a switched team's repo (`""`, one with no
+    reading): its numbers are that repo's, and it has no reader's-queue line (§4.9d *Holds new work*)."""
     bal = {k: bal[k] for k in settings_mod.BALANCE_KEYS if k in bal} if isinstance(bal, Mapping) else {}
-    if not bal.get("review"):
+    if not bal.get("review") or root is not None:
         bal.pop("review", None)  # off is no key, as the file reads
     readings = {str(k): v for k, v in (repos or {}).items() if isinstance(v, dict)}
-    now = teamrun.balance_now(name, list(sessions or []), readings)
+    now = teamrun.balance_now(name, list(sessions or []), readings, root=root)
     mark = teamrun.balance_marks(readings, dict(host or {})).get(name) if bal else None
+    rows = [line.strip() for line in teamrun.balance_rows(bal, now)]
     return {
         "on": bool(bal),
         "prs": str(bal.get("prs") or ""),
@@ -364,7 +367,7 @@ def balance_card(
         "review": bool(bal.get("review")),
         "was": json.dumps(bal or None, separators=(",", ":")),
         "live": bool(now["members"]),
-        "now": [line.strip() for line in teamrun.balance_rows(bal, now)],
+        "now": rows[:2] if root is not None else rows,
         "mark": teamrun.balance_note(mark) if mark else "",
     }
 
@@ -380,6 +383,7 @@ def team_cards(
     profiles: Mapping[str, Any] | None = None,
     default: str = "",
     labels: Mapping[str, Any] | None = None,
+    roots: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
     moves — the schedule (`schedule_card`, from `profiles.yml`'s `profiles` and `default` and the
@@ -389,7 +393,8 @@ def team_cards(
     reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
     value, `start` while the key is absent (`ON_WORK_DEFAULT`, TD-457), which `on_work_set` tells apart
     (*start the team* is then marked *default*). `flows` is each team's `teams.flow_rows`, for the
-    **flow** pick (§4.9c): the current one is `flow`, its strip `flow_strip`."""
+    **flow** pick (§4.9c): the current one is `flow`, its strip `flow_strip`. `roots` is each switched team's
+    repo root, which its balance numbers are read from (`balance_card`)."""
     now = now or datetime.now(UTC)
     out = []
     for name, d in defs.items():
@@ -407,7 +412,7 @@ def team_cards(
                 if t.get("on_work") in settings_mod.ON_WORK
                 else settings_mod.ON_WORK_DEFAULT,
                 "on_work_set": t.get("on_work") in settings_mod.ON_WORK,
-                "balance": balance_card(name, t.get("balance"), sessions, repos, host),
+                "balance": balance_card(name, t.get("balance"), sessions, repos, host, (roots or {}).get(name)),
                 "flows": (rows := list((flows or {}).get(name) or [])),
                 "flow": next((r["name"] for r in rows if r.get("current")), ""),
                 "flow_strip": next((r.get("strip") or "" for r in rows if r.get("current")), ""),
