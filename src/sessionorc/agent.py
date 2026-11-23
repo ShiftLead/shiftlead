@@ -4248,6 +4248,7 @@ class HostAgent(
         )
         if "refused" in got:
             raise RpcError(str(got["refused"]))
+        await self._rekey_teams(name, got.get("renames") or {})
         return got
 
     async def rpc_flows(self, caller: Any = None) -> dict[str, Any]:
