@@ -489,6 +489,10 @@ class TickMixin:
             self._prune_task = asyncio.create_task(
                 self._sweep(snapshot_at, live, live_ids, scratch, pruned_before, named)
             )
+        pressing = self._pressure_task is not None and not self._pressure_task.done()
+        if snapshot_at - self._pressure_at >= timedelta(seconds=scratch_mod.PRESSURE_EVERY) and not pressing:
+            self._pressure_at = snapshot_at
+            self._pressure_task = asyncio.create_task(self._pressure_pass(snapshot_at))
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -5654,6 +5658,57 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and the next pass tries again
             log.exception("the hourly sweep failed")
 
+    def _pressure_pool(self) -> str | None:
+        """The root a reclaim works in (§4.6 *The pressure pass*): `seat_root` where set, None while it has no reading
+        (never `scratch_root` in its place, which then holds the person's), else `scratch_root`."""
+        seat = self._seat_root()
+        if not seat:
+            return self._scratch_root()
+        return seat if scratch_mod.has_reading(seat) else None
+
+    def _pressure_read(self) -> tuple[str | None, float | None]:
+        pool = self._pressure_pool()
+        return pool, diskbook.share_free(pool) if pool else None
+
+    async def _pressure_pass(self, at: datetime) -> None:
+        """One reading of the pool's share free, off the loop, and a reclaim where it is low (§4.6 *The pressure
+        pass*, TD-2081); the records' snapshot is built here, on the loop. A detached task: a failure is logged."""
+        try:
+            pool, share = await asyncio.to_thread(self._pressure_read)
+            if pool is None or share is None or not self._pressure_backoff.due(share, time.time()):
+                return
+            named = _scratch_named(list(self.sessions.values()), self.host, at)
+            await asyncio.to_thread(self._reclaim, pool, share, named)
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
+            log.exception("the pressure pass failed")
+
+    def _reclaim(self, pool: str, start: float, named: dict[str, tuple[str, float | None]]) -> None:
+        """One reclaim, in a thread, under its own lock; its line in `disk.json`, weak passes folded."""
+        if not self._pressure_lock.acquire(blocking=False):
+            return
+        try:
+            ended = ("exited", "closed")
+
+            def live_now(path: str) -> bool:
+                return any(s.scratch == path and s.state not in ended for s in list(self.sessions.values()))
+
+            troots, blind = adapters.transcript_roots()
+            got = scratch_mod.reclaim(
+                pool,
+                paths.home(),
+                named,
+                live_now,
+                None if blind else troots,
+                lambda: diskbook.share_free(pool),
+                time.time(),
+                self._sweep_lock,
+            )
+            end = diskbook.share_free(pool)
+            weak = self._pressure_backoff.after(start, end, got["skipped"], time.time())
+            diskbook.note_pressure(paths.home(), self.host, got["removed"], weak, datetime.now(UTC))
+        finally:
+            self._pressure_lock.release()
+
     def _prune_runs(
         self,
         now: datetime,
@@ -5732,9 +5787,13 @@ class TickMixin:
         """This host's reading (§4.6 *The sweep's reading*, TD-1946): `disk.json`'s last pass, the 30-day totals and
         the free space under `scratch_root` and `seat_root` as it is now. Touches files: run off the loop."""
         free = diskbook.free_space(self._scratch_root())
-        return diskbook.read(
+        out = diskbook.read(
             paths.home(), self.host, self.started_at, datetime.now(UTC), free, seat_free=self._seat_free()
         )
+        pool = self._pressure_pool()  # §4.6 *The pressure pass*: a file system that gives no share free says so
+        if pool and diskbook.share_free(pool) is None:
+            out["no_pressure"] = pool
+        return out
 
     async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:
         """`ao disk` (§4.7, §4.6 *The sweep's reading*, TD-1946): a read, under no grant. With `host` naming another

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -21,6 +23,8 @@ WALK_S = 10.0  # one item's size walk at most, so a huge tree never spends a pas
 FILE = "disk.json"  # in the host's home (`SHIFTLEAD_HOME`)
 KEEP_DAYS = 30  # a pass's dated line is kept this long; the reading's `removed_30d` sums them
 LOW = 0.1  # under a tenth free, of bytes or of inodes, is drawn as a warning (§4.6 *The sweep's reading*)
+MOUNTINFO = "/proc/self/mountinfo"
+_WRITE = threading.Lock()  # the hourly pass and a reclaim each rewrite `disk.json` (§4.6 *The pressure pass*)
 
 
 def deadline() -> float:
@@ -175,6 +179,68 @@ def free_space(path: str | Path) -> dict[str, Any]:
     }
 
 
+def fs_type(path: str | Path, mountinfo: str = MOUNTINFO) -> str | None:
+    """The file system type of the longest mount point over `path`, the last mounted where two share one; None
+    where the table cannot be read (§4.6 *The pressure pass*)."""
+    at = os.path.realpath(path)
+    best: tuple[int, str] | None = None
+    try:
+        with open(mountinfo, encoding="utf-8", errors="surrogateescape") as f:
+            for line in f:
+                left, sep, right = line.partition(" - ")
+                fields = left.split()
+                if not sep or len(fields) < 5 or not right.split():
+                    continue
+                point = os.fsdecode(
+                    re.sub(rb"\\([0-7]{3})", lambda m: bytes([int(m.group(1), 8)]), os.fsencode(fields[4]))
+                )
+                over = at == point or point == "/" or at.startswith(point.rstrip("/") + "/")
+                if over and (best is None or len(point) >= best[0]):
+                    best = (len(point), right.split()[0])
+    except OSError:
+        return None
+    return best[1] if best else None
+
+
+def share_free(path: str | Path, mountinfo: str = MOUNTINFO) -> float | None:
+    """The pool's share free, 0 to 1 (§4.6 *The pressure pass*): on a `tmpfs` the lower of its free inodes and free
+    bytes, since only there are the bytes the pool's own; elsewhere its free inodes alone. None where there is no
+    reading: no inode count on a file system that is not a `tmpfs`, or a `statvfs` that failed."""
+    free = free_space(path)
+    if "error" in free:
+        return None
+    shares = []
+    if free["inodes_total"]:
+        shares.append(free["inodes_free"] / free["inodes_total"])
+    if free["bytes_total"] and fs_type(path, mountinfo) == "tmpfs":
+        shares.append(free["bytes_free"] / free["bytes_total"])
+    return min(shares) if shares else None
+
+
+def note_pressure(home: str | Path, host: str, removed: int, weak: bool, now: datetime) -> None:
+    """One reclaim's dated line in `disk.json`, its bytes under `scratch` (§4.6 *The pressure pass*). A `weak` pass
+    (it raised the share free under one point) directly after another is folded into that one's line, with a count."""
+    path = Path(home) / FILE
+    cutoff = now - timedelta(days=KEEP_DAYS)
+    with _WRITE:
+        got = _load(path)
+        lines = []
+        for line in got.get("passes") or []:
+            at = _when(line.get("at")) if isinstance(line, dict) else None
+            if at is not None and at >= cutoff:
+                lines.append(line)
+        last = (lines[-1].get("pressure") if lines else None) or {}
+        if weak and last.get("weak"):
+            kinds = lines[-1].get("removed") or {}
+            kinds["scratch"] = int(kinds.get("scratch") or 0) + removed
+            lines[-1].update(at=_stamp(now), removed=kinds, pressure={"weak": True, "count": int(last["count"]) + 1})
+        else:
+            kinds = dict.fromkeys(KINDS, 0)
+            kinds["scratch"] = removed
+            lines.append({"at": _stamp(now), "removed": kinds, "pressure": {"weak": weak, "count": 1}})
+        _atomic_write(path, json.dumps({"host": host, **got, "passes": lines}, indent=1) + "\n")
+
+
 def warnings(free: dict[str, Any]) -> list[str]:
     """What the reading draws as a warning: under a tenth free of bytes, or of inodes where the file system counts
     them (`inodes_total` 0 draws none)."""
@@ -220,16 +286,17 @@ def write(
     a temporary file and one rename; returns what it wrote."""
     path = Path(home) / FILE
     cutoff = now - timedelta(days=KEEP_DAYS)
-    lines = []
-    for line in _load(path).get("passes") or []:
-        at = _when(line.get("at")) if isinstance(line, dict) else None
-        if at is not None and at >= cutoff:
-            lines.append(line)
-    lines.append({"at": _stamp(now), "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS}})
-    out = {"host": host, "at": _stamp(now), "started": started, "kinds": result, "free": free, "passes": lines}
-    if seat_free is not None:
-        out["seat_free"] = seat_free
-    _atomic_write(path, json.dumps(out, indent=1) + "\n")
+    with _WRITE:
+        lines = []
+        for line in _load(path).get("passes") or []:
+            at = _when(line.get("at")) if isinstance(line, dict) else None
+            if at is not None and at >= cutoff:
+                lines.append(line)
+        lines.append({"at": _stamp(now), "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS}})
+        out = {"host": host, "at": _stamp(now), "started": started, "kinds": result, "free": free, "passes": lines}
+        if seat_free is not None:
+            out["seat_free"] = seat_free
+        _atomic_write(path, json.dumps(out, indent=1) + "\n")
     return out
 
 

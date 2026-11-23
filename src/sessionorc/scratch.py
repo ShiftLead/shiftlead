@@ -12,10 +12,12 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import secrets
 import stat
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -274,10 +276,12 @@ GIT_WORK = "git work"
 GIT_STEP = 20.0  # each git read's own timeout
 
 
-def _git_dirs(path: Path) -> list[tuple[str, Path]]:
+def _git_dirs(path: Path, weigh_tests: bool = True) -> list[tuple[str, Path]]:
     """Every git store under `path`, not following a symlink: (`clone`, its directory) for a `.git` directory or a
     bare repo (a directory holding `HEAD`, `objects` and `refs`), (`worktree`, its directory) for a `.git` file. A
-    store's own insides are not walked. Raises OSError where a directory cannot be read: kept as *git work*."""
+    store's own insides are not walked. Raises OSError where a directory cannot be read: kept as *git work*. With
+    `weigh_tests` false, a `pytest-of-*/` or a marked test root directly under `path` is not walked (§4.6 *The
+    pressure pass*, rule 2): its fixture repos are no one's work."""
     found: list[tuple[str, Path]] = []
     todo = [path]
     while todo:
@@ -292,8 +296,15 @@ def _git_dirs(path: Path) -> list[tuple[str, Path]]:
             if name == ".git":
                 found.append(("clone" if e.is_dir(follow_symlinks=False) else "worktree", d))
             elif e.is_dir(follow_symlinks=False):
+                if not weigh_tests and d == path and _test_root(e):
+                    continue
                 todo.append(Path(e.path))
     return found
+
+
+def _test_root(e: os.DirEntry[str]) -> bool:
+    """A directory entry that is a test run's own: `pytest-of-*`, or one holding the suite's mark, whatever its pid."""
+    return e.name.startswith("pytest-of-") or os.path.lexists(os.path.join(e.path, TEST_RUN_MARK))
 
 
 def _repo_root(d: Path) -> Path | None:
@@ -370,11 +381,11 @@ def _store_holds(kind: str, d: Path) -> bool:
     return False
 
 
-def git_work(path: str | Path) -> bool:
+def git_work(path: str | Path, weigh_tests: bool = True) -> bool:
     """Whether a scratch directory holds git work and is kept (*git work*, §4.6): any store under it that holds
-    some, or a tree or store that cannot be read."""
+    some, or a tree or store that cannot be read. `weigh_tests` false is the pressure pass's rule 2 alone."""
     try:
-        stores = _git_dirs(Path(path))
+        stores = _git_dirs(Path(path), weigh_tests)
     except OSError:
         return True
     return any(_store_holds(kind, d) for kind, d in stores)
@@ -429,7 +440,9 @@ def _remove(path: Path) -> None:
     """Remove a scratch directory whole, a symlink inside it as a link, read-only directories made writable."""
     import shutil
 
-    def again(fn, p, _exc):
+    def again(fn, p, exc):
+        if isinstance(exc, FileNotFoundError):  # the other remover took it (§4.6 *The pressure pass*)
+            return
         with contextlib.suppress(OSError):
             os.chmod(os.path.dirname(p), 0o700)
             if not os.path.islink(p) and os.path.isdir(p):
@@ -465,6 +478,7 @@ def sweep(
     tally: Any = None,
     dry: bool = False,
     deadline: float | None = None,
+    stop: Callable[[], bool] | None = None,
 ) -> list[tuple[str, str]]:
     """The hourly sweep's scratch rule for directories no live record holds (§4.6 *The disk sweep*). `named` maps
     a directory to the record naming it in the snapshot and when that record ended (None: live). A directory
@@ -477,13 +491,16 @@ def sweep(
     this home holds, measures each one the pass removes or keeps and each it has no size for, and counts what goes;
     one naming another home that exists is kept *another home*, its bytes that home's. `dry` removes nothing, each
     directory it would remove counted as gone in `tally`; past `deadline` (monotonic) it stops, the tally *partial*
-    (a dry run's, §4.6 *The sweep's reading*, TD-1946)."""
+    (a dry run's, §4.6 *The sweep's reading*, TD-1946). `stop` is the pressure pass's rule 2 (§4.6 *The pressure
+    pass*): directories go longest-ended first, its answer is read before each, and a test run's fixture repos are
+    not weighed as git work."""
     import logging
     import shutil
 
     log = logging.getLogger(__name__)
     p = parent(root)
     kept: list[tuple[str, str]] = []
+    weigh = None if stop is not None else tally  # under pressure only what goes is measured
     try:
         st = p.lstat()
         if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
@@ -495,10 +512,14 @@ def sweep(
         if tally is not None:
             tally.unlisted = True  # the last reading stands, *partial*
         return kept
+    if stop is not None:  # a directory no record names has no end to wait for: first
+        entries.sort(key=lambda e: named.get(e.path, (None, None))[1] or 0.0)
     for e in entries:
         if deadline is not None and time.monotonic() > deadline:
             if tally is not None:
                 tally.unlisted = True
+            break
+        if stop is not None and stop():
             break
         path = Path(e.path)
         if not _under(path, p) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
@@ -508,7 +529,7 @@ def sweep(
                 continue
             got = owner(path)
             if not got or not isinstance(got.get("home"), str):
-                _keep(kept, tally, path, "no owner")
+                _keep(kept, weigh, path, "no owner")
                 continue
             rid, ended = named.get(str(path), (None, None))
             if got["home"] != str(home):
@@ -523,23 +544,23 @@ def sweep(
                 tally.list(path)
             if rid is not None:
                 if ended is None or now_s - ended < keep_hours * 3600:
-                    _measure_once(tally, path, ended is None)
+                    _measure_once(weigh, path, ended is None)
                     continue
             elif now_s - _newest_write(path) < UNNAMED_AFTER_S:
-                _measure_once(tally, path, False)
+                _measure_once(weigh, path, False)
                 continue
             if live_now(str(path)):
-                _keep(kept, tally, path, "live record")
+                _keep(kept, weigh, path, "live record")
                 continue
             if any(overlaps(path, t) for t in transcript_roots):
-                _keep(kept, tally, path, "transcripts")
+                _keep(kept, weigh, path, "transcripts")
                 continue
-            if git_work(path):
-                _keep(kept, tally, path, GIT_WORK)
+            if git_work(path) if stop is None else git_work(path, weigh_tests=False):
+                _keep(kept, weigh, path, GIT_WORK)
                 continue
             mains = _worktree_mains(path)
             if live_now(str(path)):  # read again just before the removal: the weigh can take a while
-                _keep(kept, tally, path, "live record")
+                _keep(kept, weigh, path, "live record")
                 continue
             size = None
             if tally is not None:
@@ -559,3 +580,216 @@ def sweep(
         except OSError as err:
             log.warning("could not weigh or remove scratch %s: %s", path, err)
     return kept
+
+
+# -- the pressure pass (design §4.6 *The pressure pass*, TD-2081) --------------------------------------------------
+
+PRESSURE_EVERY = 60  # seconds between readings of the pool's share free
+PRESSURE_LOW = 0.25  # under this share free a reclaim starts
+PRESSURE_CLEAR = 0.35  # a reclaim stops once back over this
+PRESSURE_BACKOFF = 1800  # seconds no reclaim follows one that raised the share under `PRESSURE_RISE`
+PRESSURE_RISE = 0.01  # one point of share free
+PRESSURE_FALL = 0.05  # five more points down ends a backoff early
+PRESSURE_KEEP_HOURS = 1.0  # rule 2's keep in place of `scratch_keep_hours`
+TEST_RUN_MARK = ".shiftlead-test-run"  # a suite's scratch root, holding its pid (TD-2084)
+RUN_QUIET_S = 600  # rule 1: nothing under a run written for ten minutes
+BUILD_QUIET_S = 86_400  # rule 3: nothing under a build leftover written for a day
+BUILD_LEFTOVERS = ("pdm-build-", "pdm-wheel-cache-")
+_PYTEST_RUN = re.compile(r"pytest-\d+")
+
+
+class Backoff:
+    """Whether a low reading starts a reclaim: none for `PRESSURE_BACKOFF` after one that raised the share free under
+    a point, unless the share falls `PRESSURE_FALL` below that reclaim's last reading."""
+
+    def __init__(self) -> None:
+        self.until = 0.0
+        self.floor: float | None = None
+
+    def due(self, share: float | None, now: float) -> bool:
+        if share is None or share >= PRESSURE_LOW:
+            return False
+        return now >= self.until or self.floor is None or share <= self.floor - PRESSURE_FALL
+
+    def after(self, start: float, end: float | None, skipped: bool, now: float) -> bool:
+        """Record a finished reclaim; True where it was weak (it raised the share under a point). One that skipped
+        rule 2 starts no backoff and leaves any standing one, so the next reading tries again."""
+        weak = end is None or end - start < PRESSURE_RISE
+        if not weak:
+            self.until, self.floor = 0.0, None
+        elif not skipped:
+            self.until, self.floor = now + PRESSURE_BACKOFF, start if end is None else end
+        return weak
+
+
+def _pid_gone(text: str) -> bool:
+    """Whether a lock's text names a pid not running. Empty or unreadable, or another uid's pid, counts as live."""
+    try:
+        pid = int(text.strip())
+        if pid <= 0:
+            return False
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except (ValueError, OSError, OverflowError):
+        return False
+    return False
+
+
+def _run_over(run: Path) -> bool:
+    """A pytest run's `.lock` is absent (it finished) or names a pid not running."""
+    try:
+        return _pid_gone((run / ".lock").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _quiet(path: Path, now: float, quiet_s: float) -> bool:
+    """Nothing under `path` written for `quiet_s`, by a walk bounded by `diskbook.WALK_S`; cut short, or an entry
+    that cannot be read, it is not quiet."""
+    cut = now - quiet_s
+    limit = diskbook.deadline()
+    try:
+        if path.lstat().st_mtime > cut:
+            return False
+        todo = [path]
+        while todo:
+            if time.monotonic() > limit:
+                return False
+            for e in list(os.scandir(todo.pop())):
+                try:
+                    if e.stat(follow_symlinks=False).st_mtime > cut:
+                        return False
+                    if e.is_dir(follow_symlinks=False):
+                        todo.append(Path(e.path))
+                except FileNotFoundError:
+                    continue
+    except OSError:
+        return False
+    return True
+
+
+def _seats(root: str | Path, home: str | Path) -> list[Path]:
+    """The run directories under the pool's `shiftlead-<uid>/` a reclaim reads: this uid's, not a symlink, with an
+    `owner.json` naming this home or one that no longer exists. Another home's are that home's to reclaim. A parent
+    that is a symlink, not a directory or another uid's is refused, as `sweep` and `ensure_parent` refuse it."""
+    p = parent(root)
+    out: list[Path] = []
+    try:
+        st = p.lstat()
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return out
+        entries = sorted(os.scandir(p), key=lambda e: e.name)
+    except OSError:
+        return out
+    for e in entries:
+        path = Path(e.path)
+        try:
+            if not _under(path, p) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
+                continue
+            if e.stat(follow_symlinks=False).st_uid != os.getuid():
+                continue
+        except OSError:
+            continue
+        got = owner(path)
+        if not got or not isinstance(got.get("home"), str):
+            continue
+        if got["home"] == str(home) or not Path(got["home"]).exists():
+            out.append(path)
+    return out
+
+
+def _dirs(path: Path) -> list[os.DirEntry[str]]:
+    """The real directories straight under `path`, never a symlink; none where it cannot be read."""
+    try:
+        return [e for e in os.scandir(path) if e.is_dir(follow_symlinks=False)]
+    except OSError:
+        return []
+
+
+def _test_runs(seat: Path) -> list[Path]:
+    """Rule 1's candidates directly under a seat: each `pytest-of-*/pytest-<N>/` that is over and not `pytest-current`'s
+    target, and each directory whose `.shiftlead-test-run` names a pid not running."""
+    out: list[Path] = []
+    for e in _dirs(seat):
+        if e.name.startswith("pytest-of-"):
+            current = os.path.realpath(os.path.join(e.path, "pytest-current"))
+            out += [
+                Path(r.path)
+                for r in _dirs(Path(e.path))
+                if _PYTEST_RUN.fullmatch(r.name) and os.path.realpath(r.path) != current and _run_over(Path(r.path))
+            ]
+            continue
+        try:
+            if _pid_gone(Path(e.path, TEST_RUN_MARK).read_text(encoding="utf-8")):
+                out.append(Path(e.path))
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def reclaim(
+    root: str | Path,
+    home: str | Path,
+    named: dict[str, tuple[str, float | None]],
+    live_now: Callable[[str], bool],
+    transcript_roots: list[Path] | None,
+    share: Callable[[], float | None],
+    now_s: float,
+    sweep_lock: Any,
+) -> dict[str, Any]:
+    """One reclaim of the pool at `root` (§4.6 *The pressure pass*): test runs, then ended runs' directories under
+    `PRESSURE_KEEP_HOURS`, then build leftovers, stopping once `share()` is back over `PRESSURE_CLEAR`. Rule 2 takes
+    `sweep_lock` without waiting and is `skipped` if it is held. No rule removes a path that overlaps a transcript
+    store (§9 invariant 16), and with `transcript_roots` None (an adapter that cannot name its stores, so one could
+    lie inside any candidate) nothing is removed. Returns the bytes `removed` and `skipped`."""
+    import logging
+
+    log = logging.getLogger(__name__)
+    if transcript_roots is None:
+        return {"removed": 0, "skipped": False}
+    removed = 0
+    skipped = False
+
+    def done() -> bool:
+        got = share()
+        return got is None or got >= PRESSURE_CLEAR
+
+    def take(path: Path, quiet_s: float) -> None:
+        nonlocal removed
+        if any(overlaps(path, t) for t in transcript_roots) or not _quiet(path, now_s, quiet_s):
+            return
+        try:
+            size = diskbook.size_of(path, diskbook.deadline()) or 0
+            _remove(path)
+        except OSError as err:
+            log.warning("could not reclaim %s: %s", path, err)
+            return
+        removed += size
+        log.info("reclaimed %s", path)
+
+    for seat in _seats(root, home):
+        for run in _test_runs(seat):
+            if done():
+                return {"removed": removed, "skipped": False}
+            take(run, RUN_QUIET_S)
+    if done():
+        return {"removed": removed, "skipped": False}
+    if sweep_lock.acquire(blocking=False):
+        try:
+            tally = diskbook.Tally()
+            sweep(root, home, named, PRESSURE_KEEP_HOURS, now_s, live_now, transcript_roots, tally, stop=done)
+            removed += tally.removed
+        finally:
+            sweep_lock.release()
+    else:
+        skipped = True
+    for seat in _seats(root, home):
+        for e in _dirs(seat):
+            if e.name.startswith(BUILD_LEFTOVERS):
+                if done():
+                    return {"removed": removed, "skipped": skipped}
+                take(Path(e.path), BUILD_QUIET_S)
+    return {"removed": removed, "skipped": skipped}

@@ -3887,6 +3887,8 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             )
         for w in e.get("seat_warnings") or []:
             out.append(f"  ⚠ {seat.get('path')}: {w}")
+        if e.get("no_pressure"):  # §4.6 *The pressure pass*, TD-2081
+            out.append(f"  {e['no_pressure']}: no pressure reading")
     return out
 
 
