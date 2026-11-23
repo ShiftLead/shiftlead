@@ -21,6 +21,7 @@ from shiftlead.stage_read import (
     forge_on,
     holder_on,
     ledger_on,
+    nothing_to_read_on,
     renumbered_on,
     team_moved_on,
 )
@@ -390,3 +391,46 @@ def test_a_reopen_before_the_move_does_not_count():
 @pytest.mark.parametrize("record", [{"closed_at": "2026-11-20T10:00:00Z"}, {"carried": {"branch": "b", "pr": 4}}])
 def test_a_record_with_nothing_carried_or_not_closed_carries_nothing(record):
     assert not carried_on(record, entry(), [pr_row(4)], ["b"])
+
+
+ONLY = {
+    "stages": [{"name": "Build", "does": "build"}, {"name": "Read", "does": "review", "only-when": "protected-files"}]
+}
+AT_READ = {"stage": "read"}
+GLOBS = ["src/sessionorc/**", "docs/briefs/**"]
+
+
+def test_a_pull_request_touching_no_protected_file_has_nothing_to_read():
+    assert nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["src/shiftlead/x.py"], GLOBS)
+
+
+def test_a_pull_request_touching_a_protected_file_is_read():
+    assert not nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["a.py", "src/sessionorc/deep/x.py"], GLOBS)
+
+
+def test_a_rename_out_of_a_protected_path_is_read_by_its_old_name():
+    assert not nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["src/shiftlead/x.py", "src/sessionorc/x.py"], GLOBS)
+
+
+def test_a_repo_read_to_have_no_protected_files_has_nothing_to_read():
+    assert nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["a.py"], [])
+
+
+@pytest.mark.parametrize(
+    "head, read_at, files, protected",
+    [
+        ("h2", "h1", ["a.py"], GLOBS),  # pushed since the read
+        (None, None, ["a.py"], GLOBS),
+        ("h1", None, ["a.py"], GLOBS),
+        ("h1", "h1", None, GLOBS),  # the files could not be read
+        ("h1", "h1", [], GLOBS),  # an empty list proves nothing
+        ("h1", "h1", ["a.py"], None),  # the protected files could not be read
+    ],
+)
+def test_no_whole_reading_at_the_head_keeps_the_review(head, read_at, files, protected):
+    assert not nothing_to_read_on(AT_READ, ONLY, head, read_at, files, protected)
+
+
+@pytest.mark.parametrize("stage", ["build", "gone"])
+def test_a_stage_that_is_not_only_when_is_never_passed(stage):
+    assert not nothing_to_read_on({"stage": stage}, ONLY, "h1", "h1", ["a.py"], GLOBS)

@@ -17,8 +17,11 @@ judged by the silent rule.
 archiving the entry is open. A pull request the rows do not hold is no reading, never a pull request that is gone.
 
 `flow_on` reads whether a record's stage and flow still match its team's copy of the flow, `team_moved_on` whether the
-entry's `Team:` line now names another team, and `carried_on` whether the work a moved entry carried is still live. The
-tick's wiring calls all eight; none writes anything.
+entry's `Team:` line now names another team, and `carried_on` whether the work a moved entry carried is still live.
+
+`nothing_to_read_on` reads whether an `only-when` stage has nothing to read (act 3). Passing it lets a pull request by
+a review, so only a whole reading of its files at its current head that touches no protected file says so. The tick's
+wiring calls all nine; none writes anything.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, NamedTuple
 
-from sessionorc import board, ledger, ledgerboard, work
+from sessionorc import board, held, ledger, ledgerboard, work
 from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
@@ -185,6 +188,30 @@ def carried_on(
     if row is not None:
         return row.get("state") == "open"
     return bool(carried.get("branch")) and carried["branch"] in branches
+
+
+def nothing_to_read_on(
+    record: Mapping[str, Any],
+    doc: Mapping[str, Any],
+    head: str | None,
+    read_at: str | None,
+    files: Collection[str] | None,
+    protected: Collection[str] | None,
+) -> bool:
+    """`Reading.nothing_to_read`: the record's stage in `doc` is `only-when: protected-files`, and `files`, the pull
+    request's changed files as read at commit `read_at`, touch none of `protected`, the repo's `held:` globs. `head` is
+    the pull request's head now, so a push since the read is no reading. `files` None or empty, or `protected` None,
+    is no reading either and the stage keeps its review; `protected` empty is a repo read to have no protected files."""
+    key = str(record.get("stage"))
+    stage = next(
+        (s for s in doc.get("stages") or [] if isinstance(s, Mapping) and key_of(s.get("name")) == key),
+        None,
+    )
+    if stage is None or stage.get("only-when") != "protected-files":
+        return False
+    if not head or read_at != head or not files or protected is None:
+        return False
+    return not held.match(files, protected)
 
 
 def _instant(value: str | None) -> datetime | None:
