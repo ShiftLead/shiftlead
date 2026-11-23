@@ -1,0 +1,14 @@
+{#- **Start** and **Wind down**, on the Sessions card and the team page's head alike (design §4.5a *team groups*,
+    *Team page: the head*, TD-2059): one markup, so a press confirms the same words on both. `g` is the team's group -#}
+{% if g.stopped or g.startable %}{#- Start reads the definition's renames and removals as Apply does (§4.9 *A member renamed or removed*,
+    TD-706): its confirm says so first -#}
+{% set moved = (g.flow_changed or []) | selectattr('act', 'in', ['rename', 'removed']) | map(attribute='line') | list %}
+{% set moved_line = ("It first applies the definition: " ~ moved | join("; ") ~ ".") if moved else "" %}
+{%- if g.startable %}{% set closes = g.startable.closes or [] %}{% set leaves = g.startable.leaves or [] %}
+{%- else %}{% set closes = g.concluded.names if g.concluded else [] %}{% set leaves = [] %}{% endif %}
+{%- set leave_items = [] %}{% for x in leaves %}{% set _ = leave_items.append(x.name ~ " running (" ~ x.state ~ ")") %}{% endfor %}
+{%- set leave_line = ("it leaves " ~ leave_items | join(", ")) if leave_items else "" %}
+{%- set close_line = ("It first closes " ~ closes | join(", ") ~ " — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead") if closes else "" %}
+{%- set confirm_line = (close_line ~ "; " ~ leave_line ~ ".") if close_line and leave_line else ((close_line ~ ".") if close_line else ((leave_line[:1] | upper) ~ leave_line[1:] ~ "." if leave_line else "")) %}
+<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if confirm_line %} data-confirm="Start {{ g.team }}?{% if moved %} {{ moved_line }}{% endif %} {{ confirm_line }}"{% elif moved %} data-confirm="Start {{ g.team }}? {{ moved_line }}"{% endif %}{% if closes %} data-closes="{{ closes | join(', ') }}"{% endif %}{% if leave_line %} data-leaves="{{ (leave_line[:1] | upper) ~ leave_line[1:] }}."{% endif %}{% if moved %} data-moved="{{ moved_line }}"{% endif %}>Start</button>{% endif %}
+{% if not g.stopped or g.startable %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>{% endif %}

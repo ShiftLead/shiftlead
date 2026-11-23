@@ -3838,6 +3838,7 @@
       pendingTeams.delete(name);
       btn.disabled = false;
       syncTeams();  // the button on the page now may not be the one that was pressed
+      if (AO.teamHeadMoved) AO.teamHeadMoved();  // the team page's head (§4.5a *Team page: the head*, TD-2059)
     }
   }
 
@@ -10614,6 +10615,23 @@
   };
   AO.settings = function () {
     const page = $("#setpage"); if (!page) return;
+    // the team page's **Start** / **Wind down** (§4.5a *Team page: the head*, TD-2059): the card's own presses. This
+    // page has no event stream, so a press re-reads the head a few times while the team's sessions start or wind down
+    const teamHead = $("#teamhead", page);
+    if (teamHead) {
+      wireGroups(teamHead);
+      let reads = 0;
+      const reread = async () => {
+        const mine = ++reads;
+        try {
+          const r = await fetch(location.pathname);
+          if (!r.ok || mine !== reads) return;
+          const got = new DOMParser().parseFromString(await r.text(), "text/html").querySelector("#teamhead");
+          if (got && mine === reads && got.innerHTML !== teamHead.innerHTML) teamHead.innerHTML = got.innerHTML;
+        } catch (e) {}  // the next read, or a reload, says it
+      };
+      AO.teamHeadMoved = () => [0, 3000, 10000, 30000].forEach((ms) => setTimeout(reread, ms));
+    }
     const post = async (section, body) => {
       const r = await fetch(`/api/settings/${section}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
