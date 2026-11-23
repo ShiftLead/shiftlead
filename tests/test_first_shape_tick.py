@@ -260,3 +260,70 @@ async def test_a_built_in_seat_keeps_its_mark_across_a_replay(agent, tmp_path, w
         assert agent.sessions[sid].builtin == "techlead"
         assert agent._rules_reach(agent.sessions[sid])
         await person.call("kill", id=sid)
+
+
+def _asks_seat(agent, name: str, builtin: str | None = None, tags: bool = True) -> Session:
+    seat = Session(
+        id=f"ao-t-{name}", name=name, kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g",
+        repo="/tmp/repo", supervised=True, unattended=True, seat={"trigger": "asks", "tags": tags}, builtin=builtin,
+    )  # fmt: skip
+    agent.sessions[seat.id] = seat
+    return seat
+
+
+async def _cut_over(agent, marked: bool = True) -> None:
+    await park_ticks(agent)
+    if marked:
+        _mark()
+    agent._read_cut_over()
+
+
+@pytest.mark.parametrize("address", [{"team": "g"}, {"repo": "repo"}], ids=["team", "repo"])
+async def test_a_question_address_reads_only_a_built_in_seat_after_the_marker(agent, address):
+    old = _asks_seat(agent, "old")
+    await _cut_over(agent, marked=False)
+    assert await agent._question_seat(**address) is old
+    await _cut_over(agent)
+    with pytest.raises(RpcError, match="no question seat|no registered repo"):
+        await agent._question_seat(**address)
+    assert not old.inbox
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    assert await agent._question_seat(**address) is built_in
+
+
+async def test_a_seat_s_route_and_pool_read_no_first_shape_seat_after_the_marker(agent):
+    seat = _asks_seat(agent, "seat", tags=False)
+    seat.seat = {**seat.seat, "pool": "p", "rank": 1}
+    lead = _asks_seat(agent, "lead")
+    later = _asks_seat(agent, "later", tags=False)
+    later.seat = {**later.seat, "pool": "p", "rank": 2}
+    records, now = agent._graph(), datetime.now(UTC)
+    await _cut_over(agent, marked=False)
+    assert agent._route_lead(seat, records, now) is lead
+    assert agent._pool_next(seat, records, now) is later
+    await _cut_over(agent)
+    assert agent._route_lead(seat, records, now) is None
+    assert agent._pool_next(seat, records, now) is None
+
+
+async def test_the_tagging_seat_is_a_built_in_one_after_the_marker(agent):
+    old = _asks_seat(agent, "old")
+    records = [old]
+    await _cut_over(agent, marked=False)
+    assert agent._tagging_seat("/tmp/repo", records) is old
+    await _cut_over(agent)
+    assert agent._tagging_seat("/tmp/repo", records) is None
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    assert agent._tagging_seat("/tmp/repo", [old, built_in]) is built_in
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_send_reads_no_seat_s_extras_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc import seat_send
+
+    seat = _asks_seat(agent, "seat")
+    read = []
+    monkeypatch.setattr(seat_send, "extras_in_place", lambda own, records: read.append(own) or [])
+    await _cut_over(agent, marked=marked)
+    assert agent._seat_pick(agent._graph(), seat.id, "ao-t-x", "ask", None, None) is None
+    assert read == ([] if marked else [seat])

@@ -628,6 +628,7 @@ class MailMixin:
                 and not r.superseded_by
                 and (sender is None or self._address(r) != self._addr(sender))  # never back to its own sender
                 and _fillable(r)
+                and self._rules_reach(r)  # after the cut-over no team-defined seat is read (§4.9e)
                 and seat_able(r, now, self.unfillable)
             ),
             key=lambda kr: (pool_rank(kr[1].seat), kr[1].name),
@@ -657,6 +658,7 @@ class MailMixin:
             and (r.seat or {}).get("tags") is True
             and not r.superseded_by
             and _fillable(r)
+            and self._rules_reach(r)  # after the cut-over no team-defined seat is read (§4.9e)
             and seat_able(r, now, self.unfillable)
         ]
         if not leads:
@@ -871,6 +873,7 @@ class MailMixin:
             and (r.seat or {}).get("tags") is True
             and not r.superseded_by
             and _fillable(r)
+            and self._rules_reach(r)  # after the cut-over no team-defined seat is read (§4.9e)
         ]
         if not leads:
             return False
@@ -1076,6 +1079,7 @@ class MailMixin:
             and not r.superseded_by
             and str(r.team or "").strip()
             and _fillable(r)
+            and self._rules_reach(r)  # after the cut-over a built-in seat's record alone (§4.9e)
             and pool_rank(r.seat) < 2  # a pool is one candidate, its first member (§4.9b, TD-1476)
             and not r.scale  # an extra's seat stands for it, never the extra (§4.9 *Scaling with the work*)
         ]
@@ -2117,6 +2121,8 @@ class MailMixin:
         profile (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*).
         An own record unable as `stalled?`, `exited` or closed (`seat_send.routes_to_extras`) passes an `ask` to its
         extras first (§4.9b *A seat that cannot answer is routed around*)."""
+        if self._first_shape_off:  # no team defines a seat after the cut-over, so none has extras (§4.9e)
+            return None
         own = records.get(sid)
         if own is None or own.seat is None or isinstance(own.scale, dict):
             return None

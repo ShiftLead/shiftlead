@@ -4629,6 +4629,7 @@ class TickMixin:
             and r.unattended
             and not r.superseded_by
             and not r.suspended
+            and self._rules_reach(r)  # after the cut-over a built-in seat's record alone (§4.9e)
         ]
 
         def order(r: Session) -> tuple[int, int, str]:
