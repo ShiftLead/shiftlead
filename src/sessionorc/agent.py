@@ -2067,11 +2067,15 @@ class HostAgent(
                 except DuplicateSession:
                     taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
                 finally:
-                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
+                    self._starting.discard(sid)  # taken again below, before the next await
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
-                await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
+                self._starting.add(sid)  # the pane is up and has no record yet: a tick must not adopt it (TD-2096)
+                try:
+                    await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
+                finally:
+                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
             s = Session(
                 id=sid,
                 name=shown,
