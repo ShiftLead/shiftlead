@@ -11,9 +11,26 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import paths
+from sessionorc.agent_common import RpcError
 from sessionorc.models import Session
 
-PER_RECORD = ("_extra_drop", "_scale_down", "_brief_restart", "_cadence_line", "_held_line", "_lane_news")
+PER_RECORD = (
+    "_extra_drop",
+    "_scale_down",
+    "_crash_restart",
+    "_extra_hold",
+    "_wanted_restart",
+    "_seat_pass",
+    "_sit_out_close",
+    "_brief_restart",
+    "_idle_nudge",
+    "_idle_open",
+    "_context_line",
+    "_cadence_line",
+    "_held_line",
+    "_lane_news",
+)
+KEPT_FOR_A_SEAT = ("_crash_restart", "_seat_pass", "_sit_out_close", "_idle_nudge", "_idle_open", "_context_line")
 DETACHED = ("_cadence_pass", "_conventions_pass", "_held_pass", "_brief_pass")
 
 
@@ -26,9 +43,7 @@ def _spied(agent, monkeypatch) -> dict[str, AsyncMock]:
     spies = {n: AsyncMock(return_value=False) for n in (*PER_RECORD, *DETACHED)}
     for name, spy in spies.items():
         monkeypatch.setattr(agent, name, spy)
-    for name in ("_join_orders", "_scheduled_start", "_crash_restart", "_extra_hold", "_wanted_restart", "_seat_pass"):
-        monkeypatch.setattr(agent, name, AsyncMock())
-    for name in ("_sit_out_close", "_idle_nudge", "_idle_open", "_context_line", "_commit_defs", "_count_seats"):
+    for name in ("_join_orders", "_scheduled_start", "_commit_defs", "_count_seats"):
         monkeypatch.setattr(agent, name, AsyncMock())
     monkeypatch.setattr(agent, "_lost_brief", AsyncMock(return_value=False))
     agent.sessions["ao-t-w"] = Session(
@@ -56,6 +71,59 @@ async def test_the_member_and_lane_rules_follow_the_marker(agent, monkeypatch, m
     await _keep_running(agent)
     for name, spy in spies.items():
         assert spy.await_count == (0 if marked else 1), name
+
+
+@pytest.mark.parametrize(
+    "mark",
+    [{"builtin": "techlead", "seat": {"trigger": "asks"}}, {"seat": {"trigger": "prompt"}}],
+    ids=["built-in", "director"],
+)
+async def test_rules_1_3_4_and_5_still_reach_a_built_in_seat_and_the_director(agent, monkeypatch, mark):
+    spies = _spied(agent, monkeypatch)
+    for k, v in mark.items():
+        setattr(agent.sessions["ao-t-w"], k, v)
+    _mark()
+    await _keep_running(agent)
+    for name, spy in spies.items():
+        assert spy.await_count == (1 if name in KEPT_FOR_A_SEAT else 0), name
+
+
+async def test_a_first_shape_seat_is_not_read_by_rule_3_after_the_marker(agent, monkeypatch):
+    spies = _spied(agent, monkeypatch)
+    agent.sessions["ao-t-w"].seat = {"trigger": "asks"}
+    agent.unfillable["ao-t-w"] = "paused"
+    _mark()
+    await _keep_running(agent)
+    assert spies["_seat_pass"].await_count == 0
+    assert "ao-t-w" not in agent.unfillable
+
+
+async def test_a_member_s_idle_open_goes_at_the_marker(agent, monkeypatch):
+    _spied(agent, monkeypatch)
+    agent.sessions["ao-t-w"].idle_open = {"at": "2026-11-23T00:00:00Z", "ref": "TD-1"}
+    _mark()
+    await _keep_running(agent)
+    assert agent.sessions["ao-t-w"].idle_open is None
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_restart_from_a_stage_s_session_is_refused_after_the_marker(agent, monkeypatch, marked):
+    await park_ticks(agent)
+    if marked:
+        _mark()
+    agent._read_cut_over()
+    s = Session(
+        id="ao-t-s", name="s", kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g", lane=["TD-7"]
+    )  # fmt: skip
+    agent.sessions[s.id] = s
+    monkeypatch.setattr(agent, "_is_self", lambda *_: True)
+    if marked:
+        with pytest.raises(RpcError, match="a stage's session ends its stage"):
+            await agent.rpc_progress(s.id, status="restart", why="context bound", caller="x")
+        assert s.restart_wanted is None
+    else:
+        await agent.rpc_progress(s.id, status="restart", why="context bound", caller="x")
+        assert s.restart_wanted
 
 
 async def test_a_settings_file_that_breaks_after_the_marker_keeps_the_rules_off(agent):

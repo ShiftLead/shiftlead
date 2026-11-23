@@ -1241,6 +1241,11 @@ class TickMixin:
         if flipped:
             await self._push_changes()
 
+    def _rules_reach(self, s: Session) -> bool:
+        """Whether rules 1, 3, 4 and 5 act on `s`: on every record before the cut-over, and after it only on a built-in
+        seat's or the director's, never a member's or a stage's or an audit's session (§4.9e)."""
+        return not self._first_shape_off or bool(s.builtin) or (s.seat or {}).get("trigger") == "prompt"
+
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
         restart; rule 3, the seats; rule 4, the idle nudge; rule 5, the context bound (TD-190);
@@ -1264,18 +1269,30 @@ class TickMixin:
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
                 if not self._first_shape_off and await self._scale_down(s, now):
                     continue  # an extra out of work, back to held: never restarted (§6 rule 14, TD-1546)
-                await self._crash_restart(s, now)
-                await self._extra_hold(s, now)  # an extra's exit no rule restarts: held (TD-1547)
-                if await self._lost_brief(s, now):
+                ruled = self._rules_reach(s)  # after the cut-over, a built-in seat's record or the director's (§4.9e)
+                if ruled:
+                    await self._crash_restart(s, now)
+                if not self._first_shape_off:
+                    await self._extra_hold(s, now)  # an extra's exit no rule restarts: held (TD-1547)
+                if ruled and await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
-                await self._wanted_restart(s, now)
-                await self._seat_pass(s, now, records)
-                await self._sit_out_close(s)
+                if not self._first_shape_off:
+                    await self._wanted_restart(s, now)
+                if ruled:
+                    await self._seat_pass(s, now, records)
+                    await self._sit_out_close(s)
+                else:
+                    self.unfillable.pop(s.id, None)  # rule 3 does not read it, so no word of why it would not fill
                 if not self._first_shape_off:
                     await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
-                await self._idle_nudge(s, now)
-                await self._idle_open(s, now)
-                await self._context_line(s, now)
+                if ruled:
+                    await self._idle_nudge(s, now)
+                    await self._idle_open(s, now)
+                    await self._context_line(s, now)
+                elif s.idle_open:
+                    s.idle_open = None  # rule 4 no longer reads this member, so its *idle · open work* goes
+                    self._save(s)
+                    await self._push_changes()
                 if not self._first_shape_off:  # rules 10, 11 and 6 act on no member after the cut-over (§4.9e)
                     await self._cadence_line(s, now)
                     await self._held_line(s, now)

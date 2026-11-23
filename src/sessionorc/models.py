@@ -191,6 +191,7 @@ HOME_OWNED = frozenset(
         "seat_count",
         "seat_filled",
         "idle_open",
+        "builtin",
         "checks",
         "conventions_seen",
         "held_missed",
@@ -1540,6 +1541,9 @@ class Session:
     # `ref` is the first open reference when it was written. The home's; cleared when the stretch
     # ends, the work closes or the member declares.
     idle_open: dict[str, Any] | None = None
+    # The seat key (`techlead`, `sweeper`, `prompts`) of a built-in seat's record, which the home writes (§4.9d *How
+    # each one runs*, TD-2065). After the cut-over rules 1, 3, 4 and 5 reach only such a record and the director's.
+    builtin: str | None = None
     # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`

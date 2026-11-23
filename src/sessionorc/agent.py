@@ -5106,6 +5106,8 @@ class HostAgent(
             raise RpcError(
                 f"only {s.id} may {said}: it is the session's own word about its own run (design §9 invariant 14)"
             )
+        if status == "restart" and self._first_shape_off and self._holds_stage(s):
+            raise RpcError("a stage's session ends its stage: `ao stage end <outcome>` (design §4.9e)")
         if not (why or "").strip():
             reason = "the search that came up empty" if status == "none" else "why this run is over"
             raise RpcError(
