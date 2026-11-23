@@ -11,9 +11,11 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from sessionorc import logins
+from sessionorc import settings as settings_mod
 
 STORE_KEYS = ("label", "repo", "host", "logins", "at_once", "most")
 SET_KEYS = ("label", "logins", "at_once", "most")  # what `team_set` writes; `repo` and `host` never change
@@ -147,6 +149,48 @@ def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[st
             entry["at_once"] = now
             changed.append(str(team))
     return changed
+
+
+def _at_reserve(entry: Mapping[str, Any] | None, extra: int, now: datetime, metered: bool = False) -> bool:
+    """Whether an account's `gate` entry is at its reserve for one login, the team's `reserve` added (§6 *Usage gate*).
+    A metered window's line is its amount, reserve 0 as the gate reads it, since its `pct` is the spend over the amount.
+    An account whose logins disagree on billing is read by the rows of this login's billing alone. A window the gate
+    has no number for is never over."""
+    rows = [dict(r) for r in (entry or {}).get("windows") or () if isinstance(r, Mapping)]
+    if (entry or {}).get("billing") == "mixed":
+        rows = [r for r in rows if bool(r.get("metered")) == metered]
+    rows = [r for r in rows if r.get("metered") or r.get("reserve") is not None]
+    by_label = {str(r.get("label")): 0 if r.get("metered") else r["reserve"] for r in rows}
+    return settings_mod.crossed(settings_mod.lines(by_label, rows, now, extra)) is not None
+
+
+def login_rows(
+    read: Mapping[str, Any], accounts: Mapping[str, Any], extra: int = 0, now: datetime | None = None
+) -> dict[str, dict[str, Any]]:
+    """`pick`'s rows from the host's `tools` read and the `gate` reply's `accounts`, by login key: each login's
+    `state`, `account`, `pin`, its account's model `models`, and `at_reserve` with the team's `extra` added."""
+    when = now or datetime.now(UTC)
+    out: dict[str, dict[str, Any]] = {}
+    for card in read.get("tools") or ():
+        by_key = {str(a.get("key")): a for a in card.get("accounts") or ()}
+        for lg in card.get("logins") or ():
+            account = lg.get("account")
+            held = by_key.get(str(account)) or {}
+            out[logins.key(str(card.get("adapter")), str(lg.get("name")))] = {
+                "label": lg.get("label"),
+                "state": lg.get("state"),
+                "account": account,
+                "pin": lg.get("pin"),
+                "models": list((held.get("models") or {}).get("families") or ()),
+                "at_reserve": bool(account)
+                and _at_reserve(
+                    accounts.get(str(account)),
+                    extra,
+                    when,
+                    (lg.get("settings") or {}).get("billing") == "metered",
+                ),
+            }
+    return out
 
 
 def offers(row: Mapping[str, Any], model: str) -> bool:

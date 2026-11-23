@@ -30,12 +30,14 @@ from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
 from sessionorc import usage as usage_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     RpcError,
     _parse,
     _usage_key,
     log,
 )
+from sessionorc.agent_stage import TEAM, home_call
 from sessionorc.models import (
     PERSON,
     Session,
@@ -599,6 +601,60 @@ class SettingsMixin:
             raise RpcError(str(e)) from None
         await self._team_store_saved(before, doc)
         return {"team": team, "change": words, "version": teamstore.version(doc, str(team))}
+
+    def _team_head(self, team: str) -> dict[str, Any]:
+        """A team's head from the records the home holds (§4.9d *The page*): running with its live count, else wound
+        down or stopped, `by` saying who stopped it (`person`, `until`, `other`)."""
+        records = [r for r in self._graph().values() if r.team == team]
+        live = sum(r.state not in work_mod.DEAD for r in work_mod.crew(records))
+        wound = work_mod.team_wound_down(records) is not None
+        stopped = None if wound else work_mod.team_stopped(records)
+        word = "running" if live else "wound down" if wound else "stopped"
+        return {"word": word, "sessions": live, "by": (stopped or {}).get("by")}
+
+    def _projected(self, accounts: dict[str, Any], doc: dict[str, Any], now: datetime) -> dict[str, Any]:
+        """The `gate` reply's accounts with every window as the gate would read it at a launch (`usage.project`): the
+        reply projects only an account with a live unattended session, and a stopped team's usually has none. A
+        metered row is spend, which does not age (`_gate_windows`), so it is left as it is and takes no mark from a
+        subscription window of the same label."""
+        max_age = settings_mod.max_age(doc)
+        out: dict[str, Any] = {}
+        for key, entry in accounts.items():
+            names = entry.get("profiles") or []
+            reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), None)
+            read = usage_mod.project((reading or {}).get("windows"), now, max_age, (reading or {}).get("fetched"))
+            seen = {str(w.get("label")): w for w in read or ()}
+            marks = ("pct", "unknown", "projected", "age")
+            rows = [
+                r
+                if r.get("metered")
+                else {**r, **{k: seen[str(r.get("label"))][k] for k in marks if k in seen.get(str(r.get("label")), {})}}
+                for r in entry.get("windows") or ()
+            ]
+            out[key] = {**entry, "windows": rows}
+        return out
+
+    async def rpc_team_show(self, team: str = "", entries: bool = True, caller: Any = None) -> dict[str, Any]:
+        """`ao team show <team>` (design §4.9d *Controls and verbs*, TD-2060): what the team page shows, read only. The
+        logins are this host's `tools` read with the team's reserve added; the body is `shiftlead.team_show`.
+        `entries=False` leaves out the stage records, for `ao org`, which wants only *cannot run*."""
+        name = str(team or "")
+        doc = settings_mod.load()
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        rows = teamstore.login_rows(
+            read, self._projected(gate["accounts"], doc, now), settings_mod.team_extra(doc, name), now
+        )
+        return await asyncio.to_thread(
+            home_call(TEAM).call,
+            team=name,
+            doc=doc,
+            rows=rows,
+            head=self._team_head(name),
+            entries=entries,
+            here=hosts.local_host().name,
+            roots=hosts.local_host().repos(),
+        )
 
     async def _rekey_teams(self, flow: str, renames: dict[str, str]) -> None:
         """A flow save's renamed stages, carried to the numbers of each team on that flow (§4.9d, TD-2060)."""

@@ -25,7 +25,7 @@ import yaml
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
-from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, workorders
+from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import seams as seams_mod
@@ -1062,6 +1062,24 @@ def cmd_flow_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cannot_run() -> dict[str, str]:
+    """Each switched team that cannot run its flow, in the page's words (§4.9d *A team that cannot run says why*). A
+    host agent that does not answer costs this reading alone."""
+    doc = settings_mod.read() or {}
+    out: dict[str, str] = {}
+    for team in sorted(doc.get("teams") or {}):
+        if teamstore.switched(doc, team):
+            try:
+                got = call_sync("team_show", team=team, entries=False)
+            except AgentUnavailable:  # down or stuck: the next team would wait as long
+                break
+            except AgentError:
+                continue
+            if got.get("cannot_run"):
+                out[team] = got["cannot_run"]
+    return out
+
+
 def cmd_org(args: argparse.Namespace) -> int:
     """`ao org` and `ao org check` (design §4.7, TD-229 slice 6): the org as the clients aggregate
     it — each team with its source file, its repo, the host it lands on and why, a shadowed or
@@ -1122,6 +1140,7 @@ def cmd_org(args: argparse.Namespace) -> int:
             repos_of=teamrun.repos_via(call_sync),
         ),
         "notes": notes,
+        "cannot_run": _cannot_run(),
     }
 
     def prose() -> None:
@@ -1137,6 +1156,8 @@ def cmd_org(args: argparse.Namespace) -> int:
                 print(f"{name:<{w}}  shadowed by {org.path.name if org.path else 'org.yml'}  [{f}]")
         for name, why in got["refused"].items():
             print(f"{name:<{w}}  refused: {why}")
+        for why in got["cannot_run"].values():
+            print(why)
         for note in notes:
             if note not in got["refused"].values():
                 print(f"note: {note}")
@@ -1352,6 +1373,59 @@ def cmd_team_status(args: argparse.Namespace) -> int:
     finished = teamrun.finished(found, teamrun.seat_names(team, found) if team is not None else (), asked)
     waiting = {str(s.get("name") or s["id"]): asked[str(s["id"])] for s in found if str(s.get("id")) in asked}
     return emit(args, {"team": args.name, "sessions": rows, "finished": finished, "waiting": waiting}, prose)
+
+
+_WAITS = {"person": " (waits on you)", "parts": " (waits on its parts)", "merging": " (merging)"}
+
+
+def _team_show_prose(got: dict[str, Any]) -> None:
+    """`ao team show`'s text: the same read as `--json`, in the page's order (§4.9d *Controls and verbs*)."""
+    head = got["head"]
+    count = f"{head['sessions']} of {head['most']}" if head.get("most") else str(head["sessions"])
+    by = {"person": " by you", "until": " at its stop time"}.get(str(head.get("by") or ""), "")
+    word = f"running · {count} session{'' if count == '1' else 's'}" if head["word"] == "running" else head["word"] + by
+    title = f"{got['team']} ({got['label']})" if got.get("label") else got["team"]
+    print(f"{title}: {word}")
+    if got.get("repo"):
+        print(f"repo: {got['repo']}  host: {got.get('host') or '-'}  built-in set: {got.get('builtins')}")
+    for line in (got.get("cannot_run"), got.get("note"), got.get("unread")):
+        if line:
+            print(line)
+    flow = got.get("flow")
+    if flow:
+        print(f"flow: {flow['name']}" + ("" if flow["read"] else " (not read)"))
+        for s in flow["stages"]:
+            now = s["now"]["login"] or {"waits": "waits for a usable login", "none": "no login offers it"}.get(
+                s["now"]["state"], "not read"
+            )
+            number = f"  at most {s['at_once']}" if s.get("at_once") else ""
+            held = ", ".join(str(e["id"]) + _WAITS.get(str(e["waits"]), "") for e in s["entries"])
+            print(f"  {s['name']} [{s['does']}]  {s['model']} on {now}{number}" + (f"  {held}" if held else ""))
+        for key, n in flow["no_such_stage"].items():
+            print(f"  {key}: at most {n}, no such stage")
+    for a in got.get("audits") or ():
+        now = a["now"]["login"] or a["now"]["why"]
+        print(f"audit {a['name']}  every {a['every']}  {a['model']} on {now}")
+    for lg in got.get("logins") or ():
+        why = f" ({lg['why']})" if lg.get("why") else ""
+        idle = "  its models are in no stage, so nothing runs on it yet" if lg.get("runs_nothing") else ""
+        print(f"login {lg['login']}  {lg['state']}{why}{idle}")
+    for key, value in (got.get("settings") or {}).items():
+        print(f"{key}: {value}")
+
+
+def cmd_team_show(args: argparse.Namespace) -> int:
+    """`ao team show <team>` (design §4.9d *Controls and verbs*, TD-2060): what the team page shows; `--json` is the
+    host agent's `team_show` read, the one the page draws from."""
+    held = (settings_mod.read() or {}).get("teams") or {}
+    try:
+        known = args.name in _org_here().teams
+    except ValueError:
+        known = False
+    if not known and args.name not in held:
+        return fail(args, f"no team {args.name!r}", 1)
+    got = call_sync("team_show", team=args.name)
+    return emit(args, got, lambda: _team_show_prose(got))
 
 
 def cmd_team_list(args: argparse.Namespace) -> int:
@@ -5936,6 +6010,10 @@ def build_parser() -> argparse.ArgumentParser:
     q = add_team("status", help="each member of a live team with its state, lane and report line")
     q.add_argument("name")
     q.set_defaults(fn=cmd_team_status)
+
+    q = add_team("show", help="what the team page shows: head, flow, audits, built-in set, logins, running settings")
+    q.add_argument("name")
+    q.set_defaults(fn=cmd_team_show)
 
     q = add_team("list", help="every definition, its source file and whether it is live")
     q.set_defaults(fn=cmd_team_list)

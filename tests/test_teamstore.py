@@ -4,6 +4,7 @@ stage, and the one pick of a login for a model."""
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -231,3 +232,30 @@ def test_a_saved_rename_reaches_the_teams_numbers(agent):
 
     asyncio.run(run())
     assert settings_mod.load()["teams"]["a"]["at_once"] == {"new": 2}
+
+
+def test_team_show_reads_this_hosts_logins_with_the_teams_reserve(agent, monkeypatch):
+    doc = settings_mod.load()
+    doc["teams"]["a"].update(logins=["claude:x"], reserve=10)
+    settings_mod.save(doc)
+    account = {"key": "acct", "models": {"families": ["opus"]}}
+    login = {"name": "x", "account": "acct", "state": "signed_in"}
+    window = {"label": "week", "pct": 75, "reserve": 20, "resets": "2099-01-01T00:00:00Z"}
+    seen = {}
+
+    async def tools():
+        return {"tools": [{"adapter": "claude", "accounts": [account], "logins": [login]}]}
+
+    async def gate():
+        return {"accounts": {"acct": {"windows": [window]}}}
+
+    def call(**kw):
+        seen.update(kw)
+        return {"team": kw["team"]}
+
+    agent.rpc_tools, agent.rpc_gate = tools, gate
+    agent._graph = lambda: {}
+    agent._usage, agent._usage_acct = {}, {}
+    monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: SimpleNamespace(call=call))
+    assert asyncio.run(agent.rpc_team_show(team="a")) == {"team": "a"}
+    assert seen["rows"]["claude:x"]["at_reserve"] is True and seen["head"]["word"] == "stopped"
