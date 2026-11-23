@@ -307,6 +307,19 @@ def test_a_question_asked_after_the_merge_is_answered_as_usual(store, monkeypatc
     assert archived == [TID]
 
 
+def test_a_gate_met_by_the_merged_question_has_its_answer_applied(store, monkeypatch):
+    put(store, pr=4, branch="td7-work")
+    assert act_on(store, Reading(pr_state="merged", gate=True)).made
+    record = store.entry(TID)
+    assert record["waits"] == "person" and record["asked"] is None and record["gate_after_merge"] is True
+    monkeypatch.setattr(store, "note_unapplied", lambda *_a: pytest.fail("this gate was met after the merge"))
+    assert act_on(store, Reading(pr_state="merged", lifted="Something else: go on")).made
+    record = store.entry(TID)
+    assert (
+        record["waits"] is None and record["gate_after_merge"] is False and record["answer"] == "Something else: go on"
+    )
+
+
 def test_a_stage_with_nothing_to_read_passes_as_ship_to_merge_with_the_head(store):
     put(store, stage="review", pr=4, branch="td7")
     assert act_on(store, Reading(nothing_to_read=True, head="a" * 40)).made

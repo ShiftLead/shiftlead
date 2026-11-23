@@ -150,11 +150,16 @@ def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dic
     return Made(True)
 
 
+def _knew_merge(record: dict[str, Any]) -> bool:
+    """Whether the question the record waits on was put knowing its pull request had merged."""
+    return bool((record.get("asked") or {}).get("after_merge") or record.get("gate_after_merge"))
+
+
 def _ask(
     store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
 ) -> Made:
     """A move to the person, as its intent. An entry already carrying the gate is not asked a second time."""
-    record.update(holder=None, waits="person" if s.gate else None)
+    record.update(holder=None, waits="person" if s.gate else None, gate_after_merge=s.gate and s.pr_state == "merged")
     if s.gate:  # a gate this record did not ask: no earlier question's map or mark applies to its answer
         record.update(answers=None, asked=None)
         store.put_entry(record, "carries the home's gate: waits on the person")
@@ -217,7 +222,7 @@ def _gate_again(store: StageStore, record: dict[str, Any], _s: Reading, doc: dic
         answers,
         blocked=record.get("blocked"),
         base=record,
-        after_merge=bool(asked.get("after_merge")),  # the same question: a merge since it was asked still moved it on
+        after_merge=_knew_merge(record),  # the same question: a merge since it was asked still moved it on
     )
     return Made(True)
 
@@ -248,7 +253,9 @@ def _merge_again(store: StageStore, record: dict[str, Any], words: str) -> Made:
     if not merging.get("head"):
         return Made(False, "the record holds no merge to try again")
     fresh = {k: v for k, v in merging.items() if k != "unread_since"}
-    record.update(waits="merging", merging=fresh, answers=None, asked=None, blocked=None, answer=words)
+    record.update(
+        waits="merging", merging=fresh, answers=None, asked=None, blocked=None, answer=words, gate_after_merge=False
+    )
     store.put_entry(record, "the person's answer: try the merge again")
     return Made(True)
 
@@ -262,7 +269,7 @@ def _unapplied(store: StageStore, record: dict[str, Any], label: str) -> Made:
         store.note_unapplied(str(record["id"]), label, mark)
     except board.Refused as e:  # the record still waits, so the next pass tries again
         return Made(False, f"the entry's Log could not be written: {e}")
-    record.update(waits=None, answers=None, asked=None, blocked=None, merging=None)
+    record.update(waits=None, answers=None, asked=None, blocked=None, merging=None, gate_after_merge=False)
     store.put_entry(record, "the person's answer: applied to nothing, its pull request merged")
     return Made(True)
 
@@ -272,7 +279,7 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
     takes the stopped move, in the person's own words too, and only it starts that move's count and the cap's again.
     The move is not counted."""
     label = str(s.lifted)
-    if s.pr_state == "merged" and not (record.get("asked") or {}).get("after_merge"):
+    if s.pr_state == "merged" and not _knew_merge(record):
         return _unapplied(store, record, label)
     move, words = answer_move(record.get("answers") or {}, label)
     if isinstance(move, dict) and move.get("merge"):
@@ -323,6 +330,7 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
         merging=None,
         offers=0,
         entered_at=_now(),
+        gate_after_merge=False,
     )
     if s.pr_state in ("merged", "closed"):  # that pull request is over: the stage starts from a fresh one
         record.update(branch=None, pr=None)
