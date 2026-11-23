@@ -624,6 +624,8 @@ class RemoteMixin:
                 made = {**launch_params(params), "name": held.name, "repo": held.repo, "worktree": held.worktree}
                 if held.seat and not params.get("seat"):  # a Resume's carried seat, as the replica took it (TD-1435)
                     made["seat"] = dict(held.seat)
+                if held.builtin and not params.get("builtin"):  # and its built-in mark (§4.9d)
+                    made["builtin"] = held.builtin
                 if held.scale and not params.get("scale"):  # and its carried extra mark (§4.9 td-max)
                     made["scale"] = {"line": held.scale.get("line")}  # its line alone, never a run's `drop`
                 self._write_launch(f"{held.id}@{host}", held, {k: v for k, v in made.items() if v is not None})
