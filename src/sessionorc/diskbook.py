@@ -1,9 +1,9 @@
 """The disk sweep's pass result (design §4.6 *The sweep's reading*, TD-1945): per kind (scratch, worktrees, runs,
-caches) the bytes held, each item's size as last measured and kept in the host agent's memory so a walk stays inside
-its pass's bounds, the total *partial* until every listed item has been measured (after a host-agent restart, the
-memory is empty); the bytes the pass removed; and each item it kept that a rule would otherwise take, with why.
-Each pass writes it to `disk.json` in the host's home with the free space under `scratch_root` and a dated line per
-pass kept 30 days, from which the reading's 30-day totals are read (TD-1946, `write` and `read`)."""
+caches, home files) the bytes held, each item's size as last measured and kept in the host agent's memory so a walk
+stays inside its pass's bounds, the total *partial* until every listed item has been measured (after a host-agent
+restart, the memory is empty); the bytes the pass removed; and each item it kept that a rule would otherwise take,
+with why. Each pass writes it to `disk.json` in the host's home with the free space under `scratch_root` and a dated
+line per pass kept 30 days, from which the reading's 30-day totals are read (TD-1946, `write` and `read`)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from typing import Any
 
 from sessionorc.store import _atomic_write
 
-KINDS = ("scratch", "worktrees", "runs", "caches")
+KINDS = ("scratch", "worktrees", "runs", "caches", "home")
 WALK_S = 10.0  # one item's size walk at most, so a huge tree never spends a pass's budget (TD-1945 review)
 FILE = "disk.json"  # in the host's home (`SHIFTLEAD_HOME`)
 KEEP_DAYS = 30  # a pass's dated line is kept this long; the reading's `removed_30d` sums them

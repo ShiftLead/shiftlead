@@ -27,6 +27,7 @@ from sessionorc import (
     cachesweep,
     diskbook,
     gitinfo,
+    homesweep,
     hosts,
     link,
     mail,
@@ -6089,6 +6090,20 @@ class TickMixin:
             self._sweep_caches(now, tallies["caches"], dry=dry, deadline=deadline)
         if not late("worktrees"):
             self._sweep_worktrees(now, tallies["worktrees"], dry=dry, deadline=deadline)
+        if not late("home"):
+            try:  # §4.6 *home files*, TD-2115
+                homesweep.sweep(
+                    paths.home(),
+                    hosts.local_host().runs_keep_days,
+                    now.timestamp(),
+                    lambda: list(self.sessions.values()),
+                    tallies["home"],
+                    dry=dry,
+                    deadline=deadline,
+                )
+            except Exception:  # noqa: BLE001 — the home rule never stops the rest of the sweep
+                tallies["home"].unlisted = True
+                log.exception("home files sweep failed")
         if late("runs"):
             return
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
@@ -7869,7 +7884,9 @@ class TickMixin:
         """A conversation's start-context file, once no record but `gone` holds it (§4.1 *No prose in
         the argv*, TD-339): on Forget, and when a create replaces a record in place with another
         conversation. A record still holding it would hand it again on a Resume."""
-        if not conversation or any(r.adapter_id == conversation for r in self.sessions.values() if r is not gone):
+        if not conversation or any(
+            conversation in (r.adapter_id, r.context_id) for r in self.sessions.values() if r is not gone
+        ):
             return
         with contextlib.suppress(OSError, ValueError):
             paths.context_file(conversation).unlink(missing_ok=True)
@@ -7879,7 +7896,8 @@ class TickMixin:
         if gone is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
         self._drop_launch(sid)  # the launch record goes with the record on Forget (§6)
-        self._drop_context(gone.adapter_id, gone)
+        for conversation in {gone.adapter_id, gone.context_id}:  # a cleared session holds two (§4.6, TD-2115)
+            self._drop_context(conversation, gone)
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
         # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:

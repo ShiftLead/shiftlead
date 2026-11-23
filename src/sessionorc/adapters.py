@@ -544,6 +544,16 @@ def oldest_first(conversations: list[Conversation]) -> list[Conversation]:
     return sorted(conversations, key=lambda c: (instant(c.first_at) or floor, c.id))
 
 
+def takes_start_context(name: str) -> bool:
+    """Whether the adapter's launch takes a start context, kept in a file per conversation (design §4.1, §4.6
+    *home files*). False for an adapter this host does not know."""
+    try:
+        ad = get(name)
+    except KeyError:
+        return False
+    return bool(getattr(ad, "start_context", False))
+
+
 def start_context_system(name: str) -> bool:
     """Whether the adapter's start context is its tool's system prompt (design §4.3, TD-1669): where a member's
     brief moves at a fresh launch. False for an unknown adapter or one that does not say."""
