@@ -11,11 +11,12 @@ import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import park_ticks
 
-from sessionorc import cachesweep, paths
+from sessionorc import cachesweep, containers, diskbook, paths
 
 ENV = {
     **os.environ,
@@ -229,3 +230,89 @@ def test_a_pin_file_missing_from_the_object_store_is_no_reading(tmp_path):
     (pinned / ".git" / "objects" / blob[:2] / blob[2:]).unlink()
     assert cachesweep.pin_of(pinned) == (False, None)
     assert cachesweep.pins([pinned]) is None
+
+
+def shipped(directory: Path, name: str, days: float) -> Path:
+    t = directory / name
+    (t / "files").mkdir(parents=True)
+    (t / "files" / "s.py").write_text("x")
+    age(t, days)
+    return t
+
+
+def node_sweep(directory: Path, pinned, dry: bool = False, keep: int = 14) -> tuple[list[str], diskbook.Tally]:
+    tally = diskbook.Tally()
+    read = pinned if callable(pinned) else (lambda: pinned)
+    return cachesweep.sweep_node_trees(directory, read, keep, time.time(), tally=tally, dry=dry), tally
+
+
+def test_a_node_s_unpinned_old_tree_goes_and_a_pinned_or_young_one_stays(tmp_path):
+    d = tmp_path / "cadence"
+    p, o, y = shipped(d, PINNED, 30), shipped(d, OLD, 30), shipped(d, YOUNG, 1)
+    removed, t = node_sweep(d, {PINNED})
+    assert removed == [str(o)] and p.exists() and y.exists() and not o.exists()
+    assert (str(p), "pinned") in t.kept and {str(p), str(y)} <= t.listed
+    assert not [n for n in os.listdir(d) if n.startswith(".tmp-sweep-")]
+
+
+def test_a_node_s_unreadable_pin_removes_none_of_its_trees(tmp_path):
+    d = tmp_path / "cadence"
+    o = shipped(d, OLD, 30)
+    removed, t = node_sweep(d, None)
+    assert not removed and o.exists() and str(o) in t.listed
+
+
+def test_a_node_pin_that_moves_before_the_rename_keeps_its_tree(tmp_path):
+    d = tmp_path / "cadence"
+    o = shipped(d, OLD, 30)
+    reads = iter([{PINNED}, {OLD}])
+    removed, t = node_sweep(d, lambda: next(reads))
+    assert not removed and o.exists() and (str(o), "pinned") in t.kept
+
+
+def test_a_node_pin_that_stops_reading_before_the_rename_keeps_its_tree(tmp_path):
+    d = tmp_path / "cadence"
+    o = shipped(d, OLD, 30)
+    reads = iter([{PINNED}, None])
+    removed, _t = node_sweep(d, lambda: next(reads))
+    assert not removed and o.exists()
+
+
+def test_a_node_dry_run_counts_and_removes_nothing(tmp_path):
+    d = tmp_path / "cadence"
+    o = shipped(d, OLD, 30)
+    aside = shipped(d, f".tmp-sweep-{OLD}-1", 30)
+    removed, t = node_sweep(d, {PINNED}, dry=True)
+    assert removed == [str(o)] and o.exists() and aside.exists() and str(o) in t.gone_paths
+
+
+def test_a_dead_pass_s_aside_goes_and_a_ship_in_progress_is_not_read(tmp_path):
+    d = tmp_path / "cadence"
+    aside, ship = shipped(d, f".tmp-sweep-{OLD}-1", 30), shipped(d, f".ship-{OLD}-1", 30)
+    _removed, t = node_sweep(d, {PINNED})
+    assert not aside.exists() and ship.exists() and str(ship) not in t.listed
+
+
+def test_a_link_named_like_a_commit_in_a_node_s_directory_is_never_followed(tmp_path):
+    d, target = tmp_path / "cadence", tmp_path / "precious"
+    d.mkdir()
+    target.mkdir()
+    (target / "f").write_text("x")
+    (d / OLD).symlink_to(target)
+    removed, _t = node_sweep(d, {PINNED})
+    assert not removed and (target / "f").exists() and (d / OLD).is_symlink()
+
+
+async def test_the_pass_sweeps_each_node_by_the_home_s_and_its_checkout_s_pins(agent, monkeypatch, tmp_path):
+    await park_ticks(agent)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setattr(paths, "DEFAULT_HOME", paths.home())
+    home_repo = repo(tmp_path, "h", f'[agent-cadence]\nsource = "/x"\nref = "{PINNED}"\n')
+    checkout = repo(tmp_path, "n", f'[agent-cadence]\nsource = "/x"\nref = "{YOUNG}"\n')
+    node = SimpleNamespace(node_dir=tmp_path / "node", devcontainer=checkout)
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"n": node})
+    d = node.node_dir / "cadence"
+    by_home, by_node, unpinned = shipped(d, PINNED, 30), shipped(d, YOUNG, 30), shipped(d, OLD, 30)
+    agent._sweep_roots = [str(home_repo)]
+    agent._sweep_caches(datetime.now(UTC))
+    assert by_home.exists() and by_node.exists() and not unpinned.exists()
