@@ -6,16 +6,18 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-from pathlib import Path
 
 import pytest
 import yaml
 from fastapi.testclient import TestClient
+from test_ui_new_host import NODE_FILES, form  # noqa: F401 — a fixture
+from test_ui_repo_page import client as repo_client
+from test_ui_repo_page import fake as repo_fake
+from test_ui_repo_page import reading, rec
 
 from sessionorc import paths, teamstore
 from sessionorc.client import AgentError, LocalClient
 from shiftlead import cli, teams
-from shiftlead import org as orgmod
 from shiftlead.ui import app as uiapp
 from shiftlead.ui import common
 
@@ -111,9 +113,27 @@ def test_the_new_session_form_names_no_reader_after_the_marker(marked):
 
 
 @pytest.mark.parametrize("is_off", [True, False], ids=["after", "before"])
-def test_the_repo_page_compares_the_ledger_with_the_right_teams(monkeypatch, is_off):
+def test_the_repo_page_compares_the_ledger_with_the_right_teams(tmp_path, monkeypatch, is_off):
+    root = str(tmp_path / "samscrape")
+    records = [rec("lead", root, team="new", builtin="techlead")]
+    c = repo_client(monkeypatch, tmp_path, repo_fake({root: reading(root)}, records))
     monkeypatch.setattr(teamstore, "first_shape_off", lambda: is_off)
     monkeypatch.setattr(teams, "entry_teams", lambda *a, **k: [{"team": "old"}])
-    records = [{"id": "ao-tl", "name": "tl", "repo": "/r", "team": "new", "builtin": "techlead"}]
-    got = teams.entry_servicing(orgmod.Org(path=Path("/nonexistent")), "/r", "h", (), records)
-    assert [t["team"] for t in got] == (["new"] if is_off else ["old"])
+    seen = []
+    real = uiapp.team_notes
+    monkeypatch.setattr(uiapp, "team_notes", lambda r, defs, fleet: (seen.append(list(defs)), real(r, defs, fleet))[1])
+    assert c.get("/repo/samscrape").status_code == 200
+    assert seen == [["new"] if is_off else ["old"]]
+
+
+@pytest.mark.parametrize("is_off", [True, False], ids=["after", "before"])
+def test_the_form_drops_a_role_s_own_reader_after_the_marker(form, monkeypatch, is_off):  # noqa: F811
+    c, calls = form
+    role = "roles:\n  hunter:\n    review: {reader: techlead, held: ['src/**'], bound: 2h}\n"
+    monkeypatch.setitem(NODE_FILES, ".shiftlead.yml", role)
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: is_off)
+    data = {"name": "a1", "dir": "/srv/node/alpha", "role": "hunter", "host": "node1"}
+    r = c.post("/new", data=data, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    made = next(p for m, p in calls if m == "create")
+    assert (made.get("review") is None) is is_off

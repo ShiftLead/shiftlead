@@ -1205,6 +1205,12 @@ def team_brief_ids(
     return teams.brief_ids(org, team, host_name(), role, cfg, read=read)
 
 
+def role_review(preset: Any) -> dict[str, Any] | None:
+    """A launch's reader from its role's own `review:`, none without a role; after the cut-over no reader chain is
+    read, so none whatever the role says (§4.9e)."""
+    return None if preset is None or teamstore.first_shape_off() else preset.review
+
+
 def team_reader(
     team: str, directory: str, cfg: repoconfig.RepoConfig | None = None, role: str | None = None
 ) -> dict[str, Any]:
