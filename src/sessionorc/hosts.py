@@ -17,7 +17,7 @@ local:
   scratch_root: /tmp       # each run's scratch directory goes under <this>/shiftlead-<uid>/ (§4.6); at most 48 bytes
   seat_root: /aot          # unattended runs' scratch goes here instead (§4.6 Temporary space); unset: scratch_root
   scratch_keep_hours: 24   # an ended record's scratch is removed this long after it ended (§4.6 The disk sweep)
-  worktree_keep_days: 7   # a landed, clean, idle worktree untouched this long is removed (§4.6 The disk sweep)
+  worktree_keep_days: 7    # a landed, clean, idle worktree untouched this long is removed (§4.6 The disk sweep)
   cache_keep_days: 14      # an agent-cadence tree no repo pins, fetched this long ago, is removed (§4.6)
 ```
 
