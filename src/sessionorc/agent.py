@@ -419,6 +419,15 @@ def _resolve_in(runs: list[str], cwd: str | None, dir: Path) -> dict[str, str | 
     return {**got, **_resolve_paths(rest, dir)} if rest else got
 
 
+def _dir_inside(d: str | None, wt: Path) -> bool:
+    """Whether directory `d` is the resolved worktree `wt` or inside it, by whole path components (so `w-1` never
+    holds `w-10`); no `d`, or an empty one, is inside nothing and is never resolved (§4.6 *The disk sweep*)."""
+    if not d:
+        return False
+    p = Path(d).resolve()
+    return p == wt or wt in p.parents
+
+
 def _registered_checkout(repo: Any) -> Path | None:
     """`rpc_paths`' `repo`: its real path (`~` expanded) when that is one of `hosts.local_host().repos()`'
     real paths, by equality — a directory inside a checkout is none — else `None`, an empty, non-string
@@ -3077,15 +3086,10 @@ class HostAgent(
         and an outside session whose tool id is one of ours, never count. Run in a thread: it reads copies of the
         maps."""
         wt = wt.resolve()
-
-        def inside(d: str) -> bool:
-            p = Path(d).resolve()
-            return p == wt or wt in p.parents
-
         mine = list(self.sessions.values())
         ours = {r.adapter_id for r in mine if r.adapter_id}
         for r in mine:
-            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                 return f"in use by {r.id}"
         if self.mode == "home" and self.remote:
             for host in containers.container_nodes():
@@ -3093,7 +3097,7 @@ class HostAgent(
                     return f"{host} unreachable"
                 for r in list(self.remote.get(host, {}).values()):
                     ours.add(r.adapter_id or "")
-                    if r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+                    if r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                         return f"in use by {r.id}@{host}"
         seen = adapters.external_sessions()
         if seen["blind"]:
@@ -3101,8 +3105,25 @@ class HostAgent(
         for ext in seen["items"]:
             if ext.tool_id and ext.tool_id in ours:
                 continue
-            if ext.cwd and inside(ext.cwd):
+            if _dir_inside(ext.cwd, wt):
                 return f"in use by {ext.name} ({ext.adapter}, outside shiftlead)"
+        return None
+
+    def _record_home(self, wt: Path) -> str | None:
+        """A detached worktree's recorded home (§4.6 *The disk sweep*, TD-2103): `record: <id>` for a record in any
+        state with its `dir` at or inside `wt`, this host's first, then `record: <id>@<host>` for a linked container
+        node's, or `<host> unreachable` for a node whose link is down. Run in a thread: it reads copies of the maps."""
+        wt = wt.resolve()
+        for r in list(self.sessions.values()):
+            if _dir_inside(r.dir, wt):
+                return f"record: {r.id}"
+        if self.mode == "home":
+            for host in containers.container_nodes():
+                if not (self.links.get(host) or {}).get("up"):
+                    return f"{host} unreachable"
+                for r in list(self.remote.get(host, {}).values()):
+                    if _dir_inside(r.dir, wt):
+                        return f"record: {r.id}@{host}"
         return None
 
     def _recover_reaps(self) -> None:
