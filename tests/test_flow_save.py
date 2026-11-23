@@ -3,6 +3,8 @@ TD-2054): the check, the versions, the built-ins, and what a save does to entrie
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from sessionorc import briefs
@@ -179,7 +181,7 @@ def _call(**kw):
     )
 
 
-def test_the_rpc_body_answers_a_refusal_in_words_and_skips_a_repo_whose_checkout_is_gone(home, tmp_path):
+def test_the_rpc_body_answers_a_refusal_in_words_and_a_new_flow_needs_no_repo(home, tmp_path):
     assert "format: 3" in _call(text="name: mine\n")["refused"]
     assert "format: 3" in _call(text="a: [unclosed")["refused"]
     got = _call(text=_flow(), roots=[tmp_path / "gone"])
@@ -211,3 +213,23 @@ def test_only_a_save_that_touches_a_stage_needs_the_repos_origin(home, tmp_path)
     v = _call(text=_flow(), roots=[plain])["version"]
     v = _call(text=_flow() + "# a comment\n", version=v, roots=[plain])["version"]
     assert "origin could not be read" in _call(text=_flow(review="Check"), version=v, roots=[plain])["refused"]
+
+
+@pytest.mark.parametrize("note", ["/repo: bad yaml", "team 'x' is defined twice"])
+def test_a_delete_is_refused_while_a_repo_that_may_run_the_flow_cannot_be_read(home, tmp_path, monkeypatch, note):
+    v = _call(text=_flow())["version"]
+    org = SimpleNamespace(teams={}, unlanded={})
+    monkeypatch.setattr(flow_save.orgmod, "load", lambda: org)
+    monkeypatch.setattr(flow_save.orgmod, "with_repos", lambda o, roots: (o, [note]))
+    assert note in _call(delete=True, version=v)["refused"]
+    assert "no checkout" in _call(delete=True, version=v, roots=[tmp_path / "gone"])["refused"]
+    assert (home / "flows" / "mine").exists()
+
+
+def test_a_note_about_where_a_team_lands_does_not_refuse_a_delete(home, monkeypatch):
+    v = _call(text=_flow())["version"]
+    org = SimpleNamespace(teams={}, unlanded={"t": "t cannot land"})
+    monkeypatch.setattr(flow_save.orgmod, "load", lambda: org)
+    monkeypatch.setattr(flow_save.orgmod, "with_repos", lambda o, roots: (o, ["t cannot land", "place.x: no team"]))
+    monkeypatch.setattr(flow_save.orgmod, "with_home_settings", lambda o: o)
+    assert _call(delete=True, version=v) == {"name": "mine", "deleted": True}

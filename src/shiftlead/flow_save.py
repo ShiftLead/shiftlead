@@ -213,8 +213,15 @@ _delete = delete  # `call`'s parameter of the same name is the RPC's
 
 
 def running(name: str, roots: Iterable[str | Path]) -> list[str]:
-    """The teams that run `name`, or whose setting picks it (a pick the team no longer lists still names it)."""
-    org, _notes = orgmod.with_repos(orgmod.load(), list(roots))
+    """The teams that run `name`, or whose setting picks it (a pick the team no longer lists still names it). A repo
+    that could not be read may hold a team that runs it, so that refuses rather than answering none."""
+    roots = list(roots)
+    if gone := [str(r) for r in roots if not Path(r).is_dir()]:
+        raise FlowError(f"cannot tell which teams run {name}: no checkout at {', '.join(gone)}")
+    org, notes = orgmod.with_repos(orgmod.load(), roots)
+    unread = [n for n in notes if n not in org.unlanded.values() and not n.startswith("place.")]
+    if unread:
+        raise FlowError(f"cannot tell which teams run {name}: {'; '.join(unread)}")
     org = orgmod.with_home_settings(org)
     return sorted(t.name for t in org.teams.values() if name in (teams.current_flow(t), t.flow))
 
@@ -229,12 +236,12 @@ def call(
     roots: Iterable[str | Path],
 ) -> dict[str, Any]:
     """The `flow_save` RPC's body, in a thread of the host agent: a refusal is `{refused: <why>}`. A registered repo
-    whose checkout is gone holds no record to read; any other that cannot be read refuses the save."""
-    present = [p for p in (Path(r).expanduser() for r in roots) if p.is_dir()]
+    that cannot be read refuses what depends on it: a delete, or a save that removes, renames or re-kinds a stage."""
+    where = [Path(r).expanduser() for r in roots]
     try:
         with _SAVING:
             if delete:
-                return _delete(name, version, running(name, present))
-            return save(name, text, version, renames, present)
+                return _delete(name, version, running(name, where))
+            return save(name, text, version, renames, where)
     except (ValueError, StateError, yaml.YAMLError, OSError) as e:  # FlowError and a bad org file are ValueErrors
         return {"refused": str(e)}
