@@ -6164,9 +6164,16 @@ class TickMixin:
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
+
+        def log_live_now(path: str) -> bool:  # a record created since the snapshot (TD-2092): read just before removal
+            return any(
+                s.state not in ended and path in (s.run_log, str(self._rounds_log(s)))
+                for s in list(self.sessions.values())
+            )
+
         for f in paths.runs_dir().glob("*.log"):
             try:
-                if str(f) not in live and f.stat().st_mtime < cutoff:
+                if str(f) not in live and f.stat().st_mtime < cutoff and not log_live_now(str(f)):
                     if rm.unlink(f):
                         continue
                     log.info("pruned run log %s (older than %d days)", f.name, keep)
