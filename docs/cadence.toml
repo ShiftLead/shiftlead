@@ -49,9 +49,11 @@ agents = "claude,gemini,grok"  # this repo's fact-check seats run Gemini CLI and
 # for no fault of the PR's. The path stays short — /var/tmp/pc.XXXXXX, and pytest's --basetemp
 # under it in place of /tmp/pytest-of-<user>/pytest-<n> — since the suite's unix sockets live under
 # tmp_path and a socket's path is capped near 108 bytes (one under ~/.cache/aopre2 failed 38 tests).
+# A killed shell runs no trap, so each run first removes this user's pc.* over a day old (TD-2100): a precheck
+# takes minutes, so such a directory belongs to no live run, and a failed removal never fails the precheck.
 # After the sync, the tree's own vendored launcher validates the ledger's host-log sources and gates
 # (design §4.4 *The source*, TD-1388), needing nothing on PATH.
-precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test --basetemp=$T/p"
+precheck = "find /var/tmp -maxdepth 1 -type d -name 'pc.*' -user \"$(id -un)\" -mmin +1440 -exec rm -rf {} + 2>/dev/null; T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test --basetemp=$T/p"
 
 # A narrower precheck for a PR that changes only these docs (agent-cadence §4.12, TD-155; TD-1483): when every file
 # in the PR's diff matches the globs, `precheck.py --pr` runs this command in place of `precheck`, and records the
@@ -63,7 +65,7 @@ precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pd
 # shape. A glob over a file a test outside test-docs reads would let a PR that breaks that test merge on this
 # check; main's own precheck (design §6 *The precheck on main*) still runs the whole suite before a promote.
 [precheck-paths]
-"docs/ledger/* docs/user_attention.md docs/user_attention/* docs/design/* docs/design.md docs/design-history.md docs/history/* docs/reviews/* docs/briefs/* docs/claude-memory/* docs/decisions/* docs/glossary.md docs/mockups/*" = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run python src/sessionorc/agent_cadence.py -C . run ledger.py --check && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test-docs --basetemp=$T/p"
+"docs/ledger/* docs/user_attention.md docs/user_attention/* docs/design/* docs/design.md docs/design-history.md docs/history/* docs/reviews/* docs/briefs/* docs/claude-memory/* docs/decisions/* docs/glossary.md docs/mockups/*" = "find /var/tmp -maxdepth 1 -type d -name 'pc.*' -user \"$(id -un)\" -mmin +1440 -exec rm -rf {} + 2>/dev/null; T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run python src/sessionorc/agent_cadence.py -C . run ledger.py --check && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test-docs --basetemp=$T/p"
 
 # --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
 # naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each
