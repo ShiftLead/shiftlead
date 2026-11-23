@@ -216,6 +216,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
     role_prompts,  # noqa: F401
+    role_review,
     routed_around,  # noqa: F401
     rpc,  # noqa: F401
     settled_by_work,  # noqa: F401
@@ -537,6 +538,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_hand,
     entry_line,
     entry_role,
+    entry_servicing,
     entry_teams,
     flow_head,  # noqa: F401
     fork_title,  # noqa: F401
@@ -2708,7 +2710,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
                 ],
                 # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
-                "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
+                # after the cut-over the teams it compares are the built-in tech leads' (§4.9e)
+                "team_notes": team_notes(
+                    r, [t["team"] for t in entry_servicing(org, here_root, host_name(), (), sessions)], sessions
+                ),
                 "boards": boards,
                 "horizon": hz,
                 "doing": drows[0],
@@ -3419,7 +3424,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # picker was ticked with the team's live manager when the team was picked.
         profile = profile or (preset.profile if preset else None) or ""
         adapter = adapter or profile_adapter(profile)
-        review = preset.review if preset else None
+        review = await asyncio.to_thread(role_review, preset)
         if team.strip() and adapter != "shell":
             got = await asyncio.to_thread(
                 team_reader, team.strip(), dir.strip(), cfg if away else None, preset.name if preset else None
@@ -3897,7 +3902,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             roles = (await asyncio.to_thread(org_here))[0].roles
             # a machine node's config reads across the link, blocking on this loop: a worker thread's
             preset = await asyncio.to_thread(repoconfig.resolve_role, cfg, plan["role"], roles)
-            review = preset.review
+            review = await asyncio.to_thread(role_review, preset)
             if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
                 got = await asyncio.to_thread(team_reader, team, root, node_cfg, preset.name)
                 if got.get("flow") or review is None:
@@ -4211,7 +4216,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             profs, _default = profiles_mod.load()
             if preset.profile and preset.profile not in profs:
                 return form(f"the role {preset.name} names the profile {preset.profile}, which is not defined")
-            review = preset.review
+            review = await asyncio.to_thread(role_review, preset)
             got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
             if got.get("flow") or review is None:  # as **Open a session** takes it
                 review = got["review"]

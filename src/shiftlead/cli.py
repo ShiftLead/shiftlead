@@ -732,7 +732,11 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
     live manager as a controller when the record is given none, and the record's `review` from the
     role's or else the team's (`teams.team_review`). Fills `defaults` in place and returns the
     line saying which reader the session got, "" when none. A team the org does not define stays
-    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says."""
+    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says. After the cut-over no
+    team definition or reader chain is read: the session gets no reader and no manager (§4.9e)."""
+    if teamstore.first_shape_off():
+        defaults["review"] = None
+        return ""
     name = getattr(args, "team", None) or ""
     if not name or args.adapter == "shell":
         return ""

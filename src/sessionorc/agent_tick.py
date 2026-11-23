@@ -5083,7 +5083,9 @@ class TickMixin:
                 if "open" in (r.get("prs") or {}):
                     numbers = {str(p.get("number")) for p in prs if isinstance(p, dict)}
                     asked = {n: a for n, a in asked.items() if n in numbers}
-                unasked = held_mod.unasked(prs, asked, held_mod.has_reader(root, graph, self._repos))
+                # no reader chain runs after the cut-over, so no held PR waits to be asked (§4.9e)
+                has_reader = not self._first_shape_off and held_mod.has_reader(root, graph, self._repos)
+                unasked = held_mod.unasked(prs, asked, has_reader)
                 # recomputed from the mail at every pass, a saved entry kept only where its ask is gone (TD-704)
                 reads = held_mod.merge_reads(fresh.get(root) or {}, old.get("reads") or {}, held_ids, numbers)
                 new = {
@@ -5328,8 +5330,9 @@ class TickMixin:
     def _held_keys(self, roots: list[str]) -> dict[str, list[str]]:
         """Each root's held key for the PR read (§4.4 *A held PR nobody asked is marked*, TD-789):
         `held.repo_key` from the graph, and the union over the roots of one remote (`by_remote` reads
-        it once for them all, at the first root's key on a pass where no `remote` is read yet)."""
-        records = list(self._graph().values())
+        it once for them all, at the first root's key on a pass where no `remote` is read yet). After the cut-over
+        no record's `review` is read, so the key is the repo's own `held:` alone (§4.9e)."""
+        records = [] if self._first_shape_off else list(self._graph().values())
         own = {r: held_mod.repo_key(r, records) for r in roots}
         union: dict[str, set[str]] = {}
         for r in roots:
