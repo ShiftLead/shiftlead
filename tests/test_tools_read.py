@@ -286,10 +286,9 @@ def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
     import os
     import signal
     import subprocess
-    import sys
     import time
 
-    from conftest import CHILD, kill_private_server, private_socket_name, wait_for_sync
+    from conftest import kill_private_server, private_socket_name, spawn_agent_child, wait_for_sync
 
     from sessionorc.tmux import Tmux
 
@@ -306,13 +305,7 @@ def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
     monkeypatch.setenv("AO_TEST_TOOLS_AT_START", "1")
     monkeypatch.setenv("PATH", f"{slow}{os.pathsep}{os.environ['PATH']}")
-    proc = subprocess.Popen(
-        [sys.executable, str(CHILD), sock_name],
-        env=dict(os.environ),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    proc = spawn_agent_child(sock_name, dict(os.environ), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     try:
         sock = home / "agent.sock"
         assert wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0)

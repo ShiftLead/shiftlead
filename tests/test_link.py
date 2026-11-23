@@ -15,12 +15,12 @@ from datetime import UTC, datetime
 import pytest
 import yaml
 from conftest import (
-    CHILD,
     FAST_TICK,
     kill_private_server,
     park_ticks,
     private_socket_name,
     scratch_dir,
+    spawn_agent_child,
     wait_for,
 )
 
@@ -169,7 +169,7 @@ class Home:
     async def start(self):
         env = self.env
         env.pop("SHIFTLEAD_SESSION", None)
-        self.proc = subprocess.Popen([sys.executable, str(CHILD), self.sock_name], env=env, stderr=subprocess.DEVNULL)
+        self.proc = spawn_agent_child(self.sock_name, env, stderr=subprocess.DEVNULL)
         assert await wait_for(lambda: (self.dir / "agent.sock").exists(), timeout=10.0, step=0.05), "home never came up"
 
     def stop(self):

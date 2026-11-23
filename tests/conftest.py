@@ -32,6 +32,7 @@ import tempfile
 import threading
 import time
 import uuid
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
@@ -644,6 +645,29 @@ def pytest_runtest_protocol(item, nextitem):
             timer.cancel()
 
 
+def spawn_agent_child(sock_name: str, env: dict[str, str], **popen_kw) -> subprocess.Popen:
+    """Start `_agent_child.py` so it ends with this process, however this process ends (TD-2067).
+
+    This process alone holds the pipe's write end (non-inheritable, so no other child gets it); when it dies the child
+    reads EOF and stops. A pipe of its own rather than stdin, which the agent's own subprocesses would inherit.
+    """
+    read_end, write_end = os.pipe()
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, str(CHILD), sock_name],
+            env={**env, "AO_TEST_OWNER_FD": str(read_end)},
+            pass_fds=(read_end,),
+            **popen_kw,
+        )
+    except BaseException:
+        os.close(write_end)
+        raise
+    finally:
+        os.close(read_end)
+    weakref.finalize(proc, os.close, write_end)
+    return proc
+
+
 class ChildAgent(NamedTuple):
     home: Path
     sock_name: str
@@ -672,13 +696,7 @@ def subprocess_agent(tmp_path_factory):
         # as it goes, and a pipe nobody drains blocks its next write once full, which freezes every request to it
         err_path = home / "agent.stderr"
         with open(err_path, "w") as err_file:
-            proc = subprocess.Popen(
-                [sys.executable, str(CHILD), sock_name],
-                env=dict(os.environ),
-                stdout=subprocess.DEVNULL,
-                stderr=err_file,
-                text=True,
-            )
+            proc = spawn_agent_child(sock_name, dict(os.environ), stdout=subprocess.DEVNULL, stderr=err_file, text=True)
 
         def err() -> str:
             return err_path.read_text(errors="replace")
