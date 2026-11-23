@@ -676,8 +676,9 @@ class MailMixin:
         choice of the held extra the mail is on fills it in place. The move is a landing, not a send: no gate, no
         tally; the copies say where it went (`to`). An own record that is not live keeps its mail, filled on its
         cause — unless it cannot answer as `stalled?`, `exited` or closed, when its asks go to its extras first, a
-        reader's `ask` among them (§4.9b *A seat that cannot answer is routed around*), before `_reroute_waiting`."""
-        if self.mode != "home":
+        reader's `ask` among them (§4.9b *A seat that cannot answer is routed around*), before `_reroute_waiting`.
+        After the cut-over no seat scales, so nothing moves (§4.9e)."""
+        if self.mode != "home" or self._first_shape_off:
             return
         records = self._graph()
         changed = False
