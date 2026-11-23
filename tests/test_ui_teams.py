@@ -1453,7 +1453,7 @@ def test_a_switched_teams_page_draws_its_running_rows_and_saves_them(world, clie
 
     monkeypatch.setattr(fleet, "handle", handle)
     page = client.get("/teams/solo").text
-    band = page.split('<div class="h2">When it runs</div>')[1]
+    band = page.split('<div class="h2">When it runs</div>')[1].split('id="teamdelete"')[0]
     for row in ("Stops", "Reserve priority", "Holds new work"):
         assert row in band
     assert "When work appears" not in band and "after the switch-over" not in band
@@ -1590,3 +1590,80 @@ def test_the_route_map_draws_a_filled_pill_a_dashed_pill_and_a_stage_gone():
     assert [(p["id"], p["dashed"], p["word"]) for p in check["pills"]] == [("TD-2", True, "asked 3h 0m ago")]
     assert build["pills"][0]["href"] == "/card/shiftlead%23TD-1" and got["lines"][0]["end"] == "merged"
     assert [(p["id"], p["word"]) for p in got["gone"]] == [("TD-3", "waits on you")]
+
+
+# -- New team and Delete (design §4.9d, TD-2063) -----------------------------------------------------------------------
+
+
+def test_the_second_team_line_keeps_the_declared_names_first():
+    assert setmod.declared_line(["a", "db"], ["db"]) == "Team = db | a"
+    teams = {"r": ["a", "b"], "solo": ["c"]}
+    read = {"/x/r": {"name": "r", "ledger": {"declared_teams": ["a"]}}, "/x/solo": {"name": "solo", "ledger": {}}}
+    assert setmod.undeclared("b", "r", teams, read) == "Team = a | b"
+    assert setmod.undeclared("a", "r", teams, read) is None, "a declared team is not marked"
+    assert setmod.undeclared("c", "solo", teams, read) is None, "a repo's only team needs no declaration"
+    assert setmod.undeclared("b", "r", teams, {}) is None, "a ledger not read marks nothing"
+
+
+def test_the_new_team_form_carries_what_the_ledger_declares():
+    """§4.9d: a deleted name stays declared, so the form's line must not drop it."""
+    org = SimpleNamespace(checkouts={})
+    read = {"/x/r": {"name": "r", "ledger": {"declared_teams": ["solo", "old"]}}, "/x/s": {"name": "s", "ledger": {}}}
+    got = setmod.new_team_form(org, {"r": ["solo"]}, ["r", "s"], ["build"], "home", read)
+    assert got["declared"] == {"r": ["solo", "old"], "s": []}
+    script = (Path(setmod.__file__).parent / "static" / "team.js").read_text()
+    assert "declared[repo]" in script and script.index("declared[repo]") < script.index("teams[repo] || []), form")
+
+
+def test_new_team_is_disabled_before_the_cut_over_and_a_form_after(world, client, monkeypatch):
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    marker = {"cut_over": None}
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead"}, **marker}
+        if method == "team_show":
+            return _switched_show()
+        if method == "tools":
+            return _switched_tools()
+        if method == "flows":
+            return {"flows": [{"name": "quick"}, {"name": "build"}]}
+        if method in ("team_new", "team_delete"):
+            fleet.calls.append((method, params))
+            return {"team": params.get("team") or params.get("name")}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/solo").text
+    assert 'disabled title="after the switch-over">+ New team' in page and 'id="teamnew"' not in page
+    assert 'id="teamdelete"' in page and 'disabled title="after the switch-over">Delete solo' in page
+    marker["cut_over"] = "2026-12-01"
+    page = client.get("/teams/solo").text
+    assert 'id="teamnewopen"' in page and 'id="teamnew"' in page
+    assert page.index('value="build"') < page.index('value="quick"'), "the built-in build is the form's first flow"
+    assert (
+        client.post("/api/teams/new", json={"name": "db", "repo": "shiftlead", "flow": "build", "x": 1}).status_code
+        == 200
+    )
+    assert next(p for m, p in fleet.calls if m == "team_new") == {"name": "db", "repo": "shiftlead", "flow": "build"}
+    assert client.post("/api/teams/solo/delete", json={"version": "v1"}).status_code == 200
+    assert next(p for m, p in fleet.calls if m == "team_delete") == {"team": "solo", "version": "v1"}
+
+
+def test_a_start_is_refused_where_a_team_made_on_its_page_makes_the_repo_two_teams(tmp_path, monkeypatch):
+    """§4.9d *New team*: the second team is in `settings.yml` and in no definition, and both must be declared."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    monkeypatch.setattr(teamrun.teams, "entry_teams", lambda *_a, **_k: [{"team": "a"}])
+    plan = SimpleNamespace(launches=[SimpleNamespace(dir=root)], host="h", team="a")
+    made = {"a": "repo", "b": "repo"}
+
+    def call(method):
+        if method == "repos":
+            return {str(root): {"name": "repo", "ledger": {"declared_teams": ["b"]}}}
+        return {"switched_teams": made}
+
+    assert "add `Team = b | a`" in teamrun.undeclared(call, None, plan, "h")
+    made.pop("b")
+    assert teamrun.undeclared(call, None, plan, "h") is None, "one team needs no declaration"

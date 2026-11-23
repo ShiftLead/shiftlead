@@ -174,6 +174,37 @@ def view(
     return out
 
 
+def new_refusal(repo: str, flow: str, roots: Iterable[str | Path]) -> str | None:
+    """Why **+ New team** cannot take this repo and flow (§4.9d *New team*, TD-2063), or None."""
+    where = [Path(r).expanduser() for r in roots]
+    if _root(repo, where) is None:
+        return f"{repo} is not a registered checkout here"
+    if flow not in {str(r["name"]) for r in flow_save.listing(where)["flows"]}:
+        return f"there is no flow named {flow}"
+    return None
+
+
+def open_records(team: str, repo: str, roots: Iterable[str | Path]) -> list[str]:
+    """The team's open stage records in **Delete**'s words (§4.9d *Delete*, TD-2063): *TD-2101 is in build*, *TD-2084
+    waits on you*. A state branch that cannot be read raises: a record not read is never read as no record."""
+    root = _root(repo, [Path(r).expanduser() for r in roots])
+    if root is None:
+        raise StateError(f"{repo} is not a registered checkout here")
+    held = [r for r in StageStore(root).entries().values() if r.get("team") == team and not r.get("closed_at")]
+    return [
+        f"{r.get('id')} waits on you" if r.get("waits") == "person" else f"{r.get('id')} is in {r.get('stage')}"
+        for r in sorted(held, key=lambda r: str(r.get("id")))
+    ]
+
+
+def drop_copy(team: str, repo: str, roots: Iterable[str | Path]) -> None:
+    """The team's copy of its flow removed from the state branch, at its Delete."""
+    root = _root(repo, [Path(r).expanduser() for r in roots])
+    if root is None:
+        raise StateError(f"{repo} is not a registered checkout here")
+    StageStore(root).drop_flow(team)
+
+
 def call(
     *,
     team: str,

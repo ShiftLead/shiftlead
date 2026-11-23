@@ -131,6 +131,42 @@ def apply(doc: dict[str, Any], team: str, change: Mapping[str, Any], sent: str |
     return f"{team} {key} {'cleared' if new is None else 'set'}"
 
 
+def new(doc: dict[str, Any], name: str, *, label: Any, repo: str, host: str, flow: str) -> str:
+    """**+ New team**'s write (§4.9d *New team*, TD-2063), in place: the team stopped, with an empty login list. Its
+    name follows a login's rule, is unique compared case-folded and is fixed once made. Refused before the cut-over."""
+    if not cut_over(doc):
+        raise TeamError(BEFORE)
+    if not logins.valid_name(name):
+        raise TeamError(f"{name!r} is not a team's name: letters, digits, dashes and underscores, at most 24")
+    teams = doc.get("teams")
+    held = teams if isinstance(teams, dict) else {}
+    if name.casefold() in {str(n).casefold() for n in held}:
+        raise TeamError(f"there is already a team named {name}")
+    for what, value in (("repo", repo), ("host", host), ("flow", flow)):
+        if not isinstance(value, str) or not value.strip():
+            raise TeamError(f"a new team needs a {what}")
+    entry: dict[str, Any] = {"repo": repo, "host": host, "flow": flow, "logins": []}
+    if (words := _label(label)) is not None:
+        entry["label"] = words
+    doc["teams"] = {**held, name: entry}
+    return f"{name} made"
+
+
+def delete(doc: dict[str, Any], team: str, sent: str | None) -> str:
+    """**Delete**'s write (§4.9d *Delete*, TD-2063), in place: `teams.<team>` goes. Refused before the cut-over, for a
+    team that is not switched and over a newer version; what else refuses it is the caller's to read."""
+    if not cut_over(doc):
+        raise TeamError(BEFORE)
+    if not switched(doc, team):
+        raise TeamError(f"no switched team {team!r}")
+    if sent is None or sent != version(doc, team):
+        raise TeamError(STALE)
+    del doc["teams"][team]
+    if not doc["teams"]:
+        del doc["teams"]
+    return f"{team} deleted"
+
+
 def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[str]:
     """Each switched team on `flow` with its `at_once` keys renamed, in place (§4.9c *A switch or a rename re-keys the
     records*): the teams changed. Renames are applied at once, so a swap of two names holds, and a renamed stage's

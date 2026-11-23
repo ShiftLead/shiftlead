@@ -297,6 +297,11 @@ class StageStore:
         """The copy of the flow `team`'s records are written under; the caller has passed it through the check."""
         return self.write({f"flows/{self._named('team', team)}.yml": text}, f"shiftlead: last good flow of {team}")
 
+    def drop_flow(self, team: str) -> None:
+        """The team's copy of its flow gone, at its Delete (§4.9d *Delete*); no branch or no copy writes nothing."""
+        if self.flow(team) is not None:
+            self.write({f"flows/{self._named('team', team)}.yml": None}, f"shiftlead: {team} deleted")
+
     # -- a move to the person --------------------------------------------------------------------------------
 
     def record_intent(
