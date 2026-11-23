@@ -364,6 +364,19 @@ def test_a_gate_this_question_did_not_set_is_left_standing(repo, nonce):
     assert git(repo, "rev-parse", "origin/main") == head
 
 
+def test_an_answer_applied_to_nothing_is_said_once_on_the_log(repo):
+    """TD-2051, §4.9c act 2: one pull request adds the Log line, and a second call writes nothing."""
+    _push(repo, [], {190: _entry(190) + MOVED_LOG})
+    assert board.note_unapplied(repo, "TD-190", "Polish it", "n1")["commit"]
+    git(repo, "fetch", "-q", "origin")
+    entry = git(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert 'answer "Polish it" was applied to nothing' in entry and "(question n1)" in entry
+    head = git(repo, "rev-parse", "origin/main")
+    assert board.note_unapplied(repo, "TD-190", "Polish it", "n1") == {"nothing": True}
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+
+
 def test_an_item_shared_with_another_gated_entry_stays_open_when_one_moves(repo):
     _push(repo, [SHARED], {189: _entry(189), 190: _entry(190) + MOVED_LOG, 191: _entry(191)})
     got = board.clear_question(repo, "TD-190", "paul", "n1")

@@ -268,6 +268,58 @@ def test_an_archive_the_ledger_refuses_leaves_the_record_waiting(store, monkeypa
     assert not got.made and "parts are open" in got.why and store.entry(TID) == before
 
 
+def test_a_lift_after_a_hand_merge_is_applied_to_nothing_and_the_merge_is_reconciled(store, monkeypatch):
+    put(store, pr=4, branch="td7-work", waits="person", answers={"Polish it": "build"}, asked={"nonce": "n1"})
+    seen = []
+
+    def note(tid, label, mark):
+        seen.append((tid, label, mark, store.entry(TID)["waits"]))
+        return {"commit": "abc"}
+
+    monkeypatch.setattr(store, "note_unapplied", note)
+    reading = Reading(pr_state="merged", lifted="Polish it", lifted_for="n1")
+    assert act_on(store, reading).made
+    assert seen == [(TID, "Polish it", "n1", "person")]  # the Log first, with the record still waiting
+    record = store.entry(TID)
+    assert record["stage"] == "build" and record["pr"] == 4 and record["branch"] == "td7-work"
+    assert record["waits"] is None and record["asked"] is None and record["answers"] is None
+    assert choose(record, Reading(pr_state="merged")) == Act("reconcile", "merged-entry-open")
+
+
+def test_a_log_that_cannot_be_written_leaves_the_record_waiting(store, monkeypatch):
+    put(store, pr=4, waits="person", answers={"Polish it": "build"}, asked={"nonce": "n1"})
+
+    def refused(*_a):
+        raise board.Refused("the forge is away")
+
+    monkeypatch.setattr(store, "note_unapplied", refused)
+    got = act_on(store, Reading(pr_state="merged", lifted="Polish it", lifted_for="n1"))
+    assert not got.made and "the forge is away" in got.why
+    assert store.entry(TID)["waits"] == "person"
+
+
+def test_a_question_asked_after_the_merge_is_answered_as_usual(store, monkeypatch):
+    put(store, pr=4, waits="person", answers={ARCHIVE: {"archive": True}}, asked={"nonce": "n1", "after_merge": True})
+    monkeypatch.setattr(store, "note_unapplied", lambda *_a: pytest.fail("this answer is about the merge"))
+    archived = []
+    monkeypatch.setattr(store, "archive", lambda tid, why: archived.append(tid) or {"commit": "abc"})
+    assert act_on(store, Reading(pr_state="merged", lifted=ARCHIVE, lifted_for="n1")).made
+    assert archived == [TID]
+
+
+def test_a_gate_met_by_the_merged_question_has_its_answer_applied(store, monkeypatch):
+    put(store, pr=4, branch="td7-work")
+    assert act_on(store, Reading(pr_state="merged", gate=True)).made
+    record = store.entry(TID)
+    assert record["waits"] == "person" and record["asked"] is None and record["gate_after_merge"] is True
+    monkeypatch.setattr(store, "note_unapplied", lambda *_a: pytest.fail("this gate was met after the merge"))
+    assert act_on(store, Reading(pr_state="merged", lifted="Something else: go on")).made
+    record = store.entry(TID)
+    assert (
+        record["waits"] is None and record["gate_after_merge"] is False and record["answer"] == "Something else: go on"
+    )
+
+
 def test_a_stage_with_nothing_to_read_passes_as_ship_to_merge_with_the_head(store):
     put(store, stage="review", pr=4, branch="td7")
     assert act_on(store, Reading(nothing_to_read=True, head="a" * 40)).made
