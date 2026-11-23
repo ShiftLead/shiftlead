@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from sessionorc import board
 from shiftlead.stage_acts import Act, Holder, Reading, choose
 from shiftlead.stage_end import ARCHIVE
 from shiftlead.stage_make import make, offer, sweep_closed
@@ -220,10 +221,25 @@ def test_a_lift_of_an_earlier_question_is_not_applied_to_the_new_one(store):
     assert act_on(store, Reading(lifted="Polish it", lifted_for="new")).made
 
 
-def test_the_archive_answer_is_left_for_its_own_slice(store):
+def test_the_archive_answer_archives_and_leaves_the_record_until_the_ledger_reads_it(store, monkeypatch):
     before = put(store, waits="person", answers={"Archive the entry": {"archive": True}, OTHER: None})
-    assert not act_on(store, Reading(lifted="Archive the entry")).made
+    asked = []
+    monkeypatch.setattr(store, "archive", lambda tid, why: asked.append((tid, why)) or {"pr": 5})
+    assert act_on(store, Reading(lifted="Archive the entry")).made
+    assert asked == [(TID, "the person's answer: Archive the entry")]
     assert store.entry(TID) == before
+    assert act_on(store, Reading(entry="archived")).made and store.entry(TID)["closed_at"]
+
+
+def test_an_archive_the_ledger_refuses_leaves_the_record_waiting(store, monkeypatch):
+    before = put(store, waits="person", answers={"Archive the entry": {"archive": True}, OTHER: None})
+
+    def refuse(*_a: Any) -> dict[str, Any]:
+        raise board.Refused("parts are open")
+
+    monkeypatch.setattr(store, "archive", refuse)
+    got = act_on(store, Reading(lifted="Archive the entry"))
+    assert not got.made and "parts are open" in got.why and store.entry(TID) == before
 
 
 def test_a_stage_with_nothing_to_read_passes_as_ship_to_merge_with_the_head(store):

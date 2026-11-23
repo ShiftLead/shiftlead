@@ -299,3 +299,24 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
     src = Path(stagerecord.__file__).parent
     users = sorted(p.name for p in src.rglob("*.py") if p.name != "stagerecord.py" and "stagerecord" in p.read_text())
     assert users == ["flow_save.py", "stage_end.py", "stage_make.py", "team_show.py"]  # the last only reads
+
+
+def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):
+    store = StageStore(repo)
+    got = store.archive("TD-190", "the person's answer: Archive the entry")
+    assert got["pr"]
+    git(repo, "fetch", "-q", "origin")
+    names = git(repo, "ls-tree", "-r", "--name-only", "origin/main", "docs/ledger").splitlines()
+    assert "docs/ledger/archive/TD-190.md" in names and "docs/ledger/TD-190.md" not in names
+    text = git(repo, "show", "origin/main:docs/ledger/archive/TD-190.md")
+    assert "the person's answer: Archive the entry" in text
+    head = git(repo, "rev-parse", "origin/main")
+    assert store.archive("TD-190", "again") == {"gone": True}
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+
+
+def test_an_entry_another_is_blocked_by_can_be_archived_and_a_missing_one_is_gone(repo):
+    store = StageStore(repo)
+    assert store.archive("TD-999", "no such entry") == {"gone": True}
+    assert store.archive("TD-191", "the person's answer")["pr"]
