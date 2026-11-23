@@ -10,7 +10,7 @@ a team's flow name resolves to the first shape's built-ins (`shiftlead.flowdefs`
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,12 @@ TOP_KEYS = ("format", "name", "max-moves", "stages", "audits")
 STAGE_KEYS = ("name", "does", "model", "takes", "only-when", "brief", "also")
 AUDIT_KEYS = ("name", "model", "every", "brief", "also")
 TAKES = ("design-first", "other", "any")
+ROUTE_HEADS = {
+    "design-first": "Entries that need a design first",
+    "other": "Entries ready to build",
+    "any": "Every entry",
+}
+ROUTE_OTHER = "Reached only by other outcomes"
 MAX_MOVES = 25
 EVERY = re.compile(r"[1-9]\d* (merged-pull-requests|hours|days)")
 STANDARD = briefs.STANDARD  # the standard briefs, each with its kind (§4.9c *What a stage's session is told*)
@@ -355,6 +361,39 @@ def _move(
         bad.append(f"{name}: `{where}` goes to `{to}`, which is not a stage (rule 1)")
     else:
         st["edges"].append((where, to, limit))
+
+
+def route_lines(stages: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The route map's lines (§4.9d *The route map draws the flow as lines*), derived from a flow's stages and never
+    stored: a line per way in, following `work-pushed` (a design or build stage) or `ship` (a review stage) until
+    `merge`, the person or a stage already on the line. `end` is `merged`, `you`, `back` (to `back_to`) or None where
+    the flow names no next stop. A stage on no line is on a last line, `other`, in the flow's order."""
+    rows = {key_of(s.get("name")): s for s in stages}
+    out: list[dict[str, Any]] = []
+    for key, row in rows.items():
+        if (head := ROUTE_HEADS.get(str(row.get("takes")))) is None:
+            continue
+        stops: list[str] = []
+        end, back_to, at = None, None, key
+        while at in rows:
+            stops.append(at)
+            value = rows[at].get("ship" if rows[at].get("does") == "review" else "work-pushed")
+            value = value.get("to") if isinstance(value, Mapping) else value
+            if not isinstance(value, str):
+                break
+            to = value if value in FIXED else key_of(value)
+            if to in ("merge", "person"):
+                end = "merged" if to == "merge" else "you"
+                break
+            if to in stops:
+                end, back_to = "back", to
+                break
+            at = to
+        out.append({"head": head, "stops": stops, "end": end, "back_to": back_to, "other": False})
+    placed = {k for line in out for k in line["stops"]}
+    if rest := [k for k in rows if k not in placed]:
+        out.append({"head": ROUTE_OTHER, "stops": rest, "end": None, "back_to": None, "other": True})
+    return out
 
 
 def _loops(stages: Mapping[str, dict[str, Any]], bad: list[str]) -> None:

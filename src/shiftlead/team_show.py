@@ -48,12 +48,25 @@ def _now_on(order: list[str], model: Any, rows: Mapping[str, Mapping[str, Any]],
     return teamstore.pick(order, str(model), rows)
 
 
+def _entry(r: Mapping[str, Any]) -> dict[str, Any]:
+    asked = r.get("asked")
+    return {
+        "id": r.get("id"),
+        "stage": r.get("stage"),
+        "holder": r.get("holder"),
+        "waits": r.get("waits"),
+        "since": r.get("entered_at"),
+        "asked_at": asked.get("at") if isinstance(asked, Mapping) else None,
+    }
+
+
+def _open(records: Iterable[Mapping[str, Any]], team: str) -> list[Mapping[str, Any]]:
+    held = [r for r in records if r.get("team") == team and not r.get("closed_at")]
+    return sorted(held, key=lambda r: str(r.get("id")))
+
+
 def _entries(records: Iterable[Mapping[str, Any]], team: str, key: str) -> list[dict[str, Any]]:
-    held = [r for r in records if r.get("team") == team and not r.get("closed_at") and r.get("stage") == key]
-    return [
-        {"id": r.get("id"), "holder": r.get("holder"), "waits": r.get("waits"), "since": r.get("entered_at")}
-        for r in sorted(held, key=lambda r: str(r.get("id")))
-    ]
+    return [_entry(r) for r in _open(records, team) if r.get("stage") == key]
 
 
 def _login_row(
@@ -121,9 +134,13 @@ def view(
     numbers = entry.get("at_once") if isinstance(entry.get("at_once"), Mapping) else {}
     keys = [flow3.key_of(s.get("name")) for s in stages]
     held = list(records)
+    off_flow = [_entry(r) for r in _open(held, team) if r.get("stage") not in keys]  # all of them, a flow not read
     out["flow"] = {
         "name": name,
         "read": good,
+        "lines": flow3.route_lines(stages),
+        "gone": [e for e in off_flow if good and e["waits"] == "person"],  # *waiting on you, its stage is gone*
+        "unplaced": [e for e in off_flow if not good or e["waits"] != "person"],
         "stages": [
             {
                 "key": key,
