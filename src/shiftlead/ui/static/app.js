@@ -10665,7 +10665,8 @@
       teams: (f) => {
         // the running settings are on the team page (§4.9d, TD-2059): the Settings card sends its flow pick alone
         const body = { team: f.dataset.team };
-        if (f.elements.reserve) body.reserve = f.elements.reserve.value.trim();
+        const rs = f.elements.reserve;  // written only when it moved, so a save never reverts another tab's
+        if (rs && rs.value.trim() !== rs.dataset.was) body.reserve = rs.value.trim();
         if (f.elements.until && f.elements.until.value.trim() && f.elements.stops.value === "at") body.until = f.elements.until.value.trim();
         if (f.elements.stops && f.elements.stops.value === "never" && f.elements.stops.dataset.was === "at") body.until = null;
         // **when work appears** (§6 rule 8): written only when the pick moved, so *ask me (default)* leaves the key absent
@@ -10778,10 +10779,24 @@
         if (section === "you" && AO.termChan) { AO.termChan.postMessage(body.terminal); AO.setTermLook(body.terminal); }
         if (ap && f.elements.flow) f.elements.flow.dataset.was = body.flow;  // saved: a second Save does not send it again
         // the stop time is drawn in this host's clock by the server; a switch's toasts are read first
-        if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);
-      } catch (err) { say(f, err.message, true); }
+        if (section === "teams" && f.hasAttribute("data-autosave")) {
+          // the team page (TD-2059): what was saved is the new baseline; a redraw never takes a field being typed in
+          if (f.elements.reserve && "reserve" in body) f.elements.reserve.dataset.was = body.reserve;
+          if (f.elements.on_work && body.on_work) f.elements.on_work.dataset.was = body.on_work;
+          if ("balance" in body) $(".setbalance", f).dataset.was = JSON.stringify(body.balance);
+          if ("schedule" in body) $(".setschedule", f).dataset.was = JSON.stringify(body.schedule);
+          setTimeout(() => { if ("until" in body || !f.contains(document.activeElement) || document.activeElement.type === "checkbox") location.reload(); }, 600);
+        } else if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);
+      } catch (err) {
+        // a refused row must not ride along on the next save: redraw what is saved, with the refusal in place
+        if (f.hasAttribute("data-autosave")) { try { sessionStorage.setItem("ao.teamsaid", err.message); location.reload(); return; } catch (e) {} }
+        say(f, err.message, true);
+      }
     });
     // the team page saves each row as it is changed (§4.5a *Team page: When it runs*, TD-2059)
+    $$("form[data-autosave]", page).forEach((f) => {
+      try { const m = sessionStorage.getItem("ao.teamsaid"); if (m) { sessionStorage.removeItem("ao.teamsaid"); say(f, m, true); } } catch (e) {}
+    });
     $$("form[data-autosave]", page).forEach((f) => f.addEventListener("change", (e) => {
       if (e.target.name === "stops") {
         f.elements.until.hidden = e.target.value !== "at";

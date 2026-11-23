@@ -1621,3 +1621,4 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .teampage .setrow { grid-template-columns: minmax(0, 1fr); }
   .teampage .setrow > .setlabel, .teampage .setrow > :not(.setlabel) { grid-column: 1; grid-row: auto; }
 }
+.teampage .input[hidden] { display: none; }

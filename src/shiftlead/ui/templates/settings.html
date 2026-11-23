@@ -137,7 +137,7 @@
     {% for t in teams %}
     <form class="card pad setcard" id="team-{{ t.name }}" data-section="teams" data-team="{{ t.name }}">
       <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span>{% if t.source %}{{ filehead(t.source, "defined in") }}{% endif %}</div>
-      <div class="note">Its running settings are on <a href="/teams/{{ t.name }}">its team page</a>.</div>
+      <div class="note">Its running settings are on <a href="/teams/{{ t.name | urlencode }}">its team page</a>.</div>
       {# **flow** (§4.5a, §4.9c, TD-309 slice 4b): `teams.<team>.flow`, a pick of the team's `flows:`, each it
          cannot follow disabled with the reason — written only when it moved, and nothing more (TD-356):
          Apply moves the team. The one pick since the team card's moved here (TD-418), whose flow chip
