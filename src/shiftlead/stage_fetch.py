@@ -21,7 +21,7 @@ from typing import Any, NamedTuple
 from sessionorc import held, ledger, ledgerboard, reports
 from sessionorc.models import Session
 from shiftlead import repoconfig
-from shiftlead.stage_read import EntryFacts, EntryLedger, ledger_on, only_when_protected, renumbered_on
+from shiftlead.stage_read import EntryFacts, EntryLedger, ledger_on, only_when_protected, renumbered_on, rows_for
 
 TD_ID = re.compile(r"TD-[0-9]+")
 
@@ -104,6 +104,20 @@ def files_at(root: Path | str, pr: int, head: str | None) -> list[str] | None:
         return None
     row = reports.pr_state_row(root, pr)
     return files if row is not None and row.get("state") == "open" and row.get("head") == head else None
+
+
+def rows_of(
+    prs: Mapping[str, Any] | None,
+    wanted: Iterable[int],
+    read_one: Callable[[int], Mapping[str, Any] | None],
+) -> tuple[Mapping[str, Any], ...] | None:
+    """The repo's rows from its pull request reading, for `RepoFacts.rows`. None: no reading, or one whose last read
+    failed and so still holds old rows. The `recent` read comes after the `open` one, so its merges and closes come
+    first; its open rows come last, since they lack the fork and filing marks only the `open` read carries."""
+    if not isinstance(prs, Mapping) or "error" in prs:
+        return None
+    opened, recent = prs.get("open") or [], prs.get("recent") or []
+    return rows_for(([r for r in recent if r.get("state") != "open"], opened, recent), wanted, read_one)
 
 
 @dataclass(frozen=True)
