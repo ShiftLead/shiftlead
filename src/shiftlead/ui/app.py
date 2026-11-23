@@ -344,6 +344,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     ci_not_run_kinds,
     ci_not_run_rows,
     delegated_for,  # noqa: F401
+    disk_low_rows,
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     fork_pr_rows,
@@ -1733,6 +1734,8 @@ class Readings:
             + fork_pr_rows(repos, fleet, str(home.get("home") or hosts.home_name()))
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
             + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
+            # §4.5a *Inbox row: temporary space low* (TD-2083): the home's spells, a row per host and pool
+            + disk_low_rows(home.get("disk_low"))
             # §4.5a *Queue card / Inbox: stuck row* (§6 rule 13, TD-1497): the home's stuck asks, Open where held
             + stuck_rows(home.get("stuck"), records=fleet)
         )
@@ -2347,6 +2350,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += fork_pr_rows(repos, sessions, str((info or {}).get("home") or hosts.home_name()))
         # …and an account whose CI never starts (§4.5a *Inbox row: CI not starting*, TD-687)
         promos += ci_not_run_rows(None if agent_down else (info or {}).get("ci_spells"))
+        # …and a host's temporary space low (§4.5a *Inbox row: temporary space low*, TD-2083)
+        promos += disk_low_rows(None if agent_down else (info or {}).get("disk_low"))
         # …and stuck work the person is asked to see (§4.5a *Queue card / Inbox: stuck row*, TD-1497)
         promos += stuck_rows(None if agent_down else (info or {}).get("stuck"), records=sessions)
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)

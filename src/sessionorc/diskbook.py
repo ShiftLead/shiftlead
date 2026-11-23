@@ -296,7 +296,52 @@ def write(
         out = {"host": host, "at": _stamp(now), "started": started, "kinds": result, "free": free, "passes": lines}
         if seat_free is not None:
             out["seat_free"] = seat_free
+        if isinstance(low := _load(path).get("low"), dict):  # each pool's *low* state outlives a pass (TD-2083)
+            out["low"] = low
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
+    return out
+
+
+def low_state(home: str | Path) -> dict[str, dict[str, Any]]:
+    """Each pool's *low* state in `disk.json` (§4.6 *Told before the pool is full*), an odd entry dropped."""
+    got = _load(Path(home) / FILE).get("low")
+    return {str(k): v for k, v in got.items() if isinstance(v, dict)} if isinstance(got, dict) else {}
+
+
+def set_low(home: str | Path, host: str, low: dict[str, dict[str, Any]]) -> None:
+    """Write the pools' *low* state into `disk.json`, leaving the rest of the file as it stands."""
+    path = Path(home) / FILE
+    with _WRITE:
+        got = _load(path)
+        got.pop("low", None)
+        out = {"host": host, **got, **({"low": low} if low else {})}
+        _atomic_write(path, json.dumps(out, indent=1) + "\n")
+
+
+def low_spells(old: dict[str, Any], answers: dict[str, Any], now: str) -> dict[str, dict[str, Any]]:
+    """The home's `disk_low` spells after one round of `disk` answers (§4.6 *Told before the pool is full*), keyed
+    `<host>:<pool>`: begun by the first answer with `pressure` for the pool and ended by the first without it, holding
+    the latest share free and holders. A host whose answer is an error keeps its spells as they stand; a host no longer
+    asked has none."""
+    out: dict[str, dict[str, Any]] = {}
+    for host, answer in answers.items():
+        if not isinstance(answer, dict) or "error" in answer:
+            out.update({k: v for k, v in old.items() if isinstance(v, dict) and v.get("host") == host})
+            continue
+        pressure = answer.get("pressure")
+        for pool, one in (pressure if isinstance(pressure, dict) else {}).items():
+            if not isinstance(one, dict):
+                continue
+            key = f"{host}:{pool}"
+            was = old.get(key) if isinstance(old.get(key), dict) else {}
+            share = one.get("share_free")
+            out[key] = {
+                "host": str(host),
+                "pool": str(pool),
+                "since": str(was.get("since") or now),
+                "share_free": share if isinstance(share, int | float) else was.get("share_free"),
+                "holders": [h for h in one.get("holders") or [] if isinstance(h, dict)],
+            }
     return out
 
 

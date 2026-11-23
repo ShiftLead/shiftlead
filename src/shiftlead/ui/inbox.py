@@ -26,6 +26,7 @@ from sessionorc import hosts, ledgerboard
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
+from sessionorc import notify as notify_mod
 from sessionorc import promote as promote_mod
 from sessionorc import queue as queue_mod
 from sessionorc import seams as seams_mod
@@ -966,6 +967,41 @@ def billing_url(owner: str) -> str:
         kind = _gh_user_type_read(owner)
         _gh_user_type[key] = (now, kind)
     return ORG_BILLING.format(owner=owner) if kind == "Organization" else USER_BILLING
+
+
+def disk_low_rows(spells: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: temporary space low** (§4.6 *Told before the pool is full*, TD-2083): one row per
+    spell the home keeps (`disk_low` on `host`), under *Needs you*, counted, keyed `disk_low:<host>:<pool>`, which is
+    the attention store's snooze key and the message's `?row=`. It ends by itself once the pool is back over 35%
+    free."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    if not isinstance(spells, Mapping):  # a host record a hand or another build left odd costs the rows, not the page
+        return out
+    for key, spell in sorted(spells.items()):
+        if not isinstance(spell, Mapping):
+            continue
+        text = notify_mod.disk_low_text(dict(spell))
+        since = str(spell.get("since") or "")
+        sid = f"disk_low:{key}"
+        host = str(spell.get("host") or "")
+        out.append(
+            {
+                "row": "disk_low",
+                "sid": sid,
+                "id": sid,
+                "name": host,
+                "host": host,
+                "pool": str(spell.get("pool") or ""),
+                "subject": kind_subject("Temporary space"),
+                "team": "",
+                "at": since,
+                "age": _age(since, at),
+                "text": text,
+                "find": f"Temporary space {text}",
+            }
+        )
+    return out
 
 
 def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:

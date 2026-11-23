@@ -326,12 +326,13 @@ class InboxMixin:
             "red_pr",
             "fork_pr",
             "ci_not_run",
+            "disk_low",  # §4.5a *Inbox row: temporary space low* (TD-2083): `disk_low:<host>:<pool>`, by time alone
         )
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
                 f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, held_mail, cadence:<pr>, promote, work, "
-                "lanes, red_pr, fork_pr, ci_not_run"
+                "lanes, red_pr, fork_pr, ci_not_run, disk_low"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:
