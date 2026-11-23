@@ -110,7 +110,7 @@ not mix:
   (ADR 2026-09-13); a heading on repos **decided** 2026-10-15 (Paul, TD-722).
 - **flow** — the path a ledger entry takes from filed to done, written as records: a list of **stages**, a
   list of **audits**, in one file a check must pass (design §4.9c,
-  TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `td`, `build-review`,
+  TD-1954). A team runs one flow; the person is in every flow and is no stage. Built in: `design-wise` (the first shape's `td`), `build-review`,
   `build`. *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; TD-307), reshaped 2026-11-21 (TD-1954).
 - **stage** — one step of a flow: one kind of work (`design`, `build` or `review`) on one model, done by a
   fresh session each time an entry enters it, and ended by one of the kind's **outcomes**. An entry is in one
