@@ -120,6 +120,21 @@ def rows_of(
     return rows_for(([r for r in recent if r.get("state") != "open"], opened, recent), wanted, read_one)
 
 
+class SessionsRead(NamedTuple):
+    sessions: Mapping[str, Session]
+    read_nodes: frozenset[str]
+    open_asks: frozenset[str]
+
+
+def sessions_read(graph: Mapping[str, Session], snapshotted: Collection[str]) -> SessionsRead:
+    """`RepoFacts`' sessions from the home's graph, whose keys are the addresses a holder is written in. `snapshotted`
+    are the nodes whose link is up and has delivered its whole snapshot since it came up: a link just up holds no
+    records yet, and a link down holds old ones, so neither says a session is gone. An open ask or steer in a session's
+    outbox is a wait of its own, which keeps it from reading as silent (design §4.9c act 4)."""
+    waits = frozenset(address for address, s in graph.items() if any(e.open for e in s.outbox))
+    return SessionsRead(graph, frozenset(snapshotted), waits)
+
+
 @dataclass(frozen=True)
 class RepoFacts:
     """What the tick's pass read once for a team of a repo, for `facts_on` to take each entry's part of.
