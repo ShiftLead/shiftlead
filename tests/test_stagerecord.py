@@ -190,10 +190,33 @@ def test_a_crash_after_the_merge_writes_nothing_twice(repo):
     store.put_entry({**store.entry("TD-190"), "intent": record["intent"], "waits": None}, "as if it crashed")
     head = git(repo, "rev-parse", "origin/main")
     again = store.land_intent("TD-190")
-    assert again["already"] and again["id"] == got["id"]
+    assert again["already"] and got["id"]
     git(repo, "fetch", "-q", "origin")
     assert git(repo, "rev-parse", "origin/main") == head
     assert store.entry("TD-190")["waits"] == "person" and store.intents() == []
+
+
+def test_a_crash_then_the_persons_answer_is_not_asked_again(repo):
+    store = StageStore(repo)
+    record = _asked(store)
+    got = store.land_intent("TD-190")
+    store.put_entry({**store.entry("TD-190"), "intent": record["intent"], "waits": None}, "as if it crashed")
+    board.write_back(repo, None, "", "decide", key=got["key"], answer="Try again")
+    git(repo, "fetch", "-q", "origin")
+    head = git(repo, "rev-parse", "origin/main")
+    assert store.land_intent("TD-190") == {"already": True}
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head and store.entry("TD-190")["waits"] == "person"
+
+
+def test_a_second_question_after_an_answer_is_asked(repo):
+    store = StageStore(repo)
+    _asked(store)
+    first = store.land_intent("TD-190")
+    board.write_back(repo, None, "", "decide", key=first["key"], answer="Try again")
+    store.record_intent("TD-190", "paul", "Build ended as other. What next?", "A reason.", ANSWERS)
+    second = store.land_intent("TD-190")
+    assert second["id"] != first["id"] and "**Blocked by:** decision (paul)" in _on_main(repo, "TD-190")
 
 
 def test_the_gate_joins_what_the_entry_is_already_blocked_by(repo):

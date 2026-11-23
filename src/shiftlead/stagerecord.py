@@ -22,6 +22,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -277,7 +278,14 @@ class StageStore:
             raise StateError(f"{tid} has no stage record")
         offered = {str(k): v for k, v in answers.items()}
         offered.setdefault(OTHER_ANSWER, None)
-        record["intent"] = {"person": person, "ask": ask, "context": context, "answers": offered, "at": _now()}
+        record["intent"] = {
+            "person": person,
+            "ask": ask,
+            "context": context,
+            "answers": offered,
+            "at": _now(),
+            "nonce": uuid.uuid4().hex[:12],  # names this question in the entry's Log, so it is never landed twice
+        }
         record["blocked"] = blocked
         self.put_entry(record, "to the person: intent")
         return record
@@ -297,7 +305,16 @@ class StageStore:
             return {"nothing": True}
         offered = list(intent["answers"])
         labels = [a.split(" — ", 1)[0] for a in offered]
-        got = board.ask_on_entry(self.root, tid, intent["person"], intent["ask"], intent["context"], offered, labels)
+        got = board.ask_on_entry(
+            self.root,
+            tid,
+            intent["person"],
+            intent["ask"],
+            intent["context"],
+            offered,
+            labels,
+            nonce=intent["nonce"],
+        )
         record["intent"] = None
         if got.get("gone"):
             self.put_entry(record, "to the person: the entry is gone")

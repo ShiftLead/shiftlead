@@ -1368,21 +1368,22 @@ def ask_on_entry(
     answers: list[str],
     lifts: list[str],
     *,
+    nonce: str,
     today: str | None = None,
 ) -> dict[str, Any]:
     """**A move to the person** (design §4.9c, TD-2048): on origin's head, `decision (<person>)` added to `tid`'s
     Blocked by beside what it already names, its Ask, Context, Answers and Lifts written, and the covering decide
     item ledgerboard's `sweep` would file for that gate, landed as one pull request of the host agent's own.
 
-    Returns the landing's `{commit, message, pr}` with `id` and `key`, the item's; `{"already": True, "key": …}`
-    where this same Ask already stands with its open item (a crash after the merge, so reconcile's second landing
-    writes nothing); `{"gone": True}` for an entry archived or missing. Any other decision on the entry refuses."""
+    Returns the landing's `{commit, message, pr}` with `id` and `key`, the item's; `{"already": True}`
+    where the entry's Log already holds this question's `nonce`, answered or not (a crash after the merge, so
+    reconcile's second landing writes nothing); `{"gone": True}` for an entry archived or missing. Any other decision on the entry refuses."""
     root = Path(root)
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:
             raise unreachable("gh is not installed")
-        return _twice(lambda: _ask_on_entry(root, tid, person, ask, context, answers, lifts, today, clock))
+        return _twice(lambda: _ask_on_entry(root, tid, person, ask, context, answers, lifts, nonce, today, clock))
 
 
 def _ask_on_entry(
@@ -1393,12 +1394,13 @@ def _ask_on_entry(
     context: str,
     answers: list[str],
     lifts: list[str],
+    nonce: str,
     today: str | None,
     clock: _Clock,
 ) -> dict[str, Any]:
     t, want = _tree(root, clock)
     try:
-        return _ask_in_tree(root, t, want, tid, person, ask, context, answers, lifts, today, clock)
+        return _ask_in_tree(root, t, want, tid, person, ask, context, answers, lifts, nonce, today, clock)
     except (Refused, ledgerboard.Refused, OSError) as e:
         _reset(t, want)
         if isinstance(e, Refused):
@@ -1416,6 +1418,7 @@ def _ask_in_tree(
     context: str,
     answers: list[str],
     lifts: list[str],
+    nonce: str,
     today: str | None,
     clock: _Clock,
 ) -> dict[str, Any]:
@@ -1435,18 +1438,16 @@ def _ask_in_tree(
     url = _git(root, "remote", "get-url", "origin").stdout.strip()
     repo = ledgerboard.origin_path(url) or root.name
     raw = ledgerboard.entries(text)[0]["blocked_raw"] or ""
+    mark = f"asked by the stage record: {nonce}"
+    if mark in text:
+        _reset(t, want)
+        return {"already": True}
     standing = next(
         (g for g in ledgerboard.gate_items(ledgerboard.parse_gates(raw)) if ledgerboard.GATE_DECISION_RE.match(g)),
         None,
     )  # any person's: an entry is asked of one person at a time
     if standing is not None:
-        same = standing.lower() == gate.lower() and _asked(text) == " ".join(ask.split())
-        got = [
-            it for _, it, state in ledgerboard.covers(text, standing, [(url, root.name, b)], repo) if state == "open"
-        ]  # fmt: skip
         _reset(t, want)
-        if same and got:
-            return {"already": True, "id": got[0].id, "key": item_ref(got[0])}
         raise Refused(f"{tid} already waits on {standing}: it is asked once at a time")
     day = datetime.now(UTC).date().isoformat()
     blocked = f"{raw}, {gate}" if raw.strip() else gate
@@ -1457,6 +1458,7 @@ def _ask_in_tree(
     declared = tuple(ledgerboard.declared(led.texts()[0])[0])
     for name, words in (("Lifts", " | ".join(lifts)), ("Answers", " | ".join(answers))):
         out = ledgerboard.edit_entry(out, "edit", section=name, words=words, today=day, declared_fields=declared)
+    out = ledgerboard.edit_entry(out, "note", words=mark, today=day)
     lb_ledger.gate(led, {path: out}, today=day)
     # reask 0: a question asked again soon after the last is this write's to file, never the sweep's to hold back
     swept = ledgerboard.sweep([out], [(url, root.name, b)], {}, day, today or date.today(), reask_days=0, repo=repo)
@@ -1494,14 +1496,6 @@ def _ask_in_tree(
         also=[entry_rel],
     )
     return {**landed, "id": new, "key": workorders.PREFIX + new[-8:]}
-
-
-def _asked(text: str) -> str:
-    """The entry's Ask, its words on one line, or "" where it has none."""
-    for line in text.splitlines():
-        if line.startswith("**Ask:**"):
-            return " ".join(line.removeprefix("**Ask:**").split())
-    return ""
 
 
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
