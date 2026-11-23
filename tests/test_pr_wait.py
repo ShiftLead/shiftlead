@@ -15,6 +15,7 @@ from conftest import park_ticks
 
 from sessionorc import cadence, identity, modes, reports
 from sessionorc.client import AgentError, LocalClient
+from shiftlead.stage_work import entry_work
 
 
 def _row(n: int = 7, checks: str = "pending", conflicting: bool = False, failing: list[str] | None = None):
@@ -643,7 +644,10 @@ async def test_a_wait_out_of_time_in_a_restarts_gap_returns_expired_and_a_first_
 @pytest.mark.parametrize(
     ("got", "want"),
     [
-        ({"number": 7, "title": "t", "state": "OPEN", "headRefOid": "abc"}, {"state": "open", "head": "abc"}),
+        (
+            {"number": 7, "title": "t", "state": "OPEN", "headRefOid": "abc", "headRefName": "td7-x", "createdAt": "c"},
+            {"state": "open", "head": "abc", "branch": "td7-x", "fork": False, "created": "c"},
+        ),
         ({"number": 7, "title": "t", "state": "MERGED", "headRefOid": "abc"}, {"state": "merged"}),
         ({"number": 7, "title": "t", "state": "CLOSED", "headRefOid": "abc"}, {"state": "closed"}),
     ],
@@ -657,12 +661,25 @@ def test_pr_state_row_reads_github(monkeypatch, got, want):
 
 @pytest.mark.parametrize(
     ("state", "want"),
-    [("opened", {"state": "open", "head": "abc"}), ("merged", {"state": "merged"}), ("closed", {"state": "closed"})],
+    [
+        ("opened", {"state": "open", "head": "abc", "branch": "td7-x", "fork": True, "created": "c"}),
+        ("merged", {"state": "merged"}),
+        ("closed", {"state": "closed"}),
+    ],
 )
 def test_pr_state_row_reads_gitlab_whatever_the_state(monkeypatch, state, want):
     monkeypatch.setattr(reports, "git_origin", lambda _d: "git@gitlab.com:g/s/r.git")
     asked = []
-    mr = {"iid": 7, "title": "t", "state": state, "sha": "abc"}
+    mr = {
+        "iid": 7,
+        "title": "t",
+        "state": state,
+        "sha": "abc",
+        "source_branch": "td7-x",
+        "source_project_id": 1,
+        "target_project_id": 2,
+        "created_at": "c",
+    }
     monkeypatch.setattr(reports, "_glab_api", lambda _d, h, p, _t: asked.append((h, p)) or (mr, None))
     assert reports.pr_state_row("/x", 7) == {"number": 7, "title": "t", **want}
     assert asked == [("gitlab.com", "projects/g%2Fs%2Fr/merge_requests/7")]
@@ -683,3 +700,13 @@ def test_pr_state_row_is_none_on_a_failed_read_or_another_forge(monkeypatch):
     assert reports.pr_state_row("/x", 7) is None
     monkeypatch.setattr(reports, "git_origin", lambda _d: "git@example.org:g/r.git")
     assert reports.pr_state_row("/x", 7) is None
+
+
+@pytest.mark.parametrize(("fork", "want"), [(False, "unread"), (True, "none")])
+def test_an_open_pull_request_read_by_number_is_still_its_entry_s_work(monkeypatch, fork, want):
+    """Its files are unread, so its entry is offered to nobody; a fork's is never an entry's work."""
+    monkeypatch.setattr(reports, "git_origin", lambda _d: "git@github.com:o/r.git")
+    got = {"number": 7, "state": "OPEN", "headRefOid": "abc", "headRefName": "td7-x", "isCrossRepository": fork}
+    done = subprocess.CompletedProcess([], 0, json.dumps(got), "")
+    monkeypatch.setattr(reports.subprocess, "run", lambda *_a, **_k: done)
+    assert entry_work("TD-7", [reports.pr_state_row("/x", 7)]).state == want
