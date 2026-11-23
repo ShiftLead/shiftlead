@@ -71,6 +71,7 @@ async def test_the_member_and_lane_rules_follow_the_marker(agent, monkeypatch, m
     await _keep_running(agent)
     for name, spy in spies.items():
         assert spy.await_count == (0 if marked else 1), name
+    assert agent._lost_brief.await_count == (0 if marked else 1)
 
 
 @pytest.mark.parametrize(
@@ -86,6 +87,7 @@ async def test_rules_1_3_4_and_5_still_reach_a_built_in_seat_and_the_director(ag
     await _keep_running(agent)
     for name, spy in spies.items():
         assert spy.await_count == (1 if name in KEPT_FOR_A_SEAT else 0), name
+    assert agent._lost_brief.await_count == 1
 
 
 async def test_a_first_shape_seat_is_not_read_by_rule_3_after_the_marker(agent, monkeypatch):
@@ -124,6 +126,26 @@ async def test_a_restart_from_a_stage_s_session_is_refused_after_the_marker(agen
     else:
         await agent.rpc_progress(s.id, status="restart", why="context bound", caller="x")
         assert s.restart_wanted
+
+
+@pytest.mark.parametrize(
+    "mark",
+    [{"builtin": "techlead", "seat": {"trigger": "asks"}}, {"seat": {"trigger": "prompt"}}],
+    ids=["built-in", "director"],
+)
+async def test_a_restart_from_a_built_in_seat_or_the_director_is_not_refused(agent, monkeypatch, mark):
+    await park_ticks(agent)
+    _mark()
+    agent._read_cut_over()
+    s = Session(
+        id="ao-t-s", name="s", kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g", lane=["TD-7"]
+    )  # fmt: skip
+    for k, v in mark.items():
+        setattr(s, k, v)
+    agent.sessions[s.id] = s
+    monkeypatch.setattr(agent, "_is_self", lambda *_: True)
+    await agent.rpc_progress(s.id, status="restart", why="context bound", caller="x")
+    assert s.restart_wanted
 
 
 async def test_a_settings_file_that_breaks_after_the_marker_keeps_the_rules_off(agent):
