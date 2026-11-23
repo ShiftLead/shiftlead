@@ -372,6 +372,6 @@ class StageStore:
             return got
         record["waits"] = "person"
         record["answers"] = {a.split(" — ", 1)[0]: move for a, move in intent["answers"].items()}
-        record["asked"] = {k: intent[k] for k in ("nonce", "ask", "context", "answers")}
+        record["asked"] = {**{k: intent[k] for k in ("nonce", "ask", "context", "answers")}, "at": intent.get("at")}
         self.put_entry(record, "waits on the person")
         return got

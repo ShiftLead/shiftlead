@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pathlib
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1361,7 +1362,13 @@ def _switched_show(**more):
         "repo": "shiftlead",
         "host": HOST,
         "head": {"word": "running", "sessions": 2, "by": None, "most": 3},
-        "flow": {"name": "build", "read": True, "stages": stages, "no_such_stage": {"gone": 4}},
+        "flow": {
+            "name": "build",
+            "read": True,
+            "stages": stages,
+            "lines": [{"head": "Every entry", "stops": ["build", "check"], "end": "merged", "back_to": None}],
+            "no_such_stage": {"gone": 4},
+        },
         "logins": logins,
         "cannot_run": None,
         "note": None,
@@ -1506,3 +1513,25 @@ def test_a_team_held_only_in_settings_is_not_called_missing_while_the_agent_is_a
     assert r.status_code == 200, r.text[:200]
     assert "host agent unreachable" in r.text and "settings could not be read" in r.text
     assert "after the switch-over</div>" not in r.text.split("settings could not be read")[1]
+
+
+def test_the_route_map_draws_a_filled_pill_a_dashed_pill_and_a_stage_gone():
+    now = datetime.now(UTC)
+    held = {
+        "id": "TD-1",
+        "holder": "w",
+        "waits": None,
+        "since": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    asked = {"id": "TD-2", "waits": "person", "asked_at": (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    show = _switched_show()
+    show["flow"]["stages"][0].update(entries=[held], now={"state": "usable", "login": "claude:a"})
+    show["flow"]["stages"][1].update(entries=[asked], now={"state": "none"})
+    show["flow"]["gone"] = [{"id": "TD-3", "waits": "person", "stage": "old"}]
+    got = setmod.switched_team(show, _switched_tools())
+    build, check = got["lines"][0]["stops"]
+    assert build["on_login"] == "opus on Paul" and check["on_login"] == "fable · no login offers it"
+    assert [(p["id"], p["dashed"], p["word"]) for p in build["pills"]] == [("TD-1", False, "2h 0m")]
+    assert [(p["id"], p["dashed"], p["word"]) for p in check["pills"]] == [("TD-2", True, "asked 3h 0m ago")]
+    assert build["pills"][0]["href"] == "/card/shiftlead%23TD-1" and got["lines"][0]["end"] == "merged"
+    assert [(p["id"], p["word"]) for p in got["gone"]] == [("TD-3", "waits on you")]

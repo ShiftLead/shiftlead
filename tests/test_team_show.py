@@ -6,9 +6,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import yaml
+
 from sessionorc import teamstore as ts
 from sessionorc.agent_settings import SettingsMixin
-from shiftlead import team_show
+from shiftlead import flow3, team_show
 
 NOW = datetime(2026, 11, 23, 12, tzinfo=UTC)
 _TWO_HOURS_AGO = "2026-11-23T10:00:00Z"
@@ -206,3 +208,48 @@ def test_a_login_on_the_account_of_an_unusable_login_above_it_is_passed_over():
     assert ts.pick(order, "opus", rows)["login"] == "claude:c"
     shown = team_show.view("t", _doc(logins=order), rows, HEAD, "home", FLOW, ())["logins"]
     assert [x["why"] for x in shown][1] == "shares an account with an unusable login above it"
+
+
+def _keys(lines):
+    return [(x["head"], x["stops"], x["end"]) for x in lines]
+
+
+def test_the_route_map_draws_each_built_in_flow_by_the_rule():
+    read = {n: yaml.safe_load((flow3.PACKAGE_DIR / n / "flow.yml").read_text())["stages"] for n in flow3.BUILTIN}
+    assert _keys(flow3.route_lines(read["build"])) == [("Every entry", ["build"], "merged")]
+    assert _keys(flow3.route_lines(read["build-review"])) == [("Every entry", ["build", "review"], "merged")]
+    assert _keys(flow3.route_lines(read["design-wise"])) == [
+        ("Entries that need a design first", ["design", "first-read", "second-read", "fact-check"], "merged"),
+        ("Entries ready to build", ["build", "review", "protected-read"], "merged"),
+    ]
+
+
+def test_a_stage_on_no_line_a_loop_and_the_person_end_a_line_as_the_rule_says():
+    stages = [
+        {"name": "Build", "does": "build", "takes": "any", "work-pushed": "Check"},
+        {"name": "Check", "does": "review", "ship": {"to": "person"}},
+        {"name": "Spare", "does": "build", "work-pushed": "merge"},
+        {"name": "Loop", "does": "build", "takes": "other", "work-pushed": "Back"},
+        {"name": "Back", "does": "review", "ship": "Loop"},
+    ]
+    got = flow3.route_lines(stages)
+    assert _keys(got) == [
+        ("Every entry", ["build", "check"], "you"),
+        ("Entries ready to build", ["loop", "back"], "back"),
+        (flow3.ROUTE_OTHER, ["spare"], None),
+    ]
+    assert got[1]["back_to"] == "loop" and got[2]["other"] is True
+
+
+def test_a_record_the_flow_cannot_place_is_drawn_as_such():
+    records = [
+        {"id": "TD-1", "team": "t", "stage": "build", "asked": {"at": _TWO_HOURS_AGO}, "waits": "person"},
+        {"id": "TD-2", "team": "t", "stage": "gone", "waits": "person", "asked": {"at": _TWO_HOURS_AGO}},
+        {"id": "TD-3", "team": "t", "stage": "gone", "holder": "x"},
+        {"id": "TD-4", "team": "t", "stage": "gone", "closed_at": _TWO_HOURS_AGO},
+    ]
+    flow = team_show.view("t", _doc(), {}, HEAD, "home", FLOW, records)["flow"]
+    assert flow["stages"][0]["entries"][0]["asked_at"] == _TWO_HOURS_AGO
+    assert [e["id"] for e in flow["gone"]] == ["TD-2"] and [e["id"] for e in flow["unplaced"]] == ["TD-3"]
+    unread = team_show.view("t", _doc(), {}, HEAD, "home", None, records)["flow"]
+    assert unread["gone"] == [] and unread["unplaced"] == []

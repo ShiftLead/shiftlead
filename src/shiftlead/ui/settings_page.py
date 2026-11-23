@@ -35,7 +35,7 @@ from shiftlead import repoconfig, teamrun
 
 from . import uiconf
 from .cards import swept_words
-from .common import USAGE_UNKNOWN, _age, usage_clock, usage_read
+from .common import USAGE_UNKNOWN, _age, card_path, usage_clock, usage_read
 
 # The *i* mark of each file card (§4.5a *Settings page: read-only values and the i mark*): when the
 # file is re-read and who edits it. A host's name, its `home:` and its identity mode are read once,
@@ -444,6 +444,59 @@ def _switched_word(head: Mapping[str, Any]) -> str:
     return {"person": "Stopped by you", "until": "Stopped at its stop time"}.get(str(head.get("by") or ""), "Stopped")
 
 
+def _pill(e: Mapping[str, Any], repo: Any, now: datetime) -> dict[str, Any]:
+    """A record on the route map (§4.9d): filled with how long it has been held, or dashed, waiting on the person, with
+    how long ago the stage asked. A time the record does not hold is left out, never guessed."""
+    waits = e.get("waits")
+    if waits == "person":
+        ago = _age(e.get("asked_at"), now)
+        word = f"asked {ago} ago" if ago else "waits on you"
+    else:
+        held = {"merging": "merging", "parts": "waits for its parts"}.get(str(waits))
+        word = " · ".join(x for x in (held, _age(e.get("since"), now)) if x)
+    tid = str(e.get("id") or "")
+    return {
+        "id": tid,
+        "href": card_path(f"{repo}#{tid}"),
+        "dashed": waits == "person",
+        "word": word,
+        "holder": e.get("holder"),
+        "stage": e.get("stage"),
+    }
+
+
+def _on_login(model: Any, now: Mapping[str, Any] | None, shown: Mapping[str, str]) -> str:
+    """A stop's model and the login a session would start on now (§4.9d): *opus on claude-paul*."""
+    got = now or {}
+    state, login = got.get("state"), str(got.get("login") or "")
+    if state == "usable":
+        return f"{model} on {shown.get(login) or login.partition(':')[2] or login}"
+    word = {"waits": "waits for a usable login", "none": "no login offers it", "not_read": "not read here"}.get(
+        str(state)
+    )
+    return f"{model} · {word}" if word else str(model or "")
+
+
+def _route(flow: Mapping[str, Any], stages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The map's lines with their stops. A stage on two lines keeps its number and pills at its first stop, so a record
+    is drawn once."""
+    by_key = {s.get("key"): s for s in stages}
+    seen: set[Any] = set()
+    out = []
+    for line in flow.get("lines") or ():
+        stops = []
+        for key in line.get("stops") or ():
+            if key in by_key:
+                stops.append({**by_key[key], "repeat": key in seen})
+                seen.add(key)
+        back = by_key.get(line.get("back_to")) or {}
+        end = {"merged": "merged", "you": "you", "back": f"back to {back.get('name')}"}.get(str(line.get("end")))
+        out.append(
+            {"head": line.get("head"), "stops": stops, "end": end or ("" if line.get("other") else "no next stop")}
+        )
+    return out
+
+
 def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
     """What the team page draws of a switched team (§4.9d *The page*, TD-2060), from `team_show` and the host's `tools`
     read: the head, the login rows with each account's gauge, the logins that can be added, and the numbers."""
@@ -465,7 +518,18 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
             }
         )
     listed = {str(lg.get("login")) for lg in rows}
-    stages = [{**s, "number": s.get("at_once") or 1} for s in flow.get("stages") or ()]
+    at = datetime.now(UTC)
+    repo = show.get("repo")
+    shown = {str(lg.get("login")): str(lg.get("shown") or "") for lg in rows}
+    stages = [
+        {
+            **s,
+            "number": s.get("at_once") or 1,
+            "on_login": _on_login(s.get("model"), s.get("now"), shown),
+            "pills": [_pill(e, repo, at) for e in s.get("entries") or ()],
+        }
+        for s in flow.get("stages") or ()
+    ]
     most = (show.get("head") or {}).get("most")
     return {
         "team": show.get("team"),
@@ -491,6 +555,10 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
             if k not in listed
         ],
         "stages": stages,
+        "lines": _route(flow, stages),
+        "gone": [_pill(e, repo, at) for e in flow.get("gone") or ()],
+        "unplaced": [_pill(e, repo, at) for e in flow.get("unplaced") or ()],
+        "audits": [{**a, "on_login": _on_login(a.get("model"), a.get("now"), shown)} for a in show.get("audits") or ()],
         "no_such_stage": flow.get("no_such_stage") or {},
         "most": most,
         "sum": sum(s["number"] for s in stages),

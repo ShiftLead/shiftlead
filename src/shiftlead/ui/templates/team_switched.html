@@ -1,4 +1,4 @@
-{#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's and the flow pick TD-2062's -#}
+{#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's (§4.9d *The route map draws the flow as lines*) and the flow pick TD-2062's -#}
 <div class="note warn" id="teamsaid" role="status" hidden></div>
 {% if sw.unread %}<div class="note warn">{{ sw.unread }}</div>{% endif %}
 <div id="teamset" data-team="{{ sw.team }}" data-version="{{ sw.version }}" data-order="{{ sw.order | tojson | forceescape }}">
@@ -6,10 +6,26 @@
   {% if sw.cannot_run %}<div class="note warn">{{ sw.cannot_run }}</div>{% endif %}
   <div class="note">{% if sw.flow %}<b>{{ sw.flow }}</b>{% if not sw.flow_read %} · not read{% endif %} · {% endif %}<a href="/flows">Edit on Flows</a></div>
   {% if sw.note %}<div class="note">{{ sw.note }}</div>{% endif %}
-  <div class="teamnums">
-    {% for s in sw.stages %}<div class="teamnum" data-key="{{ s.key }}"><span class="grow"><b>{{ s.name }}</b> <span class="note">{{ s.does }} · {{ s.model }}</span></span><span class="note">at most</span><button class="btn sm ghost" type="button" data-number="-1" aria-label="One fewer in {{ s.name }}"{% if s.number <= 1 %} disabled{% endif %}>−</button><span class="mono">{{ s.number }}</span><button class="btn sm ghost" type="button" data-number="1" aria-label="One more in {{ s.name }}">+</button><span class="note">at once</span></div>{% endfor %}
+  {%- macro pill(x) %}<a class="teampill{% if x.dashed %} dashed{% endif %}" href="{{ x.href }}"{% if x.holder %} title="held by {{ x.holder }}"{% endif %}><b>{{ x.id }}</b>{% if x.word %} {{ x.word }}{% endif %}</a>{% endmacro %}
+  <div class="teammap">
+    {% for line in sw.lines %}<div class="teamline">
+      <div class="teamlinehead note">{{ line.head }}</div>
+      <ol class="teamstops">
+        {% for s in line.stops %}<li class="teamstop kind-{{ s.does }}">
+          <div class="row gap wrap"><b>{{ s.name }}</b><span class="teamkind">{{ s.does }}</span>{% if s.only_when %}<span class="note">only for protected files</span>{% endif %}</div>
+          {% if s.repeat %}<div class="note">its entries are on the line above</div>{% else %}
+          <div class="note">{{ s.on_login }}</div>
+          <div class="teamnum" data-key="{{ s.key }}"><span class="note">at most</span><button class="btn sm ghost" type="button" data-number="-1" aria-label="One fewer in {{ s.name }}"{% if s.number <= 1 %} disabled{% endif %}>−</button><span class="mono">{{ s.number }}</span><button class="btn sm ghost" type="button" data-number="1" aria-label="One more in {{ s.name }}">+</button><span class="note">at once</span></div>
+          {% if s.pills %}<div class="teampills">{% for x in s.pills %}{{ pill(x) }}{% endfor %}</div>{% endif %}{% endif %}
+        </li>{% endfor %}
+        {% if line.end %}<li class="teamend">{{ line.end }}</li>{% endif %}
+      </ol>
+    </div>{% endfor %}
     {% for key, n in sw.no_such_stage.items() %}<div class="teamnum" data-key="{{ key }}"><span class="grow mono">{{ key }}</span><span class="note">at most {{ n }} · no such stage</span><button class="btn sm link" type="button" data-remove-number>Remove</button></div>{% endfor %}
+    {% if sw.gone %}<div class="teamline"><div class="teamlinehead note">waiting on you, its stage is gone</div><div class="teampills">{% for x in sw.gone %}{{ pill(x) }}{% endfor %}</div></div>{% endif %}
+    {% if sw.unplaced %}<div class="teamline"><div class="teamlinehead note">in a stage this flow does not have</div><div class="teampills">{% for x in sw.unplaced %}{{ pill(x) }} <span class="note mono">{{ x.stage }}</span>{% endfor %}</div></div>{% endif %}
   </div>
+  {% if sw.audits %}<div class="teambeside"><div class="note"><b>Beside the path</b></div>{% for a in sw.audits %}<div class="note">{{ a.name }} · every {{ a.every }} · {{ a.on_login }}</div>{% endfor %}</div>{% endif %}
   <div class="teamnum teamlimit" data-most="{{ sw.most or '' }}">{% if sw.most %}<span class="grow">at most <b>{{ sw.most }}</b> stage and audit sessions at once</span><button class="btn sm ghost" type="button" data-most-step="-1" aria-label="Lower the team limit"{% if sw.most <= 1 %} disabled{% endif %}>−</button><button class="btn sm ghost" type="button" data-most-step="1" aria-label="Raise the team limit">+</button><button class="btn sm link" type="button" data-most-clear>Remove</button>{% else %}<span class="grow">no team limit <span class="note">· its stages add up to {{ sw.sum }}</span></span><button class="btn sm ghost" type="button" data-most-set="{{ sw.sum or 1 }}">Set one</button>{% endif %}</div>
   {% if sw.held_back %}<div class="note">The team limit holds back {{ sw.held_back | join(', ') }}.</div>{% endif %}
 </section>
