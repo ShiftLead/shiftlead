@@ -131,7 +131,10 @@ class SettingsMixin:
         if not read.get("switched"):
             return read
         gate, now = await self.rpc_gate(), datetime.now(UTC)
-        max_age = settings_mod.max_age(settings_mod.load())
+        whole = settings_mod.load()
+        max_age = settings_mod.max_age(whole)
+        # the lists are the home's: a node cannot read them, so its page draws no line rather than *in no team's list*
+        lists = builtinstore.login_lists(whole) if self.mode == "home" else None
         cards = []
         for card in read.get("tools") or []:
             accounts, caps = [], {}
@@ -153,6 +156,9 @@ class SettingsMixin:
                 if lg.get("state") == "signed_in" and key in caps and not metered:
                     till = caps[key]
                     lg = {**lg, "state": "limited", "till": till.isoformat().replace("+00:00", "Z") if till else None}
+                if lists is not None:
+                    held = lists.get(f"{card.get('adapter')}:{lg.get('name')}") or {"teams": [], "sets": []}
+                    lg = {**lg, "lists": held}
                 logins.append(lg)
             cards.append({**card, "accounts": accounts, "logins": logins})
         return {**read, "tools": cards}
