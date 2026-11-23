@@ -11,7 +11,7 @@ request holding the entry's gate and its board item (`land_intent`, through `ses
 the record's wait. A crash between leaves an intent with no wait, which `land_intent` lands again and which writes
 nothing twice.
 
-This module lands with nothing reading it: the flow's stages, `ao stage end` and the tick's six acts are later builds.
+`ao stage end` (`shiftlead.stage_end`, TD-2050) is its first reader; the tick's six acts are later builds.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ OTHER_ANSWER = f"{OTHER} — a session takes your words back to the stage that a
 
 _ID = re.compile(r"TD-\d+")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
-_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS: dict[str, threading.RLock] = {}  # re-entrant: a caller holds it from a record's read to its write
 _LOCKS_GUARD = threading.Lock()
 
 
@@ -60,9 +60,9 @@ class StateRefused(StateError):
         self.reason = reason
 
 
-def _lock(root: Path) -> threading.Lock:
+def _lock(root: Path) -> threading.RLock:
     with _LOCKS_GUARD:
-        return _LOCKS.setdefault(str(root.resolve()), threading.Lock())
+        return _LOCKS.setdefault(str(root.resolve()), threading.RLock())
 
 
 def _now() -> str:
@@ -112,6 +112,11 @@ class StageStore:
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
+
+    def locked(self) -> threading.RLock:
+        """The repo's lock, for a caller that reads a record and writes it back as one step (§4.9c: one repo's calls
+        are taken one at a time)."""
+        return _lock(self.root)
 
     # -- git ---------------------------------------------------------------------------------------------
 
@@ -274,11 +279,13 @@ class StageStore:
         answers: Mapping[str, Any],
         *,
         blocked: Any = None,
+        base: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """The first of the move's three writes: that the entry is to go to the person, with the answer map (each
         offered `<label> — <consequence>` to the move it makes) and what was `blocked`. Returns at once; the tick
-        lands it. *Something else* is always offered, its move the record's default."""
-        record = self.entry(tid)
+        lands it. *Something else* is always offered, its move the record's default. `base` is the record as a caller
+        holding the lock has already changed it, so the move and its intent are one commit."""
+        record = base if base is not None else self.entry(tid)
         if record is None:
             raise StateError(f"{tid} has no stage record")
         offered = {str(k): v for k, v in answers.items()}

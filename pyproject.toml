@@ -37,6 +37,9 @@ grok = "shiftlead.adapters.grok:GrokAdapter"
 [project.entry-points."shiftlead.known_tools"]
 table = "shiftlead.adapters.known:KNOWN_TOOLS"
 
+[project.entry-points."shiftlead.home_calls"]
+stage = "shiftlead.stage_end"
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"

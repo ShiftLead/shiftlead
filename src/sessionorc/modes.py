@@ -118,7 +118,8 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # seat ledger's (§4.4 *Spend per seat*, TD-830)
 # `pr_wait`: `ao pr wait`, a block on the PRs' reading (§4.7, TD-940)
 # `briefs`: the person's own, the home's files (§4.9c *Where a brief lives*, TD-2055)
-HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait", "briefs"})
+# `stage_show`: an entry's stage record, which the home alone writes (§4.9c, TD-2050)
+HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait", "briefs", "stage_show"})
 # The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
 # a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own
 BLOCKING = frozenset({"wait", "pr_wait"})
@@ -128,6 +129,9 @@ BLOCKING = frozenset({"wait", "pr_wait"})
 # before the person-is-served return, or a node would give its own ids and the counter would split per host. It is
 # in neither `HOME_EDITS` (whose `PERSON_NODE_BOUND` would refuse a person's call from a node) nor `identity.READS`.
 IDS = frozenset({"td_next", "td_take"})
+# A stage's end (§4.9c, TD-2050): the stage record has one writer, so it is forwarded while the link is up and refused
+# offline, since no stage ends without the home. Its own set, as `IDS` is: `HOME_EDITS` feeds `PERSON_NODE_BOUND`.
+STAGES = frozenset({"stage_end"})
 # The rank's intents (§4.4 *A move lands*, TD-769): `ranks.json` is the home's, and a move is a person's or an
 # interactive session's wherever it sits, so `rank_move` is forwarded while the link is up and refused offline.
 RANKS = frozenset({"rank_move"})
@@ -192,6 +196,8 @@ def offline_refusal(
             "scripts/ledger_next_id.py yourself, which takes from the same counter on origin "
             "(design §4.4 *Without the home*)"
         )
+    if method in STAGES:
+        return f"the stage record is written at the home, and no stage ends without it: {tail}"
     if method in RANKS:
         return f"ranks.json is the home's: a move on the rank is kept and landed there alone: {tail}"
     if caller is None or method not in NODE_ACTS or as_person(caller, records or {}):

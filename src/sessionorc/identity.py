@@ -66,6 +66,7 @@ READS = frozenset(
         "pr_wait",
         "doing_log",
         "queue",
+        "stage_show",
         "shape",
         "gate",
         "sweep_switch",

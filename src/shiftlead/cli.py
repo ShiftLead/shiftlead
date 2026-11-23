@@ -1017,6 +1017,31 @@ def cmd_flow_check(args: argparse.Namespace) -> int:
     return 0 if got.usable else 1
 
 
+def cmd_stage_end(args: argparse.Namespace) -> int:
+    """`ao stage end <outcome> [--reason "…"]` (design §4.7, §4.9c, TD-2050): a call to the home, which checks the
+    outcome's fact. A refusal or an unreachable home is exit 1, and the session carries on or tries again."""
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    got = call_sync("stage_end", id=sid, outcome=args.outcome, reason=args.reason or "")
+    again = " (already taken)" if got.get("repeat") else ""
+    return emit(args, got, lambda: print(f"{got['entry']}: {got['outcome']} → {got['went']}{again}"))
+
+
+def cmd_stage_show(args: argparse.Namespace) -> int:
+    """`ao stage show [TD-n]` (design §4.7, TD-2050): an entry's stage record, by default the one this session holds;
+    from a person's shell, the named entry of the registered repo this directory is in."""
+    entry = str(args.entry).strip().upper() if args.entry else None
+    sid = getattr(args, "id", None) or os.environ.get("SHIFTLEAD_SESSION")
+    if sid:
+        got = call_sync("stage_show", id=sid, entry=entry)
+    elif entry:
+        got = call_sync("stage_show", entry=entry, repo=_td_repo(None)[1])
+    else:
+        return fail(args, "outside a session, name the entry: ao stage show TD-n", 2)
+    return emit(args, got, lambda: print(json.dumps(got, indent=1)))
+
+
 def cmd_flow_list(args: argparse.Namespace) -> int:
     """`ao flow list` (design §4.7, TD-2047): every flow the org can see with whether it is usable, the format-3
     built-ins marked as not yet in use. A team's flow name still resolves to the first shape until the cut-over."""
@@ -5800,6 +5825,18 @@ def build_parser() -> argparse.ArgumentParser:
     q = fsub.add_parser("list", help="every flow the org can see, whether each is usable, and which are in use")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
     q.set_defaults(fn=cmd_flow_list)
+
+    p = add("stage", help="end this session's stage, or show an entry's stage record (§4.9c)")
+    ssub = p.add_subparsers(dest="action", required=True)
+    q = ssub.add_parser("end", help="end this session's stage with one outcome, which the home checks")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.add_argument("outcome", help="the outcome: the stage's prompt lists its kind's")
+    q.add_argument("--reason", help="why: needed by every outcome but work-pushed and ship")
+    q.set_defaults(fn=cmd_stage_end)
+    q = ssub.add_parser("show", help="print an entry's stage record")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.add_argument("entry", nargs="?", help="the entry (TD-n); in a session, by default the one it holds")
+    q.set_defaults(fn=cmd_stage_show)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
     p.add_argument(
