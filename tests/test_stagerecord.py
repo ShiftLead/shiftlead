@@ -303,6 +303,7 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
         "stage_end.py",
         "stage_make.py",
         "stage_merge.py",
+        "stage_pass.py",
         "team_show.py",
     ]  # the last only reads
 
