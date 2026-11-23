@@ -78,7 +78,7 @@ def records(monkeypatch):
 def test_a_new_flow_is_saved_and_passes_the_check(home):
     got = flow_save.save("mine", _flow())
     path = home / "flows" / "mine" / "flow.yml"
-    assert got == {"name": "mine", "version": briefs.version_of(path.read_text()), "moved": 0}
+    assert got == {"name": "mine", "version": briefs.version_of(path.read_text()), "moved": 0, "renames": {}}
     assert flow3.check_file(path).usable
 
 

@@ -166,7 +166,8 @@ def save(
     roots: Iterable[str | Path] = (),
 ) -> dict[str, Any]:
     """Write a flow of the person's. With no `version` it is new and may not exist; with one, the file must still be
-    that version. Returns `{name, version, moved}`, `moved` the records a rename re-keyed."""
+    that version. Returns `{name, version, moved, renames}`, `moved` the records a rename re-keyed, `renames` the stage
+    keys it moved, which the host agent carries to the teams' numbers (`teamstore.rekey`, §4.9d)."""
     path = _path(name)
     if not isinstance(text, str) or not flow3.is_format3(text):
         raise FlowError("the Flows page saves a `format: 3` flow")
@@ -194,7 +195,7 @@ def save(
         raise FlowError("; ".join(refused))
     moved = _write_records(records, name, moves) if moves else 0
     briefs._write(path, text)
-    return {"name": name, "version": briefs.version_of(text), "moved": moved}
+    return {"name": name, "version": briefs.version_of(text), "moved": moved, "renames": moves}
 
 
 def delete(name: str, version: str | None, running: Iterable[str] = ()) -> dict[str, Any]:

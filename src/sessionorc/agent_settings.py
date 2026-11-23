@@ -22,6 +22,7 @@ from sessionorc import (
     defs,
     gitinfo,
     hosts,
+    teamstore,
 )
 from sessionorc import cadence as cadence_mod
 from sessionorc import seams as seams_mod
@@ -559,6 +560,53 @@ class SettingsMixin:
         self._bg.add(task)
         task.add_done_callback(self._bg.discard)
         return out
+
+    async def _team_store_saved(self, before: dict[str, Any], doc: dict[str, Any]) -> None:
+        """A team-store write's tail, as `set_settings`': the file, the nodes' replica, and a detached commit."""
+        settings_mod.save(doc)
+        await self._push_settings()
+        task = asyncio.create_task(self._commit_defs(defs.settings_message(before, doc), ("settings.yml",)))
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
+    async def rpc_team_set(
+        self,
+        team: str = "",
+        label: Any = None,
+        logins: Any = None,
+        at_once: Any = None,
+        most: Any = None,
+        clear: str | None = None,
+        version: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """The team page's write of a label, the login list, a stage's number or the team limit (§4.9d *Controls and
+        verbs*, TD-2060), one per call: a person's own act, version-checked, refused before the cut-over. The client
+        sends no parameter that is None, so a clear is named: `clear="most"` or `clear="label"`."""
+        agent_common.person_only(caller, "change a team", "§4.9d *Controls and verbs*", self._graph())
+        given = {"label": label, "logins": logins, "at_once": at_once, "most": most}
+        change = {k: v for k, v in given.items() if v is not None}
+        if clear is not None:
+            if clear not in ("label", "most") or change:
+                raise RpcError("team_set clears label or most, and sets nothing else in that call")
+            change = {clear: None}
+        doc = settings_mod.load()
+        before = copy.deepcopy(doc)
+        try:
+            words = teamstore.apply(doc, str(team or ""), change, version)
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        await self._team_store_saved(before, doc)
+        return {"team": team, "change": words, "version": teamstore.version(doc, str(team))}
+
+    async def _rekey_teams(self, flow: str, renames: dict[str, str]) -> None:
+        """A flow save's renamed stages, carried to the numbers of each team on that flow (§4.9d, TD-2060)."""
+        if not renames:
+            return
+        doc = settings_mod.load()
+        before = copy.deepcopy(doc)
+        if teamstore.rekey(doc, flow, renames):
+            await self._team_store_saved(before, doc)
 
     async def rpc_set_reach(self, reach: Any = None, caller: Any = None) -> dict[str, Any]:
         """`ao connect`'s write (design §4.7, §5 `reach:`, §4.5b *The setting*, TD-648): the one RPC that
