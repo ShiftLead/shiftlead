@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Built-in seats · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{#- design §4.9d *The built-in seats and their page*, §4.5a *Built-in seats page* (TD-2066): a page per set. Before the cut-over it says so in place of its bands and writes nothing -#}
+{% block body %}
+{% set rail_on = "Built-in seats" %}<div class="setarea">{% include "settings_rail.html" %}
+<div class="page inboxpage setpage teampage" id="setpage">
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable</div>
+  {% for n in notes %}<div class="note warn">{{ n }}</div>{% endfor %}
+  {% if b %}
+  <div class="row wrap teamtabs">{% for x in b.tabs %}<a class="teamtab{% if x.name == b.set %} on{% endif %}" href="/builtins/{{ x.name | urlencode }}"{% if x.name == b.set %} aria-current="page"{% endif %}>{% if x.dot %}<span class="teamdot" role="img" aria-label="cannot run" title="{{ x.dot }}"></span>{% endif %}{{ x.name }}</a>{% endfor %}<span class="grow"></span>{% if b.cut_over %}<button class="btn sm ghost" type="button" id="bnewopen">+ New set</button>{% else %}<button class="btn sm ghost" type="button" disabled title="after the switch-over">+ New set</button>{% endif %}</div>
+  {% if b.cut_over %}<form class="card pad setcard" id="bnew" hidden>
+    <div class="h2">New set</div>
+    <label class="setrow"><span class="setlabel">Name</span><input class="input setin" name="name" required maxlength="24" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" autocomplete="off" spellcheck="false"><span class="note">fixed once made</span></label>
+    <label class="setrow"><span class="setlabel">Label</span><input class="input setin" name="label" maxlength="60" autocomplete="off"><span class="note">optional</span></label>
+    <div class="note">It starts with the default set's models and no logins, so it cannot run until a login is added.</div>
+    <div class="note warn" id="bnewsaid" role="status" hidden></div>
+    <div class="row gap"><button class="btn sm" type="submit">Make the set</button><button class="btn sm ghost" type="button" id="bnewcancel">Cancel</button></div>
+  </form>{% endif %}
+  <div class="row gap wrap teamhead"><span class="h1{% if not b.name_beside %} mono{% endif %}">{{ b.title }}</span>{% if b.cut_over %}<button class="btn sm ghost" type="button" id="blabel" data-label="{{ b.label }}" title="Change the label" aria-label="Change the label">✎</button>{% endif %}{% if b.name_beside %}<span class="note mono">{{ b.name_beside }}</span>{% endif %}<span class="note">{% if b.used_by %}used by {% for r in b.used_by %}<b>{{ r }}</b>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}used by no repo{% endif %}</span></div>
+  {% if not b.cut_over %}<section class="isec"><div class="note" id="bbefore">after the switch-over</div></section>{% else %}
+  <div class="note warn" id="bsaid" role="status" hidden></div>
+  <div id="bset" data-set="{{ b.set }}" data-version="{{ b.version }}" data-order="{{ b.order | tojson | forceescape }}" data-models="{{ b.models | tojson | forceescape }}">
+  <section class="isec"><div class="h2">The seats</div>
+    <div class="note">Five seats stand outside every flow. A set gives each one a model, and every team of a repo that uses the set is served by it.</div>
+    <div class="card bseats">{% for s in b.seats %}<div class="bseat">
+      <b>{{ s.name }}</b>
+      {% if s.director %}<span class="note">the director answers these</span>{% else %}<span class="bpick"><select class="input setin" data-seat="{{ s.key }}" aria-label="{{ s.name }} model">{% for m in s.options %}<option value="{{ m }}"{% if m == s.model %} selected{% endif %}>{{ m }}</option>{% endfor %}</select> <span class="note">{{ s.on_login }}</span></span>{% endif %}
+      <span class="note">{{ s.does }} · acts for {{ s.for }}</span>
+    </div>{% endfor %}</div>
+  </section>
+  <section class="isec"><div class="h2">Logins, in the order they are tried</div>
+    <div class="note">A built-in seat starts on the first login here that offers its model and is usable right now. This list is the set's own; no team's list is used.</div>
+    {% if not b.logins %}<div class="note">No logins yet, so this set cannot run.</div>{% endif %}
+    {% with band = {"logins": b.logins, "where": "", "idle": "no seat of this set runs on its models"} %}{% include "login_rows.html" %}{% endwith %}
+    <div class="row gap wrap baddrow"><select class="input setin" id="baddpick" aria-label="A login to add"{% if not b.can_add %} disabled{% endif %}>{% for o in b.can_add %}<option value="{{ o.key }}">{{ o.shown }}</option>{% else %}<option value="">no other login on this host</option>{% endfor %}</select><button class="btn sm" type="button" id="badd"{% if not b.can_add %} disabled{% endif %}>Add a login</button><input class="input setin" id="baddtyped" placeholder="tool:name, a node's" aria-label="A node's login, typed" autocomplete="off" spellcheck="false"><button class="btn sm ghost" type="button" id="baddtypedgo">Add it</button><a class="note" href="/tools">Tools</a></div>
+  </section>
+  <section class="isec"><div class="h2">Repos</div>
+    <div class="note">Each repo uses one set. The seats that act for a repo run while any of its teams is started.</div>
+    <div class="card bseats">{% for r in b.repos %}<label class="bseat"><b>{{ r.repo }}</b><select class="input setin" data-repo="{{ r.repo }}" aria-label="{{ r.repo }}'s built-in set">{% for x in b.tabs %}<option value="{{ x.name }}"{% if x.name == r.set %} selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></label>{% else %}<div class="bseat note">No repo is registered here.</div>{% endfor %}</div>
+  </section>
+  <section class="isec"><button class="btn sm ghost" type="button" id="bdelete"{% if b.delete_why %} disabled title="{{ b.delete_why }}"{% endif %}>Delete {{ b.set }}</button>{% if b.delete_why %} <span class="note">{{ b.delete_why }}</span>{% endif %}<div class="note warn" id="bdeletesaid" role="status" hidden></div></section>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+{% block scripts %}{% if b and b.cut_over %}<script src="{{ static_url('builtins.js') }}"></script>{% endif %}{% endblock %}

@@ -37,6 +37,7 @@ PAGES = {
     "flows.html": "/flows",
     "briefs.html": "/briefs",
     "team.html": "/teams",
+    "builtins.html": "/builtins/default",
     "repo.html": "/repo/samscrape",
 }
 

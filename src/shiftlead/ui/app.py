@@ -5446,6 +5446,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             version=body.get("version") or None,
         )
 
+    def _or_none(got: Any) -> Any:
+        return None if isinstance(got, HTTPException) else got
+
     @app.get("/teams")
     async def teams_first():
         """`/teams` opens the first team of the tabs' order (§4.9d *The page*, TD-2059)."""
@@ -5475,6 +5478,72 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """§4.5a *Team page: Delete* (TD-2063): the person's own act, at the version the page was drawn at."""
         body = await body_of(request)
         return await call("team_delete", team=name, version=body.get("version"))
+
+    @app.post("/api/builtins/new")
+    async def builtins_new(request: Request):
+        """§4.5a *Built-in seats page: + New set* (TD-2066): `{name, label?}`, the person's own act."""
+        body = await body_of(request)
+        return await call("builtins_new", **{k: body[k] for k in ("name", "label") if k in body})
+
+    @app.post("/api/builtins/repo")
+    async def repo_builtins(request: Request):
+        """§4.5a *Built-in seats page: repos* (TD-2066): `{repo, set, version}`, the person's own act."""
+        body = await body_of(request)
+        return await call("repo_builtins", **{k: body[k] for k in ("repo", "set", "version") if k in body})
+
+    @app.post("/api/builtins/{name}/set")
+    async def builtins_set(name: str, request: Request):
+        """§4.5a *Built-in seats page* (TD-2066): a set's label, models or logins, at the page's version."""
+        body = await body_of(request)
+        return await call(
+            "builtins_set", set=name, **{k: body[k] for k in ("label", "models", "logins", "version") if k in body}
+        )
+
+    @app.post("/api/builtins/{name}/delete")
+    async def builtins_delete(name: str, request: Request):
+        """§4.5a *Built-in seats page: Delete* (TD-2066): the person's own act, at the page's version."""
+        body = await body_of(request)
+        return await call("builtins_delete", set=name, version=body.get("version"))
+
+    @app.get("/builtins")
+    async def builtins_first():
+        """`/builtins` opens `default` (§4.9d *The page*)."""
+        return RedirectResponse("/builtins/default", status_code=303)
+
+    @app.get("/builtins/{name}", response_class=HTMLResponse)
+    async def builtins_page(request: Request, name: str):
+        """A built-in set's page (§4.9d *The built-in seats and their page*, TD-2066): a person's own page, drawn from
+        the one read `ao builtins show` prints; before the cut-over it says so in place of its bands."""
+
+        async def read(method: str, **params: Any) -> Any:
+            try:
+                return await call(method, **params)
+            except HTTPException as e:
+                return e
+
+        show, info = await asyncio.gather(read("builtins_show", set=name), read("host"))
+        down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (show, info))
+        notes: list[str] = []
+        if isinstance(show, HTTPException) and not down:
+            if str(show.detail).startswith("no built-in set"):
+                raise HTTPException(404, str(show.detail))
+            notes.append(str(show.detail))
+        b = None if isinstance(show, HTTPException) else setmod.builtins_page(show)
+        info = {} if isinstance(info, HTTPException) else info
+        return templates.TemplateResponse(
+            request,
+            "builtins.html",
+            {
+                "b": b,
+                "notes": notes,
+                "agent_down": down,
+                "host": host_name(),
+                "active": "Settings",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if down else await chip_usage(call),
+                "build_chip": None if down else await chip_build(call, info or None),
+            },
+        )
 
     @app.get("/teams/{team}", response_class=HTMLResponse)
     async def team_page(request: Request, team: str):

@@ -88,6 +88,10 @@ HOME_EDITS = frozenset(
         "team_set",
         "team_new",
         "team_delete",
+        "builtins_new",
+        "builtins_delete",
+        "builtins_set",
+        "repo_builtins",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
@@ -125,6 +129,7 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # `stage_show`: an entry's stage record, which the home alone writes (§4.9c, TD-2050)
 # `flows`, `flow_check`: the Flows page's reads of the org's flows, the home's files (§4.9c, TD-2054)
 # `team_show`: what the team page shows, from the home's settings and stage records (§4.9d, TD-2060)
+# `builtins_show`: the Built-in seats page, from the home's settings, logins and repos (§4.9d, TD-2066)
 HOME_READS = frozenset(
     {
         "repos",
@@ -138,6 +143,7 @@ HOME_READS = frozenset(
         "flows",
         "flow_check",
         "team_show",
+        "builtins_show",
     }
 )
 # The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
