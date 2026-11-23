@@ -9,10 +9,11 @@ import json
 import pathlib
 import shutil
 import subprocess
-import uuid
 
 import pytest
+from conftest import kill_private_server, private_socket_name
 
+from sessionorc.tmux import Tmux
 from shiftlead.ui.pty_bridge import grid_argv, grid_read
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
@@ -127,7 +128,7 @@ def test_the_grid_reading_is_what_tmux_says_for_the_window():
     counted as a client's grid counts it."""
     if not shutil.which("tmux"):
         pytest.skip("tmux is not installed")
-    sock = f"ao-mark-{uuid.uuid4().hex[:8]}"
+    sock = private_socket_name()
     try:
         new = ["new", "-d", "-s", "m", "-x", "90", "-y", "20"]
         subprocess.run(["tmux", "-L", sock, "-f", "/dev/null", *new], check=True, timeout=10)
@@ -135,4 +136,4 @@ def test_the_grid_reading_is_what_tmux_says_for_the_window():
         assert out.returncode == 0, out.stderr
         assert grid_read(out.stdout) == (90, 21)
     finally:
-        subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=10)
+        kill_private_server(Tmux(socket_name=sock))
