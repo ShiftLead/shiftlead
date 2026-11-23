@@ -14,11 +14,11 @@ judged by the silent rule. The tick's wiring calls both; neither writes anything
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import NamedTuple
 
 from sessionorc import ledgerboard, work
-from sessionorc.agent_common import _parse, shells_live, subagents_live
+from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
 from shiftlead.stage_acts import Holder
@@ -51,9 +51,10 @@ def answer_on(text: str, person: str) -> EntryAnswer:
 
 def _instant(value: str | None) -> datetime | None:
     try:
-        return _parse(str(value)) if value else None
+        at = _parse(str(value)) if value else None
     except ValueError:
         return None
+    return at.replace(tzinfo=UTC) if at is not None and at.tzinfo is None else at
 
 
 def _lapsed(s: Session, tid: str, now: datetime) -> bool:
@@ -79,7 +80,8 @@ def holder_on(s: Session | None, tid: str, now: datetime, *, open_ask: bool = Fa
     live_hold = bool(s.gated or s.stop_held or s.wind_down or s.wrapup_at) or s.state in ("limited", "unreachable")
     open_prompts = s.pendings or ([s.pending] if s.pending else [])
     permission = any(p.kind == "permission" for p in open_prompts)
-    busy = bool(s.tool_open_at) or subagents_live(s, now) or shells_live(s, now)
+    tool_at = _instant(s.tool_open_at)  # a lost tool-end must not hold it from silent for good, as the tick reads it
+    busy = (tool_at is not None and now - tool_at <= OPEN_TOOL_CEILING) or subagents_live(s, now) or shells_live(s, now)
     return Holder(
         ended=ended,
         lease_lapsed=_lapsed(s, tid, now),

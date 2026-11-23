@@ -174,3 +174,14 @@ def test_a_clock_ahead_of_the_home_reads_as_no_idle_time():
 
 def test_a_bare_holder_defaults_are_the_dataclass_ones():
     assert holder_on(session(), "TD-7", NOW) == Holder(idle_for=timedelta(minutes=5))
+
+
+def test_a_tool_open_past_its_ceiling_no_longer_keeps_a_holder_from_silent():
+    assert holder_on(session(turn_at=ago(hours=4), tool_open_at=ago(hours=3, minutes=1)), "TD-7", NOW).silent
+
+
+def test_a_time_with_no_zone_reads_as_utc():
+    s = session(claimed=None, turn_at="2026-11-23T17:55:00")
+    s.progress = [ProgressEntry(ref="TD-7", at="2026-11-23T17:00:00")]
+    h = holder_on(s, "TD-7", NOW)
+    assert h.idle_for == timedelta(minutes=5) and not h.lease_lapsed
