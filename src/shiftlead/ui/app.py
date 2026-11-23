@@ -5485,13 +5485,17 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (got, info))
         notes = [*notes, *(str(r.detail) for r in (got, info) if isinstance(r, HTTPException) and r.status_code != 503)]
-        got = {} if isinstance(got, HTTPException) else got
+        teams_unread = isinstance(got, HTTPException)  # a team held only in settings cannot be told from no team
+        got = {} if teams_unread else got
         info = {} if isinstance(info, HTTPException) else info
         fleet = [] if isinstance(fleet, HTTPException) else fleet
         readings = {} if isinstance(readings, HTTPException) else readings
         held = got.get("switched_teams") or {}
         tabs = setmod.team_tabs(org.teams, held)
-        if team not in tabs and (tabs or team != "-"):
+        team_unread = teams_unread and team not in tabs and team != "-"
+        if team_unread:
+            tabs = [*tabs, team]
+        elif team not in tabs and not teams_unread and (tabs or team != "-"):
             raise HTTPException(404, f"no team {team!r}: the org defines {', '.join(tabs) or 'none'}")
         switched = None
         if team in held:  # the head, logins and numbers from the one read `ao team show` prints (§4.9d)
@@ -5526,6 +5530,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "t": card,
                 "sw": switched,
                 "team": team if team in tabs else None,
+                "teams_unread": teams_unread,
+                "team_unread": team_unread,
                 "head": head,
                 "group": group,
                 "tabs": tabs,

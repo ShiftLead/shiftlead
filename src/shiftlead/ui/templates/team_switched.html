@@ -1,9 +1,9 @@
 {#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's and the flow pick TD-2062's -#}
 <div class="note warn" id="teamsaid" role="status" hidden></div>
-{% if sw.cannot_run %}<div class="note warn">{{ sw.cannot_run }}</div>{% endif %}
 {% if sw.unread %}<div class="note warn">{{ sw.unread }}</div>{% endif %}
 <div id="teamset" data-team="{{ sw.team }}" data-version="{{ sw.version }}" data-order="{{ sw.order | tojson | forceescape }}">
 <section class="isec"><div class="h2">The flow it runs</div>
+  {% if sw.cannot_run %}<div class="note warn">{{ sw.cannot_run }}</div>{% endif %}
   <div class="note">{% if sw.flow %}<b>{{ sw.flow }}</b>{% if not sw.flow_read %} · not read{% endif %} · {% endif %}<a href="/flows">Edit on Flows</a></div>
   {% if sw.note %}<div class="note">{{ sw.note }}</div>{% endif %}
   <div class="teamnums">

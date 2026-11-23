@@ -1422,3 +1422,19 @@ def test_the_switched_team_page_draws_from_team_show_and_a_press_is_team_set(wor
     assert r.status_code == 200
     sent = next(p for m, p in fleet.calls if m == "team_set")
     assert sent == {"team": "solo", "at_once": {"gone": None}, "version": "v1"}
+
+
+def test_a_team_held_only_in_settings_is_not_called_missing_while_the_agent_is_away(world, client, monkeypatch):
+    _tmp_path, fleet = world
+    plain = fleet.handle
+
+    def handle(method, params):
+        if method in ("settings", "host"):
+            raise uiapp.AgentUnavailable("the host agent is restarting")
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    r = client.get("/teams/solo")
+    assert r.status_code == 200, r.text[:200]
+    assert "host agent unreachable" in r.text and "settings could not be read" in r.text
+    assert "after the switch-over</div>" not in r.text.split("settings could not be read")[1]
