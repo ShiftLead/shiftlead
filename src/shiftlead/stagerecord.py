@@ -107,6 +107,20 @@ def ask_words(stage: str, outcome: str, reason: str) -> tuple[str, str]:
     return f"{head}, what next?", (said or f"{head}.")
 
 
+def answer_move(answers: Mapping[str, Any], label: str) -> tuple[Any, str]:
+    """The move the person's lifted `label` makes, by the record's answer map, and the words kept for the next session
+    (§4.9c act 2). A form (`Hold: <note>`) matches by its head, whatever the case; any other is *Something else*."""
+    if label in answers:
+        return answers[label], label
+    if ":" in label:
+        head = label.split(":", 1)[0].strip().casefold()
+        for offered, move in answers.items():
+            is_form = offered != OTHER and offered.endswith(">") and ":" in offered
+            if is_form and offered.split(":", 1)[0].strip().casefold() == head:
+                return move, label
+    return answers.get(OTHER), label
+
+
 class StageStore:
     """The records of the repo whose checkout is at `root`, read from and written to origin's `shiftlead/state`."""
 
