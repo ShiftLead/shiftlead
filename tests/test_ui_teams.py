@@ -11,6 +11,7 @@ from __future__ import annotations
 import pathlib
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -18,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from shiftlead import teamrun
 from shiftlead.ui import app as uiapp
+from shiftlead.ui import settings_page as setmod
 
 pytestmark = pytest.mark.unit
 
@@ -1330,3 +1332,93 @@ def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_list
     # a role with neither a template nor a definition reads no layer, so it starts with no prompt typed
     assert client.post("/new", data={**data, "name": "h6", "role": "plain"}, follow_redirects=False).status_code == 303
     assert len(fleet.creates()) == 1
+
+
+def _switched_show(**more):
+    stages = [
+        {"key": "build", "name": "Build", "does": "build", "model": "opus", "at_once": 2, "entries": [], "now": {}},
+        {
+            "key": "check",
+            "name": "Check",
+            "does": "review",
+            "model": "fable",
+            "at_once": None,
+            "entries": [],
+            "now": {},
+        },
+    ]
+    logins = [
+        {"login": "claude:a", "tool": "claude", "name": "a", "label": "Paul", "state": "signed_in", "account": "acct",
+         "models": ["opus"], "why": None, "runs_nothing": False},
+        {"login": "claude:b", "tool": "claude", "name": "b", "label": None, "state": "limited", "account": "acct",
+         "models": ["haiku"], "why": "limited", "runs_nothing": True},
+    ]  # fmt: skip
+    return {
+        "team": "solo",
+        "switched": True,
+        "version": "v1",
+        "label": "Solo team",
+        "repo": "shiftlead",
+        "host": HOST,
+        "head": {"word": "running", "sessions": 2, "by": None, "most": 3},
+        "flow": {"name": "build", "read": True, "stages": stages, "no_such_stage": {"gone": 4}},
+        "logins": logins,
+        "cannot_run": None,
+        "note": None,
+        "unread": None,
+        **more,
+    }
+
+
+def _switched_tools():
+    login = {"name": "c", "label": None, "state": "signed_in"}
+    metered = {"name": "a", "settings": {"billing": "metered"}}
+    return {"tools": [{"adapter": "claude", "accounts": [], "logins": [metered, {"name": "b"}, login]}]}
+
+
+def test_a_switched_teams_words_numbers_and_logins():
+    got = setmod.switched_team(_switched_show(), _switched_tools())
+    assert (got["title"], got["name_beside"], got["word"]) == ("Solo team", "solo", "Running · 2 of 3 sessions")
+    assert [(s["key"], s["number"]) for s in got["stages"]] == [("build", 2), ("check", 1)]
+    assert got["no_such_stage"] == {"gone": 4} and got["sum"] == 3 and got["held_back"] == []
+    assert got["order"] == ["claude:a", "claude:b"] and [o["key"] for o in got["can_add"]] == ["claude:c"]
+    assert got["logins"][0]["metered"] is True and got["logins"][1]["metered"] is False
+
+
+def test_a_stopped_switched_team_says_who_stopped_it():
+    for by, word in (("person", "Stopped by you"), ("until", "Stopped at its stop time"), (None, "Stopped")):
+        head = {"word": "stopped", "sessions": 0, "by": by, "most": None}
+        assert setmod.switched_team(_switched_show(head=head), {})["word"] == word
+
+
+def test_a_team_only_the_settings_hold_gets_a_tab_in_the_repo_order():
+    defs = {"zed": SimpleNamespace(repo="ao-api")}
+    assert setmod.team_tabs(defs, {"solo": "shiftlead", "alpha": "ao-api"}) == ["alpha", "zed", "solo"]
+
+
+def test_the_switched_team_page_draws_from_team_show_and_a_press_is_team_set(world, client, monkeypatch):
+    _tmp_path, fleet = world
+    plain = fleet.handle
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead"}}
+        if method == "team_show":
+            return _switched_show()
+        if method == "tools":
+            return _switched_tools()
+        if method == "team_set":
+            fleet.calls.append((method, params))
+            return {"team": params["team"], "change": "set", "version": "v2"}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/solo").text
+    assert "Solo team" in page and "Running · 2 of 3 sessions" in page and "team.js" in page
+    assert "spends money" in page and "Passed over: limited" in page and "no such stage" in page
+    assert "build names none of its models, so nothing runs on it yet" in page
+    assert 'href="/teams/solo"' in client.get("/teams/ao-grind").text
+    r = client.post("/api/teams/solo/set", json={"at_once": {"gone": None}, "version": "v1", "ignored": 1})
+    assert r.status_code == 200
+    sent = next(p for m, p in fleet.calls if m == "team_set")
+    assert sent == {"team": "solo", "at_once": {"gone": None}, "version": "v1"}
