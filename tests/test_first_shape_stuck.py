@@ -61,12 +61,14 @@ def test_a_decided_line_names_no_lane_after_the_marker(agent, monkeypatch, marke
         assert got is not None and got[0]["reason"] == {"state": "no_lane"}
 
 
-def test_a_line_held_by_a_first_shape_member_is_not_reported_after_the_marker(agent):
-    _mark()
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+def test_a_line_someone_holds_is_still_read_against_its_holder(agent, marked):
+    """§4.9e takes a first-shape record out of the open-ask reading only; of a decided line it stops the lanes'."""
+    if marked:
+        _mark()
     agent._read_cut_over()
-    r = _rec()
     order = {"id": "board:abc", "entry": {}}
-    assert agent._stuck_order({"ao-t-w": r}, {}, "/r", order, ["ao-t-w"], NOW - timedelta(hours=3), NOW) is None
+    assert agent._stuck_order({"ao-t-w": _rec()}, {}, "/r", order, ["ao-t-w"], NOW - timedelta(hours=3), NOW)
 
 
 async def test_a_schedule_replays_nobody_after_the_marker(agent, monkeypatch):

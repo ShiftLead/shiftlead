@@ -815,11 +815,10 @@ class TickMixin:
             got = stuck_mod.reading(actors, now, mail.STUCK_ORDER_AFTER)
             return (got, actors) if got is not None else None
 
-        if self._first_shape_off:  # no lane is read after the cut-over; a line's job record is TD-2053's (§4.9e)
-            held = [a for a in held if not stuck_mod.first_shape_record(graph.get(a), self._first_shape_cut)]
-            return read([one(a) for a in held]) if held else None
         if held:
             return read([one(a) for a in held])
+        if self._first_shape_off:  # no lane is read after the cut-over; a line's job record is TD-2053's (§4.9e)
+            return None
         lanes = stuck_mod.lane_records(root, order["entry"], graph, teams)
         if not lanes:
             got = stuck_mod.no_lane(at, now, mail.STUCK_ORDER_AFTER)

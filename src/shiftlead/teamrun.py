@@ -684,7 +684,12 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
         busy = [{"name": b["name"], "state": b["state"]} for b in reading["busy"]] if reading else []
         startable = (
             {"closes": reading["closes"], "leaves": busy}
-            if reading and busy and not reading["orphans"] and waiting is not None and not reading["why"]
+            if reading
+            and busy
+            and not first_shape_off  # its `closes` is the *concluded* reading, drawn for no team after the marker
+            and not reading["orphans"]
+            and waiting is not None
+            and not reading["why"]
             else None
         )
         rows_out.append(
