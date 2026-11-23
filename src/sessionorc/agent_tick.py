@@ -333,6 +333,7 @@ class TickMixin:
     # inside a check-then-act sequence — the loop runs them one at a time.
 
     _first_shape_off = False  # the cut-over's marker as the last readable `settings.yml` held it (§4.9e)
+    _first_shape_cut: str | None = None  # …and its date, which says whose record was made before it
 
     def _read_cut_over(self) -> None:
         """Whether the first shape's rules are off this tick (§4.9e *What decides which shape runs*). A file that does
@@ -340,14 +341,17 @@ class TickMixin:
         turns the lanes back on. A failed write stays on the record, for the tick's own save to carry."""
         if (doc := settings_mod.read()) is None:
             return
-        off = teamstore.cut_over(doc) is not None
-        if off == self._first_shape_off:
+        cut = teamstore.cut_over(doc)
+        off = cut is not None
+        if off == self._first_shape_off and cut == self._first_shape_cut:
             return
-        self._first_shape_off = off
+        self._first_shape_off, self._first_shape_cut = off, cut
         if off:
             self._host_rec["first_shape_off"] = True
+            self._host_rec["first_shape_cut"] = cut
         else:
             self._host_rec.pop("first_shape_off", None)
+            self._host_rec.pop("first_shape_cut", None)
         try:
             self.host_store.save(self._host_rec)
         except OSError:
@@ -608,6 +612,8 @@ class TickMixin:
                         continue  # two addressees that walk to one record are one actor
                     walked.add(sid)
                     r = graph.get(sid)
+                    if self._first_shape_off and stuck_mod.first_shape_record(r, self._first_shape_cut):
+                        continue  # a member or seat of the first shape is no actor after the cut-over (§4.9e)
                     stamp = self._unanswered_of(graph, sid, e, now)
                     clock = stuck_mod.ask_idle_clock(r, e.id)
                     actors.append(
@@ -809,6 +815,9 @@ class TickMixin:
             got = stuck_mod.reading(actors, now, mail.STUCK_ORDER_AFTER)
             return (got, actors) if got is not None else None
 
+        if self._first_shape_off:  # no lane is read after the cut-over; a line's job record is TD-2053's (§4.9e)
+            held = [a for a in held if not stuck_mod.first_shape_record(graph.get(a), self._first_shape_cut)]
+            return read([one(a) for a in held]) if held else None
         if held:
             return read([one(a) for a in held])
         lanes = stuck_mod.lane_records(root, order["entry"], graph, teams)
@@ -2900,7 +2909,8 @@ class TickMixin:
                 rec = copy.deepcopy(before)
                 rule = (conf.get(team) or {}).get("schedule")
                 # a rule naming a login (a switched team's, §4.9d) has no firing until TD-2065 builds it
-                if not rule or not rule.get("profile"):
+                # …and after the cut-over no first-shape rule replays a team (§4.9e)
+                if not rule or not rule.get("profile") or self._first_shape_off:
                     rec.pop("schedule_next", None)  # cleared: nothing upcoming; `schedule_fired` stays, a fact
                 else:
                     await self._schedule_team(team, rule, rec, by_team.get(team) or [], now)

@@ -215,6 +215,8 @@ class HostStore:
             rec["last_tick"] = raw["last_tick"]
         if isinstance(raw, dict) and raw.get("first_shape_off") is True:
             rec["first_shape_off"] = True
+            if isinstance(raw.get("first_shape_cut"), str):
+                rec["first_shape_cut"] = raw["first_shape_cut"]  # the marker's date, which rule 13's ask reading reads
         for name in ("ci_spells", "disk_low"):  # `disk_low`: §4.6 *Told before the pool is full*, TD-2083
             spells = raw.get(name) if isinstance(raw, dict) else None
             if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
