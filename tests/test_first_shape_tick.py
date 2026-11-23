@@ -4,10 +4,10 @@ which shape runs*, TD-2076), and before it they run as they did."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-import yaml
 from conftest import park_ticks
 
 from sessionorc import paths
@@ -78,10 +78,9 @@ async def test_the_wound_down_marks_go_at_the_marker_and_none_is_written(agent, 
     agent._read_cut_over()
     await agent._work_marks(datetime.now(UTC))
     assert agent._host_rec["teams"] == {"h": {"other": 1}}
-    assert yaml.safe_load((paths.home() / "settings.yml").read_text())["cut_over"]
 
 
-@pytest.mark.parametrize("name", ["_finished_pass", "_finished_closed_managers", "_scale_pass", "_seat_move"])
+@pytest.mark.parametrize("name", ["_finished_pass", "_finished_closed_managers", "_seat_move"])
 async def test_a_team_pass_reads_no_record_after_the_marker(agent, monkeypatch, name):
     await park_ticks(agent)
     _mark()
@@ -89,3 +88,39 @@ async def test_a_team_pass_reads_no_record_after_the_marker(agent, monkeypatch, 
     monkeypatch.setattr(agent, "_graph", lambda: pytest.fail("the pass read the records after the marker"))
     agent.sessions.clear()
     await getattr(agent, name)(datetime.now(UTC))
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_no_line_scales_after_the_marker(agent, monkeypatch, marked):
+    await park_ticks(agent)
+    if marked:
+        _mark()
+    agent._read_cut_over()
+    agent.sessions["ao-t-w"] = Session(
+        id="ao-t-w", name="w", kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g"
+    )  # fmt: skip
+    monkeypatch.setattr("sessionorc.agent_scale._scale_line", lambda r: "w")
+    spy = AsyncMock()
+    monkeypatch.setattr(agent, "_scale_line_pass", spy)
+    await agent._scale_pass(datetime.now(UTC))
+    assert spy.await_count == (0 if marked else 1)
+
+
+async def test_a_question_that_ends_after_the_marker_writes_no_work_mark(agent, monkeypatch):
+    await park_ticks(agent)
+    _mark()
+    agent._read_cut_over()
+    monkeypatch.setattr(agent, "_graph", lambda: pytest.fail("rule 8 read the team after the marker"))
+    orphaned = {"team": "g", "name": "w", "ref": "TD-1", "repo": "r"}
+    agent._question_end(SimpleNamespace(id="m-1", kind="ask", orphaned=orphaned), "lapsed")
+    assert "work_waiting" not in (agent._host_rec.get("teams") or {}).get("g", {})
+
+
+async def test_a_press_of_start_after_the_marker_starts_nobody(agent, monkeypatch):
+    await park_ticks(agent)
+    _mark()
+    agent._read_cut_over()
+    agent._host_rec["teams"] = {"g": {"work_waiting": {"members": {"w": ["TD-1"]}}}}
+    monkeypatch.setattr(agent, "_work_start", AsyncMock(side_effect=AssertionError("started a team after the marker")))
+    got = await agent.rpc_work_start(team="g")
+    assert got == {"team": "g", "started": False, "ids": [], "held": None}

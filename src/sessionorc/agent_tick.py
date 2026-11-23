@@ -3236,10 +3236,10 @@ class TickMixin:
         keeping its `at`. Under `on_work: off`, or for a team stopped rather than wound down, or one live again, nothing
         is written: a live member is waiting (§4.9a), and a stopped team's note waits in the mailbox for the person's
         Start, while that team's lanes are read (*A team that stopped*, TD-781). The next tick's `_work_marks` does
-        what the team's `on_work` says. Never on a node."""
+        what the team's `on_work` says. Never on a node, and never after the cut-over (§4.9e)."""
         o = e.orphaned if isinstance(e.orphaned, dict) else {}
         team, name, ref = str(o.get("team") or ""), str(o.get("name") or ""), str(o.get("ref") or "")
-        if self.mode != "home" or not (team and name and ref):
+        if self.mode != "home" or self._first_shape_off or not (team and name and ref):
             return
         try:
             on_work = (settings_mod.teams(settings_mod.load()).get(team) or {}).get(

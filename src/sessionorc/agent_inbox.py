@@ -2024,6 +2024,8 @@ class InboxMixin:
         team = str(team or "").strip()
         if not team:
             raise RpcError("work_start needs the team whose members to start")
+        if self._first_shape_off:  # rule 8 starts no team for work after the cut-over (§4.9e)
+            return {"team": team, "started": False, "ids": [], "held": None}
         teams = self._host_rec.setdefault("teams", {})
         rec = teams.get(team) or {}
         mark = rec.get("work_waiting")
