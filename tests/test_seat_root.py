@@ -118,6 +118,7 @@ def test_the_sweep_walks_each_distinct_root_once_and_skips_one_not_mounted(roots
     assert agent._scratch_pools() == [str(root), str(seat)]
     (tmp_path / "hosts.yml").write_text(f"local:\n  scratch_root: {root}\n  seat_root: {root}\n")
     assert agent._scratch_pools() == [str(root)]
+    assert agent._seat_free() is None  # the same disk: `ao disk` draws it once
 
 
 @pytest.mark.unit

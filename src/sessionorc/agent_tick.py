@@ -5721,9 +5721,10 @@ class TickMixin:
         return [root, seat] if seat and seat != root and scratch_mod.has_reading(seat) else [root]
 
     def _seat_free(self) -> dict[str, Any] | None:
-        """`seat_root`'s free space, `not_mounted` where it has no reading, None where it is unset (§4.6, TD-2082)."""
+        """`seat_root`'s free space, `not_mounted` where it has no reading; None where it is unset or is `scratch_root`,
+        whose reading is already drawn (§4.6, TD-2082)."""
         seat = self._seat_root()
-        if not seat:
+        if not seat or seat == self._scratch_root():
             return None
         return diskbook.free_space(seat) if scratch_mod.has_reading(seat) else {"path": seat, "not_mounted": True}
 
