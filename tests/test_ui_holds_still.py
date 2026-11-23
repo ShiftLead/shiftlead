@@ -535,6 +535,7 @@ def test_the_bar_floats_only_while_something_waits_td2117():
     rule = css[css.index(".qbar.qwaits {") :].split("}", 1)[0]
     assert "position: sticky" in rule and "top: var(--barh)" in rule and "z-index: 20" in rule
     assert "padding" not in rule and "border" not in rule and "margin" not in rule  # nothing under it moves
+    assert "min-height: 26px" in css[css.index(".qbar {") :].split("}", 1)[0]  # Refresh coming or going moves nothing
     assert "html:has(.topbar.away) .qbar.qwaits { top: 0; }" in css
     assert "html:has(.qbar.qwaits) { scroll-padding-top:" in css
     assert "html:has(.qbar.qwaits):has(.topbar.away) { scroll-padding-top:" in css

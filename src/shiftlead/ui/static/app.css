@@ -1572,7 +1572,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 /* The page holds still (§4.5 screen 12, §4.5a *Queue page: the bar, Refresh*, *Queue card: held*, *gone — refresh*;
    TD-1761): the bar above the first group; the held mark in width kept for it, drawn only while something waits;
    a gone item's controls hidden in their place, its links and height kept */
-.qbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; color: var(--muted); }
+.qbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 26px; margin: 4px 0 8px; color: var(--muted); }  /* 26 px: a small button's, so Refresh coming or going moves nothing */
 .qbar .qbarlive { color: var(--working-fg); }
 .qbar.notlive .qbarlive { color: var(--warn-fg); }
 .qbar .qbarask { color: var(--needs-fg); font-weight: 600; }

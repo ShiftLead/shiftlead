@@ -806,7 +806,7 @@
   };
   AO.barDecide = function () {};  // a page without a bar (a popped-out Focus) has nothing to decide
   // the Queue's and a card page's bar follows the scroll while something waits (§4.5 screen 12 *The page holds still*,
-  // TD-2117); `--qbarh` is its height, which a jump to a card clears
+  // TD-2117); `--qbarh` is its height, which the scroll padding reads only while it floats
   AO.qbarFloat = function (bar, on) {
     const put = () => document.documentElement.style.setProperty("--qbarh", `${bar.offsetHeight}px`);
     bar.classList.toggle("qwaits", on);
