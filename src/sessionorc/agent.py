@@ -1031,6 +1031,9 @@ class HostAgent(
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
+        # the cut-over's marker, read before the first RPC or tick; a file that does not read keeps the record's (§4.9e)
+        self._first_shape_off = self._host_rec.get("first_shape_off") is True
+        self._read_cut_over()
         # the previous run's last tick, read before this run's first tick overwrites it: a pane found
         # gone on that first tick ended while nobody was looking (§4.5 row 5 (b), TD-490)
         self._prev_last_tick: str | None = self._host_rec.get("last_tick")

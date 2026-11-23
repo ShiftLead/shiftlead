@@ -33,6 +33,7 @@ from sessionorc import (
     naming,
     paths,
     reports,
+    teamstore,
     witness,
     workorders,
     worktreesweep,
@@ -331,6 +332,27 @@ class TickMixin:
     # return plain data. So a tick's reconcile step and an RPC handler can never interleave
     # inside a check-then-act sequence — the loop runs them one at a time.
 
+    _first_shape_off = False  # the cut-over's marker as the last readable `settings.yml` held it (§4.9e)
+
+    def _read_cut_over(self) -> None:
+        """Whether the first shape's rules are off this tick (§4.9e *What decides which shape runs*). A file that does
+        not read keeps the last reading, which `host.json` holds across a restart, so a typo after the cut-over never
+        turns the lanes back on. A failed write stays on the record, for the tick's own save to carry."""
+        if (doc := settings_mod.read()) is None:
+            return
+        off = teamstore.cut_over(doc) is not None
+        if off == self._first_shape_off:
+            return
+        self._first_shape_off = off
+        if off:
+            self._host_rec["first_shape_off"] = True
+        else:
+            self._host_rec.pop("first_shape_off", None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.warning("could not write first_shape_off to %s", self.host_store.path)
+
     async def _setup_notes(self) -> None:
         """What a machine needs a person for before an adapter's sessions can run (design §4.3 *The person
         meets the step at setup*, TD-875): on the first tick, whenever `profiles.yml` changes, and hourly
@@ -443,6 +465,7 @@ class TickMixin:
 
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
+        self._read_cut_over()
         if self.mode == "home":
             # first in the home's part of the tick, before any pass reads a reserve (§6 *The migration*)
             try:
@@ -1237,9 +1260,9 @@ class TickMixin:
             try:
                 self._released_prune(s)  # every record of the repo, at work or not (TD-1706)
                 await self._scheduled_start(s, now)
-                if await self._extra_drop(s):
+                if not self._first_shape_off and await self._extra_drop(s):
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
-                if await self._scale_down(s, now):
+                if not self._first_shape_off and await self._scale_down(s, now):
                     continue  # an extra out of work, back to held: never restarted (§6 rule 14, TD-1546)
                 await self._crash_restart(s, now)
                 await self._extra_hold(s, now)  # an extra's exit no rule restarts: held (TD-1547)
@@ -1248,13 +1271,15 @@ class TickMixin:
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
                 await self._sit_out_close(s)
-                await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
+                if not self._first_shape_off:
+                    await self._brief_restart(s, now)  # first: a member it restarts is typed nothing else
                 await self._idle_nudge(s, now)
                 await self._idle_open(s, now)
                 await self._context_line(s, now)
-                await self._cadence_line(s, now)
-                await self._held_line(s, now)
-                await self._lane_news(s, now)
+                if not self._first_shape_off:  # rules 10, 11 and 6 act on no member after the cut-over (§4.9e)
+                    await self._cadence_line(s, now)
+                    await self._held_line(s, now)
+                    await self._lane_news(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
         if (
@@ -1263,12 +1288,19 @@ class TickMixin:
             # detached, as the reports are: `gh` talks to the network, and the tick must not wait on it
             self._seat_counted_at = now
             self._seat_count_task = asyncio.create_task(self._count_seats(records))
-        if (self._cadence_task is None or self._cadence_task.done()) and now - self._cadence_read_at > DERIVE_EVERY:
+        first_shape = not self._first_shape_off  # rules 7, 10, 11 and 12's readings run on no team after it (§4.9e)
+        if (
+            first_shape
+            and (self._cadence_task is None or self._cadence_task.done())
+            and now - self._cadence_read_at > DERIVE_EVERY
+        ):
             self._cadence_read_at = now  # rule 10: the script talks to GitHub, so detached as well
             self._cadence_task = asyncio.create_task(self._cadence_pass(records))
         if (
-            self._conventions_task is None or self._conventions_task.done()
-        ) and now - self._conventions_read_at > DERIVE_EVERY:
+            first_shape
+            and (self._conventions_task is None or self._conventions_task.done())
+            and now - self._conventions_read_at > DERIVE_EVERY
+        ):
             self._conventions_read_at = now  # rule 12: the script runs git, so detached as well
             self._conventions_task = asyncio.create_task(self._conventions_pass(records))
         if self._sweep_task is None or self._sweep_task.done():
@@ -1276,10 +1308,18 @@ class TickMixin:
             if any(gatesweep_mod.due(self._swept_on.get(r), today) for r in self._repos):
                 # the event runner (TD-1376): the sweep asks the forge and opens PRs, so detached as well
                 self._sweep_task = asyncio.create_task(self._sweep_pass(today))
-        if (self._held_task is None or self._held_task.done()) and now - self._held_read_at > DERIVE_EVERY:
+        if (
+            first_shape
+            and (self._held_task is None or self._held_task.done())
+            and now - self._held_read_at > DERIVE_EVERY
+        ):
             self._held_read_at = now  # rule 11: one `gh pr view` a merged PR, so detached as well
             self._held_task = asyncio.create_task(self._held_pass(records, now))
-        if (self._brief_task is None or self._brief_task.done()) and now - self._brief_read_at > DERIVE_EVERY:
+        if (
+            first_shape
+            and (self._brief_task is None or self._brief_task.done())
+            and now - self._brief_read_at > DERIVE_EVERY
+        ):
             self._brief_read_at = now
             self._brief_task = asyncio.create_task(self._brief_pass(now))
         if (
@@ -2939,7 +2979,8 @@ class TickMixin:
         reading) whose members' lanes hold ids their `lane_seen` does not gets `work_waiting: {at,
         repo, members: {<name>: [ids]}}` on the home's `host` record under its name, once
         `WORK_SETTLE` has passed since the home first read the newest of them (a time kept in
-        memory, so a restart settles again). It is removed when the team is no longer wound down —
+        memory, so a restart settles again). After the cut-over no lane exists: the marks go and none
+        is written (§4.9e). It is removed when the team is no longer wound down —
         a crew session live again, or a member that never declared — when no id is new, and under
         `on_work: off`. `lane_seen` itself is rule 6's, written for a member that is gone as for a
         live one and pruned by it on the same tick, before this pass (`work.reread`, TD-407), which
@@ -2947,6 +2988,19 @@ class TickMixin:
         if self.mode != "home":
             return
         teams = self._host_rec.setdefault("teams", {})
+        if self._first_shape_off:
+            marked = [t for t, rec in teams.items() if "work_waiting" in rec]
+            for team in marked:
+                teams[team].pop("work_waiting")
+                if not teams[team]:
+                    del teams[team]
+            if marked:
+                try:
+                    self.host_store.save(self._host_rec)
+                except OSError:
+                    log.exception("writing the home's host record failed")
+                await self._push_changes()
+            return
         try:
             settings = settings_mod.teams(settings_mod.load())
         except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
@@ -3195,10 +3249,10 @@ class TickMixin:
         keeping its `at`. Under `on_work: off`, or for a team stopped rather than wound down, or one live again, nothing
         is written: a live member is waiting (§4.9a), and a stopped team's note waits in the mailbox for the person's
         Start, while that team's lanes are read (*A team that stopped*, TD-781). The next tick's `_work_marks` does
-        what the team's `on_work` says. Never on a node."""
+        what the team's `on_work` says. Never on a node, and never after the cut-over (§4.9e)."""
         o = e.orphaned if isinstance(e.orphaned, dict) else {}
         team, name, ref = str(o.get("team") or ""), str(o.get("name") or ""), str(o.get("ref") or "")
-        if self.mode != "home" or not (team and name and ref):
+        if self.mode != "home" or self._first_shape_off or not (team and name and ref):
             return
         try:
             on_work = (settings_mod.teams(settings_mod.load()).get(team) or {}).get(
@@ -3492,8 +3546,8 @@ class TickMixin:
         members closed under the wrap-up's safety check, its manager told once and closed after
         `WRAPUP_GRACE`, and the person told what the manager did not say. When the reading first held
         is kept in memory per team and dropped the tick it stops holding. One team's surprise is a
-        log line, never another's."""
-        if self.mode != "home":
+        log line, never another's. Nothing winds a team down after the cut-over (§4.9e)."""
+        if self.mode != "home" or self._first_shape_off:
             return
         by_team: dict[str, list[Session]] = {}
         for r in self._graph().values():
@@ -3697,8 +3751,9 @@ class TickMixin:
         each team whose manager is `closed` with `finished_sent_at` set and no rule 9 mark yet — unless a member
         is at work again, which takes the wind-down back — is marked `closed_for: {why: finished}` with this
         run's `wound_down_by`, saved, and the person told. A step of its own ahead of `_keep_running` in the tick,
-        so no seat's fill reads that end before it carries the key; `_finished_team` then finds it marked."""
-        if self.mode != "home":
+        so no seat's fill reads that end before it carries the key; `_finished_team` then finds it marked. Off after
+        the cut-over, with the rest of rule 9 (§4.9e)."""
+        if self.mode != "home" or self._first_shape_off:
             return
         by_team: dict[str, list[Session]] = {}
         for r in self._graph().values():
