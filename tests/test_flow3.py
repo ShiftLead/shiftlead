@@ -89,6 +89,49 @@ def test_each_rule_refuses_naming_the_stage_and_outcome(doc, words):
     assert words in problems(doc)
 
 
+@pytest.mark.parametrize(
+    "doc, words",
+    [
+        (edit(1, ship={"to": "merge", "refused": "build"}, **{"changes-wanted": "person"}), "(rule 3)"),
+        (edit(1, ship={"to": "merge", "refused": "done"}), "`ship.refused: done` is not a destination"),
+        (edit(1, ship={"to": "merge", "limit": 2}), "put it on `refused`"),
+        (edit(1, ship={"to": "person", "limit": 2}), "a limit sits on a move to a stage"),
+        (edit(0, name=3), "stage 1 has no name"),
+        (flow(audits=[{"name": "A", "model": "sonnet", "every": "1 hours\n", "brief": "docs"}]), "`every` is written"),
+    ],
+)
+def test_a_refused_move_a_misplaced_limit_and_a_name_that_is_not_text_are_refused(doc, words):
+    assert words in problems(doc)
+
+
+def test_two_stages_taking_one_kind_of_entry_are_refused():
+    doc = flow()
+    doc["stages"].append({"name": "Other", "does": "build", "model": "opus", "takes": "other", "work-pushed": "review"})
+    assert "new `other` entries need exactly one stage that takes them; found 2 (rule 6)" in problems(doc)
+
+
+def test_the_builtins_are_the_paths_the_design_names():
+    def path(name):
+        doc = yaml.safe_load((flow3.PACKAGE_DIR / name / flow3.FILE).read_text())
+        return [(s["name"], s["does"], s.get("takes"), s.get("only-when")) for s in doc["stages"]], doc.get(
+            "audits", []
+        )
+
+    wise, audits = path("design-wise")
+    assert wise == [
+        ("Design", "design", "design-first", None),
+        ("First read", "review", None, None),
+        ("Second read", "review", None, None),
+        ("Fact-check", "review", None, None),
+        ("Build", "build", "other", None),
+        ("Review", "review", None, None),
+        ("Protected read", "review", None, "protected-files"),
+    ]
+    assert [(a["brief"], a["every"]) for a in audits] == [("docs", "10 merged-pull-requests"), ("tests", "6 hours")]
+    assert path("build-review")[0] == [("Build", "build", "any", None), ("Review", "review", None, None)]
+    assert path("build")[0] == [("Build", "build", "any", None)]
+
+
 def test_a_pull_request_with_no_way_out_is_refused():
     """Rule 4: a build whose every move goes round, with limits, never reaches a merge or the person."""
     doc = {

@@ -40,7 +40,7 @@ STAGE_KEYS = ("name", "does", "model", "takes", "only-when", "brief", "also")
 AUDIT_KEYS = ("name", "model", "every", "brief", "also")
 TAKES = ("design-first", "other", "any")
 MAX_MOVES = 25
-EVERY = re.compile(r"^[1-9]\d* (merged-pull-requests|hours|days)$")
+EVERY = re.compile(r"[1-9]\d* (merged-pull-requests|hours|days)")
 # the standard briefs (§4.9c *What a stage's session is told*), each with its kind
 STANDARD = {
     "design": "design",
@@ -201,7 +201,7 @@ def _audits(
         bad.append("`audits:` is a list")
         return audits
     for i, a in enumerate(raw, 1):
-        if not isinstance(a, dict) or not a.get("name"):
+        if not isinstance(a, dict) or not isinstance(a.get("name"), str) or not a["name"].strip():
             bad.append(f"audit {i} has no name (rule 10)")
             continue
         name = str(a["name"])
@@ -210,7 +210,7 @@ def _audits(
                 bad.append(f"{name}: unknown key `{k}`; an audit has {', '.join(AUDIT_KEYS)} (rule 10)")
         if a.get("model") not in models:
             bad.append(f"{name}: model must be one of {', '.join(models)} (rule 10)")
-        if not EVERY.match(str(a.get("every", ""))):
+        if not EVERY.fullmatch(str(a.get("every", ""))):
             bad.append(f"{name}: `every` is written like `10 merged-pull-requests`, `6 hours` or `1 days` (rule 10)")
         if not a.get("brief"):
             bad.append(
@@ -236,7 +236,7 @@ def _stages(
     stages: dict[str, dict[str, Any]] = {}
     takes: dict[str, list[str]] = {"design-first": [], "other": []}
     for i, st in enumerate(raw, 1):
-        if not isinstance(st, dict) or not st.get("name"):
+        if not isinstance(st, dict) or not isinstance(st.get("name"), str) or not st["name"].strip():
             bad.append(f"stage {i} has no name (rule 7)")
             continue
         name, kind = str(st["name"]), st.get("does")
