@@ -264,6 +264,7 @@ from sessionorc.agent_serve import ServeMixin
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_shape import ShapeMixin
 from sessionorc.agent_spend import SpendMixin
+from sessionorc.agent_stage import StageMixin
 from sessionorc.agent_sync import SyncMixin
 from sessionorc.agent_tick import FILLED_FOR, TickMixin
 from sessionorc.agent_wake import WakeMixin
@@ -593,6 +594,7 @@ class HostAgent(
     RemoteMixin,
     LinkMixin,
     LoginsMixin,
+    StageMixin,
 ):
     def __init__(
         self,
