@@ -77,6 +77,19 @@ async def test_the_prune_keeps_a_live_names_round_log_and_drops_an_old_one(agent
     assert kept.exists() and not gone.exists()
 
 
+async def test_a_session_created_after_the_sweeps_reading_keeps_its_old_round_log(agent, tmp_path):
+    """TD-2092: the pass reads the records again just before an age removal, so a stale reading loses no live log."""
+    reading: set[str] = set()  # the sweep's reading, taken before the create
+    async with LocalClient() as person:
+        m = await _mk(person, tmp_path)
+    log = paths.rounds_log(m)
+    log.write_text("2026-06-01T00:00Z an earlier run of this name\n")
+    old = time.time() - 90 * 86400
+    os.utime(log, (old, old))
+    await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), reading)
+    assert log.exists()
+
+
 def test_ao_log_writes_and_reads_its_own(subprocess_agent, tmp_path, capsys, monkeypatch):
     from shiftlead import cli
 
