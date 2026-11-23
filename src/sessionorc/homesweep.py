@@ -145,7 +145,7 @@ def _removal(tree: Path) -> tuple[str, Path | None]:
     named = text.removeprefix("gitdir:").strip() if text.startswith("gitdir:") else ""
     if not named:
         return "", None
-    admin = Path(os.path.normpath(tree / named))
+    admin = Path(os.path.normpath(os.path.join(os.path.realpath(tree), named)))  # `..` from the physical tree
     if admin.parent.name != "worktrees":
         return "", None
     common = admin.parent.parent

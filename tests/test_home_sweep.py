@@ -347,3 +347,16 @@ def test_a_link_at_a_board_s_tree_is_never_followed(tmp_path):
     (home / "boards" / "gone" / "tree").symlink_to(target)
     t = boards(home, ["other"])
     assert (target / "f").exists() and not t.listed
+
+
+@pytest.mark.unit
+def test_a_relative_gitdir_under_a_symlinked_home_is_read_from_the_physical_tree(tmp_path):
+    home, repo, tree = board_tree(tmp_path)
+    admin = repo / ".git" / "worktrees" / "tree"
+    (tree / ".git").write_text(f"gitdir: {os.path.relpath(admin, tree)}\n")
+    aged(tree)
+    link = tmp_path / "a" / "b" / "link"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(home)
+    boards(link, ["other"])
+    assert not tree.exists() and not admin.exists()
