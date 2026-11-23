@@ -133,6 +133,9 @@ FAST_TICK = 0.3
 # the sockets, never under `$TMPDIR`: a precheck gives each run a `TMPDIR` of its own (TD-1052), and runs
 # that could not see each other's owners would sweep each other's servers.
 OWNERS = Path("/tmp") / f"ao-test-owners-{os.getuid()}"
+# Inside each of a run's scratch roots, its pid: what says whose a root in a seat's directory is (design §4.6 *The
+# pressure pass*, rule 1). The `OWNERS` files stay for the roots at the top of `/tmp`.
+TEST_RUN_MARK = ".shiftlead-test-run"
 
 
 def private_socket_name() -> str:
@@ -222,19 +225,60 @@ def _rmtree_writable(path: str) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
-def sweep_stale_scratch_roots(base: str = "/tmp") -> None:
+def sweep_stale_scratch_roots(base: str = "/tmp", tmpdir: str | None = None) -> None:
     """A test run whose workers are killed, or whose session restarts mid-run, never reaches its scratch
     root's cleanup, so its `aoscr-*` directory used to stay in `/tmp` for good: 182 of them held about
     45,000 inodes of the shared tmpfs on 2026-11-19, which then refused every test's setup (TD-2015). The
     sweep removes the roots of runs that have ended — an owner file naming a pid no longer running — and
     leaves a live run's alone, as the tmux sweep does. A root no owner file names (one made before TD-2015)
-    is never touched: whose it is cannot be read, so it is left for a person to clear."""
+    is never touched: whose it is cannot be read, so it is left for a person to clear.
+
+    A root in a seat's directory (TD-2084) is read by the pid in its own `TEST_RUN_MARK`, in every seat's under
+    `base`'s `shiftlead-<uid>/` and, where `tmpdir` is a seat's in another pool, under that one's too."""
     for root in glob.glob(os.path.join(base, "aoscr-*")):
         name = os.path.basename(root)
         if not (OWNERS / name).exists() or _owner_alive(name):
             continue
         _rmtree_writable(root)
         _forget_owner(name)
+    for holder in _seat_holders(base, tmpdir):
+        with contextlib.suppress(OSError):  # one seat's directory going away mid-sweep never stops the others'
+            for root in holder.glob("*/aoscr-*"):
+                if _marked_run_ended(root):
+                    _rmtree_writable(str(root))
+
+
+def _seat_holders(base: str, tmpdir: str | None) -> list[Path]:
+    """The `shiftlead-<uid>/` directories whose seats' scratch roots this run sweeps."""
+    name = f"shiftlead-{os.getuid()}"
+    holders = [Path(base) / name]
+    if tmpdir and Path(tmpdir).parent.name == name and Path(tmpdir).parent not in holders:
+        holders.append(Path(tmpdir).parent)
+    return [h for h in holders if h.is_dir() and not h.is_symlink()]
+
+
+def _marked_run_ended(root: Path) -> bool:
+    """Does this root's mark name a pid no longer running? No mark, or one still being written, is a run starting."""
+    if root.is_symlink() or root.parent.is_symlink():
+        return False
+    try:
+        pid = int((root / TEST_RUN_MARK).read_text().strip())
+    except (OSError, ValueError):
+        return False
+    return pid != os.getpid() and not _pid_running(pid)
+
+
+def _scratch_parent(tmpdir: str | None) -> str:
+    """Where this run's scratch root goes: `$TMPDIR` where the root made there fits `scratch.MAX_ROOT`, else `/tmp`
+    (design §4.6 *Temporary space is a pool of its own*, TD-2084). The fit leaves room for `/s/r`, the root
+    `test_scratch.py`'s tests make inside this one, which is held to the same bound."""
+    from sessionorc.scratch import MAX_ROOT
+
+    if tmpdir and os.path.isabs(tmpdir) and os.path.isdir(tmpdir) and os.access(tmpdir, os.W_OK | os.X_OK):
+        parent = os.path.normpath(tmpdir)
+        if len(os.fsencode(os.path.join(parent, "aoscr-" + "x" * 8, "s", "r"))) <= MAX_ROOT:  # tempfile's are 8 long
+            return parent
+    return "/tmp"
 
 
 def _pid_running(pid: int) -> bool:
@@ -313,16 +357,21 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 def _scratch_root():
     """Every run's scratch directory (design §4.6, TD-1944) under a short root of the test run's own, never
     the host's `/tmp/shiftlead-<uid>/`: short, since a root past 48 bytes is refused, so not `tmp_path`.
-    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`). Its owner is recorded,
-    and the roots of runs that have ended are swept first (TD-2015)."""
+    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`). It lies under `$TMPDIR` where it
+    fits (TD-2084), its owner is recorded, and the roots of runs that have ended are swept first (TD-2015)."""
     from sessionorc import hosts
 
-    sweep_stale_scratch_roots()
-    with tempfile.TemporaryDirectory(prefix="aoscr-", dir="/tmp", ignore_cleanup_errors=True) as root:
+    tmpdir = os.environ.get("TMPDIR")
+    sweep_stale_scratch_roots(tmpdir=tmpdir)
+    parent = _scratch_parent(tmpdir)
+    with tempfile.TemporaryDirectory(prefix="aoscr-", dir=parent, ignore_cleanup_errors=True) as root:
         name = os.path.basename(root)
         with contextlib.suppress(OSError):
-            OWNERS.mkdir(exist_ok=True)
-            (OWNERS / name).write_text(str(os.getpid()))
+            (Path(root) / TEST_RUN_MARK).write_text(str(os.getpid()))
+        if parent == "/tmp":
+            with contextlib.suppress(OSError):
+                OWNERS.mkdir(exist_ok=True)
+                (OWNERS / name).write_text(str(os.getpid()))
         mp = pytest.MonkeyPatch()
         mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
         mp.setenv("AO_TEST_SCRATCH_ROOT", root)
@@ -332,6 +381,18 @@ def _scratch_root():
             mp.undo()
             _rmtree_writable(root)
             _forget_owner(name)
+
+
+@pytest.fixture
+def short(_scratch_root):
+    """A root of this test's own under the run's short one: `tmp_path` is past the 48 bytes a root may hold, and the
+    run's root may lie in a seat's directory (TD-2084), so its name is one letter. A worker runs one test at a time."""
+    d = Path(_scratch_root) / "s"
+    d.mkdir()
+    try:
+        yield d
+    finally:
+        _rmtree_writable(str(d))
 
 
 @pytest.fixture(scope="session", autouse=True)

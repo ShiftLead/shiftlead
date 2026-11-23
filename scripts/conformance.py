@@ -47,7 +47,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -580,7 +579,7 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
     from sessionorc import adapters
 
     version = smoke_version(adapters.get(args.adapter))
-    home = Path(tempfile.mkdtemp(prefix="aos-", dir="/tmp"))
+    home = look_home.scratch_home("aos-")
     sock = f"ao-smoke-{uuid.uuid4().hex[:8]}"
     agent: subprocess.Popen | None = None
     sid = ""
@@ -707,7 +706,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke:
         return run_smoke(args, entry, start_env)
 
-    home = Path(tempfile.mkdtemp(prefix="aoc-", dir="/tmp"))
+    home = look_home.scratch_home("aoc-")
     sock = f"ao-conf-{uuid.uuid4().hex[:8]}"
     capture = home / "captured" if args.capture else None
     env = agent_env(home, sock, capture)

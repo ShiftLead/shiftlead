@@ -25,15 +25,6 @@ from shiftlead.ui import settings_page
 CLEAN = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
 
 
-@pytest.fixture
-def short(_scratch_root):
-    """A root of this test's own under the run's short one: `tmp_path` is past the 48 bytes a root may hold."""
-    import tempfile
-
-    with tempfile.TemporaryDirectory(dir=_scratch_root) as d:
-        yield Path(d)
-
-
 def _owner(path: str) -> dict:
     return json.loads((Path(path) / "owner.json").read_text())
 
@@ -427,11 +418,14 @@ async def test_the_host_agent_refuses_to_start_on_a_root_holding_or_inside_a_tra
     a = HostAgent(tmux=Tmux(socket_name="ao-test-never-started"))
     with pytest.raises(scratch.ScratchError, match="transcripts"):
         await a.serve(tmp_path / "s.sock")
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(short / "c"))
-    (tmp_path / "home" / "hosts.yml").write_text(f"local:\n  scratch_root: {short / 'c' / 'projects' / 's'}\n")
+    # a path alone, never made: the refusal comes first, and `short` may be too long to hold `projects/s` in 48 bytes
+    config = Path("/tmp") / f"aotc-{os.getpid()}"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
+    (tmp_path / "home" / "hosts.yml").write_text(f"local:\n  scratch_root: {config / 'projects' / 's'}\n")
     with pytest.raises(scratch.ScratchError, match="transcripts"):
         await a.serve(tmp_path / "s.sock")
     assert not (tmp_path / "s.sock").exists() and not (root / f"shiftlead-{os.getuid()}").exists()
+    assert not config.exists()
 
 
 @pytest.mark.unit

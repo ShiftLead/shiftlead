@@ -5,7 +5,6 @@ a missing mount stops no host agent and is never made; `ao disk` and the Setting
 from __future__ import annotations
 
 import os
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,13 +18,6 @@ from shiftlead import cli
 from shiftlead.ui import settings_page
 
 NOW = datetime(2026, 11, 23, 12, 0, tzinfo=UTC)
-
-
-@pytest.fixture
-def short(_scratch_root):
-    """A root of this test's own, short enough for the 48 bytes `tmp_path` is past."""
-    with tempfile.TemporaryDirectory(dir=_scratch_root) as d:
-        yield Path(d)
 
 
 @pytest.fixture
@@ -93,17 +85,17 @@ def test_a_missing_mount_fails_only_a_run_that_belongs_in_it(roots):
 
 @pytest.mark.unit
 def test_the_start_check_refuses_a_bad_seat_root_and_never_makes_it(short):
-    root = short / "r"
-    transcripts = short / "t"
+    root = short  # one level up from the other tests' `short / "r"`: a path inside it must still fit the 48 bytes
+    transcripts = short.parent / "t"
     with pytest.raises(scratch.ScratchError, match="seat_root .* longer"):
         scratch.check_seat_root("/tmp/" + "x" * 44, root, [])
-    for bad in (root / "in", short):
+    for bad in (root / "i", short.parent):
         with pytest.raises(scratch.ScratchError, match="overlaps scratch_root"):
             scratch.check_seat_root(bad, root, [])
     with pytest.raises(scratch.ScratchError, match="seat_root .* transcripts"):
         scratch.check_seat_root(transcripts / "s", root, [transcripts])
     scratch.check_seat_root(root, root, [])  # equal is allowed
-    missing = short / "nowhere"
+    missing = short.parent / "m"
     agent_mod._check_scratch_root(str(root), str(missing))  # a missing mount stops no start
     assert not missing.exists() and scratch.parent(root).is_dir()
 
