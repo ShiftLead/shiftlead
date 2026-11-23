@@ -56,7 +56,9 @@ def _entries(records: Iterable[Mapping[str, Any]], team: str, key: str) -> list[
     ]
 
 
-def _login_row(lk: str, rows: Mapping[str, Mapping[str, Any]], names: set[str], on_node: bool) -> dict[str, Any]:
+def _login_row(
+    lk: str, rows: Mapping[str, Mapping[str, Any]], names: set[str], on_node: bool, why: str | None
+) -> dict[str, Any]:
     tool, name = logins.split(lk)
     if on_node:
         return {"login": lk, "tool": None, "name": name, "state": "not_read"}
@@ -69,7 +71,7 @@ def _login_row(lk: str, rows: Mapping[str, Mapping[str, Any]], names: set[str], 
         "state": row.get("state") or "unknown",
         "account": row.get("account"),
         "models": list(row.get("models") or ()),
-        "why": teamstore.unusable(row),
+        "why": why,
         "runs_nothing": bool(names) and not any(teamstore.offers(row, m) for m in names),
     }
 
@@ -146,7 +148,8 @@ def view(
         }
         for a in audits
     ]
-    out["logins"] = [_login_row(lk, rows, set(models), on_node) for lk in order]
+    whys = teamstore.reasons(order, rows)
+    out["logins"] = [_login_row(lk, rows, set(models), on_node, whys[lk]) for lk in order]
     if on_node:
         out["note"] = NODE_NOTE
     elif good:

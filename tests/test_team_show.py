@@ -189,3 +189,20 @@ def test_a_team_on_a_node_makes_no_check_of_its_logins():
     assert got["cannot_run"] is None and got["note"] == team_show.NODE_NOTE
     assert got["logins"][0] == {"login": "claude:a", "tool": None, "name": "a", "state": "not_read"}
     assert got["flow"]["stages"][0]["now"]["state"] == "not_read"
+
+
+def test_a_login_on_the_account_of_an_unusable_login_above_it_is_passed_over():
+    rows = {
+        "claude:a": {"state": "signed_in", "account": "acct", "models": ["opus"], "at_reserve": True},
+        "claude:b": {"state": "signed_in", "account": "acct", "models": ["opus"]},
+        "claude:c": {"state": "signed_in", "account": "other", "models": ["opus"]},
+    }
+    order = list(rows)
+    assert ts.reasons(order, rows) == {
+        "claude:a": "at its reserve",
+        "claude:b": "shares an account with an unusable login above it",
+        "claude:c": None,
+    }
+    assert ts.pick(order, "opus", rows)["login"] == "claude:c"
+    shown = team_show.view("t", _doc(logins=order), rows, HEAD, "home", FLOW, ())["logins"]
+    assert [x["why"] for x in shown][1] == "shares an account with an unusable login above it"
