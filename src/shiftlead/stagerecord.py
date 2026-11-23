@@ -257,6 +257,16 @@ class StageStore:
     def drop_entry(self, tid: str, why: str) -> str:
         return self.write({self._entry_path(tid): None}, f"shiftlead: {tid} {why}")
 
+    def drop_entries(self, tids: list[str], why: str) -> str:
+        """Several records removed in one commit."""
+        return self.write({self._entry_path(t): None for t in tids}, f"shiftlead: {why}")
+
+    def move_entry(self, record: Mapping[str, Any], old: str, why: str) -> str:
+        """A renumbered entry's record, under its new id, and its old file gone, in one commit."""
+        new = str(record["id"])
+        text = json.dumps(record, indent=1) + "\n"
+        return self.write({self._entry_path(old): None, self._entry_path(new): text}, f"shiftlead: {new} {why}")
+
     # -- audits and the team's last good flow ---------------------------------------------------------------
 
     @staticmethod

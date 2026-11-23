@@ -65,6 +65,7 @@ class Reading:
 
     entry: Literal["open", "archived"] = "open"
     pr_state: Literal["open", "merged", "closed"] | None = None
+    head: str | None = None  # the open pull request's head, which a passed stage's move to merge carries
     renumbered_to: str | None = None
     design: bool = False
     open_parts: int = 0
