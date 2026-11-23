@@ -111,9 +111,9 @@ class RepoFacts:
     """What the tick's pass read once for a team of a repo, for `facts_on` to take each entry's part of.
 
     `sessions` are the records by the address a stage record's holder is written in, and `read_nodes` the nodes whose
-    sessions were read this pass, so a node nobody reached is never read as its session gone. `open_asks` are the addresses with an open ask of their own, `merging` the
-    entries whose merge is in flight, and `was` the flow the team's records were written under, read before its copy is
-    replaced. `may_start` and `within_size` are TD-2065's.
+    sessions were read this pass, so a node nobody reached is never read as its session gone. `open_asks` are the
+    addresses with an open ask of their own, `merging` the entries whose merge is in flight, and `was` the flow the
+    team's records were written under, read before its copy is replaced. `may_start` and `within_size` are TD-2065's.
     """
 
     root: Path | str
