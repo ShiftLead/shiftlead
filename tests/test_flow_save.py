@@ -203,3 +203,11 @@ def test_a_delete_is_refused_when_the_org_cannot_be_read(home, monkeypatch):
     monkeypatch.setattr(flow_save, "running", broken)
     assert "org.yml" in _call(delete=True, version=v)["refused"]
     assert (home / "flows" / "mine").exists()
+
+
+def test_only_a_save_that_touches_a_stage_needs_the_repos_origin(home, tmp_path):
+    plain = tmp_path / "no-origin"
+    plain.mkdir()
+    v = _call(text=_flow(), roots=[plain])["version"]
+    v = _call(text=_flow() + "# a comment\n", version=v, roots=[plain])["version"]
+    assert "origin could not be read" in _call(text=_flow(review="Check"), version=v, roots=[plain])["refused"]

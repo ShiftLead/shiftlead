@@ -185,7 +185,8 @@ def save(
         raise FlowError("; ".join(got.problems))
     was, now = stages_of(was_text), stages_of(text)
     moves = _renames(renames, was, now)
-    records = open_records(roots, name)
+    # only a stage that goes, moves or changes kind can strand an entry, so no other save depends on every repo's origin
+    records = open_records(roots, name) if any(now.get(k) != v for k, v in was.items()) else []
     held: dict[str, list[str]] = {}
     for _root, record in records:
         held.setdefault(str(record.get("stage")), []).append(str(record.get("id")))
