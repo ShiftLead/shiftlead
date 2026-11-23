@@ -614,7 +614,9 @@ class SettingsMixin:
 
     def _projected(self, accounts: dict[str, Any], doc: dict[str, Any], now: datetime) -> dict[str, Any]:
         """The `gate` reply's accounts with every window as the gate would read it at a launch (`usage.project`): the
-        reply projects only an account with a live unattended session, and a stopped team's usually has none."""
+        reply projects only an account with a live unattended session, and a stopped team's usually has none. A
+        metered row is spend, which does not age (`_gate_windows`), so it is left as it is and takes no mark from a
+        subscription window of the same label."""
         max_age = settings_mod.max_age(doc)
         out: dict[str, Any] = {}
         for key, entry in accounts.items():
@@ -624,7 +626,9 @@ class SettingsMixin:
             seen = {str(w.get("label")): w for w in read or ()}
             marks = ("pct", "unknown", "projected", "age")
             rows = [
-                {**r, **{k: seen[str(r.get("label"))][k] for k in marks if k in seen.get(str(r.get("label")), {})}}
+                r
+                if r.get("metered")
+                else {**r, **{k: seen[str(r.get("label"))][k] for k in marks if k in seen.get(str(r.get("label")), {})}}
                 for r in entry.get("windows") or ()
             ]
             out[key] = {**entry, "windows": rows}

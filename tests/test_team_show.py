@@ -4,11 +4,14 @@ reply the page draws from, for a team before the cut-over, on this host and on a
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 from sessionorc import teamstore as ts
+from sessionorc.agent_settings import SettingsMixin
 from shiftlead import team_show
 
 NOW = datetime(2026, 11, 23, 12, tzinfo=UTC)
+_TWO_HOURS_AGO = "2026-11-23T10:00:00Z"
 FLOW = {
     "format": 3,
     "name": "build",
@@ -82,6 +85,29 @@ def test_a_mixed_account_is_read_by_the_rows_of_the_logins_billing():
     read = _read()
     read["tools"][0]["logins"][0]["settings"] = {"billing": "metered"}
     assert ts.login_rows(read, gate, 0, NOW)["claude:a"]["at_reserve"] is True
+
+
+def _projected(row_windows, reading_windows, billing="subscription"):
+    host = SimpleNamespace(_usage={}, _usage_acct={"acct": {"windows": reading_windows, "fetched": _TWO_HOURS_AGO}})
+    accounts = {"acct": {"billing": billing, "profiles": ["a"], "windows": row_windows}}
+    return SettingsMixin._projected(host, accounts, {}, NOW)["acct"]["windows"]
+
+
+def test_a_stale_metered_reading_does_not_age_out_of_its_spent_amount():
+    spent = {"label": "month", "reserve": 50, "metered": True, "pct": 100, "resets": "2026-12-01T00:00:00Z"}
+    rows = _projected([spent], [{"label": "month", "pct": 100, "resets": "2026-12-01T00:00:00Z"}], "metered")
+    assert rows == [spent]
+    gate = {"acct": {"billing": "metered", "windows": rows}}
+    assert ts.login_rows(_read(), gate, 0, NOW)["claude:a"]["at_reserve"] is True
+
+
+def test_a_subscription_window_lays_nothing_on_a_metered_row_of_the_same_label():
+    spent = {"label": "month", "reserve": 50, "metered": True, "pct": 100, "resets": "2026-12-01T00:00:00Z"}
+    plan = {"label": "month", "reserve": 10, "pct": 20, "resets": "2026-12-01T00:00:00Z"}
+    reading = [{"label": "month", "pct": 20, "resets": "2026-12-01T00:00:00Z"}]
+    metered, subscription = _projected([spent, plan], reading, "mixed")
+    assert metered == spent
+    assert subscription["unknown"] == "rate"
 
 
 def test_a_broken_copy_of_the_flow_costs_the_flow_and_never_the_read(tmp_path, monkeypatch):
