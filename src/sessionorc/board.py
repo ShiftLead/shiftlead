@@ -503,6 +503,8 @@ def _tree(root: Path, clock: _Clock) -> tuple[Path, str]:
                 why = _why(cp, "git worktree add")
                 continue
         cp = _git(t, "reset", "-q", "--hard", f"origin/{want}", timeout=clock.left("tree"))
+        if cp.returncode == 0:  # a write a crash cut short left its new files, which a reset keeps
+            cp = _git(t, "clean", "-fdq", timeout=clock.left("tree"))
         if cp.returncode == 0:
             return t, want
         why = _why(cp, "git reset")
@@ -532,9 +534,11 @@ def _drop_tree(root: Path, t: Path) -> None:
 
 
 def _reset(t: Path, want: str) -> None:
-    """The tree back at origin's head after a failure: what it held is never the next press's."""
+    """The tree back at origin's head after a failure, the new files a write made included: what it held is never the
+    next press's. `t` is only ever the host agent's own tree (`tree_dir`), which no one works in."""
     with contextlib.suppress(Refused):
         _git(t, "reset", "-q", "--hard", f"origin/{want}")
+        _git(t, "clean", "-fdq")
 
 
 def board_files(rel: Path | str) -> list[str]:

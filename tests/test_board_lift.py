@@ -298,3 +298,37 @@ def test_go_now_whose_build_changed_at_origin_is_refused_and_writes_nothing(repo
     git(repo, "commit", "-qam", "the design lifted elsewhere")
     git(repo, "push", "-q", "origin", "main")
     assert board.lift_on_press(repo, "TD-190", builds=["TD-191"]) == {"gone": True}
+
+
+def test_a_failed_add_leaves_no_new_file_and_the_next_write_lands(repo, monkeypatch):
+    """TD-2090: an archive whose `git add` fails has already written its new file, which a hard reset keeps; left
+    there, the next archive of the entry would find its path taken and be refused on every pass."""
+    real = board._git
+
+    def add_fails(at, *args, **kw):
+        if args[:2] == ("add", "-A"):
+            return subprocess.CompletedProcess(args, 1, "", "add refused")
+        return real(at, *args, **kw)
+
+    monkeypatch.setattr(board, "_git", add_fails)
+    with pytest.raises(board.Refused, match="commit failed"):
+        board.archive_entry(repo, "TD-190", "a test's")
+    monkeypatch.setattr(board, "_git", real)
+    t = board.tree_dir(repo)
+    assert not (t / "docs" / "ledger" / "archive" / "TD-190.md").exists()
+    assert git(t, "status", "--porcelain") == ""
+
+    assert board.archive_entry(repo, "TD-190", "a test's").get("commit")
+    git(repo, "fetch", "-q", "origin")
+    git(repo, "cat-file", "-e", "origin/main:docs/ledger/archive/TD-190.md")
+    assert git(t, "status", "--porcelain") == ""
+
+
+def test_a_stray_file_a_crash_left_is_gone_at_the_next_press(repo):
+    """TD-2090: a crash runs no `_reset`, so the tree is cleaned again where the next press takes it."""
+    board.archive_entry(repo, "TD-190", "a test's")
+    t = board.tree_dir(repo)
+    stray = t / "docs" / "ledger" / "archive" / "stray.md"
+    stray.write_text("left by a write a crash cut short\n")
+    board._tree(repo, board._Clock())
+    assert not stray.exists()
