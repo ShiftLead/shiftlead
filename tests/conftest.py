@@ -341,10 +341,22 @@ def _sweep_dead_runs_in(parent: Path, own: Path) -> None:
             _rmtree_writable(str(d))
 
 
+def make_git_template(base: Path) -> Path:
+    """A `git init` template with no sample hooks (TD-2098): an empty `hooks/` and an `info/` with an empty `exclude`,
+    which is what a test that writes a hook or an exclude line expects to find."""
+    template = base / "git-template"
+    (template / "hooks").mkdir(parents=True, exist_ok=True)
+    (template / "info").mkdir(exist_ok=True)
+    (template / "info" / "exclude").touch()
+    return template
+
+
+@pytest.hookimpl(tryfirst=True)  # before xdist starts its workers, which inherit the template's variable
 def pytest_sessionstart(session: pytest.Session) -> None:
     """The dead runs' sweep (TD-2028), in the xdist controller alone (a worker's base temp is inside the
     controller's run), from the controller's own base temp,
-    over every seat's scratch where it lies in one (TD-2032)."""
+    over every seat's scratch where it lies in one (TD-2032). The run's small `git init` template too (TD-2098), set in
+    `os.environ` so subprocess agents, clones and the adopt scripts get it."""
     if os.environ.get("PYTEST_XDIST_WORKER"):
         return
     factory = getattr(session.config, "_tmp_path_factory", None)
@@ -352,6 +364,33 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         return
     with contextlib.suppress(OSError, ValueError, OverflowError):  # a sweep never stops the run
         sweep_dead_pytest_runs(factory.getbasetemp())
+    with contextlib.suppress(OSError):  # without it git copies its default template, which only costs inodes
+        os.environ["GIT_TEMPLATE_DIR"] = str(make_git_template(factory.getbasetemp()))
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Note a run that passed, for `pytest_unconfigure` to release (TD-2098)."""
+    session.config._release_base_temp = exitstatus == 0
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Remove the base temp of a run that passed, a caller's `--basetemp` included (TD-2098, design §4.6 *Temporary
+    space is a pool of its own*): any other exit keeps its tree for reading. Once, in the xdist controller or a run
+    without xdist, here because the workers have ended by now. `pytest-current` goes with it while it still names
+    this run; a concurrent run's tree and link are never touched."""
+    if os.environ.get("PYTEST_XDIST_WORKER") or not getattr(config, "_release_base_temp", False):
+        return
+    factory = getattr(config, "_tmp_path_factory", None)
+    base = getattr(factory, "_basetemp", None)
+    if base is None:
+        return
+    current = base.parent / f"{base.name.rsplit('-', 1)[0]}-current"
+    with contextlib.suppress(OSError):
+        if current.is_symlink() and current.resolve() == base.resolve():
+            current.unlink()
+    with contextlib.suppress(OSError):
+        _rmtree_writable(str(base))
 
 
 @pytest.fixture(scope="session", autouse=True)
