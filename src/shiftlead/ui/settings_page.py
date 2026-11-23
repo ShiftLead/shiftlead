@@ -416,6 +416,32 @@ def team_cards(
     return out
 
 
+def team_tabs(defs: Mapping[str, Any]) -> list[str]:
+    """The team page's tabs (§4.9d *The page*): by repo and then by name, both compared case-folded."""
+    return sorted(defs, key=lambda n: (str(getattr(defs[n], "repo", "") or "").casefold(), n.casefold()))
+
+
+def team_head(name: str, d: Any, group: Mapping[str, Any] | None, host: str) -> dict[str, Any]:
+    """The head of a team that is not switched (§4.9d *Before and after the cut-over*): the state word the Sessions
+    card shows for the team, and its counts from the team's live members as that card counts them."""
+    g = group or {}
+    if g.get("concluded"):
+        word = "concluded"
+    elif g.get("live"):
+        word = "running"
+    elif g.get("wound_down"):
+        word = "wound down"
+    else:
+        word = "stopped"
+    return {
+        "repo": str(getattr(d, "repo", "") or g.get("repo") or ""),
+        "on": str(getattr(d, "host", "") or host),
+        "word": word,
+        "running": word == "running",
+        "counts": list(g.get("counts") or []) if g.get("live") else [],
+    }
+
+
 # why the **schedule** field offers no metered profile (§4.5a *Settings page: Teams*, §6 *Schedule*)
 SCHEDULE_METERED = (
     "a metered profile has no account reading to fall back on, so with no session running under it"

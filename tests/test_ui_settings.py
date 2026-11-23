@@ -641,15 +641,15 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         "    members: [{role: grinder, count: 2}]\n"
     )
     try:
-        page = client.get("/settings").text
+        page = client.get("/teams/sett-team").text
         assert 'data-team="sett-team"' in page and "not built — TD-133" not in page
-        assert "grinder ×2" in page  # the Org section draws the definition, read-only
+        assert "grinder ×2" in client.get("/settings").text  # the Org section draws the definition, read-only
         assert client.post("/api/settings/teams", json={"team": "sett-team", "until": "+2h", "reserve": "10"}).json()[
             "ok"
         ]
         t = call_sync("settings")["teams"]["sett-team"]
         assert t["reserve"] == 10 and t["until"].endswith("Z") and not t["passed"]
-        assert re.search(r"\+10 on the profile", client.get("/settings").text)
+        assert re.search(r"\+10 on the profile", client.get("/teams/sett-team").text)
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "until": "soon"})
         assert bad.status_code == 400 and "not a time" in bad.json()["detail"]
         assert client.post("/api/settings/teams", json={"team": "sett-team", "until": None, "reserve": "0"}).json()[
@@ -658,11 +658,11 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         assert "sett-team" not in (call_sync("settings")["teams"] or {})
         # **when work appears** (§4.5a, §6 rule 8, TD-227 slice 3): *start the team* is the default while the
         # key is absent (TD-457, TD-466), the pick is written as `on_work`, and anything else is refused
-        page = client.get("/settings").text
+        page = client.get("/teams/sett-team").text
         assert 'name="on_work" data-was="start"' in page and "start the team (default)" in page
         assert client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "start"}).json()["ok"]
         assert call_sync("settings")["teams"]["sett-team"] == {"on_work": "start"}
-        page = client.get("/settings").text
+        page = client.get("/teams/sett-team").text
         assert 'data-was="start"' in page and '<option value="start" selected>' in page
         assert "start the team (default)" not in page and "the home starts it" in page
         # the note says all three choices, the picked one first (TD-286)
@@ -670,9 +670,14 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
         assert note.startswith("wound down — start the team: the home starts it · ask me: an Inbox row")
         assert note.endswith("do nothing: it waits for Start or its schedule")
         # the definition's file at the card's head, not a foot under Save (TD-286)
-        card = page[page.index('data-team="sett-team"') :]
+        # the Settings card keeps the file and links the page; the rows are the team page's alone (TD-2059)
+        settings = client.get("/settings").text
+        card = settings[settings.index('data-team="sett-team"') :]
         card = card[: card.index("</form>")]
-        assert card.index('defined in <span class="mono">org.yml</span>') < card.index("stop time")
+        assert 'defined in <span class="mono">org.yml</span>' in card and 'href="/teams/sett-team"' in card
+        for row in ('name="until"', 'name="reserve"', 'name="on_work"', 'name="balance_on"', 'name="schedule_on"'):
+            assert row not in card and row in page
+        assert 'class="on" aria-current="page">Teams</a>' in page and "+ New team" in page
         assert "setfoot" not in card
         bad = client.post("/api/settings/teams", json={"team": "sett-team", "on_work": "maybe"})
         assert bad.status_code == 400 and "ask, start or off" in bad.json()["detail"]
@@ -712,14 +717,14 @@ def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess
     )
     post = lambda body: client.post("/api/settings/teams", json={"team": "bal-team", **body})  # noqa: E731
     try:
-        page = client.get("/settings").text
+        page = client.get("/teams/bal-team").text
         assert 'class="setrow setbalance" data-was="null"' in page
         assert re.search(r'name="balance_prs" value=""[^>]* disabled', page)
         assert "the techlead's queue past its bound</label>" in page  # the seat by its role (TD-428 slice 7)
         assert "no live member: a team with none is not read" in page and "open PRs: could not look (no line)" in page
         assert post({"balance": {"prs": "8", "oldest": "2d", "review": True}}).json()["ok"]
         assert call_sync("settings")["teams"]["bal-team"] == {"balance": {"prs": 8, "oldest": "2d", "review": True}}
-        page = client.get("/settings").text
+        page = client.get("/teams/bal-team").text
         assert 'data-was="{&#34;prs&#34;:8,&#34;oldest&#34;:&#34;2d&#34;,&#34;review&#34;:true}"' in page
         assert 'name="balance_prs" value="8"' in page and "open PRs: could not look (line 8)" in page
         assert not re.search(r'name="balance_prs"[^>]* disabled', page)
@@ -760,7 +765,7 @@ def test_a_team_card_draws_the_schedule_and_writes_it_whole(client, subprocess_a
     post = lambda body: client.post("/api/settings/teams", json={"team": "sch-team", **body})  # noqa: E731
     rule = {"start": "reset", "profile": "grind", "window": "week"}
     try:
-        page = client.get("/settings").text
+        page = client.get("/teams/sch-team").text
         card = page[page.index('data-team="sch-team"') :]
         card = card[: card.index("</form>")]
         assert (
@@ -772,7 +777,7 @@ def test_a_team_card_draws_the_schedule_and_writes_it_whole(client, subprocess_a
         )
         assert post({"schedule": rule}).json()["ok"]
         assert call_sync("settings")["teams"]["sch-team"]["schedule"] == rule
-        page = client.get("/settings").text
+        page = client.get("/teams/sch-team").text
         card = page[page.index('data-team="sch-team"') :]
         card = card[: card.index("</form>")]
         assert (
@@ -820,7 +825,7 @@ def test_the_settings_page_hands_profiles_yml_to_the_schedule_card(client, subpr
 
     monkeypatch.setattr(ui.LocalClient, "call", call)
     try:
-        page = client.get("/settings").text
+        page = client.get("/teams/sch-team").text
         assert sorted(asked[-1]) == ["api", "grind"]
         card = page[page.index('data-team="sch-team"') :]
         card = card[: card.index("</form>")]
@@ -1147,3 +1152,20 @@ def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(
     assert 'data-section="usage" data-account="claude-code:paul"' not in page
     assert "keep their reserves beside their gauges" in page
     assert real(seen[0]) is None  # the agent's own read: not switched
+
+
+def test_teams_opens_the_first_tab_and_an_undefined_team_is_no_page(client, subprocess_agent, monkeypatch):
+    """§4.9d *The page* (TD-2059): the tabs run by repo then name, and `/teams` opens the first."""
+    from types import SimpleNamespace
+
+    from shiftlead.ui import settings_page as setmod
+
+    defs = {
+        "Zed": SimpleNamespace(repo="alpha"),
+        "beta": SimpleNamespace(repo="Alpha"),
+        "aim": SimpleNamespace(repo="zulu"),
+    }
+    assert setmod.team_tabs(defs) == ["beta", "Zed", "aim"]
+    assert client.get("/teams/no-such-team").status_code == 404
+    got = client.get("/teams", follow_redirects=False)
+    assert got.status_code == 303 and got.headers["location"].startswith("/teams/")

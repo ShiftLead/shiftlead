@@ -1024,7 +1024,7 @@ def test_a_teams_header_reads_its_flow_and_strip_and_why_it_cannot_follow_it(wor
     head = _head(client.get("/").text)
     # the **flow chip** (TD-418): the strip its tooltip, its press the team's Settings card
     assert (
-        '<a class="badge flowchip" href="/settings#team-ao-grind" '
+        '<a class="badge flowchip" href="/teams/ao-grind" '
         'title="build → review → you, through ao-shiftlead-tl-ao' in head
     )
     assert ">flow: build-review</a>" in head
