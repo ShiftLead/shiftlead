@@ -353,9 +353,10 @@ def test_every_home_call_in_pyproject_resolves():
     data = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text())
     group = data["project"]["entry-points"][agent_stage.GROUP]
     assert agent_stage.NAME in group
+    assert agent_stage.FLOW in group
     for target in group.values():
-        module = importlib.import_module(target)
-        assert callable(module.call) and callable(module.show)
+        assert callable(importlib.import_module(target).call)
+    assert callable(importlib.import_module(group[agent_stage.NAME]).show)
 
 
 def test_stage_show_from_a_persons_shell_reads_the_named_entry_of_a_registered_repo(monkeypatch):

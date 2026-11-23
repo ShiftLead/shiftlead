@@ -15,19 +15,25 @@ from sessionorc.models import lane_refs
 
 GROUP = "shiftlead.home_calls"
 NAME = "stage"
+FLOW = "flow"
 
 
-def stage_calls() -> Any:
-    """The module holding the stage calls, or a refusal naming the install that lacks it."""
+def home_call(name: str) -> Any:
+    """The module the group names `name`, or a refusal naming the install that lacks it."""
     for ep in entry_points(group=GROUP):
-        if ep.name != NAME:
+        if ep.name != name:
             continue
         try:
             return ep.load()
-        except Exception as e:  # noqa: BLE001 — a broken stage module refuses this call and never takes the agent down
-            log.exception("the %s entry point %s failed to load", GROUP, NAME)
-            raise RpcError(f"the stage code could not be loaded ({type(e).__name__}): reinstall shiftlead") from None
-    raise RpcError(f"this install has no {GROUP} entry point: reinstall shiftlead, then try again")
+        except Exception as e:  # noqa: BLE001 — a broken module refuses this call and never takes the agent down
+            log.exception("the %s entry point %s failed to load", GROUP, name)
+            raise RpcError(f"the {name} code could not be loaded ({type(e).__name__}): reinstall shiftlead") from None
+    raise RpcError(f"this install has no {GROUP} entry point {name}: reinstall shiftlead, then try again")
+
+
+def stage_calls() -> Any:
+    """The module holding the stage calls."""
+    return home_call(NAME)
 
 
 class StageMixin:

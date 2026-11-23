@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import shutil
+import threading
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -18,8 +19,11 @@ from typing import Any
 import yaml
 
 from sessionorc import briefs, paths
-from shiftlead import flow3, repoconfig
-from shiftlead.stagerecord import StageStore
+from shiftlead import flow3, repoconfig, teams
+from shiftlead import org as orgmod
+from shiftlead.stagerecord import StageStore, StateError
+
+_SAVING = threading.Lock()  # a save reads the file, checks it and writes it as one step
 
 
 class FlowError(ValueError):
@@ -202,3 +206,34 @@ def delete(name: str, version: str | None, running: Iterable[str] = ()) -> dict[
         raise FlowError(f"{name} is run by {', '.join(teams)}")
     shutil.rmtree(path.parent)
     return {"name": name, "deleted": True}
+
+
+_delete = delete  # `call`'s parameter of the same name is the RPC's
+
+
+def running(name: str, roots: Iterable[str | Path]) -> list[str]:
+    """The teams that run `name`, or whose setting picks it (a pick the team no longer lists still names it)."""
+    org, _notes = orgmod.with_repos(orgmod.load(), list(roots))
+    org = orgmod.with_home_settings(org)
+    return sorted(t.name for t in org.teams.values() if name in (teams.current_flow(t), t.flow))
+
+
+def call(
+    *,
+    name: str,
+    text: str,
+    version: str | None,
+    renames: Mapping[str, str] | None,
+    delete: bool,
+    roots: Iterable[str | Path],
+) -> dict[str, Any]:
+    """The `flow_save` RPC's body, in a thread of the host agent: a refusal is `{refused: <why>}`. A registered repo
+    whose checkout is gone holds no record to read; any other that cannot be read refuses the save."""
+    present = [p for p in (Path(r).expanduser() for r in roots) if p.is_dir()]
+    try:
+        with _SAVING:
+            if delete:
+                return _delete(name, version, running(name, present))
+            return save(name, text, version, renames, present)
+    except (ValueError, StateError, yaml.YAMLError, OSError) as e:  # FlowError and a bad org file are ValueErrors
+        return {"refused": str(e)}

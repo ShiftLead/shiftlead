@@ -171,3 +171,35 @@ def test_delete_is_refused_while_a_team_runs_it_and_needs_the_version(home):
         flow_save.delete("mine", "0" * 16)
     assert flow_save.delete("mine", v) == {"name": "mine", "deleted": True}
     assert not (home / "flows" / "mine").exists()
+
+
+def _call(**kw):
+    return flow_save.call(
+        **{"name": "mine", "text": "", "version": None, "renames": None, "delete": False, "roots": [], **kw}
+    )
+
+
+def test_the_rpc_body_answers_a_refusal_in_words_and_skips_a_repo_whose_checkout_is_gone(home, tmp_path):
+    assert "format: 3" in _call(text="name: mine\n")["refused"]
+    assert "format: 3" in _call(text="a: [unclosed")["refused"]
+    got = _call(text=_flow(), roots=[tmp_path / "gone"])
+    assert got["name"] == "mine" and got["moved"] == 0
+
+
+def test_the_rpc_body_refuses_a_delete_while_a_team_runs_the_flow(home, monkeypatch):
+    v = _call(text=_flow())["version"]
+    monkeypatch.setattr(flow_save, "running", lambda name, roots: ["alpha"])
+    assert "run by alpha" in _call(delete=True, version=v)["refused"]
+    monkeypatch.setattr(flow_save, "running", lambda name, roots: [])
+    assert _call(delete=True, version=v) == {"name": "mine", "deleted": True}
+
+
+def test_a_delete_is_refused_when_the_org_cannot_be_read(home, monkeypatch):
+    v = _call(text=_flow())["version"]
+
+    def broken(name, roots):
+        raise ValueError("org.yml: the top level must be a mapping")
+
+    monkeypatch.setattr(flow_save, "running", broken)
+    assert "org.yml" in _call(delete=True, version=v)["refused"]
+    assert (home / "flows" / "mine").exists()
