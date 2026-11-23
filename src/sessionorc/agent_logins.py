@@ -16,7 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, agent_common, defs, logins
+from sessionorc import adapters, agent_common, builtinstore, defs, logins
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import RpcError, log
 
@@ -69,6 +69,18 @@ class LoginsMixin:
             if (getattr(s, "login", None) or s.profile) == name:
                 out.append(s.id)
         return out
+
+    def _login_listed(self, lk: str) -> list[str]:
+        """The home's lists that name a login, in words. A settings file that is there and cannot be read refuses: what
+        it lists is unknown, and a forgotten login would leave a team's list naming nothing."""
+        if self.mode != "home":
+            return []
+        doc = settings_mod.read()
+        if doc is None:
+            if settings_mod.settings_file().exists():
+                raise logins.LoginError(f"{lk} cannot be forgotten: settings.yml cannot be read to see what lists it")
+            return []
+        return builtinstore.login_holders(doc, lk)
 
     async def rpc_login_label(
         self, login: str = "", label: str | None = None, version: str | None = None, caller: Any = None
@@ -215,12 +227,13 @@ class LoginsMixin:
 
     async def rpc_login_forget(self, login: str = "", version: str | None = None, caller: Any = None) -> dict[str, Any]:
         """`ao login forget <login>`, **Forget this login**: moved to `forgotten:`, its folder left on disk; refused,
-        naming them, while a live session runs on it."""
+        naming them, while a live session runs on it or, on the home, a team's or built-in set's list or a team's
+        schedule names it. A node cannot read those lists, so it is not refused for them (§4.2b *On a node*)."""
         agent_common.person_only(caller, "forget a login", SECTION, self._graph())
 
         def edit(d: dict[str, Any]) -> str:  # under the logins lock: what runs on it is read as the write is made
             lk, _ = logins.resolve(d, str(login or ""))
-            return logins.forget(d, lk, version, in_use=self._login_users(lk))
+            return logins.forget(d, lk, version, in_use=[*self._login_users(lk), *self._login_listed(lk)])
 
         return await self._login_write(edit)
 

@@ -109,6 +109,44 @@ def named_by(doc: Mapping[str, Any], name: str) -> list[str]:
     return sorted(str(r) for r, row in repos.items() if isinstance(row, Mapping) and row.get("builtins") == name)
 
 
+def login_lists(doc: Mapping[str, Any]) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Each login any list names (§4.2b *The page*, TD-2064): the switched teams and the built-in sets whose login list
+    holds it, each `{name, label}`, teams by name and sets in `sets`' order."""
+    out: dict[str, dict[str, list[dict[str, Any]]]] = {}
+
+    def add(lk: Any, kind: str, name: str, label: Any) -> None:
+        if isinstance(lk, str):
+            row = out.setdefault(lk, {"teams": [], "sets": []})
+            if not any(x["name"] == name for x in row[kind]):
+                row[kind].append({"name": name, "label": label if isinstance(label, str) and label else None})
+
+    teams = doc.get("teams")
+    names = sorted((t for t in teams if isinstance(t, str)), key=str.casefold) if isinstance(teams, Mapping) else []
+    for team in names:
+        if teamstore.switched(doc, team):
+            held = teams[team].get("logins")
+            for lk in held if isinstance(held, list) else ():
+                add(lk, "teams", team, teams[team].get("label"))
+    for name, entry in sets(doc).items():
+        for lk in entry["logins"]:
+            add(lk, "sets", name, entry["label"])
+    return out
+
+
+def login_holders(doc: Mapping[str, Any], lk: str) -> list[str]:
+    """What keeps a login from being forgotten, in words (§4.2b *⋯ on a login*): the teams and built-in sets listing
+    it, and a switched team whose `schedule.login` still names it."""
+    row = login_lists(doc).get(lk) or {"teams": [], "sets": []}
+    out = [f"team {t['name']}" for t in row["teams"]] + [f"built-in set {s['name']}" for s in row["sets"]]
+    teams = doc.get("teams")
+    for team, entry in teams.items() if isinstance(teams, Mapping) else ():
+        schedule = entry.get("schedule") if isinstance(entry, Mapping) else None
+        named = isinstance(schedule, Mapping) and schedule.get("login") == lk
+        if named and isinstance(team, str) and teamstore.switched(doc, team):
+            out.append(f"team {team}'s schedule")
+    return out
+
+
 def model(entry: Mapping[str, Any], seat: str) -> str:
     """The model a set gives a seat: its own, else the package's."""
     return str((entry.get("models") or {}).get(seat) or PACKAGE_MODELS[seat])
