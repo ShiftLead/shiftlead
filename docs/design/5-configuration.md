@@ -102,7 +102,7 @@ reach:                                        # §4.5b *The setting*: the person
   `flow` names the one format-3 flow the team runs, by its name (§4.9c has no flow id); `schedule` names a
   `login:` of the list, as `<tool>:<name>`, where it named a `profile:`; `balance` keeps `prs` and `oldest` and loses `review`; `size`, `max` and `on_work` go (a started team takes
   work as it appears, §4.9d *When it runs*).
-  **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `manager`,
+  **`builtins.<set>`** holds a built-in set — `label`, `models` (a model under `tech-lead`, `prompts`,
   `board-answers`, `unheld-pull-requests`, `sweeper`) and `logins` in order — and `repos.<repo>.builtins` names the
   set a repo uses, `default` where absent; `builtins.default` always exists (§4.9d *The built-in seats and
   their page*). They are written by the Built-in seats page's own calls and, for `builtins.default`, by the window's move (§4.9e); absent, `default` reads as the package's models and an empty list. `cut_over: <date>`, at the top of the file, is written once by the window

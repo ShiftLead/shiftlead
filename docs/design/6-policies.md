@@ -228,7 +228,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      words**: *its restart row's Restart, or `ao restart <id>`* is what it writes beside a member it
      puts on the board, and the press is the person's. Restart, not *Resume with changes…*, is a
      supervised member's way back into its team's run (§4.9a *One member back, today*).
-  3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
+  3. **Seats.** (After the cut-over this rule fills three built-in seats and the director alone, their records written by the home and no manager among them: §4.9d *How each one runs*, §4.9e *What decides which shape runs*.) `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b) — each member of a pool as a seat of its own, its `seat`
      also carrying `pool` and `rank` (§4.9b *A seat as an ordered pool*, TD-1476), so this rule fills a member
      only when mail waits on it — and the tick computes **`seat_due: {at,

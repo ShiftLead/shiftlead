@@ -58,7 +58,12 @@ not mix:
   to it, a permission, a `stalled?` member, one *idle · open work* — and closed when it has acted;
   the lifecycle jobs are the host agent's tick (§6 rules 1–12). A **standing** manager is the
   other shape, rounding on `ao wait`, asked for with `on_call: false`; on call is the default from the
-  build (Paul, 2026-10-01).
+  build (Paul, 2026-10-01). **After the cut-over there is no manager** (design §4.9d *How each one
+  runs*, TD-1976): a lost or silent session is the home's to notice, a question the techlead's, and a
+  permission prompt the director's or the **prompts seat**'s — a built-in seat, one per repo, written only
+  where the org has no director. A **job** is what the two built-in seats *board answers* and *pull requests
+  nobody holds* run: one decided board line or one pull request, with a record and a holder as an entry in a
+  stage has.
 - **techlead** — the technical go-between of TD-075: a session that answers technical
   questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
   optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
