@@ -680,7 +680,20 @@ def doer_target(
         servicing = [named, *(t for t in servicing if t is not named)]
     elif not servicing or not servicing[0]["seat"]:
         return None
-    return {"root": root, "repo": roots[root], "team": team, "teams": servicing}
+    # after the cut-over the host agent resolves by `team` alone, so a repo with two tech leads is sent the first
+    return {
+        "root": root,
+        "repo": roots[root],
+        "team": team or (servicing[0]["team"] if off else ""),
+        "teams": servicing,
+    }
+
+
+def hand_team(plan: Mapping[str, Any], off: bool) -> str:
+    """The team the Add entry form sends: its pick, and after the cut-over, where the host agent resolves by `team`
+    alone, the first it shows, so a repo with two built-in tech leads is not refused for a blank pick (§4.9e)."""
+    shown = plan.get("teams") or []
+    return str(plan.get("picked") or (shown[0]["team"] if off and shown else ""))
 
 
 def doer_hands(
@@ -1697,7 +1710,7 @@ class Readings:
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
         org, host = await self.defs(), host_name()
-        boards_of = repo_boards(org, host)
+        boards_of = await asyncio.to_thread(repo_boards, org, host)  # reads the marker per checkout (§4.9e)
         fleet: list[dict[str, Any]] = []
         if await asyncio.to_thread(teamstore.first_shape_off):  # a Doer then resolves to a built-in tech lead (§4.9e)
             with contextlib.suppress(Exception):  # no list: a doer reads as unresolved, drawn by the lane test
@@ -3767,7 +3780,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ),
             {},
         )
-        servicing = teams.entry_servicing(org, root, host_name(), led.get("declared_teams") or (), records.values())
+        said = led.get("declared_teams") or ()
+        servicing = await asyncio.to_thread(teams.entry_servicing, org, root, host_name(), said, list(records.values()))
         picked = next((t for t in servicing if t["team"] == pick), None)
         servicing = [picked, *(t for t in servicing if t is not picked)] if picked else servicing
         return {
@@ -3835,7 +3849,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             type=plan["type"],
             text=str(body.get("words") or ""),
             teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
-            team=plan["picked"],  # `entry.team`: the pick, empty when blank (§4.10, TD-764)
+            # `entry.team`: the pick, empty when blank (§4.10, TD-764)
+            team=hand_team(plan, await asyncio.to_thread(teamstore.first_shape_off)),
             priority=str(body.get("priority") or ""),  # `entry.priority`, `medium` when absent (TD-851)
             **_draft_of(body),
         )

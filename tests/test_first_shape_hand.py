@@ -91,3 +91,19 @@ def test_an_unreadable_settings_file_keeps_the_road_open_on_the_last_reading(roo
         ui.teamstore, "HostStore", lambda: type("H", (), {"load": lambda self: {"first_shape_off": True}})()
     )
     assert ui.road_refusal(org, nobody, "session", "kmaster") == ""
+
+
+def test_a_repo_doer_names_the_first_of_two_built_in_tech_leads_after_the_marker(roots, tmp_path):  # noqa: F811
+    org, _ = ui.org_here()
+    board, other = str(roots["samscrape"].resolve()), roots["other"].resolve()
+    _mark(tmp_path)
+    got = ui.doer_target(org, board, "other", "kmaster", {str(other): ["b"]}, [_seat(other, "a"), _seat(other, "b")])
+    assert got["team"] == "b"
+
+
+def test_the_form_sends_its_pick_and_after_the_marker_the_first_team_it_shows():
+    plan = {"picked": "", "teams": [{"team": "b"}, {"team": "a"}]}
+    assert ui.hand_team(plan, False) == ""
+    assert ui.hand_team(plan, True) == "b"
+    assert ui.hand_team(plan | {"picked": "a"}, True) == "a"
+    assert ui.hand_team({"picked": "", "teams": []}, True) == ""
