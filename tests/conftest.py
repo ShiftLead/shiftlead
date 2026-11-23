@@ -160,6 +160,17 @@ def _owner_alive(name: str) -> bool:
     return pid != os.getpid() and Path(f"/proc/{pid}").exists()
 
 
+def _owner_ended(name: str) -> bool:
+    """Does this server's owner file name a process that has ended? Unlike `_owner_alive`, this run's own pid counts
+    as running (its name may have no server yet), and a file that cannot be read says nothing: a concurrent run may be
+    between creating it and writing its pid."""
+    try:
+        pid = int((OWNERS / name).read_text().strip())
+    except (OSError, ValueError):
+        return False
+    return pid != os.getpid() and not Path(f"/proc/{pid}").exists()
+
+
 def _forget_owner(name: str) -> None:
     with contextlib.suppress(OSError):
         (OWNERS / name).unlink()
@@ -208,6 +219,13 @@ def sweep_stale_test_servers() -> None:
         with contextlib.suppress(OSError):
             os.unlink(sock)
         _forget_owner(name)
+    # `private_socket_name` writes the owner file before any server exists, so a test that never started one, or a
+    # killed run, leaves a file the walk above never reaches (TD-2101). Only `ao-test-*`: `aoscr-*` owners are the
+    # scratch sweep's.
+    with contextlib.suppress(OSError):
+        for owner in OWNERS.glob("ao-test-*"):
+            if _owner_ended(owner.name) and not os.path.lexists(f"/tmp/tmux-{os.getuid()}/{owner.name}"):
+                _forget_owner(owner.name)
 
 
 def _rmtree_writable(path: str) -> None:

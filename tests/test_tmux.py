@@ -149,6 +149,32 @@ def test_the_stale_server_sweep_leaves_a_concurrent_runs_server_alone():
         kill_private_server(t)  # a failed assertion above must not leave a server behind
 
 
+def test_the_sweep_removes_an_owner_file_only_when_its_owner_ended_and_it_has_no_socket():
+    """TD-2101: an owner file is written before its server exists, so one with no socket used to stay for good. It goes
+    once its pid has ended; a live owner's stays, this run's own stays, and so does one whose pid cannot be read yet."""
+    ended = subprocess.Popen(["true"])
+    ended.wait(timeout=5)
+    live = subprocess.Popen(["sleep", "60"])
+    names = {k: f"ao-test-td2101{k}{os.getpid()}" for k in ("ended", "live", "own", "blank")}
+    other = f"aoscr-td2101{os.getpid()}"  # a scratch root's owner, the other sweep's
+    try:
+        conftest.OWNERS.mkdir(exist_ok=True)
+        (conftest.OWNERS / names["ended"]).write_text(str(ended.pid))
+        (conftest.OWNERS / names["live"]).write_text(str(live.pid))
+        (conftest.OWNERS / names["own"]).write_text(str(os.getpid()))
+        (conftest.OWNERS / names["blank"]).write_text("")
+        (conftest.OWNERS / other).write_text(str(ended.pid))
+        conftest.sweep_stale_test_servers()
+        assert not (conftest.OWNERS / names["ended"]).exists()
+        assert all((conftest.OWNERS / names[k]).exists() for k in ("live", "own", "blank"))
+        assert (conftest.OWNERS / other).exists()
+    finally:
+        live.terminate()
+        live.wait(timeout=5)
+        for name in (*names.values(), other):
+            conftest._forget_owner(name)
+
+
 def test_a_command_too_long_for_tmux_is_launched_through_a_script(tmux, tmp_path, monkeypatch):
     """2026-09-20: `ao team start` failed with tmux's *command too long* — a session's brief rides in
     its argv, and one had grown to 16,194 bytes. Past `LONG_COMMAND` the argv goes through a launch
