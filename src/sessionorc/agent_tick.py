@@ -25,6 +25,7 @@ from typing import Any
 from sessionorc import (
     adapters,
     agent_common,
+    branchsweep,
     cachesweep,
     containers,
     diskbook,
@@ -5885,8 +5886,11 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — the reading never stops a pass
             log.exception("the sweep's reading of the runs failed")
             before = None
+        if self._branch_kept is None:  # the kept rows outlive a restart in the file (§4.6 *The sweep's reading*)
+            self._branch_kept = diskbook.branch_kept(paths.home())
+        branches: dict[str, Any] = {"deleted": 0}
         try:
-            self._prune_rules(now, live, live_ids, scratch, named, tallies)
+            self._prune_rules(now, live, live_ids, scratch, named, tallies, branches=branches)
         finally:
             runs = tallies["runs"]
             try:
@@ -5913,6 +5917,7 @@ class TickMixin:
                     self.started_at,
                     datetime.now(UTC),
                     seat_free=self._seat_free(),
+                    branches=diskbook.branch_rows(int(branches["deleted"]), self._branch_kept or {}),
                 )
             except Exception:  # noqa: BLE001 — the reading never stops a pass
                 log.exception("writing the sweep's reading failed")
@@ -5989,15 +5994,19 @@ class TickMixin:
                 for path, size in _run_items(live_ids).items():
                     tallies["runs"].measure(path, size)
             deadline = time.monotonic() + SWEEP_DRY_S
-            self._prune_rules(datetime.now(UTC), live, live_ids, None, named, tallies, dry=True, deadline=deadline)
+            branches: dict[str, Any] = {"would_delete": [], "kept": [], "partial": False}
+            self._prune_rules(
+                datetime.now(UTC), live, live_ids, None, named, tallies, dry=True, deadline=deadline, branches=branches
+            )
             kinds = book.dry(tallies)
         finally:
             self._sweep_lock.release()
         return {
             "host": self.host,
             "dry_run": True,
-            "partial": any(k["partial"] for k in kinds.values()),
+            "partial": any(k["partial"] for k in kinds.values()) or bool(branches["partial"]),
             "kinds": kinds,
+            "branches": branches,
         }
 
     async def _disk_everywhere(self, method: str, here: Callable[[], dict[str, Any]]) -> dict[str, Any]:
@@ -6032,6 +6041,7 @@ class TickMixin:
         tallies: dict[str, diskbook.Tally],
         dry: bool = False,
         deadline: float | None = None,
+        branches: dict[str, Any] | None = None,
     ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
@@ -6121,6 +6131,11 @@ class TickMixin:
             except Exception:  # noqa: BLE001 — the home rule never stops the rest of the sweep
                 tallies["home"].unlisted = True
                 log.exception("home files sweep failed")
+        if branches is not None:  # §4.6 *branches*, TD-2112: not a kind, so its result is `branches`
+            if deadline is not None and time.monotonic() > deadline:
+                branches["partial"] = True
+            else:
+                self._sweep_branches(now, branches, dry=dry, deadline=deadline)
         if late("runs"):
             return
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
@@ -6268,18 +6283,75 @@ class TickMixin:
         for path, why in got.kept:
             log.debug("worktree kept: %s (%s)", path, why)
 
+    def _sweep_branches(
+        self, now: datetime, out: dict[str, Any], dry: bool = False, deadline: float | None = None
+    ) -> None:
+        """The branch rule of §4.6 *The disk sweep* (TD-2112, `branchsweep`), under the worktree rule's scope: a run at
+        most once a day, carried on from the cursor when its budget stopped it. `out` takes a pass's `deleted` count,
+        or a dry run's lists, which weigh from the first branch and move neither the cursor, the day nor the rows."""
+        scope = self._worktree_scope if self._worktree_scope is not None else cachesweep.default_home()
+        roots = list(self._sweep_roots)
+        if not scope or not roots:
+            return
+        clock = time.monotonic()
+        ended = self._branch_ended
+        if (
+            not dry
+            and self._branch_cursor is None
+            and ended is not None
+            and clock - ended < branchsweep.SWEEP_BRANCH_EVERY
+        ):
+            return
+        budget = branchsweep.SWEEP_BRANCH_S
+        if dry:
+            budget = max(0.0, deadline - clock) if deadline is not None else float("inf")
+        try:
+            got = branchsweep.sweep(
+                roots,
+                cursor=None if dry else self._branch_cursor,
+                keep_days=hosts.local_host().worktree_keep_days,
+                hold=None if dry else self._hold_locks,
+                budget=budget,
+                now=now.timestamp(),
+                dry=dry,
+            )
+        except Exception:  # noqa: BLE001 — the branch rule never stops the rest of the sweep
+            log.exception("branch sweep failed")
+            if dry:
+                out["partial"] = True
+            return
+        if dry:
+            out["would_delete"] = [{"repo": r, "branch": b, "proof": p} for r, b, _tip, p in got.deleted]
+            out["kept"] = [{"repo": r, "branch": b, "why": w} for r, b, w in got.kept]
+            out["partial"] = got.stopped
+            return
+        out["deleted"] = len(got.deleted)
+        kept = self._branch_kept if self._branch_kept is not None else {}
+        kept.update({(r, b): w for r, b, w in got.kept})
+        for r, b, _tip, _proof in got.deleted:
+            kept.pop((r, b), None)
+        self._branch_kept = kept
+        self._branch_cursor = got.cursor if got.stopped else None
+        if not got.stopped:
+            self._branch_ended = time.monotonic()
+            self._branch_kept = {k: w for k, w in kept.items() if k in got.present or k[0] in got.unread}
+
     def _hold_create_locks(self, wt: Path, repo: Path) -> Callable[[], None] | None:
+        """The create's two locks for worktree `wt` (`_hold_locks`), its main checkout read from it, else `repo`."""
+        try:
+            main = gitinfo.main_checkout(wt)
+        except gitinfo.WorktreeError:
+            main = repo
+        return self._hold_locks(main, wt.name, wt)
+
+    def _hold_locks(self, main: Path, name: str, wt: Path) -> Callable[[], None] | None:
         """Take, without waiting, the two locks a create holds before its record exists (`_dir_locks` keyed
         `worktree:<main>:<name>` and by the directory), from the sweep's thread on the loop; their release, or None
         when either is busy (§4.6 *The disk sweep*: *busy: a start is using it*)."""
         loop = self._sweep_loop
         if loop is None or loop.is_closed():
             return None
-        try:
-            main = gitinfo.main_checkout(wt)
-        except gitinfo.WorktreeError:
-            main = repo
-        keys = [f"worktree:{main}:{wt.name}", str(wt)]
+        keys = [f"worktree:{main}:{name}", str(wt)]
         abandoned = threading.Event()  # the sweep stopped waiting: whatever `take` holds, it lets go
 
         async def take() -> list[asyncio.Lock] | None:

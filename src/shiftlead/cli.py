@@ -3870,6 +3870,13 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
                     out.append(f"    would remove {gone.get('path')} ({_bytes(gone.get('bytes'))})")
                 for kept in k.get("kept") or []:
                     out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+            if b := e.get("branches"):  # §4.6 *branches*, TD-2112
+                short = " (partial)" if b.get("partial") else ""
+                out.append(f"  branches   would delete {len(b.get('would_delete') or [])}{short}")
+                for gone in b.get("would_delete") or []:
+                    out.append(f"    would delete {gone.get('repo')} {gone.get('branch')} — {gone.get('proof')}")
+                for kept in b.get("kept") or []:
+                    out.append(f"    kept {kept.get('repo')} {kept.get('branch')} — {kept.get('why')}")
             continue
         out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
         for kind, k in (e.get("kinds") or {}).items():
@@ -3880,6 +3887,12 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             )
             for kept in k.get("kept") or []:
                 out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+        if b := e.get("branches"):  # §4.6 *branches*, TD-2112: counts, not bytes
+            out.append(f"  branches   deleted {b.get('deleted', 0)} last pass, {b.get('deleted_30d', 0)} in 30 days")
+            for kept in b.get("kept") or []:
+                out.append(f"    kept {kept.get('repo')} {kept.get('branch')} — {kept.get('why')}")
+            if b.get("kept_more"):
+                out.append(f"    and {b['kept_more']} more kept")
         free = e.get("free") or {}
         if "error" in free:
             out.append(f"  free under {free.get('path')}: unreadable — {free['error']}")

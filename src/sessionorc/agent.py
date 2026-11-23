@@ -873,6 +873,11 @@ class HostAgent(
         # held in memory only, so a restart starts at the first; and its scope, None reading `default_home()` (a test
         # gives True to run the rule on a scratch home)
         self._worktree_cursor = ""
+        # the branch rule's memory (§4.6 *branches*, TD-2104): the pair a budget stopped at, when a run last reached the
+        # end (monotonic), the kept rows by (repo, branch), seeded from `disk.json` at the first pass
+        self._branch_cursor: tuple[str, str] | None = None
+        self._branch_ended: float | None = None
+        self._branch_kept: dict[tuple[str, str], str] | None = None
         self._disk_book = diskbook.Book()  # the sweep's sizes, in memory: a restart reads *partial* (TD-1945)
         self._disk_result: dict[str, Any] | None = None  # the last pass's result (§4.6 *The sweep's reading*)
         self._worktree_scope: bool | None = None

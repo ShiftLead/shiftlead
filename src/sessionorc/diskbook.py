@@ -21,6 +21,7 @@ from sessionorc.store import _atomic_write
 KINDS = ("scratch", "worktrees", "runs", "caches", "home")
 WALK_S = 10.0  # one item's size walk at most, so a huge tree never spends a pass's budget (TD-1945 review)
 FILE = "disk.json"  # in the host's home (`SHIFTLEAD_HOME`)
+BRANCH_ROWS = 200  # `branches.kept` holds at most this many rows, `kept_more` the count past them
 KEEP_DAYS = 30  # a pass's dated line is kept this long; the reading's `removed_30d` sums them
 LOW = 0.1  # under a tenth free, of bytes or of inodes, is drawn as a warning (§4.6 *The sweep's reading*)
 MOUNTINFO = "/proc/self/mountinfo"
@@ -271,6 +272,37 @@ def _load(path: Path) -> dict[str, Any]:
     return got if isinstance(got, dict) else {}
 
 
+def branch_rows(deleted: int, kept: dict[tuple[str, str], str]) -> dict[str, Any]:
+    """The branch rule's part of a pass (§4.6 *The sweep's reading*): its `deleted` count and the kept map as rows, by
+    repo then branch, at most `BRANCH_ROWS`, with `kept_more` the count past them."""
+    rows = [{"repo": r, "branch": b, "why": kept[(r, b)]} for r, b in sorted(kept)]
+    return {"deleted": deleted, "kept": rows[:BRANCH_ROWS], "kept_more": max(0, len(rows) - BRANCH_ROWS)}
+
+
+def branch_kept(home: str | Path) -> dict[tuple[str, str], str]:
+    """The kept rows `disk.json` holds, as the map the host agent seeds at its first pass."""
+    got = _load(Path(home) / FILE).get("branches")
+    rows = got.get("kept") if isinstance(got, dict) else None
+    return {
+        (str(x["repo"]), str(x["branch"])): str(x.get("why") or "")
+        for x in rows or []
+        if isinstance(x, dict) and x.get("repo") and x.get("branch")
+    }
+
+
+def _branches_30d(lines: list[Any], cutoff: datetime) -> int:
+    total = 0
+    for line in lines:
+        at = _when(line.get("at")) if isinstance(line, dict) else None
+        if at is None or at < cutoff:
+            continue
+        try:
+            total += int(line.get("branches_deleted") or 0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
 def write(
     home: str | Path,
     host: str,
@@ -279,11 +311,13 @@ def write(
     started: str,
     now: datetime,
     seat_free: dict[str, Any] | None = None,
+    branches: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write one pass's `result` (`Book.close`'s) to `disk.json` in `home`: the pass's kinds, `free`, `seat_free`
     where the host sets a `seat_root` (TD-2082), the host agent's `started` (a reading by a later run says *partial*,
-    its memory being empty), and the dated lines of the passes in the last `KEEP_DAYS`, this one's appended. Through
-    a temporary file and one rename; returns what it wrote."""
+    its memory being empty), the branch rule's `branches` (`branch_rows`; None: no delete, the file's rows stand), and
+    the dated lines of the passes in the last `KEEP_DAYS`, this one's appended. Through a temporary file and one
+    rename; returns what it wrote."""
     path = Path(home) / FILE
     cutoff = now - timedelta(days=KEEP_DAYS)
     with _WRITE:
@@ -292,8 +326,27 @@ def write(
             at = _when(line.get("at")) if isinstance(line, dict) else None
             if at is not None and at >= cutoff:
                 lines.append(line)
-        lines.append({"at": _stamp(now), "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS}})
-        out = {"host": host, "at": _stamp(now), "started": started, "kinds": result, "free": free, "passes": lines}
+        if branches is None:
+            old = _load(path).get("branches")
+            old = old if isinstance(old, dict) else {}
+            branches = {"deleted": 0, "kept": old.get("kept") or [], "kept_more": int(old.get("kept_more") or 0)}
+        lines.append(
+            {
+                "at": _stamp(now),
+                "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS},
+                "branches_deleted": int(branches.get("deleted") or 0),
+            }
+        )
+        branches = {**branches, "deleted_30d": _branches_30d(lines, cutoff)}
+        out = {
+            "host": host,
+            "at": _stamp(now),
+            "started": started,
+            "kinds": result,
+            "branches": branches,
+            "free": free,
+            "passes": lines,
+        }
         if seat_free is not None:
             out["seat_free"] = seat_free
         if isinstance(low := _load(path).get("low"), dict):  # each pool's *low* state outlives a pass (TD-2083)
@@ -382,7 +435,22 @@ def read(
             "removed_30d": totals[k],
             "kept": [x for x in one.get("kept") or [] if isinstance(x, dict)],
         }
-    out = {"host": host, "at": got.get("at"), "kinds": kinds, "free": free, "warnings": warnings(free)}
+    raw = got.get("branches")
+    raw = raw if isinstance(raw, dict) else {}
+    branches = {
+        "deleted": int(raw.get("deleted") or 0),
+        "deleted_30d": _branches_30d(got.get("passes") or [], cutoff),
+        "kept": [x for x in raw.get("kept") or [] if isinstance(x, dict)],
+        "kept_more": int(raw.get("kept_more") or 0),
+    }
+    out = {
+        "host": host,
+        "at": got.get("at"),
+        "kinds": kinds,
+        "branches": branches,
+        "free": free,
+        "warnings": warnings(free),
+    }
     if seat_free is not None:
         out["seat_free"] = seat_free
         out["seat_warnings"] = warnings(seat_free)
