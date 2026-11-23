@@ -18,6 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
+import yaml
+
 from sessionorc import held, ledger, ledgerboard, reports
 from sessionorc.models import Session
 from shiftlead import repoconfig
@@ -118,6 +120,42 @@ def rows_of(
         return None
     opened, recent = prs.get("open") or [], prs.get("recent") or []
     return rows_for(([r for r in recent if r.get("state") != "open"], opened, recent), wanted, read_one)
+
+
+class TeamFlow(NamedTuple):
+    """The flow a team's records are read against this pass. `doc` is what runs, `was` the copy it replaces where the
+    two differ, `put` the text to store as the team's copy once the pass has read its records, and `problems` why the
+    flow in use is the last good copy rather than the current flow."""
+
+    doc: Mapping[str, Any]
+    was: Mapping[str, Any] | None = None
+    put: str | None = None
+    problems: tuple[str, ...] = ()
+
+
+def _flow_doc(text: str | None) -> Mapping[str, Any] | None:
+    if not text:
+        return None
+    try:
+        doc = repoconfig.parse_yaml(text)
+    except (yaml.YAMLError, ValueError, RecursionError):  # a file nested past the parser's depth is unreadable too
+        return None
+    return doc if isinstance(doc, Mapping) else None
+
+
+def team_flow(current: str | None, problems: Collection[str], kept: str | None) -> TeamFlow | None:
+    """Which flow runs (design §4.9c: *A flow that stops passing its check keeps its last good version in use*).
+    `current` is the team's flow as read now (None: unreadable), `problems` its check's, and `kept` the team's copy on
+    the state branch. A passing flow runs and is to replace the copy; any other runs the copy, with the problems to
+    tell the person. None: neither can run, so the team's entries have no reading this pass."""
+    doc = None if problems else _flow_doc(current)
+    if doc is not None:
+        same = current == kept
+        return TeamFlow(doc, None if same else _flow_doc(kept), None if same else current)
+    last = _flow_doc(kept)
+    if last is None:
+        return None
+    return TeamFlow(last, problems=tuple(problems) or ("the flow could not be read",))
 
 
 class SessionsRead(NamedTuple):
