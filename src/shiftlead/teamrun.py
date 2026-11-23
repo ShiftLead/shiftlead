@@ -304,7 +304,11 @@ def balance_note(mark: dict[str, Any]) -> str:
 
 
 def balance_now(
-    team: str, sessions: list[dict[str, Any]], repos: dict[str, dict[str, Any]], now: datetime | None = None
+    team: str,
+    sessions: list[dict[str, Any]],
+    repos: dict[str, dict[str, Any]],
+    now: datetime | None = None,
+    root: str | None = None,
 ) -> dict[str, Any]:
     """The numbers a team's balance lines are read against, as they read now (design §4.7 `ao team
     balance`, §6 *Balance*), gathered as the home's tick gathers them: the registered repos the
@@ -312,11 +316,16 @@ def balance_now(
     the oldest in seconds (`oldest`), how long the oldest pull request has waited at the team's
     seats (`review`) and the bound it is read against (`bound`, the shortest `review.bound` a live
     member carries, two hours where none). A number that cannot be told is None: no live member,
-    no reading, nothing waiting; `oldest` is 0 where the reading holds no open pull request."""
+    no reading, nothing waiting; `oldest` is 0 where the reading holds no open pull request. `root` is a
+    switched team's repo (§6 *Balance*, after the cut-over: the team's repo is its `repo` key), read with or
+    without a live session; `""` is a switched team whose repo has no reading."""
     now = now or datetime.now(UTC)
     members = [s for s in sessions if s.get("team") == team and s.get("state") not in DEAD]
     members = [s for s in members if not s.get("superseded_by")]
-    roots = sorted({str(s["repo"]) for s in members if s.get("repo") and s["repo"] in repos})
+    if root is None:
+        roots = sorted({str(s["repo"]) for s in members if s.get("repo") and s["repo"] in repos})
+    else:
+        roots = [root] if root in repos else []
 
     def age(iso: Any) -> int | None:
         try:

@@ -5504,10 +5504,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 notes = [*notes, f"the team could not be read: {show.detail}"]
             else:
                 switched = setmod.switched_team(show, None if isinstance(tools, HTTPException) else tools)
+        # the tabs' cannot-run dots (§4.9d *The page*), the cheap read `ao org` makes; one unread draws no dot
+        shows = await asyncio.gather(*(read("team_show", team=x, entries=False) for x in held))
+        dots = {
+            x: str(s["cannot_run"])
+            for x, s in zip(held, shows, strict=True)
+            if isinstance(s, dict) and s.get("cannot_run")
+        }
         card, head, group = None, None, None
-        if team in org.teams:
+        if team in org.teams or team in held:
+            names = repo_roots(readings) if team in held else {}
             card = setmod.team_cards(
-                {team: org.teams[team]},
+                {team: org.teams.get(team)},
                 got.get("teams"),
                 sessions=fleet,
                 repos=readings,
@@ -5515,7 +5523,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 profiles=profiles,
                 default=default,
                 labels=got.get("labels"),
+                roots={team: names.get(held[team], "")} if team in held else None,
             )[0]
+        if team in org.teams:
             seats, waits = await h.seats_of(fleet), await h.person_waits()
             rows = await h.team_rows(fleet)
             views = [view(s, fleet, seats=seats, repos=readings, waits=waits) for s in fleet]
@@ -5529,6 +5539,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "t": card,
                 "sw": switched,
+                "is_switched": team in held,
+                "dots": dots,
                 "team": team if team in tabs else None,
                 "teams_unread": teams_unread,
                 "team_unread": team_unread,
@@ -5805,10 +5817,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await body_of(request)
         team = str(body.get("team") or "")
         defined = org_here()[0].teams
-        if team not in defined:
+        # a switched team is held in `settings.yml` and in no `org.yml` (§4.9d *Before and after the cut-over*)
+        held = {} if team in defined else (await call("settings")).get("switched_teams") or {}
+        if team not in defined and team not in held:
             raise HTTPException(
                 400, f"no team {team!r}: the org defines {', '.join(sorted(defined)) or 'none'} (design §4.9)"
             )
+        if team in held and "on_work" in body:  # the first shape's row, which a switched team does not have (§4.9d)
+            raise HTTPException(400, f"{team} is switched: when work appears went with the cut-over (§4.9d)")
         change: dict[str, Any] = {}
         if "until" in body:
             when = str(body.get("until") or "").strip()
