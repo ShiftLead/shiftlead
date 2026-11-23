@@ -16,7 +16,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import tomllib
 import uuid
@@ -370,7 +369,7 @@ def run(args: argparse.Namespace, entry: dict[str, Any]) -> int:
     if not table.is_file():
         print(f"judge: refused — no table {table.relative_to(ROOT)}", file=sys.stderr)
         return 2
-    home = Path(tempfile.mkdtemp(prefix="aoj-", dir="/tmp"))
+    home = look_home.scratch_home("aoj-")
     sock = f"ao-judge-{uuid.uuid4().hex[:8]}"
     agent: subprocess.Popen | None = None
     call: Callable[..., Any] | None = None

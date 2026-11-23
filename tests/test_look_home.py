@@ -122,3 +122,15 @@ def test_v2_writes_the_fixture_ledger_as_a_directory_the_reader_reads(tmp_path):
     assert ledger.ledger_path(repo) == "docs/ledger"
     got = ledger.reading(repo, datetime.now(UTC), with_history=False)
     assert {e["id"] for e in got["entries"]} == {"TD-001", "TD-002", "TD-003", "TD-004"}
+
+
+def test_a_scratch_home_lies_under_the_runs_scratch(tmp_path, monkeypatch):
+    lh = _load()
+    monkeypatch.setenv("SHIFTLEAD_SCRATCH", str(tmp_path))
+    assert lh.scratch_home("aoj-").parent == tmp_path
+    monkeypatch.delenv("SHIFTLEAD_SCRATCH")
+    made = lh.scratch_home("aoj-")
+    try:
+        assert made.parent == Path("/tmp")
+    finally:
+        made.rmdir()

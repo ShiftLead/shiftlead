@@ -280,6 +280,11 @@ def stop(proc: subprocess.Popen | None) -> None:
         proc.wait(timeout=5)
 
 
+def scratch_home(prefix: str) -> Path:
+    """A new scratch home under this run's `$SHIFTLEAD_SCRATCH`, else `/tmp` (design §4.6)."""
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
+
+
 def remove_home(home: Path, quiet: float = 1.0, limit: float = 6.0, step: float = 0.2) -> None:
     """Remove the scratch home, and again while anything writes into it, until it stays gone for `quiet`
     seconds or `limit` passes (TD-311). A tool killed with the tmux server still runs its exit hooks,
@@ -323,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # the run's own scratch (§4.6, TD-1944) where it has one: at most 78 bytes,
         # so `agent.sock` at most 105 (AF_UNIX: 107)
-        home = Path(tempfile.mkdtemp(prefix="aolook-", dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
+        home = scratch_home("aolook-")
     sock = f"ao-look-{uuid.uuid4().hex[:8]}"
     port = args.port or free_port()
     env = child_env(home, sock)

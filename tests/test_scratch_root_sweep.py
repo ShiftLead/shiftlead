@@ -8,9 +8,10 @@ import subprocess
 import sys
 import time
 import uuid
+from pathlib import Path
 
 import pytest
-from conftest import OWNERS, sweep_stale_scratch_roots
+from conftest import OWNERS, TEST_RUN_MARK, _scratch_parent, sweep_stale_scratch_roots
 
 
 def _root(base, owner_pid=None, age=0.0):
@@ -52,3 +53,51 @@ def test_a_root_no_owner_file_names_is_never_swept(tmp_path):
     sweep_stale_scratch_roots(str(tmp_path))
     assert unowned.exists()
     os.chmod(unowned / "shiftlead-1000" / "ro", 0o755)
+
+
+def _seat_root(holder, seat, mark):
+    root = holder / f"shiftlead-{os.getuid()}" / seat / f"aoscr-{uuid.uuid4().hex[:8]}"
+    (root / "shiftlead-1000").mkdir(parents=True)
+    if mark is not None:
+        (root / TEST_RUN_MARK).write_text(mark)
+    return root
+
+
+@pytest.mark.unit
+def test_a_killed_runs_root_in_another_seats_directory_is_swept(tmp_path):
+    dead = _seat_root(tmp_path, "seat-a", str(_dead_pid()))
+    live = _seat_root(tmp_path, "seat-b", str(os.getppid()))
+    starting = _seat_root(tmp_path, "seat-b", "")  # the mark's file made, its pid not yet written
+    unmarked = _seat_root(tmp_path, "seat-c", None)
+    sweep_stale_scratch_roots(str(tmp_path))
+    assert not dead.exists()
+    assert live.exists() and starting.exists() and unmarked.exists()
+
+
+@pytest.mark.unit
+def test_a_seats_tmpdir_in_another_pool_has_that_pools_seats_swept(tmp_path):
+    pool = tmp_path / "pool"
+    dead = _seat_root(pool, "seat-a", str(_dead_pid()))
+    own = pool / f"shiftlead-{os.getuid()}" / "seat-b"
+    own.mkdir()
+    sweep_stale_scratch_roots(str(tmp_path / "top"), tmpdir=str(own))
+    assert not dead.exists()
+
+
+@pytest.mark.unit
+def test_the_root_goes_under_tmpdir_only_where_it_fits(tmp_path, monkeypatch):
+    short = tmp_path / "s"
+    short.mkdir()
+    monkeypatch.setattr("sessionorc.scratch.MAX_ROOT", len(str(short)) + len("/aoscr-12345678/s/r"))
+    assert _scratch_parent(str(short)) == str(short)
+    monkeypatch.setattr("sessionorc.scratch.MAX_ROOT", len(str(short)) + len("/aoscr-12345678/s/r") - 1)
+    assert _scratch_parent(str(short)) == "/tmp"
+    monkeypatch.setattr("sessionorc.scratch.MAX_ROOT", 4096)
+    assert _scratch_parent(str(tmp_path / "missing")) == "/tmp"
+    assert _scratch_parent("relative") == "/tmp"
+    assert _scratch_parent(None) == "/tmp"
+
+
+@pytest.mark.unit
+def test_this_runs_root_carries_its_pid(_scratch_root):
+    assert (Path(_scratch_root) / TEST_RUN_MARK).read_text() == str(os.getpid())
