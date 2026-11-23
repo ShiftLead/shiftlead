@@ -992,12 +992,7 @@ def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str 
         readings = got if isinstance(got, dict) else {}
     except Exception:  # noqa: BLE001 — no reading passes, as a ledger that did not parse does
         return None
-    try:  # a team made on its page is in `settings.yml` and in no definition (§4.9d *New team*, TD-2063)
-        got = call("settings")
-        made = got.get("switched_teams") if isinstance(got, dict) else None
-        made = made if isinstance(made, dict) else {}
-    except Exception:  # noqa: BLE001 — no reading of them: the definitions alone, as before
-        made = {}
+    made: dict[Any, Any] | None = None
     for root in roots:
         here = Path(root).resolve()
         r = next((v for k, v in readings.items() if isinstance(v, dict) and Path(k).resolve() == here), {})
@@ -1006,6 +1001,13 @@ def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str 
             continue
         declared = [str(t) for t in led.get("declared_teams") or []]
         defined = [t["team"] for t in teams.entry_teams(org, str(here), plan.host or host)]
+        if made is None:  # read only for a ledger that declares: a team made on its page is in no definition (§4.9d)
+            try:
+                held = call("settings")
+                made = held.get("switched_teams") if isinstance(held, dict) else None
+                made = made if isinstance(made, dict) else {}
+            except Exception:  # noqa: BLE001 — no reading of them: the definitions alone, as before
+                made = {}
         repo = str(r.get("name") or here.name)
         defined += [str(n) for n, x in made.items() if x == repo and n not in defined]
         if len(defined) < 2 or plan.team.casefold() in {t.casefold() for t in declared}:
