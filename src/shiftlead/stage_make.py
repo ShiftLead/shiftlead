@@ -10,9 +10,10 @@ It makes reconcile's cases that start no session (`close`, `renumbered`, `land-i
 pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
 takes its claim and writes the record.
-`sweep_closed` removes a closed record after its thirty days. Every other case returns `Made(False, …)` and writes
-nothing. A write that takes a record from its holder names that session in `Made.end`, for the caller to end outside
-the lock. Nothing calls this yet.
+`sweep_closed` removes a closed record after its thirty days. The `merging` case is `stage_merge.run`'s, whose gate and
+merge run outside the lock; *Try the merge again* is this module's answer. Every other case returns `Made(False, …)`
+and writes nothing. A write that takes a record from its holder names that session in `Made.end`, for the caller to
+end outside the lock. Nothing calls this yet.
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ def _rewrite_flow(store: StageStore, record: dict[str, Any], _s: Reading, doc: d
     for count, n in (record.get("counts") or {}).items():
         key, _, outcome = str(count).rpartition(":")
         stage = _stage_or_none(doc, key)
-        if stage is not None and outcome in stage:
+        if stage is not None and (outcome in stage or outcome == "refused"):  # a refused merge's count is its own
             kept[count] = n
     record.update(flow=name, counts=kept)
     store.put_entry(record, f"rewritten to flow {name}")
@@ -191,12 +192,25 @@ _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, A
 }
 
 
+def _merge_again(store: StageStore, record: dict[str, Any], words: str) -> Made:
+    """*Try the merge again*: the record is `merging` at the head its verdict read, and the gate runs afresh."""
+    merging = record.get("merging") or {}
+    if not merging.get("head"):
+        return Made(False, "the record holds no merge to try again")
+    fresh = {k: v for k, v in merging.items() if k != "unread_since"}
+    record.update(waits="merging", merging=fresh, answers=None, asked=None, blocked=None, answer=words)
+    store.put_entry(record, "the person's answer: try the merge again")
+    return Made(True)
+
+
 def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
     """The person's lifted label, mapped to a move by the record's answer map (act 2). An answer at a limit or the cap
     takes the stopped move, in the person's own words too, and only it starts that move's count and the cap's again.
     The move is not counted."""
     label = str(s.lifted)
     move, words = answer_move(record.get("answers") or {}, label)
+    if isinstance(move, dict) and move.get("merge"):
+        return _merge_again(store, record, words)
     blocked = record.get("blocked") or {}
     stopped = blocked.get("to")
     if move is None and stopped:
@@ -240,6 +254,7 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
         asked=None,
         blocked=None,
         answer=words,
+        merging=None,
         offers=0,
         entered_at=_now(),
     )
