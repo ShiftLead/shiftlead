@@ -1,2 +1,2 @@
 {#- design §4.9d *Where the settings pages sit* (TD-2059): the rail behind the gear, listing the pages that exist -#}
-<nav class="setrail" aria-label="Settings pages">{% for label, href in [("Settings", "/settings"), ("Tools", "/tools"), ("Briefs", "/briefs"), ("Teams", "/teams")] %}<a href="{{ href }}"{% if label == rail_on %} class="on" aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+<nav class="setrail" aria-label="Settings pages">{% for label, href in [("Settings", "/settings"), ("Tools", "/tools"), ("Flows", "/flows"), ("Briefs", "/briefs"), ("Teams", "/teams")] %}<a href="{{ href }}"{% if label == rail_on %} class="on" aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>

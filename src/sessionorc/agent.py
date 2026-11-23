@@ -4250,6 +4250,16 @@ class HostAgent(
             raise RpcError(str(got["refused"]))
         return got
 
+    async def rpc_flows(self, caller: Any = None) -> dict[str, Any]:
+        """What the Flows page draws (design §4.9c *The Flows page*, TD-2054): every flow, the models and the briefs."""
+        return await asyncio.to_thread(home_call(FLOW).listing, hosts.local_host().repos())
+
+    async def rpc_flow_check(
+        self, name: str = "", doc: Any = None, version: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """§4.9c's check of the flow the Flows page holds, and the file Save would write. Writes nothing."""
+        return await asyncio.to_thread(home_call(FLOW).checked, name, doc, version)
+
     def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
         self.tmux.ensure_server()
         grid = settings_mod.terminal_grid(settings_mod.load())  # pinned as a session is (§4.6, TD-1919)

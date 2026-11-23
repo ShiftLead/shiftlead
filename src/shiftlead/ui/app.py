@@ -5318,6 +5318,53 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             delete=b.get("delete") is True,
         )
 
+    @app.get("/flows", response_class=HTMLResponse)
+    async def flows_page(request: Request):
+        """§4.9c *The Flows page*, §4.5a (TD-2054): the page is drawn in the browser from this one read."""
+        agent_down, data, why = False, {"flows": [], "models": [], "briefs": {}, "max_moves": 25}, ""
+        try:
+            data = await call("flows")
+        except HTTPException as e:
+            agent_down = e.status_code == 503
+            why = "" if agent_down else f"the host agent did not serve the flows: {e.detail}"
+        return templates.TemplateResponse(
+            request,
+            "flows.html",
+            {
+                "data": data,
+                "why": why,
+                "agent_down": agent_down,
+                "host": host_name(),
+                "active": "Settings",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
+    @app.post("/api/flows/check")
+    async def flows_check(request: Request):
+        """§4.5a *Does it flow?*: the check's words and the file Save would write, for the flow the page holds."""
+        b = await body_of(request)
+        version = b.get("version") or None
+        return await call(
+            "flow_check", name=str(b.get("name") or ""), doc=b.get("doc"), version=str(version) if version else None
+        )
+
+    @app.post("/api/flows/save")
+    async def flows_save(request: Request):
+        """§4.5a *Flows page*: **Save** and **Delete**, through `flow_save`, the person's own act (TD-2054)."""
+        b = await body_of(request)
+        version, renames = b.get("version") or None, b.get("renames")
+        return await call(
+            "flow_save",
+            name=str(b.get("name") or ""),
+            text=str(b.get("text") or ""),
+            version=str(version) if version else None,
+            renames=renames if isinstance(renames, dict) else None,
+            delete=b.get("delete") is True,
+        )
+
     @app.post("/api/tools/check")
     async def tools_check():
         """§4.5a *Tools page: Check again* (TD-1973): `tools_check`, the person's own act — this host's tools read

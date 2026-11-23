@@ -34,6 +34,7 @@ PAGES = {
     "card_page.html": "/card/s%23TD-1",
     "spend.html": "/spend",
     "tools.html": "/tools",
+    "flows.html": "/flows",
     "briefs.html": "/briefs",
     "team.html": "/teams",
     "repo.html": "/repo/samscrape",
