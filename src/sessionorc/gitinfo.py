@@ -61,6 +61,7 @@ class WorktreeError(RuntimeError):
 
 
 WORKTREES_DIR = ".claude/worktrees"  # design §5 default; Claude Code's own `--worktree` uses the same place
+WORKTREE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")  # a name `ensure_worktree` takes
 
 
 def worktree_path(repo: Path, name: str, timeout: float | None = None) -> Path:
@@ -160,7 +161,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0, *, resume: boo
     repo's own when present, the pinned tree's in a pinned repo (`hydrate_command`) — so the worktree gets the
     untracked pieces git leaves out. `created` is whether this call made it, which the record keeps as
     `worktree_made` (design §4.1 *A close reaps the worktree it made*)."""
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+    if not WORKTREE_NAME.fullmatch(name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
     path = worktree_path(repo, name)
     repo = path.parent.parent.parent
