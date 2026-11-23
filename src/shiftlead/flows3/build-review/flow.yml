@@ -1,0 +1,14 @@
+# The built-in flow `build-review` (design §4.9c *The built-in flows*, TD-2047).
+format: 3
+name: build-review
+stages:
+  - name: Build
+    does: build
+    model: opus
+    takes: any
+    work-pushed: review
+  - name: Review
+    does: review
+    model: sonnet
+    ship: {to: merge, refused: {to: build, limit: 3}}
+    changes-wanted: {to: build, limit: 3}

@@ -1,0 +1,1 @@
+Audit the repo's tests. Look for behaviour the design states that no test holds, a test that would pass with its code removed, and a test that depends on timing or on the machine it runs on. Confirm each problem by reading the code and the test, and file each as a ledger entry of its own, saying what is unheld and where. Fix nothing.
