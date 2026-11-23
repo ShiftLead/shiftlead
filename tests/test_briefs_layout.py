@@ -40,6 +40,7 @@ NAMED = {
     "sweeper": {"{board}", "{cadence_rules}", "{gate}", "{merge}", "{test}"},
     "fact-checker": set(),
     "designer": {"{board}", "{cadence_rules}", "{merge}"},
+    "reviewer": {"{cadence_rules}"},
 }
 ROLES = tuple(NAMED)
 

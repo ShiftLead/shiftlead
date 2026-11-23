@@ -390,11 +390,28 @@ def _reachable(stages: Mapping[str, dict[str, Any]], start: str, skip: Collectio
     return seen
 
 
+def _skips_review(stages: Mapping[str, dict[str, Any]], key: str) -> bool:
+    """Rule 11 for one stage: `merge` can be reached from it without passing a review stage that runs every time."""
+    always = {k for k, st in stages.items() if st["kind"] == "review" and not st["only"]}
+    return any(stages[k]["merges"] for k in _reachable(stages, key, always))
+
+
+def independent_review(doc: Any) -> frozenset[str]:
+    """The keys of the design and build stages rule 11 names: the home adds the cadence's independent review to what
+    their sessions are told (§4.9c *The gate's review row needs no new input*). Reads a flow the check has passed."""
+    bad: list[str] = []
+    audits = _audits(doc.get("audits"), (), "file", None, lambda _p: None, bad)
+    stages, _ = _stages(doc["stages"], audits, (), "file", None, lambda _p: None, bad)
+    for st in stages.values():
+        for o in (*OUTCOMES[st["kind"]], OTHER):
+            _move(st, o, st["outs"].get(o, "person"), stages, audits, bad)
+    return frozenset(k for k, st in stages.items() if st["kind"] in WRITES and _skips_review(stages, k))
+
+
 def _reach(
     stages: Mapping[str, dict[str, Any]], takes: Mapping[str, list[str]], bad: list[str], info: list[str]
 ) -> None:
     """Rules 4, 8 and 11, and the same-model warning."""
-    always = {k for k, st in stages.items() if st["kind"] == "review" and not st["only"]}
     for key, st in stages.items():
         if st["kind"] not in WRITES:
             continue
@@ -404,7 +421,7 @@ def _reach(
         for k in sorted(reach - {key}):
             if stages[k]["kind"] == "review" and stages[k]["model"] == st["model"]:
                 info.append(f"warning: {stages[k]['name']} reviews on {st['model']}, the model {st['name']} writes on")
-        if any(stages[k]["merges"] for k in _reachable(stages, key, always)):
+        if _skips_review(stages, key):
             info.append(
                 f"{st['name']}: merge can be reached with no review that always runs, so its session runs the "
                 "cadence's independent review first (rule 11)"

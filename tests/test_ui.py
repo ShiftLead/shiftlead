@@ -65,14 +65,14 @@ def test_pages_and_shell_flow(client, tmp_path):
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
     assert 'name="role"' in r.text and 'title="built-in · grants control">manager · unattended</option>' in r.text
-    (tmp_path / ".shiftlead.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
-    (tmp_path / ".shiftlead" / "roles" / "reviewer").mkdir(parents=True)  # a role directory (§4.9c)
-    (tmp_path / ".shiftlead" / "roles" / "reviewer" / "role.yml").write_text("")
-    (tmp_path / ".shiftlead" / "roles" / "reviewer" / "template.md").write_text("review {lane}\n")
+    (tmp_path / ".shiftlead.yml").write_text("controllers: [orc]\nroles: {inspector: {lane: [ui]}}\n")
+    (tmp_path / ".shiftlead" / "roles" / "inspector").mkdir(parents=True)  # a role directory (§4.9c)
+    (tmp_path / ".shiftlead" / "roles" / "inspector" / "role.yml").write_text("")
+    (tmp_path / ".shiftlead" / "roles" / "inspector" / "template.md").write_text("review {lane}\n")
     r = client.get(f"/new?dir={tmp_path}")
-    assert 'title="repo role + repo">reviewer · unattended</option>' in r.text and 'data-default="orc"' in r.text
+    assert 'title="repo role + repo">inspector · unattended</option>' in r.text and 'data-default="orc"' in r.text
     roles = client.get(f"/api/roles?dir={tmp_path}").json()
-    assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "reviewer"
+    assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "inspector"
     (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert "unknown grant 'fly'" in client.get(f"/api/roles?dir={tmp_path}").json()["error"]
     r = client.post("/new", data={"name": "x", "dir": str(tmp_path), "role": "grinder"}, follow_redirects=False)

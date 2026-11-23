@@ -641,14 +641,14 @@ def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_t
     cfg = repoconfig.RepoConfig(root=tmp_path)
     text = repoconfig.resolve_role(cfg, "grinder").brief_text()
     assert "## This repo's rules" in text and "\n\nnone\n\n" in text and "{repo}" not in text
-    (tmp_path / "r.md").write_text("reviewer: {lane}\n")
-    d = tmp_path / ".shiftlead" / "roles" / "reviewer"
+    (tmp_path / "r.md").write_text("inspector: {lane}\n")
+    d = tmp_path / ".shiftlead" / "roles" / "inspector"
     d.mkdir(parents=True)
     (d / "role.yml").write_text("")
-    (d / "template.md").write_text("reviewer: {lane}\n{repo}\n")
-    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\nnone\n"
-    cfg.roles = {"reviewer": {"brief": "r.md"}}
-    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\nreviewer: TD-1\n"
+    (d / "template.md").write_text("inspector: {lane}\n{repo}\n")
+    assert repoconfig.resolve_role(cfg, "inspector").brief_text(["TD-1"]) == "inspector: TD-1\nnone\n"
+    cfg.roles = {"inspector": {"brief": "r.md"}}
+    assert repoconfig.resolve_role(cfg, "inspector").brief_text(["TD-1"]) == "inspector: TD-1\ninspector: TD-1\n"
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
     # a repo's `roles.grinder.brief` fills the slot, and a definition's `brief:` takes it instead
     (tmp_path / "g.md").write_text("the role's own\n")
@@ -656,7 +656,7 @@ def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_t
     role = repoconfig.resolve_role(cfg, "grinder")
     assert "\n\nthe role's own\n\n" in role.brief_text()
     given = role.brief_text(supplement=str(tmp_path / "r.md"))
-    assert "reviewer: free-pick" in given and "the role's own" not in given and "**grinder**" in given
+    assert "inspector: free-pick" in given and "the role's own" not in given and "**grinder**" in given
 
 
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
