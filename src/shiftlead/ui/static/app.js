@@ -10661,7 +10661,7 @@
       const f = row.closest("form"), on = f.elements.balance_on, parts = [f.elements.balance_prs, f.elements.balance_oldest, f.elements.balance_review];
       on.addEventListener("change", () => {
         parts.forEach((p) => { p.disabled = !on.checked; });
-        if (on.checked && !parts[0].value.trim() && !parts[1].value.trim() && !parts[2].checked) { parts[0].value = "10"; parts[1].value = "2d"; parts[2].checked = true; }
+        if (on.checked && !parts[0].value.trim() && !parts[1].value.trim() && !parts[2].checked) { parts[0].value = "10"; parts[1].value = "2d"; parts[2].checked = !parts[2].hidden; }  // a switched team has no reader's-queue line (§4.9d)
       });
     });
     // **schedule** (§4.5a, §6 *Schedule*, TD-1346): off, the picks are not the person's to move but keep their
@@ -10697,7 +10697,7 @@
       const bal = {}, prs = f.elements.balance_prs.value.trim(), oldest = f.elements.balance_oldest.value.trim();
       if (prs) bal.prs = /^[0-9]+$/.test(prs) ? Number(prs) : prs;
       if (oldest) bal.oldest = oldest;
-      if (f.elements.balance_review.checked) bal.review = true;
+      if (f.elements.balance_review.checked && !f.elements.balance_review.hidden) bal.review = true;
       return bal;
     };
     const forms = {
