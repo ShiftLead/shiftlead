@@ -12,6 +12,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -127,6 +128,68 @@ def test_rule_three_takes_a_build_leftover_unwritten_for_a_day(pool):
     _age(seat / "clone", 90_000)
     _reclaim(root, home)
     assert not old.exists() and fresh.exists() and deep.exists()
+
+
+@pytest.mark.unit
+def test_rule_one_keeps_a_run_holding_a_transcript_store(pool, dead_pid):
+    root, home = pool
+    run = _run(_seat(root, home), 1, lock=str(dead_pid))
+    store = run / "store"
+    store.mkdir()
+    (store / "t.jsonl").write_text("x")
+    _age(run, 3600)
+    _reclaim(root, home, troots=[store])
+    assert (store / "t.jsonl").exists()
+
+
+@pytest.mark.unit
+def test_rule_three_keeps_a_leftover_holding_a_transcript_store(pool):
+    root, home = pool
+    left = _seat(root, home) / "pdm-build-x"
+    store = left / "store"
+    store.mkdir(parents=True)
+    (store / "t.jsonl").write_text("x")
+    _age(store, 90_000)
+    _age(left, 90_000)
+    _reclaim(root, home, troots=[store])
+    assert (store / "t.jsonl").exists()
+
+
+@pytest.mark.unit
+def test_an_adapter_that_cannot_name_its_stores_stops_every_rule(pool, dead_pid):
+    root, home = pool
+    seat = _seat(root, home)
+    run = _run(seat, 1, lock=str(dead_pid))
+    left = seat / "pdm-build-x"
+    left.mkdir()
+    _age(left, 90_000)
+    got = scratch.reclaim(
+        root,
+        home,
+        {str(seat): ("ao-a", time.time() - 7200)},
+        lambda _p: False,
+        None,
+        lambda: 0.1,
+        time.time(),
+        threading.Lock(),
+    )
+    assert got == {"removed": 0, "skipped": False}
+    assert run.exists() and left.exists() and seat.exists()
+
+
+@pytest.mark.unit
+def test_a_parent_of_another_uid_is_not_read(pool, monkeypatch):
+    root, home = pool
+    seat = _seat(root, home)
+    assert scratch._seats(root, home) == [seat]
+    the_parent, lstat = scratch.parent(root), Path.lstat
+
+    def foreign(self, *a, **k):
+        st = lstat(self, *a, **k)
+        return SimpleNamespace(st_mode=st.st_mode, st_uid=os.getuid() + 1) if self == the_parent else st
+
+    monkeypatch.setattr(Path, "lstat", foreign)
+    assert scratch._seats(root, home) == []
 
 
 @pytest.mark.unit

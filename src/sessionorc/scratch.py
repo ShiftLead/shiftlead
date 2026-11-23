@@ -673,11 +673,13 @@ def _quiet(path: Path, now: float, quiet_s: float) -> bool:
 
 def _seats(root: str | Path, home: str | Path) -> list[Path]:
     """The run directories under the pool's `shiftlead-<uid>/` a reclaim reads: this uid's, not a symlink, with an
-    `owner.json` naming this home or one that no longer exists. Another home's are that home's to reclaim."""
+    `owner.json` naming this home or one that no longer exists. Another home's are that home's to reclaim. A parent
+    that is a symlink, not a directory or another uid's is refused, as `sweep` and `ensure_parent` refuse it."""
     p = parent(root)
     out: list[Path] = []
     try:
-        if p.is_symlink():
+        st = p.lstat()
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
             return out
         entries = sorted(os.scandir(p), key=lambda e: e.name)
     except OSError:
@@ -740,11 +742,14 @@ def reclaim(
 ) -> dict[str, Any]:
     """One reclaim of the pool at `root` (§4.6 *The pressure pass*): test runs, then ended runs' directories under
     `PRESSURE_KEEP_HOURS`, then build leftovers, stopping once `share()` is back over `PRESSURE_CLEAR`. Rule 2 takes
-    `sweep_lock` without waiting and is `skipped` if it is held; with `transcript_roots` None (an adapter that cannot
-    name its stores) it does not run. Returns the bytes `removed` and `skipped`."""
+    `sweep_lock` without waiting and is `skipped` if it is held. No rule removes a path that overlaps a transcript
+    store (§9 invariant 16), and with `transcript_roots` None (an adapter that cannot name its stores, so one could
+    lie inside any candidate) nothing is removed. Returns the bytes `removed` and `skipped`."""
     import logging
 
     log = logging.getLogger(__name__)
+    if transcript_roots is None:
+        return {"removed": 0, "skipped": False}
     removed = 0
     skipped = False
 
@@ -754,7 +759,7 @@ def reclaim(
 
     def take(path: Path, quiet_s: float) -> None:
         nonlocal removed
-        if not _quiet(path, now_s, quiet_s):
+        if any(overlaps(path, t) for t in transcript_roots) or not _quiet(path, now_s, quiet_s):
             return
         try:
             size = diskbook.size_of(path, diskbook.deadline()) or 0
@@ -772,16 +777,15 @@ def reclaim(
             take(run, RUN_QUIET_S)
     if done():
         return {"removed": removed, "skipped": False}
-    if transcript_roots is not None:
-        if sweep_lock.acquire(blocking=False):
-            try:
-                tally = diskbook.Tally()
-                sweep(root, home, named, PRESSURE_KEEP_HOURS, now_s, live_now, transcript_roots, tally, stop=done)
-                removed += tally.removed
-            finally:
-                sweep_lock.release()
-        else:
-            skipped = True
+    if sweep_lock.acquire(blocking=False):
+        try:
+            tally = diskbook.Tally()
+            sweep(root, home, named, PRESSURE_KEEP_HOURS, now_s, live_now, transcript_roots, tally, stop=done)
+            removed += tally.removed
+        finally:
+            sweep_lock.release()
+    else:
+        skipped = True
     for seat in _seats(root, home):
         for e in _dirs(seat):
             if e.name.startswith(BUILD_LEFTOVERS):
