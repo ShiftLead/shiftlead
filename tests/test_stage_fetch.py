@@ -78,6 +78,35 @@ def test_a_ledger_that_is_not_there_or_a_bad_ref_is_no_read(repo: Path) -> None:
     assert ledger_read(repo, "docs/ledger", "no-such-ref") is None
 
 
+def test_a_v1_ledger_in_a_directory_reads(tmp_path: Path) -> None:
+    root = tmp_path / "v1"
+    root.mkdir()
+    git(root, "init", "-q")
+    commit(root, {"docs/technical_debt.md": f"# Ledger\n\n{entry(7)}", "docs/technical_debt_archive.md": entry(8)})
+    read = ledger_read(root, "docs/technical_debt.md", "HEAD")
+    assert read is not None
+    assert entry_on(root, "HEAD", read, "TD-7").ledger == EntryLedger("open")
+    assert entry_on(root, "HEAD", read, "TD-8").ledger == EntryLedger("archived")
+
+
+def test_a_padded_file_renumbered_is_found_from_an_unpadded_id(repo: Path) -> None:
+    commit(repo, {"docs/ledger/TD-015.md": entry(15)})
+    git(repo, "mv", "docs/ledger/TD-015.md", "docs/ledger/TD-016.md")
+    commit(repo, {"docs/ledger/TD-016.md": entry(16)})
+    read = ledger_read(repo, "docs/ledger", "HEAD")
+    assert read is not None
+    assert entry_on(repo, "HEAD", read, "TD-15") == EntryOn(renumbered_to="TD-016")
+
+
+def test_a_heading_in_a_code_fence_does_not_cut_the_entry_off(repo: Path) -> None:
+    body = entry(21, "") + "\n```\n## not a heading\n```\n\n**Log:**\n- 2026-11-20: asked by the stage record: n1\n"
+    commit(repo, {"docs/ledger/TD-021.md": body})
+    read = ledger_read(repo, "docs/ledger", "HEAD")
+    assert read is not None
+    got = entry_on(repo, "HEAD", read, "TD-21").text
+    assert got is not None and "asked by the stage record: n1" in got
+
+
 def test_entry_text_matches_by_number_and_skips_a_commented_template() -> None:
     text = f"<!--\n{entry(7)}-->\n{entry(70)}{entry(7, '**Type:** debt')}## Notes\n\nnot the entry\n"
     got = entry_text(text, "TD-007")

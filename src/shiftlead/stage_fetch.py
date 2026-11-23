@@ -10,6 +10,7 @@ yet, and none of it writes anything.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
@@ -22,6 +23,7 @@ class LedgerRead(NamedTuple):
     rel: str
     text: str
     archive: str | None
+    file: Callable[[str], str | None]
 
 
 class EntryOn(NamedTuple):
@@ -33,11 +35,11 @@ class EntryOn(NamedTuple):
 def ledger_read(root: Path | str, rel: str, ref: str) -> LedgerRead | None:
     """The ledger named `rel` and its archive at `ref`, either layout. None: the tree cannot be read, the ledger is not
     there, or it is faulted, whose files may not be read as they say."""
-    io = ledger.git_io(root, ref, rel=rel)
+    io = ledger.git_io(root, ref, under=ledger.common_parent(rel), rel=rel)  # both layouts sit in that directory
     if io is None:
         return None
     path, text, archive, faults = ledger.read_pair(rel, io)
-    return None if faults or text is None else LedgerRead(path, text, archive)
+    return None if faults or text is None else LedgerRead(path, text, archive, io[1])
 
 
 def entry_text(text: str, tid: str) -> str | None:
@@ -56,9 +58,15 @@ def entry_on(root: Path | str, ref: str, read: LedgerRead, tid: str) -> EntryOn:
     """Where `tid` stands in `read`, taken at `ref`: open with its own text, archived, or renumbered. An entry in
     neither file and not renumbered is the empty answer, no reading of it this pass."""
     standing = ledger_on(tid, read.text, read.archive)
+    names = tuple(dict.fromkeys((tid, f"TD-{ledgerboard._num(tid):03d}")))  # a file's name may be padded, the id not
     if standing is None:
-        return EntryOn(renumbered_to=renumbered_on(root, ref, read.rel, tid))
-    return EntryOn(standing, text=entry_text(read.text, tid) if standing.entry == "open" else None)
+        return EntryOn(renumbered_to=next(filter(None, (renumbered_on(root, ref, read.rel, n) for n in names)), None))
+    if standing.entry != "open":
+        return EntryOn(standing)
+    # a directory's entry is its whole file, so a `## ` line in a code fence cannot cut its Log off
+    files = () if read.rel.endswith(".md") else (read.file(f"{read.rel}/{n}.md") for n in names)
+    own = next((t for t in files if t is not None), None)
+    return EntryOn(standing, text=own if own is not None else entry_text(read.text, tid))
 
 
 def protected_at(root: Path | str, ref: str) -> list[str] | None:
