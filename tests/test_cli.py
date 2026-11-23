@@ -2622,6 +2622,42 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tm
     assert cli.main(["kill", rec["id"]]) == 0
 
 
+def test_ao_schedule_names_a_login_for_a_switched_team_and_a_profile_for_any_other(
+    subprocess_agent, tmp_path, capsys, monkeypatch
+):
+    """Design §4.7, §4.9d *When it runs* (TD-2091): `--login` for a switched team, none meaning its first; `--profile`
+    refused there, and `--login` refused for a team not switched."""
+    from sessionorc import paths
+    from sessionorc import settings as settings_mod
+
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (paths.home() / "org.yml").write_text(
+        f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
+        "teams:\n  ao-grind:\n    repo: ao\n    manager: {role: manager, name: m}\n"
+        "    members: [{role: grinder, name: g}]\n"
+    )
+    (paths.home() / "settings.yml").write_text(
+        "teams:\n  solo: {repo: ao, flow: build, logins: ['claude:a', 'claude:b']}\n"
+    )
+    assert cli.main(["schedule", "solo", "reset", "--login", "claude:b", "--window", "week"]) == 0
+    capsys.readouterr()
+    rule = settings_mod.teams(settings_mod.load())["solo"]["schedule"]
+    assert rule == {"start": "reset", "login": "claude:b", "window": "week"}
+    assert cli.main(["schedule", "solo", "reset", "--window", "week"]) == 0
+    capsys.readouterr()
+    assert settings_mod.teams(settings_mod.load())["solo"]["schedule"] == {"start": "reset", "window": "week"}
+    assert cli.main(["schedule", "solo", "reset", "--profile", "grind", "--window", "week"]) != 0
+    assert "names a login" in capsys.readouterr().err
+    assert cli.main(["schedule", "solo", "reset", "--login", "claude:z", "--window", "week"]) != 0
+    assert "not in solo's logins" in capsys.readouterr().err
+    assert cli.main(["schedule", "ao-grind", "reset", "--login", "claude:a", "--window", "week"]) != 0
+    assert "names a profile" in capsys.readouterr().err
+    assert cli.main(["schedule", "solo", "off"]) == 0
+    assert "schedule" not in settings_mod.teams(settings_mod.load())["solo"]
+    (paths.home() / "settings.yml").unlink()  # the agent fixture's home is shared with the next test
+
+
 def test_ao_schedule_sets_lists_clears_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-133 slice 2 end to end (design §4.7 `ao schedule`, §6 *Schedule*): every defined team listed
     with its rule or *no schedule*, a rule written to `teams.<team>.schedule` through `set_settings`, a

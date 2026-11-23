@@ -704,7 +704,7 @@ def switched_schedule(rule: Any, sw: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "who": "login",
         "on": bool(standing),
-        "can": bool(offered) and not sw.get("on_node"),
+        "can": bool(standing) or (bool(offered) and not sw.get("on_node")),  # a standing rule can always be cleared
         "why": why,
         "profile": login,
         "window": window,

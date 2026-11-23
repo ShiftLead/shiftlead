@@ -1468,6 +1468,15 @@ def _sw(*rows, **more):
     return {"logins": [{"login": k, "shown": k[2:], "metered": m, "windows": w} for k, m, w in rows], **more}
 
 
+def test_a_standing_schedule_can_always_be_turned_off():
+    """§4.9d *When it runs* (TD-2091): an empty list, an all-metered list and a node team start nothing, and the rule
+    that stands on each can still be cleared; with no rule, none of them offers the switch."""
+    rule, m = {"start": "reset", "window": "week"}, ("c:m", True, [])
+    for sw in (_sw(), _sw(m), _sw(("c:a", False, ["week"]), on_node=True)):
+        assert (setmod.switched_schedule(rule, sw)["on"], setmod.switched_schedule(rule, sw)["can"]) == (True, True)
+        assert setmod.switched_schedule(None, sw)["can"] is False
+
+
 def test_the_starts_row_of_a_switched_team():
     """§4.9d *When it runs* (TD-2091): the rule's login, the first by default, and what the row says when it moved."""
     a, b, m = ("c:a", False, ["week"]), ("c:b", False, ["week", "5h"]), ("c:m", True, [])

@@ -2712,7 +2712,8 @@ def _schedule_words(t: dict[str, Any]) -> str:
 
 
 def cmd_schedule(args: argparse.Namespace) -> int:
-    """`ao schedule` / `ao schedule <team> reset --profile <p> --window <label>` / `ao schedule <team> off`
+    """`ao schedule` / `ao schedule <team> reset --profile <p> --window <label>` (a switched team: `--login
+    <tool>:<name>`, none meaning its first) / `ao schedule <team> off`
     (design §4.7, §6 *Schedule*, §5 `teams.<team>.schedule`, TD-133): every team's rule and when it next
     fires, or set or clear one through `set_settings` — a person's own, refused to a session as `ao gate`
     is. The team is checked here against the org's definitions (the agent reads none); the window
@@ -2739,13 +2740,23 @@ def cmd_schedule(args: argparse.Namespace) -> int:
         return emit(args, rows, prose)
     if args.what is None:
         raise AgentError("ao schedule <team> reset --profile <p> --window <label>, or ao schedule <team> off")
+    # a switched team is the settings' own and may be in no definition (§4.9d *Before and after the cut-over*)
+    is_switched = args.name in (call_sync("settings").get("switched_teams") or {})
     try:
-        name = _defined_team(args)
+        name = args.name if is_switched else _defined_team(args)
     except ValueError as e:
         return fail(args, str(e), 1)
     if args.what == "off":
         rule = None
+    elif is_switched:
+        if args.profile:
+            raise AgentError(f"{name} is switched: its schedule names a login, --login <tool>:<name> (design §4.9d)")
+        if not args.window:
+            raise AgentError(f"ao schedule {name} reset needs --window, and --login or its first login")
+        rule = {"start": "reset", "window": args.window, **({"login": args.login} if args.login else {})}
     else:
+        if args.login:
+            raise AgentError(f"{name} is not switched: its schedule names a profile, --profile <p> (design §4.9d)")
         if not args.profile or not args.window:
             raise AgentError(
                 f"ao schedule {name} reset needs --profile and --window, e.g. --profile grind --window week"
@@ -6263,7 +6274,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "what", nargs="?", choices=("reset", "off"), help="reset: start it at the window's reset; off: clear"
     )
-    p.add_argument("--profile", help="the profile whose account reading names the reset")
+    p.add_argument("--profile", help="the profile whose account reading names the reset (a team not switched)")
+    p.add_argument("--login", help="a switched team: a login of its list as <tool>:<name>; none means the first")
     p.add_argument("--window", help="the window's label as the profile's adapter reports it: 5h, week")
     p.set_defaults(fn=cmd_schedule)
 
