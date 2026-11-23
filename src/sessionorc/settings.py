@@ -770,7 +770,7 @@ def parse_team(value: Any, drop: bool = False, switched: bool | None = None) -> 
             if not word:
                 raise ValueError(f"schedule.{key} is needed: the profile and the window whose reset starts the team")
             out[key] = word
-        if by_login and v.get("login") is not None:
+        if by_login and v.get("login") not in (None, ""):  # empty: the page's rule on an empty list, none named
             word = v["login"].strip() if isinstance(v["login"], str) else ""
             if ":" not in word:
                 raise ValueError(f"schedule.login is a login as <tool>:<name>, not {v['login']!r}")

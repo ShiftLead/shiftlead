@@ -318,6 +318,8 @@ def test_a_login_rule_is_a_switched_teams_alone():
     assert settings_mod.parse_team({"schedule": LOGIN_RULE}, switched=True) == {"schedule": LOGIN_RULE}
     no_login = {"start": "reset", "window": "week"}
     assert settings_mod.parse_team({"schedule": no_login}, switched=True) == {"schedule": no_login}
+    blank = {**no_login, "login": ""}  # what the page sends for a rule on an empty login list
+    assert settings_mod.parse_team({"schedule": blank}, switched=True) == {"schedule": no_login}
     for bad in (LOGIN_RULE, no_login):
         with pytest.raises(ValueError):
             settings_mod.parse_team({"schedule": bad})
