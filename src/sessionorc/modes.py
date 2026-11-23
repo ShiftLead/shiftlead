@@ -88,6 +88,10 @@ HOME_EDITS = frozenset(
         "team_set",
         "team_new",
         "team_delete",
+        "builtins_new",
+        "builtins_delete",
+        "builtins_set",
+        "repo_builtins",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

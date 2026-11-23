@@ -1624,6 +1624,16 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 }
 .teampage .input[hidden] { display: none; }
 
+/* The Built-in seats page (§4.5a *Built-in seats page*, TD-2066): a seat or repo a row of name, pick and words */
+.teampage form[hidden] { display: none; }
+.bseats { display: flex; flex-direction: column; margin-bottom: 14px; }
+.baddrow .input { width: auto; flex: 1 1 200px; min-width: 0; }
+.bseat { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 16px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+.bseat:first-child { border-top: 0; }
+.bpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.bpick .input { width: auto; }
+@media (max-width: 640px) { .bseat { grid-template-columns: minmax(0, 1fr); } }
+
 /* The Briefs page (§4.5a *Briefs page*, TD-2055) */
 .inboxpage.briefspage { max-width: 880px; display: flex; flex-direction: column; gap: 12px; }
 .briefspage .toolshead { align-items: baseline; border-bottom: 2px solid var(--strong); padding-bottom: 6px; }

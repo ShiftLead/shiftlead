@@ -568,16 +568,13 @@ def _window_labels(account: Mapping[str, Any] | None) -> list[str]:
     return [str(w.get("label")) for w in g.get("windows") or () if isinstance(w, Mapping)]
 
 
-def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
-    """What the team page draws of a switched team (§4.9d *The page*, TD-2060), from `team_show` and the host's `tools`
-    read: the head, the login rows with each account's gauge, the logins that can be added, and the numbers."""
-    cards = list((tools or {}).get("tools") or ())
-    accounts = {str(a.get("key")): a for c in cards for a in c.get("accounts") or ()}
-    known = {f"{c.get('adapter')}:{lg.get('name')}": lg for c in cards for lg in c.get("logins") or ()}
-    flow = show.get("flow") or {}
-    on_node = any(lg.get("state") == "not_read" for lg in show.get("logins") or ()) or show.get("note") == NODE_NOTE
+def _band_rows(
+    shown: Iterable[Mapping[str, Any]], accounts: Mapping[str, Any], known: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """The logins band's rows, a team's or a built-in set's (§4.9d *The logins, in order*): each with its account's
+    gauge and whether it spends money."""
     rows = []
-    for lg in show.get("logins") or ():
+    for lg in shown:
         account = accounts.get(str(lg.get("account")))
         held = known.get(str(lg.get("login"))) or {}
         rows.append(
@@ -589,6 +586,65 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
                 "windows": _window_labels(account),
             }
         )
+    return rows
+
+
+def builtins_page(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
+    """What the Built-in seats page draws (§4.9d *The page*, TD-2066), from `builtins_show` and the host's `tools`
+    read. A seat's pick lists the models the Tools page lists, with the one it holds kept among them."""
+    cards = list((tools or {}).get("tools") or ())
+    accounts = {str(a.get("key")): a for c in cards for a in c.get("accounts") or ()}
+    known = {f"{c.get('adapter')}:{lg.get('name')}": lg for c in cards for lg in c.get("logins") or ()}
+    listed = list(
+        dict.fromkeys(str(m) for a in accounts.values() for m in (a.get("models") or {}).get("families") or ())
+    )
+    rows = _band_rows(show.get("logins") or (), accounts, known)
+    labels = {str(lg.get("login")): str(lg.get("shown") or "") for lg in rows}
+    seats = []
+    for s in show.get("seats") or ():
+        now = s.get("now") or {}
+        words = s.get("cannot_run") or _on_login(s.get("model"), now, labels).partition(" ")[2]
+        seats.append(
+            {
+                **s,
+                "options": list(dict.fromkeys([*listed, *([s["model"]] if s.get("model") else [])])),
+                "on_login": words,
+            }
+        )
+    name = str(show.get("set"))
+    using = list(show.get("named_by") or ())
+    held = {str(lg.get("login")) for lg in rows}
+    return {
+        **show,
+        "title": show.get("label") or name,
+        "name_beside": name if show.get("label") else None,
+        "label": show.get("label") or "",
+        "tabs": [{"name": x["name"], "dot": "; ".join(x.get("cannot_run") or ())} for x in show.get("sets") or ()],
+        "seats": seats,
+        "models": {s["key"]: s["model"] for s in seats if s.get("model")},
+        "logins": rows,
+        "can_add": [
+            {"key": k, "shown": f"{lg.get('label') or lg.get('name')} ({k.partition(':')[0]})"}
+            for k, lg in known.items()
+            if k not in held
+        ],
+        "delete_why": "The default set always exists."
+        if name == "default"
+        else f"Used by {', '.join(using)}: move their pick first."
+        if using
+        else None,
+    }
+
+
+def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
+    """What the team page draws of a switched team (§4.9d *The page*, TD-2060), from `team_show` and the host's `tools`
+    read: the head, the login rows with each account's gauge, the logins that can be added, and the numbers."""
+    cards = list((tools or {}).get("tools") or ())
+    accounts = {str(a.get("key")): a for c in cards for a in c.get("accounts") or ()}
+    known = {f"{c.get('adapter')}:{lg.get('name')}": lg for c in cards for lg in c.get("logins") or ()}
+    flow = show.get("flow") or {}
+    on_node = any(lg.get("state") == "not_read" for lg in show.get("logins") or ()) or show.get("note") == NODE_NOTE
+    rows = _band_rows(show.get("logins") or (), accounts, known)
     listed = {str(lg.get("login")) for lg in rows}
     at = datetime.now(UTC)
     repo = show.get("repo")
@@ -616,6 +672,8 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
         "cannot_run": show.get("cannot_run"),
         "note": show.get("note"),
         "unread": show.get("unread"),
+        "builtins": show.get("builtins"),
+        "builtins_cannot_run": show.get("builtins_cannot_run") or [],
         "flow": flow.get("name"),
         "flow_read": bool(flow.get("read")),
         "on_node": on_node,

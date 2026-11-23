@@ -1428,6 +1428,38 @@ def cmd_team_show(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: _team_show_prose(got))
 
 
+def _builtins_show_prose(got: dict[str, Any]) -> None:
+    """`ao builtins show`'s text: the same read as `--json`, in the page's order (§4.9d *The page*)."""
+    title = f"{got['set']} ({got['label']})" if got.get("label") else got["set"]
+    print(f"{title}: used by {', '.join(got['used_by']) or 'no repo'}")
+    print("sets: " + ", ".join(x["name"] + (" (cannot run a seat)" if x["cannot_run"] else "") for x in got["sets"]))
+    if got.get("note"):
+        print(got["note"])
+        return
+    for line in got.get("cannot_run") or ():
+        print(line)
+    for s in got["seats"]:
+        if s["director"]:
+            print(f"  {s['name']}: the director answers these")
+            continue
+        now = (
+            s["now"]["login"] or {"waits": "waits for a usable login", "none": "no login offers it"}[s["now"]["state"]]
+        )
+        print(f"  {s['name']}  {s['model']} on {now}  acts for {s['for']}")
+    for lg in got.get("logins") or ():
+        why = f" ({lg['why']})" if lg.get("why") else ""
+        print(f"login {lg['login']}  {'not read here' if lg['state'] == 'not_read' else lg['state']}{why}")
+    for r in got.get("repos") or ():
+        print(f"repo {r['repo']}: {r['set']}")
+
+
+def cmd_builtins_show(args: argparse.Namespace) -> int:
+    """`ao builtins show [<set>]` (§4.9d *The built-in seats and their page*, TD-2066): what the page shows; `--json` is
+    the host agent's `builtins_show` read, the one the page draws from."""
+    got = call_sync("builtins_show", set=args.set or "default")
+    return emit(args, got, lambda: _builtins_show_prose(got))
+
+
 def cmd_team_list(args: argparse.Namespace) -> int:
     """`ao team list` (design §4.9): every definition, its source file, and whether it is live — a
     team is live when any session carrying its badge is live. There is no team record: a team that
@@ -5917,6 +5949,12 @@ def build_parser() -> argparse.ArgumentParser:
         "of that checkout's own — a definition checked before it merges (§4.7)",
     )
     p.set_defaults(fn=cmd_org)
+
+    p = add("builtins", help="the built-in sets: each seat's model and login, the logins and the repos (§4.9d)")
+    bisub = p.add_subparsers(dest="action", required=True)
+    q = bisub.add_parser("show", help="what the Built-in seats page shows")
+    q.add_argument("set", nargs="?", help="the set (default: default)")
+    q.set_defaults(fn=cmd_builtins_show)
 
     p = add("flow", help="check a flow file, or list the flows the org can see (§4.9c)")
     fsub = p.add_subparsers(dest="action", required=True)

@@ -14,8 +14,9 @@ from typing import Any
 
 import yaml
 
-from sessionorc import logins, teamstore
+from sessionorc import builtinstore, logins, teamstore
 from shiftlead import flow3, flow_save, repoconfig
+from shiftlead import org as orgmod
 from shiftlead.stagerecord import StageStore, StateError
 
 RUNNING_KEYS = ("schedule", "until", "reserve", "balance", "on_work")
@@ -97,6 +98,8 @@ def view(
     here: str,
     flow_doc: Any,
     records: Iterable[Mapping[str, Any]],
+    *,
+    director: bool = False,
 ) -> dict[str, Any]:
     """The reply, from what was read. A team not switched has no flow or logins to show yet."""
     teams = doc.get("teams")
@@ -115,17 +118,19 @@ def view(
         "flow": None,
         "audits": [],
         "builtins": None,
+        "builtins_cannot_run": [],
         "logins": [],
         "cannot_run": None,
         "note": None if switched else teamstore.BEFORE,
     }
     if not switched:
         return out
-    repos = doc.get("repos")
-    repo_row = repos.get(entry["repo"]) if isinstance(repos, Mapping) else None
-    out["builtins"] = (repo_row.get("builtins") if isinstance(repo_row, Mapping) else None) or "default"
+    out["builtins"] = builtinstore.repo_set(doc, str(entry["repo"]))
     order = [str(lk) for lk in entry.get("logins") or ()]
     on_node = str(entry.get("host") or here) != here
+    if not on_node:  # a team on a node says *not checked* instead (§4.9d *The login a seat starts on*)
+        held_set = builtinstore.sets(doc)[out["builtins"]]
+        out["builtins_cannot_run"] = builtinstore.cannot_run(out["builtins"], held_set, rows, director=director)
     name = str(entry.get("flow") or "")
     good = isinstance(flow_doc, Mapping)
     stages = _maps(flow_doc.get("stages")) if good else []
@@ -174,6 +179,81 @@ def view(
     return out
 
 
+def _has_director() -> bool:
+    """Whether the org has a director, whose seat answers the prompts a prompts seat otherwise would (§4.9d). An
+    `org.yml` that cannot be read names none, so the prompts row stays a pick."""
+    try:
+        return orgmod.load().director is not None
+    except (ValueError, OSError, yaml.YAMLError):
+        return False
+
+
+def builtins_view(
+    *,
+    name: str,
+    doc: Mapping[str, Any],
+    rows: Mapping[str, Mapping[str, Any]],
+    roots: Iterable[str | Path],
+    director: bool | None = None,
+) -> dict[str, Any]:
+    """`ao builtins show [<set>]` and the Built-in seats page's read (§4.9d *The page*), of the home's logins alone."""
+    has_director = _has_director() if director is None else director
+    every = builtinstore.sets(doc)
+    if name not in every:
+        raise ValueError(f"no built-in set {name!r}")
+    repos = [Path(r).expanduser().name for r in roots]
+    entry = every[name]
+    order = list(entry["logins"])
+    whys = teamstore.reasons(order, rows)
+    models = {builtinstore.model(entry, s[0]) for s in builtinstore.SEATS}
+    cut = teamstore.cut_over(doc)
+    cannot = builtinstore.cannot_run(name, entry, rows, director=has_director)
+    seats = []
+    for key, shown, words, does, acts_for in builtinstore.SEATS:
+        by_director = has_director and key == builtinstore.PROMPTS
+        model = builtinstore.model(entry, key)
+        seats.append(
+            {
+                "key": key,
+                "name": shown,
+                "does": does,
+                "for": acts_for,
+                "model": None if by_director else model,
+                "director": by_director,
+                "now": None if by_director else teamstore.pick(order, model, rows),
+                "cannot_run": next((c for c in cannot if c.startswith(f"{name} cannot run {words}:")), None),
+            }
+        )
+    return {
+        "set": name,
+        "label": entry["label"],
+        "cut_over": cut,
+        "note": None if cut else teamstore.BEFORE,
+        "version": builtinstore.version(doc),
+        "sets": [
+            {
+                "name": n,
+                "label": e["label"],
+                "cannot_run": builtinstore.cannot_run(n, e, rows, director=has_director),
+            }
+            for n, e in every.items()
+        ],
+        "used_by": builtinstore.using(doc, name, repos),
+        "named_by": builtinstore.named_by(doc, name),
+        "seats": seats,
+        "logins": [_login_row(lk, rows, models, False, whys[lk]) if lk in rows else _unread_login(lk) for lk in order],
+        "order": order,
+        "repos": [{"repo": r, "set": builtinstore.repo_set(doc, r)} for r in repos],
+        "cannot_run": cannot,
+    }
+
+
+def _unread_login(lk: str) -> dict[str, Any]:
+    """A login the home does not hold, a node's typed by name: drawn *not read here* (§4.9d *The page*)."""
+    tool, name = logins.split(lk)
+    return {"login": lk, "tool": tool, "name": name, "state": "not_read"}
+
+
 def new_refusal(repo: str, flow: str, roots: Iterable[str | Path]) -> str | None:
     """Why **+ New team** cannot take this repo and flow (§4.9d *New team*, TD-2063), or None."""
     where = [Path(r).expanduser() for r in roots]
@@ -220,6 +300,7 @@ def call(
     where = [Path(r).expanduser() for r in roots]
     if not teamstore.switched(doc, team):
         return view(team, doc, rows, head, here, None, ())
+    director = _has_director()
     teams = doc["teams"]
     root = _root(str(teams[team]["repo"]), where)
     store = StageStore(root) if root is not None else None
@@ -238,4 +319,4 @@ def call(
                 flow_doc = _flow_doc(team, name, None, where)
             except UNREADABLE as again:
                 unread = f"{unread}; the flow could not be read: {again}"
-    return {**view(team, doc, rows, head, here, flow_doc, records), "unread": unread}
+    return {**view(team, doc, rows, head, here, flow_doc, records, director=director), "unread": unread}

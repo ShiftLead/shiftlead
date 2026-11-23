@@ -1,0 +1,15 @@
+{#- design §4.9d *The logins, in order*: the band's rows, on a team's list or a built-in set's (TD-2066). `band.logins` are drawn; `band.where` names a login not read here; `band.idle` says what a login whose models nothing runs on means -#}
+<ol class="teamlogins">
+    {% for lg in band.logins %}
+    {% if not loop.first %}<li class="teamthen note" aria-hidden="true">if not usable, then</li>{% endif %}
+    <li class="teamlogin" data-login="{{ lg.login }}">
+      <div class="row gap wrap"><span class="mono">{{ loop.index }}</span><b>{{ lg.shown }}</b>{% if lg.metered %}<span class="teamspends">spends money</span>{% endif %}
+        {% if lg.state == "not_read" %}<span class="note">{{ band.where }}not read here</span>{% else %}<span class="note">{{ lg.tool }}{% if lg.account %} · {{ lg.account }}{% endif %}{% if lg.models %} · {{ lg.models | join(', ') }}{% endif %}</span>
+        {% if lg.why %}<span class="teampassed">Passed over: {{ lg.why }}</span>{% else %}<span class="teamusable">Usable</span>{% endif %}{% endif %}
+        <span class="grow"></span>
+        <button class="btn sm ghost" type="button" data-move="-1" aria-label="Move {{ lg.shown }} up"{% if loop.first %} disabled{% endif %}>▲</button><button class="btn sm ghost" type="button" data-move="1" aria-label="Move {{ lg.shown }} down"{% if loop.last %} disabled{% endif %}>▼</button><button class="btn sm ghost" type="button" data-drop aria-label="Remove {{ lg.shown }}">×</button></div>
+      {% if lg.runs_nothing %}<div class="note">{{ band.idle }}</div>{% endif %}
+      {% if lg.gauge and lg.gauge.mixed %}<div class="note">its account's logins disagree on billing, so it takes no reserve</div>{% elif lg.gauge %}{% for w in lg.gauge.gauges %}<div class="teamgauge"><div class="gauge{% if w.used is none %} unread{% endif %}{% if lg.gauge.stale %} stale{% endif %}">{% if w.used is not none %}<div class="used" style="width:{{ w.used }}%"></div>{% endif %}{% if w.keep %}<div class="keep" style="width:{{ w.keep }}%"></div>{% endif %}</div><span class="note">{% if lg.gauge.metered %}{{ w.label }} · {{ w.line }}{% elif w.used is none %}No usage reading yet · {{ w.label }}{% else %}{{ w.used | round | int }}% of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% endif %}</span></div>{% endfor %}{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
