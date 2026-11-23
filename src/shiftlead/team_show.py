@@ -134,13 +134,13 @@ def view(
     numbers = entry.get("at_once") if isinstance(entry.get("at_once"), Mapping) else {}
     keys = [flow3.key_of(s.get("name")) for s in stages]
     held = list(records)
-    off_flow = [_entry(r) for r in _open(held, team) if good and r.get("stage") not in keys]
+    off_flow = [_entry(r) for r in _open(held, team) if r.get("stage") not in keys]  # all of them, a flow not read
     out["flow"] = {
         "name": name,
         "read": good,
         "lines": flow3.route_lines(stages),
-        "gone": [e for e in off_flow if e["waits"] == "person"],  # *waiting on you, its stage is gone*
-        "unplaced": [e for e in off_flow if e["waits"] != "person"],
+        "gone": [e for e in off_flow if good and e["waits"] == "person"],  # *waiting on you, its stage is gone*
+        "unplaced": [e for e in off_flow if not good or e["waits"] != "person"],
         "stages": [
             {
                 "key": key,

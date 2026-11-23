@@ -252,4 +252,4 @@ def test_a_record_the_flow_cannot_place_is_drawn_as_such():
     assert flow["stages"][0]["entries"][0]["asked_at"] == _TWO_HOURS_AGO
     assert [e["id"] for e in flow["gone"]] == ["TD-2"] and [e["id"] for e in flow["unplaced"]] == ["TD-3"]
     unread = team_show.view("t", _doc(), {}, HEAD, "home", None, records)["flow"]
-    assert unread["gone"] == [] and unread["unplaced"] == []
+    assert unread["gone"] == [] and [e["id"] for e in unread["unplaced"]] == ["TD-1", "TD-2", "TD-3"]
