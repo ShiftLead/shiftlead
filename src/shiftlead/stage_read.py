@@ -8,22 +8,28 @@ any lift in the Log was of an earlier gate.
 `holder_on` reads what became of a record's holder from its session's record (§4.9c act 4). A holder the person or the
 home stopped or holds is neither lost nor silent: one still there is `held`, and one whose end a Stop or a person made
 is `stopped`. A claim released by `done` or `drop` is not a lapsed lease, so a live session that released its claim is
-judged by the silent rule. The tick's wiring calls both; neither writes anything.
+judged by the silent rule.
+
+`ledger_on` reads where the entry stands in the ledger and its archive, and whether it is a design with parts.
+`renumbered_on` reads the id an entry that left both was renumbered to, from the commit that removed its file. The
+tick's wiring calls all four; none writes anything.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
-from typing import NamedTuple
+from pathlib import Path, PurePosixPath
+from typing import Literal, NamedTuple
 
-from sessionorc import ledgerboard, work
+from sessionorc import ledger, ledgerboard, work
 from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
 from shiftlead.stage_acts import Holder
 
 _ASKED = re.compile(r"asked by the stage record: (\S+)")
+_ENTRY_FILE = re.compile(r"(TD-\d+)\.md")
 
 
 class EntryAnswer(NamedTuple):
@@ -47,6 +53,53 @@ def answer_on(text: str, person: str) -> EntryAnswer:
         elif line.get("kind") == "note" and (mark := _ASKED.fullmatch(str(line.get("text")))):
             asked, lifted, lifted_for = mark.group(1), None, None
     return EntryAnswer(False, lifted, lifted_for)
+
+
+class EntryLedger(NamedTuple):
+    entry: Literal["open", "archived"]
+    design: bool = False
+    open_parts: int = 0
+    had_parts: bool = False
+
+
+def _parent(e: dict) -> int | None:
+    par = ledgerboard.parse_part_of(e.get("part_of_raw"))[0]
+    return ledgerboard._num(par) if par else None
+
+
+def ledger_on(tid: str, text: str, archive: str | None) -> EntryLedger | None:
+    """`Reading.entry`, `.design`, `.open_parts` and `.had_parts` of `tid`, from the ledger's and the archive's text,
+    an id matched by its number. None: the entry is in neither, so the caller looks for a renumbering, and with none
+    has no reading of it this pass."""
+    n = ledgerboard._num(tid)
+    live, gone = ledgerboard.entries(text), ledgerboard.entries(archive or "")
+    own = next((e for e in live if ledgerboard._num(e["id"]) == n), None)
+    if own is None:
+        return EntryLedger("archived") if any(ledgerboard._num(e["id"]) == n for e in gone) else None
+    open_parts = sum(1 for e in live if e is not own and _parent(e) == n)
+    return EntryLedger(
+        "open",
+        design=ledgerboard.first_word(own["fields"].get("kind")) == "design-first",
+        open_parts=open_parts,
+        had_parts=bool(open_parts) or any(_parent(e) == n for e in gone),
+    )
+
+
+def renumbered_on(root: Path | str, ref: str, rel: str, tid: str) -> str | None:
+    """The id `tid` was renumbered to: the entry file the commit that last removed `<rel>/<tid>.md` on `ref` renamed it
+    to, in the same directory. None where git cannot say, or where that commit deleted the file outright."""
+    old = f"{rel.rstrip('/')}/{tid}.md"
+    commit = (ledger._git(root, "log", "-1", "--format=%H", "--diff-filter=D", ref, "--", old) or "").strip()
+    if not commit:
+        return None
+    out = ledger._git(root, "diff-tree", "-r", "-M", "--name-status", "-z", f"{commit}^", commit)
+    fields = (out or "").split("\0")
+    for at, field in enumerate(fields[:-2]):
+        if field.startswith("R") and fields[at + 1] == old:
+            new = PurePosixPath(fields[at + 2])
+            found = _ENTRY_FILE.fullmatch(new.name)
+            return found.group(1) if found and new.parent == PurePosixPath(old).parent else None
+    return None
 
 
 def _instant(value: str | None) -> datetime | None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 from sessionorc import ledgerboard
 from sessionorc.models import Pending, ProgressEntry, Session
 from shiftlead.stage_acts import Holder
-from shiftlead.stage_read import EntryAnswer, answer_on, holder_on
+from shiftlead.stage_read import EntryAnswer, EntryLedger, answer_on, holder_on, ledger_on, renumbered_on
 
 HEAD = "## TD-7: An entry\n\n**Priority:** Low\n**Status:** Open\n"
 ASKED = "- 2026-11-20: asked by the stage record: n1\n"
@@ -185,3 +186,80 @@ def test_a_time_with_no_zone_reads_as_utc():
     s.progress = [ProgressEntry(ref="TD-7", at="2026-11-23T17:00:00")]
     h = holder_on(s, "TD-7", NOW)
     assert h.idle_for == timedelta(minutes=5) and not h.lease_lapsed
+
+
+def led(tid: str, *fields: str) -> str:
+    return "\n".join(
+        [f"## {tid}: An entry", "", "**Priority:** Low", "**Status:** Open", *fields, "", "**Why:** It.", ""]
+    )
+
+
+def test_an_open_entry_that_is_no_design():
+    assert ledger_on("TD-7", led("TD-7", "**Kind:** build"), "") == EntryLedger("open")
+
+
+def test_an_archived_entry_reads_archived_by_its_number():
+    assert ledger_on("TD-7", led("TD-8"), led("TD-007")) == EntryLedger("archived")
+
+
+def test_an_entry_in_neither_has_no_reading():
+    assert ledger_on("TD-7", led("TD-8"), None) is None
+
+
+def test_a_design_counts_its_open_parts_and_knows_it_had_parts():
+    text = led("TD-7", "**Kind:** design-first") + led("TD-8", "**Part of:** TD-007") + led("TD-9", "**Part of:** TD-7")
+    assert ledger_on("TD-7", text, led("TD-5", "**Part of:** TD-7")) == EntryLedger("open", True, 2, True)
+
+
+def test_a_design_whose_parts_are_all_archived_had_parts():
+    text = led("TD-7", "**Kind:** design-first")
+    assert ledger_on("TD-7", text, led("TD-5", "**Part of:** TD-7 the first")) == EntryLedger("open", True, 0, True)
+
+
+def test_a_design_with_no_parts_had_none():
+    text = led("TD-7", "**Kind:** design-first") + led("TD-8", "**Part of:** TD-70")
+    assert ledger_on("TD-7", text, led("TD-5")) == EntryLedger("open", True, 0, False)
+
+
+def git(root, *args: str) -> str:
+    who = ("-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false")
+    return subprocess.run(["git", "-C", str(root), *who, *args], check=True, capture_output=True, text=True).stdout
+
+
+@pytest.fixture
+def repo(tmp_path):
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "docs/ledger/archive").mkdir(parents=True)
+    (tmp_path / "docs/ledger/TD-7.md").write_text(
+        led("TD-7", "**Kind:** build") + "A body long enough to be alike.\n" * 9
+    )
+    (tmp_path / "docs/ledger/TD-8.md").write_text("## TD-8: Another\n\n**Status:** Open\n")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "first")
+    return tmp_path
+
+
+def test_a_renumbered_entry_names_its_new_id(repo):
+    git(repo, "mv", "docs/ledger/TD-7.md", "docs/ledger/TD-12.md")
+    git(repo, "commit", "-qm", "renumber")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") == "TD-12"
+
+
+def test_a_file_deleted_outright_was_not_renumbered(repo):
+    git(repo, "rm", "-q", "docs/ledger/TD-7.md")
+    git(repo, "commit", "-qm", "gone")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_a_move_into_the_archive_is_no_renumbering(repo):
+    git(repo, "mv", "docs/ledger/TD-7.md", "docs/ledger/archive/TD-7.md")
+    git(repo, "commit", "-qm", "archive")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_an_entry_never_removed_was_not_renumbered(repo):
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_a_ref_git_cannot_read_is_no_reading(repo):
+    assert renumbered_on(repo, "no-such-ref", "docs/ledger", "TD-7") is None
