@@ -1510,6 +1510,36 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: temporary space low** (§4.6 *Told before the pool is full*, TD-2083) ──
+   One row per host and pool that is low, for the home's spell's life. **Snooze ▾** by time alone, keyed
+   `disk_low:<host>:<pool>`; the full reading is `ao disk`'s. #}
+{% macro disk_low_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="the host whose temporary space is low">{{ e.host }}</span>
+  <span class="badge kindmark k-promote">{% call cap() %}temporary space{% endcall %}</span>
+  <span class="grow"></span>
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="low since">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{{ e.text }}</div>
+<div class="row gap wrap mfoot">
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
+  <span class="grow"></span>
+  {%- if not drawn_on_queue %}
+  <details class="more"><summary class="btn sm ghost" title="{{ help_title('disk-low-snooze') }}">Snooze ▾</summary>
+    <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="disk_low" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="disk_low" data-when="1d">+1 day</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="disk_low" data-when="1w">+1 week</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="disk_low" data-when="pick">pick a date…</button>
+    </div>
+  </details>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *Stuck work*, TD-1470, built by TD-1497) ──
    Work open past its wait with no live session able to act on it: *stuck <age>: <the work> — <reason>*, the
    reason the actor's in `unanswered.words`' fixed words or rule 13's own (`inbox.stuck_rows`). A Do item on the
@@ -1837,6 +1867,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
 {%- elif e.row == 'fork_pr' %}{{ fork_pr_row(e, section) }}
 {%- elif e.row == 'ci_not_run' %}{{ ci_not_run_row(e, section) }}
+{%- elif e.row == 'disk_low' %}{{ disk_low_row(e, section) }}
 {%- elif e.row == 'stuck' %}{{ stuck_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>

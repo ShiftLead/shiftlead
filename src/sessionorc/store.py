@@ -190,8 +190,9 @@ class RepoStore:
 
 class HostStore:
     """The home's own `host` record (design §6 *Balance*, TD-239), `{teams: {<team>: {...}},
-    last_tick?, ci_spells?, stuck?, stuck_open?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b), TD-490),
-    `ci_spells` the *CI not starting* rows' spells by owner (§4.4, TD-687), `stuck` and `stuck_open` rule 13's
+    last_tick?, ci_spells?, disk_low?, stuck?, stuck_open?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b),
+    TD-490), `ci_spells` the *CI not starting* rows' spells by owner (§4.4, TD-687), `disk_low` the *temporary space
+    low* rows' spells by `<host>:<pool>` (§4.6, TD-2083), `stuck` and `stuck_open` rule 13's
     stuck work and its board lines' clocks (§6 *Stuck work*, TD-1496), each shape-checked — written whole each
     time it changes. A missing or unreadable file is an empty record, never a crash: the
     next tick writes what stands."""
@@ -211,9 +212,10 @@ class HostStore:
         }
         if isinstance(raw, dict) and isinstance(raw.get("last_tick"), str):
             rec["last_tick"] = raw["last_tick"]
-        spells = raw.get("ci_spells") if isinstance(raw, dict) else None
-        if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
-            rec["ci_spells"] = kept
+        for name in ("ci_spells", "disk_low"):  # `disk_low`: §4.6 *Told before the pool is full*, TD-2083
+            spells = raw.get(name) if isinstance(raw, dict) else None
+            if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
+                rec[name] = kept
         # rule 13's stuck work and its board lines' clocks (§6 *Stuck work*, TD-1496): an entry that fails its
         # shape is dropped, never a crash
         for name, ok in (("stuck", stuck_mod.shape_ok), ("stuck_open", stuck_mod.open_shape_ok)):

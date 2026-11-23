@@ -95,6 +95,28 @@ def ci_line(owner: str, n: int) -> str:
     return f"{PREFIX} · GitHub Actions does not start in {owner} · {n} waiting"
 
 
+def disk_low_text(spell: dict[str, Any]) -> str:
+    """A low pool's words, the Inbox row's and the message's (§4.5a *Inbox row: temporary space low*): *<host>
+    temporary space low (<pool>): <n>% free. Largest: <three holders>*, a count cut short reading *at least*."""
+    share = spell.get("share_free")
+    free = f": {int(share * 100)}% free" if isinstance(share, int | float) else ""
+    names = []
+    got = spell.get("holders")
+    for h in got if isinstance(got, list) else []:  # a record a hand or another build left odd costs the name alone
+        if not isinstance(h, dict) or not isinstance(h.get("inodes"), int):
+            continue
+        n = h["inodes"]
+        count = f"{'at least ' if h.get('cut') else ''}{n:,} {'file' if n == 1 else 'files'}"
+        names.append(f"{h.get('name')} ({count})")
+    largest = f". Largest: {', '.join(names)}" if names else ""
+    return f"{spell.get('host')} temporary space low ({spell.get('pool')}){free}{largest}"
+
+
+def disk_low_line(spell: dict[str, Any]) -> str:
+    """The message for a low pool: *shiftlead · <the row's words>*."""
+    return f"{PREFIX} · {disk_low_text(spell)}"
+
+
 def test_line(home: str) -> str:
     """**Send a test**: *shiftlead · a test from kmaster*."""
     return f"{PREFIX} · a test from {home}"

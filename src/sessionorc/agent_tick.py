@@ -494,6 +494,10 @@ class TickMixin:
             self._pressure_at = snapshot_at
             self._pressure_task = asyncio.create_task(self._pressure_pass(snapshot_at))
         if self.mode == "home":
+            reading = self._disk_low_task is not None and not self._disk_low_task.done()
+            if snapshot_at - self._disk_low_at >= timedelta(seconds=scratch_mod.PRESSURE_EVERY) and not reading:
+                self._disk_low_at = snapshot_at  # one detached read, never a second beside it (§4.6, TD-2083)
+                self._disk_low_task = asyncio.create_task(self._disk_low_pass())
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
             if day != self._backed_up and (self._backup_task is None or self._backup_task.done()):
@@ -5675,17 +5679,80 @@ class TickMixin:
         pass*, TD-2081); the records' snapshot is built here, on the loop. A detached task: a failure is logged."""
         try:
             pool, share = await asyncio.to_thread(self._pressure_read)
-            if pool is None or share is None or not self._pressure_backoff.due(share, time.time()):
-                return
-            named = _scratch_named(list(self.sessions.values()), self.host, at)
-            await asyncio.to_thread(self._reclaim, pool, share, named)
+            ran = False
+            if pool is not None and share is not None and self._pressure_backoff.due(share, time.time()):
+                named = _scratch_named(list(self.sessions.values()), self.host, at)
+                ran = await asyncio.to_thread(self._reclaim, pool, share, named)
+            await asyncio.to_thread(self._low_step, ran)
         except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
             log.exception("the pressure pass failed")
 
-    def _reclaim(self, pool: str, start: float, named: dict[str, tuple[str, float | None]]) -> None:
-        """One reclaim, in a thread, under its own lock; its line in `disk.json`, weak passes folded."""
+    def _low_pools(self) -> tuple[list[tuple[str, str, bool]], set[str]]:
+        """The pools told about (§4.6 *Told before the pool is full*), each `(name, path, reclaimed from)`, and the
+        names whose state is kept. No `seat_root`: `shared`, reclaimed. One on `scratch_root`'s file system: `seats`
+        alone. One on another: `seats`, and `shared` on the reading alone. One with no reading: the pass reclaims
+        nothing, so `scratch_root` is read as `shared`, low on the reading alone, and a `seats` state held is kept."""
+        root, seat = self._scratch_root(), self._seat_root()
+        if not seat:
+            return [("shared", root, True)], {"shared"}
+        if not scratch_mod.has_reading(seat):
+            return [("shared", root, False)], {"seats", "shared"}
+        if seat == root or scratch_mod.same_fs(seat, root):
+            return [("seats", seat, True)], {"seats"}
+        return [("seats", seat, True), ("shared", root, False)], {"seats", "shared"}
+
+    def _low_step(self, reclaimed: bool) -> None:
+        """One reading of each pool's *low* state, kept in `disk.json` so a restart neither ends nor repeats it; the
+        walk naming the holders runs only as a pool turns low. In a thread."""
+        pools, keep = self._low_pools()
+        readings = [(name, path, reclaims, diskbook.share_free(path)) for name, path, reclaims in pools]
+        just = next((name for name, _path, reclaims in pools if reclaims), None) if reclaimed else None
+        old = diskbook.low_state(paths.home())
+        new = scratch_mod.step_low(old, readings, keep, just, scratch_mod.holders, now_iso())
+        if new != old:
+            diskbook.set_low(paths.home(), self.host, new)
+
+    def _pressure_view(self) -> dict[str, Any]:
+        """The `pressure` of this host's `disk` reading: each *low* pool's holders and `since`, its share free read
+        live where the pool has a reading, else as it was when it turned low. Touches files: run off the loop."""
+        pools, keep = self._low_pools()
+        paths_of = {name: path for name, path, _reclaims in pools}
+        out: dict[str, Any] = {}
+        for name, one in diskbook.low_state(paths.home()).items():
+            if name not in keep or not one.get("low"):
+                continue
+            live = diskbook.share_free(paths_of[name]) if name in paths_of else None
+            out[name] = {
+                "since": one.get("since"),
+                "share_free": one.get("share_free") if live is None else live,
+                "holders": one.get("holders") or [],
+            }
+        return out
+
+    async def _disk_low_pass(self) -> None:
+        """The home's read of every host's `pressure` (§4.6 *Told before the pool is full*), one `disk` call per host
+        at once: a detached task, so a node that is down holds up only its own answer. A change is saved to the `host`
+        record, which the page and the notify pass read."""
+        try:
+            got = await self._disk_everywhere("disk", self._disk_here)
+            old = self._host_rec.get("disk_low") or {}
+            new = diskbook.low_spells(old, got, now_iso())
+            if new == old:
+                return
+            if new:
+                self._host_rec["disk_low"] = new
+            else:
+                self._host_rec.pop("disk_low", None)
+            self.host_store.save(self._host_rec)
+            await self._push_changes()
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
+            log.exception("reading the hosts' temporary space failed")
+
+    def _reclaim(self, pool: str, start: float, named: dict[str, tuple[str, float | None]]) -> bool:
+        """One reclaim, in a thread, under its own lock; its line in `disk.json`, weak passes folded. False where
+        another holds the lock and none ran."""
         if not self._pressure_lock.acquire(blocking=False):
-            return
+            return False
         try:
             ended = ("exited", "closed")
 
@@ -5706,6 +5773,7 @@ class TickMixin:
             end = diskbook.share_free(pool)
             weak = self._pressure_backoff.after(start, end, got["skipped"], time.time())
             diskbook.note_pressure(paths.home(), self.host, got["removed"], weak, datetime.now(UTC))
+            return True
         finally:
             self._pressure_lock.release()
 
@@ -5793,6 +5861,8 @@ class TickMixin:
         pool = self._pressure_pool()  # §4.6 *The pressure pass*: a file system that gives no share free says so
         if pool and diskbook.share_free(pool) is None:
             out["no_pressure"] = pool
+        if pressure := self._pressure_view():  # §4.6 *Told before the pool is full*, TD-2083
+            out["pressure"] = pressure
         return out
 
     async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:

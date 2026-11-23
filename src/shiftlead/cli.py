@@ -28,6 +28,7 @@ from sessionorc import client as clientmod
 from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
+from sessionorc import notify as notify_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -3909,6 +3910,9 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             out.append(f"  ⚠ {seat.get('path')}: {w}")
         if e.get("no_pressure"):  # §4.6 *The pressure pass*, TD-2081
             out.append(f"  {e['no_pressure']}: no pressure reading")
+        for pool, one in (e.get("pressure") or {}).items():  # §4.6 *Told before the pool is full*, TD-2083
+            words = notify_mod.disk_low_text({**one, "host": host, "pool": pool})
+            out.append(f"  ⚠ {words} (since {one.get('since')})")
     return out
 
 

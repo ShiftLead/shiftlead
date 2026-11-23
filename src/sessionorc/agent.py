@@ -861,6 +861,9 @@ class HostAgent(
         self._pressure_task: asyncio.Task[None] | None = None
         self._pressure_at = datetime.now(UTC)
         self._pressure_backoff = scratch_mod.Backoff()
+        # the home's read of each host's low pools (§4.6 *Told before the pool is full*, TD-2083)
+        self._disk_low_task: asyncio.Task[None] | None = None
+        self._disk_low_at = datetime.now(UTC)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
@@ -1529,6 +1532,8 @@ class HostAgent(
             out["notify"] = self._notify_view()
             out["push"] = self._push_view()  # the Push card's devices and key (§4.10, TD-1302); absent on a node
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
+            # the *temporary space low* rows' spells (§4.6 *Told before the pool is full*, TD-2083)
+            out["disk_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("disk_low") or {}).items())}
             # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
             # with its `waiting_until` where this tick read one (never stored)
             out["stuck"] = {

@@ -591,6 +591,9 @@ PRESSURE_BACKOFF = 1800  # seconds no reclaim follows one that raised the share 
 PRESSURE_RISE = 0.01  # one point of share free
 PRESSURE_FALL = 0.05  # five more points down ends a backoff early
 PRESSURE_KEEP_HOURS = 1.0  # rule 2's keep in place of `scratch_keep_hours`
+PRESSURE_TELL = 0.15  # under this share free, once reclaimed from, a pool is *low* (TD-2083)
+PRESSURE_WALK_S = 30.0  # the one walk that names a low pool's largest holders
+PRESSURE_HOLDERS = 3
 TEST_RUN_MARK = ".shiftlead-test-run"  # a suite's scratch root, holding its pid (TD-2084)
 RUN_QUIET_S = 600  # rule 1: nothing under a run written for ten minutes
 BUILD_QUIET_S = 86_400  # rule 3: nothing under a build leftover written for a day
@@ -793,3 +796,109 @@ def reclaim(
                     return {"removed": removed, "skipped": skipped}
                 take(Path(e.path), BUILD_QUIET_S)
     return {"removed": removed, "skipped": skipped}
+
+
+# -- told before the pool is full (design §4.6, TD-2083) ------------------------------------------------------------
+
+
+def _inodes(path: str, limit: float) -> tuple[int, bool]:
+    """How many inodes lie at and under `path`, never through a symlink, and whether the walk was cut at `limit`."""
+    n, todo = 1, [path]
+    try:
+        if not stat.S_ISDIR(os.lstat(path).st_mode):
+            return n, False
+    except OSError:
+        return n, False
+    while todo:
+        if time.monotonic() > limit:
+            return n, True
+        try:
+            with os.scandir(todo.pop()) as it:
+                for e in it:
+                    n += 1
+                    if not n % 4096 and time.monotonic() > limit:  # one huge flat directory is bounded too
+                        return n, True
+                    with contextlib.suppress(OSError):
+                        if e.is_dir(follow_symlinks=False):
+                            todo.append(e.path)
+        except OSError:
+            continue
+    return n, False
+
+
+def holders(root: str | Path, walk_s: float = PRESSURE_WALK_S) -> list[dict[str, Any]]:
+    """A low pool's three largest holders by inodes (§4.6 *Told before the pool is full*): each directory under
+    `shiftlead-<uid>/`, named by the record in its `owner.json`, and each other top-level entry. One walk bounded by
+    `walk_s`; a count it cut short has `cut`, read as *at least*."""
+    limit = time.monotonic() + walk_s
+    ours = parent(root)
+    found: list[dict[str, Any]] = []
+
+    def count(path: str, name: str) -> None:
+        n, cut = _inodes(path, limit)
+        found.append({"name": name, "inodes": n, "cut": cut})
+
+    try:
+        with os.scandir(root) as it:
+            top = sorted(it, key=lambda e: e.name)
+    except OSError:
+        return []
+    for e in top:
+        if Path(e.path) != ours or e.is_symlink():
+            count(e.path, e.name)
+            continue
+        try:
+            with os.scandir(e.path) as it:
+                seats = sorted(it, key=lambda s: s.name)
+        except OSError:
+            count(e.path, e.name)
+            continue
+        for s in seats:
+            got = owner(s.path) if s.is_dir(follow_symlinks=False) else None
+            count(s.path, str((got or {}).get("id") or s.name))
+    found.sort(key=lambda h: -h["inodes"])
+    return found[:PRESSURE_HOLDERS]
+
+
+def same_fs(a: str | Path, b: str | Path) -> bool:
+    """Whether two paths lie on one file system (`st_dev`), each read at its nearest existing parent. Unreadable, no."""
+
+    def dev(path: str | Path) -> int:
+        at = Path(path)
+        while not at.exists() and at.parent != at:
+            at = at.parent
+        return at.stat().st_dev
+
+    try:
+        return dev(a) == dev(b)
+    except OSError:
+        return False
+
+
+def step_low(
+    state: dict[str, dict[str, Any]],
+    readings: list[tuple[str, str, bool, float | None]],
+    keep: set[str],
+    reclaimed: str | None,
+    walk: Callable[[str], list[dict[str, Any]]],
+    now: str,
+) -> dict[str, dict[str, Any]]:
+    """The pools' *low* state after one reading (§4.6 *Told before the pool is full*). `readings` is `(pool, path,
+    reclaims, share)`. A pool reclaimed from turns low under `PRESSURE_TELL` once a reclaim has run since it was last
+    over `PRESSURE_CLEAR`; one that is not (`shared` beside `seats`) on the reading alone. It stays low until back over
+    `PRESSURE_CLEAR`; no reading changes nothing, and a pool not in `keep` is forgotten."""
+    out = {k: dict(v) for k, v in state.items() if k in keep}
+    for name, path, reclaims, share in readings:
+        if name == reclaimed:  # kept even where this reading failed: the reclaim did run
+            out.setdefault(name, {})["reclaimed"] = True
+        if share is None:
+            continue
+        if share >= PRESSURE_CLEAR:
+            out.pop(name, None)
+            continue
+        one = out.get(name) or {}
+        if not one.get("low") and share < PRESSURE_TELL and (one.get("reclaimed") or not reclaims):
+            one.update(low=True, since=now, share_free=share, holders=walk(path))
+        if one:
+            out[name] = one
+    return out
