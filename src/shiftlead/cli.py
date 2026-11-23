@@ -1190,7 +1190,7 @@ def cmd_org(args: argparse.Namespace) -> int:
 
 def _first_shape_gone(args: argparse.Namespace) -> int | None:
     """The exit of a first-shape team verb after the cut-over (§4.9e *What decides which shape runs*), else None."""
-    if teamstore.cut_over(settings_mod.read() or {}):
+    if teamstore.first_shape_off():
         return fail(args, teamstore.GONE, 1)
     return None
 
@@ -3450,7 +3450,7 @@ def cmd_pr(args: argparse.Namespace) -> int:
 
     if args.action == "wait":
         return _pr_wait(args)
-    if teamstore.cut_over(settings_mod.read() or {}):  # §4.9e: no reader chain runs after the marker
+    if teamstore.first_shape_off():  # §4.9e: no reader chain runs after the marker
         got = {"pr": args.n, "held": False, "paths": [], "text": teamstore.NO_PR_HELD}
         return emit(args, got, lambda: print(f"PR #{args.n}: {teamstore.NO_PR_HELD}"))
     sid = _own_session(args)

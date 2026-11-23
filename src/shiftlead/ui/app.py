@@ -4529,7 +4529,7 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 def _first_shape_gone() -> None:
     """Refuse a first-shape team control after the cut-over (§4.9e *What decides which shape runs*)."""
-    if teamstore.cut_over(settings_mod.read() or {}):
+    if teamstore.first_shape_off():
         raise HTTPException(409, teamstore.GONE)
 
 

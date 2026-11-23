@@ -27,7 +27,6 @@ from sessionorc import hosts, naming, teamstore
 from sessionorc import ledger as ledger_mod
 from sessionorc import reports as reports_mod
 from sessionorc import seams as seams_mod
-from sessionorc import settings as settings_mod
 from sessionorc import workorders as workorders_mod
 from sessionorc.agent_common import ORPHAN_AFTER
 from sessionorc.client import AgentError
@@ -670,7 +669,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
     crew = [s for s in sessions if not persons(s)]
     up = live(crew)
     names = {str(s.get("id")): str(s.get("name") or "") for s in sessions}
-    first_shape_off = teamstore.cut_over(settings_mod.read() or {}) is not None  # no *concluded* after it (§4.9e)
+    first_shape_off = teamstore.first_shape_off()  # no *concluded* after it (§4.9e)
     rows_out = []
     for t in org.teams.values():
         mine = badged(t.name, crew)
