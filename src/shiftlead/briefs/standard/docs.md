@@ -1,0 +1,1 @@
+Audit the repo's documents against its code. Look for what a document states that the code no longer does, a name or path that no longer exists, and a rule that two documents state differently. Confirm each problem against the code, and file each as a ledger entry of its own, saying what is wrong and where. Fix nothing.

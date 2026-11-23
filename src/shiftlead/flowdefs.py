@@ -20,7 +20,7 @@ import yaml
 
 from sessionorc import paths
 from sessionorc.models import LANE_WORDS, owner_word
-from shiftlead import repoconfig
+from shiftlead import flow3, repoconfig
 
 PACKAGE_DIR = Path(__file__).resolve().parent / "flows"
 REPO_DIR = Path(".shiftlead") / "flows"
@@ -130,6 +130,13 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
         return flow
     if not isinstance(data, dict):
         flow.problems.append(f"{where}: the top level must be a mapping with `stages:`")
+        return flow
+    if "format" in data:  # a format-3 flow is flow3's, and no team runs one until the cut-over (§4.9c, §4.9e)
+        flow.problems.append(
+            f"{where}: a format-3 flow, which no team runs until the cut-over"
+            if flow3.is_format3(text)
+            else f"{where}: `format:` is 3, or unwritten for the first shape"
+        )
         return flow
     for k in data:
         if k not in FLOW_KEYS:
@@ -316,6 +323,12 @@ def load(
     return check(flow, cfg, overlay, read=read) if flow is not None else None
 
 
+def _format3_row(text: str, place: str, d: Path, root: Path | None = None) -> dict[str, Any]:
+    """A format-3 flow's `visible` fields: judged by its own check (§4.9c), and in use by no team until the cut-over."""
+    got = flow3.check_text(text, place=place, flow_dir=d, repo_root=root)
+    return {"usable": got.usable, "problems": list(got.problems), "format": flow3.FORMAT, "in_use": False}
+
+
 def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Every flow the org can see on this host (§4.7 `ao org`, §4.9c *What is shown*): the package's
     built-ins, then the org's `~/.shiftlead/flows/<name>/`, then each registered checkout's
@@ -343,6 +356,8 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
         row = {"name": name, "source": str(org / name), "usable": False, "problems": []}
         if name in BUILTIN:
             row["shadowed"] = f"not read: {name} is a built-in's name, and the built-in is the flow"
+        elif flow3.is_format3(text := _read_here(org / name / FILE)):
+            row.update(_format3_row(text, "org", org / name))
         elif (flow := load(name, package_cfg, overlay)) is not None:
             row.update(usable=flow.usable, problems=list(flow.problems))
         out.append(row)
@@ -365,6 +380,8 @@ def visible(roots: Collection[Path | str], overlay: dict[str, dict[str, Any]] | 
                 row["shadowed"] = f"not read: {d.name} is a built-in's name, and the built-in is the flow"
             elif d.name in org_names:
                 row["shadowed"] = f"not read: the org's flow {d.name} ({org / d.name}) is the flow"
+            elif flow3.is_format3(text := _read_here(d / FILE)):
+                row.update(_format3_row(text, "repo", d, where))
             elif (flow := load(d.name, cfg, overlay)) is None:  # `_read_here` reads an unreadable file as none
                 row["problems"] = [f"flow {d.name}: its {FILE} could not be read ({d / FILE})"]
             else:

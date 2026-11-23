@@ -1,0 +1,44 @@
+# The built-in flow `design-wise` (design §4.9c *The built-in flows*, TD-2047, named by TD-2075).
+format: 3
+name: design-wise
+stages:
+  - name: Design
+    does: design
+    model: opus
+    takes: design-first
+    work-pushed: first-read
+    no-design-needed: build
+  - name: First read
+    does: review
+    model: sonnet
+    ship: second-read
+    changes-wanted: {to: design, limit: 3}
+  - name: Second read
+    does: review
+    model: fable
+    ship: fact-check
+    changes-wanted: {to: design, limit: 3}
+  - name: Fact-check
+    does: review
+    model: sonnet
+    ship: {to: merge, refused: {to: design, limit: 3}}
+    changes-wanted: {to: design, limit: 3}
+  - name: Build
+    does: build
+    model: opus
+    takes: other
+    work-pushed: review
+  - name: Review
+    does: review
+    model: sonnet
+    ship: protected-read
+    changes-wanted: {to: build, limit: 3}
+  - name: Protected read
+    does: review
+    model: fable
+    only-when: protected-files
+    ship: {to: merge, refused: {to: build, limit: 3}}
+    changes-wanted: {to: build, limit: 3}
+audits:
+  - {name: Docs audit, model: sonnet, every: 10 merged-pull-requests, brief: docs}
+  - {name: Tests audit, model: sonnet, every: 6 hours, brief: tests}

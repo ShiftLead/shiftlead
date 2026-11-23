@@ -1,0 +1,10 @@
+# The built-in flow `build` (design §4.9c *The built-in flows*, TD-2047): no review stage, so its
+# builder runs the cadence's independent review (rule 11).
+format: 3
+name: build
+stages:
+  - name: Build
+    does: build
+    model: opus
+    takes: any
+    work-pushed: {to: merge, refused: {to: build, limit: 3}}

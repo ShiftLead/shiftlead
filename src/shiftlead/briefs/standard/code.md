@@ -1,0 +1,1 @@
+Audit the repo's code for defects. Look for a failure path nothing handles, state that two paths write differently, a race, and a check that can be passed around. Confirm each problem by tracing it through the code to a concrete input and a wrong result, and file each as a ledger entry of its own, saying what fails and where. Fix nothing.

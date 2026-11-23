@@ -53,7 +53,7 @@ from sessionorc.models import (
     tokens_short,
 )
 from sessionorc.tmux import attach_argv
-from shiftlead import connect, doctor, feedback, layers, orgcheck, repoconfig, service, teamrun, teams
+from shiftlead import connect, doctor, feedback, flow3, flowdefs, layers, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead.cardtext import (  # `ao card`'s names, kept where they were (TD-1903)
     CARD_NOT_MAIL,  # noqa: F401
@@ -1000,6 +1000,41 @@ def _org_here() -> orgmod.Org:
     for note in notes:
         print(note, file=sys.stderr)
     return o
+
+
+def cmd_flow_check(args: argparse.Namespace) -> int:
+    """`ao flow check <file> [--repo DIR]` (design §4.7, §4.9c *A flow is usable only when it flows*, TD-2047): each
+    problem and exit 1, or what the check says of a usable flow and `OK`. Reads and writes nothing else."""
+    got = flow3.check_file(args.file, repo=args.repo)
+    if getattr(args, "json", False):
+        print(json.dumps({"usable": got.usable, "problems": got.problems, "info": got.info}, indent=1))
+    else:
+        for line in got.problems:
+            print(f"PROBLEM: {line}")
+        for line in got.info if got.usable else ():
+            print(f"info: {line}")
+        print("OK" if got.usable else f"{len(got.problems)} problem(s)")
+    return 0 if got.usable else 1
+
+
+def cmd_flow_list(args: argparse.Namespace) -> int:
+    """`ao flow list` (design §4.7, TD-2047): every flow the org can see with whether it is usable, the format-3
+    built-ins marked as not yet in use. A team's flow name still resolves to the first shape until the cut-over."""
+    try:
+        org, _notes = _org_notes("ao flow list", {})
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    roots = hosts.local_host().repos()
+    rows = [*flowdefs.visible(roots, org.roles), *flow3.builtins()]
+    if getattr(args, "json", False):
+        print(json.dumps(rows, indent=1))
+        return 0
+    w = max((len(r["name"]) for r in rows), default=0)
+    for r in rows:
+        state = r.get("shadowed") or ("usable" if r["usable"] else "not usable — " + "; ".join(r["problems"]))
+        word = "  format 3, not yet in use" if r.get("format") == flow3.FORMAT else ""
+        print(f"flow {r['name']:<{w}}  {state}{word}  [{r['source']}]")
+    return 0
 
 
 def cmd_org(args: argparse.Namespace) -> int:
@@ -5754,6 +5789,17 @@ def build_parser() -> argparse.ArgumentParser:
         "of that checkout's own — a definition checked before it merges (§4.7)",
     )
     p.set_defaults(fn=cmd_org)
+
+    p = add("flow", help="check a flow file, or list the flows the org can see (§4.9c)")
+    fsub = p.add_subparsers(dest="action", required=True)
+    q = fsub.add_parser("check", help="run the check on a flow.yml: each problem, or what goes to the person and OK")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.add_argument("file", help="the flow.yml")
+    q.add_argument("--repo", help="the checkout to check it against: a merge destination needs that repo's merge gate")
+    q.set_defaults(fn=cmd_flow_check)
+    q = fsub.add_parser("list", help="every flow the org can see, whether each is usable, and which are in use")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.set_defaults(fn=cmd_flow_list)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
     p.add_argument(
