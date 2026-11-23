@@ -1511,6 +1511,11 @@ ARCHIVE_BODY = (
 )
 
 
+def archive_subject(tid: str) -> str:
+    """The subject and title of the home's own pull request archiving `tid`, which the stage Reading looks for."""
+    return f"{TOOL}: archive {tid} (session n/a)"
+
+
 def archive_entry(root: str | Path, tid: str, why: str) -> dict[str, Any]:
     """**The home archives an entry** (design §4.9c *Who archives the entry*, TD-2051): on origin's head, `tid` archived
     as it stands, landed as one pull request of the host agent's own. Returns the landing's `{commit, message, pr}`, or
@@ -1542,7 +1547,7 @@ def _archive_entry(root: Path, tid: str, why: str, clock: _Clock) -> dict[str, A
             root,
             t,
             want,
-            f"{TOOL}: archive {tid} (session n/a)",
+            archive_subject(tid),
             clock,
             lambda: _git(t, "cat-file", "-e", f"origin/{want}:{rel}").returncode == 0,
             body=ARCHIVE_BODY,

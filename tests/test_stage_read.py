@@ -7,10 +7,19 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from sessionorc import ledgerboard
+from sessionorc import board, ledgerboard
 from sessionorc.models import Pending, ProgressEntry, Session
 from shiftlead.stage_acts import Holder
-from shiftlead.stage_read import EntryAnswer, EntryLedger, answer_on, holder_on, ledger_on, renumbered_on
+from shiftlead.stage_read import (
+    EntryAnswer,
+    EntryForge,
+    EntryLedger,
+    answer_on,
+    forge_on,
+    holder_on,
+    ledger_on,
+    renumbered_on,
+)
 
 HEAD = "## TD-7: An entry\n\n**Priority:** Low\n**Status:** Open\n"
 ASKED = "- 2026-11-20: asked by the stage record: n1\n"
@@ -263,3 +272,46 @@ def test_an_entry_never_removed_was_not_renumbered(repo):
 
 def test_a_ref_git_cannot_read_is_no_reading(repo):
     assert renumbered_on(repo, "no-such-ref", "docs/ledger", "TD-7") is None
+
+
+# -- the forge ----------------------------------------------------------------------------------------------------
+
+
+def pr_row(number: int, state: str = "open", head: str = "abc", title: str = "work") -> dict:
+    return {"number": number, "state": state, "head": head, "title": title}
+
+
+def test_an_open_pull_request_carries_its_head():
+    assert forge_on("TD-7", 4, [pr_row(4)]) == EntryForge("open", "abc")
+
+
+@pytest.mark.parametrize("state", ["merged", "closed"])
+def test_a_finished_pull_request_has_no_head_to_carry(state):
+    assert forge_on("TD-7", 4, [pr_row(4, state)]) == EntryForge(state, None)
+
+
+def test_an_open_row_with_no_head_reads_as_none():
+    assert forge_on("TD-7", 4, [pr_row(4, head="")]) == EntryForge("open", None)
+
+
+@pytest.mark.parametrize("rows", [[], [pr_row(5)], [pr_row(4, "unknown")]])
+def test_a_pull_request_not_read_is_no_reading_rather_than_gone(rows):
+    assert forge_on("TD-7", 4, rows) is None
+
+
+def test_a_record_with_no_pull_request_is_a_reading():
+    assert forge_on("TD-7", None, [pr_row(5)]) == EntryForge()
+
+
+def test_the_homes_open_archive_pull_request_is_seen():
+    row = pr_row(9, title=board.archive_subject("TD-7"))
+    assert forge_on("TD-7", None, [row]).archive_open
+    assert forge_on("TD-7", 4, [pr_row(4, "merged"), row]) == EntryForge("merged", None, True)
+
+
+@pytest.mark.parametrize(
+    "row",
+    [pr_row(9, "merged", title=board.archive_subject("TD-7")), pr_row(9, title=board.archive_subject("TD-70"))],
+)
+def test_a_finished_or_another_entrys_archive_pull_request_is_not_this_ones(row):
+    assert not forge_on("TD-7", None, [row]).archive_open
