@@ -3,8 +3,10 @@ shape runs*, TD-2076), and before it they are not."""
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -12,8 +14,10 @@ from fastapi.testclient import TestClient
 
 from sessionorc import paths, teamstore
 from sessionorc.client import AgentError, LocalClient
-from shiftlead import cli
+from shiftlead import cli, teams
+from shiftlead import org as orgmod
 from shiftlead.ui import app as uiapp
+from shiftlead.ui import common
 
 VERBS = [
     ["team", "flow", "t"],
@@ -93,3 +97,23 @@ def test_the_team_start_stays_after_the_marker(marked):
     with TestClient(uiapp.create_app()) as c:
         got = c.post("/api/teams/t/start", json={})
     assert teamstore.GONE not in got.text
+
+
+def test_a_new_session_gets_no_reader_after_the_marker(marked):
+    args = argparse.Namespace(team="t", adapter="claude-code", dir=str(marked), repo=None, role=None)
+    defaults = {"review": {"reader": "techlead", "held": ["**"], "bound": "2h"}}
+    assert cli._team_defaults(args, defaults) == ""
+    assert defaults["review"] is None
+
+
+def test_the_new_session_form_names_no_reader_after_the_marker(marked):
+    assert common.team_reader("t", str(marked)) == {"review": None, "line": teamstore.NO_PR_HELD}
+
+
+@pytest.mark.parametrize("is_off", [True, False], ids=["after", "before"])
+def test_the_repo_page_compares_the_ledger_with_the_right_teams(monkeypatch, is_off):
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: is_off)
+    monkeypatch.setattr(teams, "entry_teams", lambda *a, **k: [{"team": "old"}])
+    records = [{"id": "ao-tl", "name": "tl", "repo": "/r", "team": "new", "builtin": "techlead"}]
+    got = teams.entry_servicing(orgmod.Org(path=Path("/nonexistent")), "/r", "h", (), records)
+    assert [t["team"] for t in got] == (["new"] if is_off else ["old"])

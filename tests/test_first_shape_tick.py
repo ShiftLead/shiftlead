@@ -91,9 +91,10 @@ async def test_rules_1_3_4_and_5_still_reach_a_built_in_seat_and_the_director(ag
     assert agent._lost_brief.await_count == 1
 
 
-async def test_a_first_shape_seat_is_not_read_by_rule_3_after_the_marker(agent, monkeypatch):
+@pytest.mark.parametrize("trigger", ["asks", "team"], ids=["asks seat", "manager"])
+async def test_a_first_shape_seat_is_not_read_by_rule_3_after_the_marker(agent, monkeypatch, trigger):
     spies = _spied(agent, monkeypatch)
-    agent.sessions["ao-t-w"].seat = {"trigger": "asks"}
+    agent.sessions["ao-t-w"].seat = {"trigger": trigger}
     agent.unfillable["ao-t-w"] = "paused"
     _mark()
     await _keep_running(agent)
@@ -391,3 +392,35 @@ async def test_a_waiting_handed_entry_moves_to_no_first_shape_seat_after_the_mar
     await _cut_over(agent, marked=marked)
     moved = agent._move_handed(entry, seat.id, seat, "unable", "2026-11-23T00:00:00Z", {})
     assert moved is (not marked)
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_the_held_key_reads_no_record_s_reader_after_the_marker(agent, tmp_path, marked):
+    if marked:
+        _mark()
+    agent._read_cut_over()
+    root = str(tmp_path / "r")
+    review = {"reader": "techlead", "held": ["src/**"], "bound": "2h"}
+    rec = Session(
+        id="ao-t-w", name="w", kind="agent", adapter="shell", dir=root, repo=root, state="idle", review=review
+    )
+    agent.sessions[rec.id] = rec
+    agent._repos[root] = {"root": root}
+    assert agent._held_keys([root])[root] == ([] if marked else ["src/**"])
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_no_pull_request_is_unasked_after_the_marker(agent, tmp_path, marked):
+    if marked:
+        _mark()
+    agent._read_cut_over()
+    root = str(tmp_path / "r")
+    review = {"reader": "techlead", "held": ["src/**"], "bound": "2h"}
+    rec = Session(
+        id="ao-t-w", name="w", kind="agent", adapter="shell", dir=root, repo=root, state="idle", review=review
+    )
+    agent.sessions[rec.id] = rec
+    pr = {"number": 7, "held": ["src/a.py"], "checks": "green", "branch": "td7-x", "title": "x"}
+    agent._repos[root] = {"root": root, "prs": {"open": [pr]}}
+    await agent._red_prs(datetime.now(UTC))
+    assert (agent._repos[root].get("pr_orders") or {}).get("unasked", []) == ([] if marked else [7])

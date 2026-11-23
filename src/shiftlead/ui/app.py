@@ -537,6 +537,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_hand,
     entry_line,
     entry_role,
+    entry_servicing,
     entry_teams,
     flow_head,  # noqa: F401
     fork_title,  # noqa: F401
@@ -2708,7 +2709,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
                 ],
                 # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
-                "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
+                # after the cut-over the teams it compares are the built-in tech leads' (§4.9e)
+                "team_notes": team_notes(
+                    r, [t["team"] for t in entry_servicing(org, here_root, host_name(), (), sessions)], sessions
+                ),
                 "boards": boards,
                 "horizon": hz,
                 "doing": drows[0],
