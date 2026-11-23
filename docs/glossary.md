@@ -122,7 +122,7 @@ not mix:
   stage at a time; its name is the **stage chip** on *TDs in motion*, and its key is the name in lower case with
   hyphens. — *proposed* 2026-10-04, reshaped 2026-11-21 (design §4.9c).
 - **outcome** — the word a session ends its stage with (`work-pushed`, `no-design-needed`, `not-needed`, `design-needs-changing`,
-  `ship`, `changes-wanted`, or `other` when none fits), reported by `ao stage end` and checked against the facts
+  `check-waits` on a live check, `ship`, `changes-wanted`, or `other` when none fits), reported by `ao stage end` and checked against the facts
   before it is taken; the flow says where each sends the entry. *Not:* ending, state. — *proposed* 2026-11-21
   (design §4.9c, TD-1954).
 - **limit** — how many times one entry may take one move between stages before it comes to the person; a
