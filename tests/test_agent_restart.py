@@ -170,21 +170,14 @@ def test_sigterm_stops_serve_cleanly(tmp_path, monkeypatch):
     import os
     import signal
     import subprocess
-    import sys
 
-    from conftest import CHILD, wait_for_sync
+    from conftest import spawn_agent_child, wait_for_sync
 
     home = tmp_path / "home"
     sock_name = private_socket_name()
     monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
-    proc = subprocess.Popen(
-        [sys.executable, str(CHILD), sock_name],
-        env=dict(os.environ),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    proc = spawn_agent_child(sock_name, dict(os.environ), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     try:
         sock = home / "agent.sock"
         assert wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0)

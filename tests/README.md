@@ -57,11 +57,14 @@ before, so a test may lean on no other test's leftovers, and a wait bounds an ev
 
 ## After a killed run
 
-Ctrl-C or a CI timeout skips fixture teardown and can leave `ao-test-*` tmux servers and
-`_agent_child.py` orphans behind. They never touch the real server. The session-scoped
-`_sweep_stale_test_servers` fixture kills stale servers at the start of the next run; by hand:
+Ctrl-C, a CI timeout or a SIGKILL skips fixture teardown. An `_agent_child.py` ends by itself within
+seconds, because it watches a pipe only its owner holds (`spawn_agent_child`, TD-2067). The `ao-test-*`
+tmux servers left behind never touch the real server, and the session-scoped `_sweep_stale_test_servers`
+fixture kills them at the start of the next run.
+
+Never stop children or servers by matching a name: that reaches a concurrent run's too. A child started
+before TD-2067 has no pipe, so list them and signal by pid only one whose parent is not a live pytest:
 
 ```sh
-for s in /tmp/tmux-$(id -u)/ao-test-*; do tmux -S "$s" kill-server; done
-pkill -f tests/_agent_child.py
+ps -eo pid,ppid,lstart,args | grep '[_]agent_child.py'
 ```

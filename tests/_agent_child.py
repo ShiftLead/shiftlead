@@ -7,6 +7,10 @@ the test suite never spawns it. This script takes the socket name as its one arg
 Stops the way `shiftlead-agent serve` does (`serve_until_signal`, TD-024): SIGTERM cancels the
 serve task, `serve()`'s `finally` unlinks the socket file, and the process exits 0 with no
 pending-task traceback — `test_agent_restart.py` asserts exactly that on this child.
+
+Ends with whoever started it (TD-2067): `conftest.spawn_agent_child` holds the write end of a pipe and names the read
+end in `AO_TEST_OWNER_FD`. The kernel closes the write end however the owner dies, a SIGKILL included, and the EOF here
+stops this process the same way a SIGTERM does.
 """
 
 import asyncio
@@ -15,6 +19,8 @@ import logging
 import os
 import signal
 import sys
+import threading
+import time
 from datetime import timedelta
 
 from _stubs import AgentShellStub, HookFedStub
@@ -48,11 +54,30 @@ async def _run(socket_name: str) -> None:
     )
 
 
+def _end_with_owner() -> None:
+    """Watch the owner's pipe (TD-2067); the variable leaves the environment, so no session started here sees it."""
+    raw = os.environ.pop("AO_TEST_OWNER_FD", None)
+    if raw is None:
+        return
+    fd = int(raw)
+    os.set_inheritable(fd, False)
+
+    def watch() -> None:
+        while os.read(fd, 1):
+            pass
+        os.kill(os.getpid(), signal.SIGTERM)  # serve()'s own way out; before its handler is set, the default ends us
+        time.sleep(5)
+        os._exit(1)  # the owner is gone, so nothing else would ever stop an agent stuck in its shutdown
+
+    threading.Thread(target=watch, name="owner-watch", daemon=True).start()
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     # TD-2037: conftest's hang watchdog sends SIGUSR1 to a child agent a test is stuck on, so a request that never
     # comes back shows where the agent is, not only the test's side of the wait
     faulthandler.register(signal.SIGUSR1, all_threads=True)
+    _end_with_owner()
     asyncio.run(_run(sys.argv[1]))
     return 0
 
