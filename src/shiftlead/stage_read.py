@@ -32,7 +32,7 @@ where any part is no reading of it this pass. None of these writes anything.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -140,6 +140,28 @@ def forge_on(tid: str, pr: int | None, rows: Iterable[Mapping[str, Any]]) -> Ent
     if state not in ("open", "merged", "closed"):
         return None
     return EntryForge(state, (row.get("head") or None) if state == "open" else None, archive_open)
+
+
+def rows_for(
+    reads: Iterable[Iterable[Mapping[str, Any]]],
+    wanted: Iterable[int],
+    read_one: Callable[[int], Mapping[str, Any] | None],
+) -> tuple[Mapping[str, Any], ...]:
+    """The repo's rows for `forge_on`, one per number. `reads` go latest first, so a stale open row never hides a merge.
+    Each of `wanted`, the records' pull requests, that no read holds is read by its number; one that cannot be read
+    stays missing, which is no reading of its entry this pass."""
+    rows: list[Mapping[str, Any]] = []
+    seen: set[Any] = set()
+    for read in reads:
+        for row in read:
+            number = row.get("number")
+            if number not in seen:
+                seen.add(number)
+                rows.append(row)
+    for number in sorted(set(wanted) - seen):
+        if (row := read_one(number)) is not None:
+            rows.append(row)
+    return tuple(rows)
 
 
 class EntryFlow(NamedTuple):
