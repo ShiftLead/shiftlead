@@ -122,3 +122,10 @@ def test_the_page_carries_its_read_and_the_rail_marks_it(home, monkeypatch):
     data = json.loads(re.search(r'id="flowsdata">(.*?)</script>', text, re.S).group(1))
     assert [r["name"] for r in data["flows"]] == list(flow3.BUILTIN)
     assert seen["flow_save"] == {"name": "mine", "text": "t", "version": "v1", "renames": {"a": "b"}, "delete": False}
+
+
+def test_the_page_keeps_off_the_session_press_handler():
+    """`app.js` posts every `data-act` press on any page to `/api/sessions/<id>/<act>`, so this page's controls carry
+    an attribute of their own: a press here must never reach a session's action."""
+    js = (app_mod.Path(app_mod.__file__).parent / "static" / "flows.js").read_text(encoding="utf-8")
+    assert "data-act" not in js and "data-fl=" in js
