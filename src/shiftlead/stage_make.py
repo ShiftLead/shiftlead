@@ -5,8 +5,9 @@ write. The record is read again under that lock and the choice made again, so an
 home's reading is never overwritten: the act is simply not made, and the next pass reads afresh.
 
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
-`mark-waiting`, `rewrite-flow`, `re-enter`) and those that put a question to the person (`merged-entry-open`,
-`pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own pull request), the
+`mark-waiting`, `rewrite-flow`, `re-enter`, `archive-design`) and those that put a question to the person
+(`merged-entry-open`, `pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own
+pull request), the
 pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
 takes its claim and writes the record.
@@ -118,6 +119,16 @@ def _re_enter(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[s
     return Made(True)
 
 
+def _archive_design(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+    """A design entry left open after its last part merged: the home archives it in a pull request of its own, and the
+    record closes when the ledger reads it archived (§4.9c *Who archives the entry*)."""
+    try:
+        store.archive(str(record["id"]), "its last part merged")
+    except board.Refused as e:  # the record stands, so the next pass tries again
+        return Made(False, f"the entry could not be archived: {e}")
+    return Made(True)
+
+
 def _ask(
     store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
 ) -> Made:
@@ -189,6 +200,7 @@ _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, A
     "mark-waiting": _mark_waiting,
     "rewrite-flow": _rewrite_flow,
     "re-enter": _re_enter,
+    "archive-design": _archive_design,
 }
 
 
