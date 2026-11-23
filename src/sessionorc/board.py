@@ -1377,7 +1377,8 @@ def ask_on_entry(
 
     Returns the landing's `{commit, message, pr}` with `id` and `key`, the item's; `{"already": True}`
     where the entry's Log already holds this question's `nonce`, answered or not (a crash after the merge, so
-    reconcile's second landing writes nothing); `{"gone": True}` for an entry archived or missing. Any other decision on the entry refuses."""
+    reconcile's second landing writes nothing); `{"gone": True}` for an entry archived or missing. Any other
+    decision on the entry refuses."""
     root = Path(root)
     with _EDIT:
         clock = _Clock()
