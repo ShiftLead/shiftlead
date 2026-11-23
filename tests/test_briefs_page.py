@@ -79,7 +79,22 @@ def test_a_stale_save_and_a_duplicate_new_are_refused(home):
         briefs.save("careful", "build", "three", got["version"])
 
 
-def test_brief_save_is_a_persons_own_act():
+@pytest.mark.parametrize("text", ["---\nfirst line is a rule", "before\n---\nafter", "kind: review"])
+def test_a_briefs_text_survives_a_save_and_a_read(home, text):
+    got = briefs.save("careful", "build", text)
+    assert got["text"].strip() == text
+    again = briefs.save("careful", "build", got["text"], got["version"])
+    assert again["version"] == got["version"] and briefs.own()[0]["kind"] == "build"
+
+
+def test_a_delete_that_lost_the_race_is_stale(home, monkeypatch):
+    got = briefs.save("careful", "build", "text")
+    monkeypatch.setattr(briefs.Path, "unlink", lambda self: (_ for _ in ()).throw(FileNotFoundError()))
+    with pytest.raises(briefs.BriefError, match="reload"):
+        briefs.delete("careful", got["version"])
+
+
+def test_a_brief_save_is_a_persons_own_act():
     assert "brief_save" in mail.PERSON_ONLY
 
 
@@ -100,3 +115,17 @@ def test_the_page_draws_standard_read_only_and_own_with_controls(home, monkeypat
     standard = text[text.index("Standard briefs") :]
     assert "<textarea" not in standard and "data-brief-delete" not in standard
     assert '<a href="/briefs" class="on"' in text
+    assert text.count("choose a kind") == 1  # the blank form's; a brief with a kind keeps its own
+
+
+def test_a_brief_with_no_kind_is_never_saved_as_the_first_kind(home, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    async def call(method, **params):
+        return {"briefs": [{"name": "old", "kind": None, "text": "t", "version": "v"}]} if method == "briefs" else {}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        text = c.get("/briefs").text
+    form = text[text.index('data-brief="old"') :]
+    assert '<option value="" disabled selected>choose a kind</option>' in form

@@ -8,7 +8,7 @@
 <form class="briefform" data-version="{{ b.version or '' }}">
   <div class="row gap wrap">
     <label>name <input class="mono" name="name" value="{{ b.name or '' }}" required pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"{% if b.name %} readonly{% endif %}></label>
-    <label>kind <select name="kind">{% for k in kinds %}<option{% if b.kind == k %} selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
+    <label>kind <select name="kind" required>{% if not b.kind %}<option value="" disabled selected>choose a kind</option>{% endif %}{% for k in kinds %}<option{% if b.kind == k %} selected{% endif %}>{{ k }}</option>{% endfor %}</select></label>
     <span class="grow"></span>
     <button class="btn sm" type="submit">Save</button>
     {%- if b.name %}<button class="btn sm ghost" type="button" data-brief-delete title="{{ help_title('briefs-delete') }}">Delete</button>{% endif %}

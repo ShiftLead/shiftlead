@@ -170,5 +170,8 @@ def delete(name: str, version: str | None) -> dict[str, Any]:
         raise BriefError(STALE)
     if using := flows_naming(name):
         raise BriefError(f"{name} is named by a flow: {', '.join(using)}")
-    path.unlink()
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        raise BriefError(STALE) from None
     return {"name": name, "deleted": True}
