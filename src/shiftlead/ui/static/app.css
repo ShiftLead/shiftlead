@@ -1593,3 +1593,31 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .cardpage .qmoves { display: none; }
 .cardpage .qgrip { visibility: hidden; }  /* its grid column kept: the header's place and words stay where they are */
 .cardpage .qgroup { border: 0; padding: 0; }
+
+/* the settings area (design §4.9d *Where the settings pages sit*, TD-2059): a rail left of the page, a row on a phone */
+.setarea { display: flex; align-items: flex-start; gap: 24px; max-width: 1140px; margin: 0 auto; padding: 0 16px; }
+.setarea > .page { flex: 1; min-width: 0; margin: 0; }
+.setrail { flex: none; width: 150px; display: flex; flex-direction: column; gap: 2px; padding-top: 18px; position: sticky; top: 0; }
+.setrail a { padding: 6px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+.setrail a:hover { color: var(--fg); }
+.setrail a.on { background: var(--fg); color: var(--bg); font-weight: 600; }
+.teamtabs { gap: 2px; border-bottom: 2px solid var(--fg); align-items: flex-end; }
+.teamtab { padding: 6px 14px; border-radius: 6px 6px 0 0; color: var(--muted); text-decoration: none; font-family: var(--mono, monospace); }
+.teamtab.on { background: var(--fg); color: var(--bg); }
+.teamstate { color: var(--muted); font-weight: 600; }
+.teamstate.running { color: var(--ok, #1f8a4c); }
+@media (max-width: 720px) {
+  .setarea { display: block; padding: 0; }
+  .setrail { position: static; width: auto; flex-direction: row; overflow-x: auto; padding: 8px 16px 0; }
+  .setrail a { white-space: nowrap; }
+}
+.teampage .setrow { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 12px; align-items: start; }
+.teampage .setrow > .setlabel { grid-column: 1; grid-row: 1 / span 2; padding-top: 7px; }
+.teampage .setrow > :not(.setlabel) { grid-column: 2; min-width: 0; }
+.teampage .setrow > .setin { width: min(100%, 260px); }
+.teampage .setrow > .setpicks { display: flex; flex-flow: row wrap; justify-content: flex-start; justify-self: stretch; width: 100%; align-items: center; gap: 6px 14px; text-align: left; }
+.teampage .setpicks .setin { width: auto; max-width: 100%; }
+@media (max-width: 720px) {
+  .teampage .setrow { grid-template-columns: minmax(0, 1fr); }
+  .teampage .setrow > .setlabel, .teampage .setrow > :not(.setlabel) { grid-column: 1; grid-row: auto; }
+}

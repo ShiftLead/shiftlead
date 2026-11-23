@@ -10663,8 +10663,11 @@
       max_age: (f) => ["max_age", { max_age: f.elements.max_age.value.trim() }],  // **trust a reading for** (TD-233)
       settle: (f) => ["settle", { settle: f.elements.settle.value.trim() }],  // **settle** (§4.5a, TD-710)
       teams: (f) => {
-        const body = { team: f.dataset.team, reserve: f.elements.reserve.value.trim() };
-        if (f.elements.until.value.trim()) body.until = f.elements.until.value.trim();
+        // the running settings are on the team page (§4.9d, TD-2059): the Settings card sends its flow pick alone
+        const body = { team: f.dataset.team };
+        if (f.elements.reserve) body.reserve = f.elements.reserve.value.trim();
+        if (f.elements.until && f.elements.until.value.trim() && f.elements.stops.value === "at") body.until = f.elements.until.value.trim();
+        if (f.elements.stops && f.elements.stops.value === "never" && f.elements.stops.dataset.was === "at") body.until = null;
         // **when work appears** (§6 rule 8): written only when the pick moved, so *ask me (default)* leaves the key absent
         const ow = f.elements.on_work; if (ow && ow.value !== ow.dataset.was) body.on_work = ow.value;
         // **balance** (§6 *Balance*): the lines whole, written only when they moved; off is null, an empty field no line
@@ -10778,6 +10781,14 @@
         if (section === "teams") setTimeout(() => location.reload(), ap ? 4000 : 600);
       } catch (err) { say(f, err.message, true); }
     });
+    // the team page saves each row as it is changed (§4.5a *Team page: When it runs*, TD-2059)
+    $$("form[data-autosave]", page).forEach((f) => f.addEventListener("change", (e) => {
+      if (e.target.name === "stops") {
+        f.elements.until.hidden = e.target.value !== "at";
+        if (e.target.value === "at") { if (e.target.dataset.was !== "at") f.elements.until.focus(); return; }
+      }
+      f.requestSubmit();
+    }));
     page.addEventListener("click", async (e) => {
       const clear = e.target.closest("[data-clear='until']"); if (!clear) return;
       const f = clear.closest("form.setcard");
@@ -10853,7 +10864,7 @@
       const v = store.get(dd.dataset.key, null);
       dd.textContent = v === null ? "not set" : typeof v === "boolean" ? (v ? "on" : "off") : String(v);
     });
-    $("#setreset").addEventListener("click", () => {
+    $("#setreset")?.addEventListener("click", () => {
       if (!confirm("Reset this browser? Every ao.* key this browser keeps — the theme, the folds, the filters, the pop-out windows — is cleared, and the page reloads. Nothing anywhere else changes.")) return;
       try { Object.keys(localStorage).filter((k) => k.startsWith("ao.")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
       location.reload();

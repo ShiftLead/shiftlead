@@ -28,7 +28,7 @@
     live team whose records differ from what that flow compiles to, *flow changed* and **Apply**
     (`ao team flow <team> --apply`), the members it would change in the mark's title. Read when the
     page was drawn, not per delta #}
-{% if g.team and g.flow %}<a class="badge flowchip" href="/settings#team-{{ g.team }}" title="{{ g.flow_strip or g.flow }} — the flow this team runs (design §4.9c); pick it on Settings">flow: {{ g.flow }}</a>{% endif %}
+{% if g.team and g.flow %}<a class="badge flowchip" href="/teams/{{ g.team }}" title="{{ g.flow_strip or g.flow }} — the flow this team runs (design §4.9c); its team page">flow: {{ g.flow }}</a>{% endif %}
 {#- design §4.5a team card **td-max** mark (§4.9 *What the person sees*, TD-1548): display only, while the team's
     `max` is not `off` and a line or seat of it may scale — the ceilings are the Members dialog's **up to** #}
 {% if g.team and g.td_max %}<span class="badge tdmax" title="this team grows past its size with the work, each line or seat up to its ceiling (design §4.9 Scaling with the work) · up to in Members…">td-max</span>{% endif %}

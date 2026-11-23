@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ t.name if t else "Teams" }} · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{#- design §4.9d *The page*, *Before and after the cut-over* (TD-2059): a page per team behind the gear. Before the
+    cut-over it draws the head and **When it runs** on today's keys, each row saved as it is changed -#}
+{% block body %}
+{% set rail_on = "Teams" %}<div class="setarea">{% include "settings_rail.html" %}
+<div class="page inboxpage setpage teampage" id="setpage" data-set-at="{{ set_at }}">
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable</div>
+  {% for n in notes %}<div class="note warn">{{ n }}</div>{% endfor %}
+  <div class="row wrap teamtabs">{% for x in tabs %}<a class="teamtab{% if t and x == t.name %} on{% endif %}" href="/teams/{{ x }}"{% if t and x == t.name %} aria-current="page"{% endif %}>{{ x }}</a>{% endfor %}<span class="grow"></span><button class="btn sm ghost" type="button" disabled title="after the switch-over">+ New team</button></div>
+  {% if not t %}<div class="note">The org defines no teams.</div>{% else %}
+  <div class="row gap wrap teamhead"><span class="h1 mono">{{ t.name }}</span><span class="note">{% if head.repo %}works <b>{{ head.repo }}</b>{% endif %}{% if head.on %} on {{ head.on }}{% endif %}</span><span class="grow"></span><span class="teamstate{% if head.running %} running{% endif %}">{{ head.word }}{% if head.counts %} · {{ head.counts | join(' · ') }}{% endif %}</span><a class="btn sm ghost" href="/#team-{{ t.name }}">Start or wind down on Sessions</a></div>
+  <section class="isec"><div class="h2">The flow it runs</div><div class="note">after the switch-over · today's flow pick is on <a href="/settings#team-{{ t.name }}">Settings</a></div></section>
+  <section class="isec"><div class="h2">Logins, in the order they are tried</div><div class="note">after the switch-over</div></section>
+  <section class="isec"><div class="h2">When it runs</div>
+    <form class="card pad setcard" id="team-{{ t.name }}" data-section="teams" data-team="{{ t.name }}" data-autosave>
+      {# **schedule** (§4.5a, §6 *Schedule*, TD-1346): `teams.<team>.schedule`, whole, written only when it moved;
+         off, the key is absent. The window pick is redrawn from `data-labels` on a profile pick (`app.js`),
+         a text field where the profile has no reading; `schedule_window` in both forms #}
+      {%- set sc = t.schedule %}
+      <div class="setrow setschedule" data-was="{{ sc.was }}" data-labels="{{ sc.labels }}">
+        <span class="setlabel">Starts</span>
+        <span class="setpicks">
+          <label title="{{ sc.why or help_title('schedule') }}"><input type="checkbox" name="schedule_on"{% if sc.on %} checked{% endif %}{% if not sc.can %} disabled{% endif %}> start at a reset</label>
+          <label>profile <select class="input setin" name="schedule_profile"{% if not sc.on %} disabled{% endif %}>{% for o in sc.options %}<option value="{{ o.name }}"{% if o.name == sc.profile %} selected{% endif %}{% if o.disabled %} disabled title="{{ o.title }}"{% endif %}>{{ o.name }}{{ o.mark }}</option>{% endfor %}</select></label>
+          <label>window <span class="setschedwin">
+            {%- if sc.fixed or sc.windows -%}
+            <select class="input setin" name="schedule_window"{% if not sc.on %} disabled{% endif %}>{% for w in sc.windows %}<option value="{{ w.label }}"{% if w.label == sc.window %} selected{% endif %}>{{ w.label }}{{ w.mark }}</option>{% endfor %}</select>
+            {%- else -%}
+            <input class="input setnum" name="schedule_window" value="{{ sc.window }}" placeholder="week" autocomplete="off" spellcheck="false"{% if not sc.on %} disabled{% endif %}>{% if sc.note %} <span class="note">{{ sc.note }}</span>{% endif %}
+            {%- endif -%}
+          </span></label>
+        </span>
+        <span class="note setstarts">{{ sc.starts }}</span>
+      </div>
+      <div class="setrow"><span class="setlabel">Stops</span>
+        <span class="setpicks"><select class="input setin" name="stops" data-was="{{ 'at' if t.until else 'never' }}"><option value="never"{% if not t.until %} selected{% endif %}>never</option><option value="at"{% if t.until %} selected{% endif %}>at</option></select>
+        <input class="input setin" name="until" value="" placeholder="06:00, +8h or ISO" autocomplete="off" spellcheck="false" aria-label="stop time"{% if not t.until %} hidden{% endif %}></span>
+        <span class="note">{% if t.until %}{{ t.until }}{% if t.passed %} (passed) <button class="btn sm ghost" type="button" data-clear="until">Clear</button>{% endif %} · every member and seat{% else %}no stop time{% endif %}</span></div>
+      {# **when work appears** (§4.5a, §6 rule 8, TD-227): `teams.<team>.on_work`, written only when the pick moves #}
+      <label class="setrow"><span class="setlabel">When work appears</span>
+        <select class="input setin" name="on_work" data-was="{{ t.on_work }}" title="{{ help_title('on-work') }}">
+          <option value="ask"{% if t.on_work == "ask" %} selected{% endif %}>ask me</option>
+          <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team{% if not t.on_work_set %} (default){% endif %}</option>
+          <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
+        </select>
+        {#- the note says all three, the picked one first (TD-286) -#}
+        {%- set says = {"ask": "ask me: an Inbox row asks when its lanes gain entries", "start": "start the team: the home starts it", "off": "do nothing: it waits for Start or its schedule"} %}
+        <span class="note setonwork">wound down — {{ says[t.on_work] if t.on_work in says else says.start }}{% for k in ["ask", "start", "off"] if k != (t.on_work if t.on_work in says else "start") %} · {{ says[k] }}{% endfor %}</span></label>
+      <label class="setrow"><span class="setlabel">Reserve priority</span>
+        <input class="input setin" name="reserve" value="{{ t.reserve or '' }}" placeholder="0" inputmode="numeric" autocomplete="off">
+        <span class="note">{% if t.reserve %}+{{ t.reserve }} on the profile's reserve for this team's sessions{% else %}none — the profile's line{% endif %}</span></label>
+      {# **balance** (§4.5a, §6 *Balance*, TD-239): `teams.<team>.balance`, whole, written only when it moved;
+         off, the key is absent; a field left empty is a line not drawn #}
+      <div class="setrow setbalance" data-was="{{ t.balance.was }}">
+        <span class="setlabel">Holds new work</span>
+        <span class="setpicks">
+          <label title="{{ help_title('balance') }}"><input type="checkbox" name="balance_on"{% if t.balance.on %} checked{% endif %}> no new claim over a line</label>
+          <label>open PRs above <input class="input setnum" name="balance_prs" value="{{ t.balance.prs }}" inputmode="numeric" autocomplete="off"{% if not t.balance.on %} disabled{% endif %}></label>
+          <label>oldest open longer than <input class="input setnum" name="balance_oldest" value="{{ t.balance.oldest }}" placeholder="2d" autocomplete="off" spellcheck="false"{% if not t.balance.on %} disabled{% endif %}></label>
+          <label><input type="checkbox" name="balance_review"{% if t.balance.review %} checked{% endif %}{% if not t.balance.on %} disabled{% endif %}> the techlead's queue past its bound</label>
+        </span>
+        <span class="note setnow">{% if t.balance.mark %}<span class="setover">{{ t.balance.mark }}</span><br>{% endif %}{% if not t.balance.live %}no live member: a team with none is not read<br>{% endif %}now — {% for line in t.balance.now %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</span>
+      </div>
+      <div class="note setsaid" role="status"></div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.settings();</script>{% endblock %}

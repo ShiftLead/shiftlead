@@ -5271,7 +5271,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "why": why,
                 "agent_down": agent_down,
                 "host": host_name(),
-                "active": "",
+                "active": "Settings",
                 "volatile": hosts.local_host().volatile,
                 "usage": {} if agent_down else await chip_usage(call),
                 "build_chip": None if agent_down else await chip_build(call),
@@ -5357,6 +5357,77 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             key=str(body.get("key") or ""),
             label=body.get("label") or None,
             version=body.get("version") or None,
+        )
+
+    @app.get("/teams")
+    async def teams_first():
+        """`/teams` opens the first team of the tabs' order (§4.9d *The page*, TD-2059)."""
+        tabs = setmod.team_tabs(org_here()[0].teams)
+        return RedirectResponse(f"/teams/{quote(tabs[0], safe='')}" if tabs else "/teams/-", status_code=303)
+
+    @app.get("/teams/{team}", response_class=HTMLResponse)
+    async def team_page(request: Request, team: str):
+        """A team's page, before the cut-over (§4.9d *Before and after the cut-over*, TD-2059): the head and **When it
+        runs**, on today's keys and `set_settings` writes (`/api/settings/teams`)."""
+
+        async def read(method: str, **params: Any) -> Any:
+            try:
+                return await call(method, **params)
+            except HTTPException as e:
+                return e
+
+        org = org_here()[0]
+        tabs = setmod.team_tabs(org.teams)
+        if team not in org.teams and (tabs or team != "-"):
+            raise HTTPException(404, f"no team {team!r}: the org defines {', '.join(tabs) or 'none'}")
+        profiles, default, notes = await asyncio.to_thread(settings_profiles)
+        got, info, fleet, readings = await asyncio.gather(
+            read("settings", profiles=list(profiles)),
+            read("host"),
+            read("list"),
+            read("repos", omit=[*REPOS_OMIT_PAGE, "completed"]),
+        )
+        down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (got, info))
+        notes = [*notes, *(str(r.detail) for r in (got, info) if isinstance(r, HTTPException) and r.status_code != 503)]
+        got = {} if isinstance(got, HTTPException) else got
+        info = {} if isinstance(info, HTTPException) else info
+        fleet = [] if isinstance(fleet, HTTPException) else fleet
+        readings = {} if isinstance(readings, HTTPException) else readings
+        card, head = None, None
+        if team in org.teams:
+            card = setmod.team_cards(
+                {team: org.teams[team]},
+                got.get("teams"),
+                sessions=fleet,
+                repos=readings,
+                host=info,
+                profiles=profiles,
+                default=default,
+                labels=got.get("labels"),
+            )[0]
+            seats, waits = await h.seats_of(fleet), await h.person_waits()
+            rows = await h.team_rows(fleet)
+            views = [view(s, fleet, seats=seats, repos=readings, waits=waits) for s in fleet]
+            groups = team_groups(views, rows, readings) or []
+            head = setmod.team_head(
+                team, org.teams[team], next((g for g in groups if g.get("team") == team), None), host_name()
+            )
+        return templates.TemplateResponse(
+            request,
+            "team.html",
+            {
+                "t": card,
+                "head": head,
+                "tabs": tabs,
+                "notes": notes,
+                "agent_down": down,
+                "host": host_name(),
+                "active": "Settings",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if down else await chip_usage(call),
+                "build_chip": None if down else await chip_build(call, info or None),
+                "set_at": str(info.get("home") or hosts.home_name()) if info.get("mode") == "node" else "",
+            },
         )
 
     @app.get("/settings", response_class=HTMLResponse)

@@ -40,6 +40,7 @@
 <dl class="setvals">{% for r in list %}<dt>{{ r.key }}</dt><dd class="mono">{{ r.value }}{% if r.default %} <span class="badge defmark" title="the file does not set this: its default">default</span>{% endif %}</dd>{% endfor %}</dl>
 {%- endmacro %}
 {% set seth = "set at " ~ set_at ~ " — a write forwards to the home, and is refused while the link is down (§4.4a)" %}
+{% set rail_on = "Settings" %}<div class="setarea">{% include "settings_rail.html" %}
 <div class="page inboxpage setpage" id="setpage" data-set-at="{{ set_at }}">
   <div class="row gap wrap"><span class="h1">Settings</span>{% if set_at %}<span class="badge setat" title="{{ seth }}">set at {{ set_at }}</span>{% endif %}</div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — the settings cannot be read or written until it is back <span class="grow"></span><a class="btn sm ghost" href="/settings">Retry</a></div>
@@ -136,34 +137,7 @@
     {% for t in teams %}
     <form class="card pad setcard" id="team-{{ t.name }}" data-section="teams" data-team="{{ t.name }}">
       <div class="row gap wrap"><span class="h2 mono">{{ t.name }}</span><span class="note">team</span>{% if t.source %}{{ filehead(t.source, "defined in") }}{% endif %}</div>
-      <label class="setrow"><span class="setlabel">stop time</span>
-        <input class="input setin" name="until" value="" placeholder="06:00, +8h or ISO" autocomplete="off" spellcheck="false">
-        <span class="note">{% if t.until %}{{ t.until }}{% if t.passed %} (passed){% endif %} · every member and seat{% else %}none{% endif %}</span></label>
-      <label class="setrow"><span class="setlabel">reserve priority</span>
-        <input class="input setin" name="reserve" value="{{ t.reserve or '' }}" placeholder="0" inputmode="numeric" autocomplete="off">
-        <span class="note">{% if t.reserve %}+{{ t.reserve }} on the profile's reserve for this team's sessions{% else %}none — the profile's line{% endif %}</span></label>
-      {# **when work appears** (§4.5a, §6 rule 8, TD-227): `teams.<team>.on_work`, written only when the pick moves #}
-      <label class="setrow"><span class="setlabel">when work appears</span>
-        <select class="input setin" name="on_work" data-was="{{ t.on_work }}" title="{{ help_title('on-work') }}">
-          <option value="ask"{% if t.on_work == "ask" %} selected{% endif %}>ask me</option>
-          <option value="start"{% if t.on_work == "start" %} selected{% endif %}>start the team{% if not t.on_work_set %} (default){% endif %}</option>
-          <option value="off"{% if t.on_work == "off" %} selected{% endif %}>do nothing</option>
-        </select>
-        {#- the note says all three, the picked one first (TD-286) -#}
-        {%- set says = {"ask": "ask me: an Inbox row asks when its lanes gain entries", "start": "start the team: the home starts it", "off": "do nothing: it waits for Start or its schedule"} %}
-        <span class="note setonwork">wound down — {{ says[t.on_work] if t.on_work in says else says.start }}{% for k in ["ask", "start", "off"] if k != (t.on_work if t.on_work in says else "start") %} · {{ says[k] }}{% endfor %}</span></label>
-      {# **balance** (§4.5a, §6 *Balance*, TD-239): `teams.<team>.balance`, whole, written only when it moved;
-         off, the key is absent; a field left empty is a line not drawn #}
-      <div class="setrow setbalance" data-was="{{ t.balance.was }}">
-        <span class="setlabel">balance</span>
-        <span class="setpicks">
-          <label title="{{ help_title('balance') }}"><input type="checkbox" name="balance_on"{% if t.balance.on %} checked{% endif %}> no new claim over a line</label>
-          <label>open PRs above <input class="input setnum" name="balance_prs" value="{{ t.balance.prs }}" inputmode="numeric" autocomplete="off"{% if not t.balance.on %} disabled{% endif %}></label>
-          <label>oldest open longer than <input class="input setnum" name="balance_oldest" value="{{ t.balance.oldest }}" placeholder="2d" autocomplete="off" spellcheck="false"{% if not t.balance.on %} disabled{% endif %}></label>
-          <label><input type="checkbox" name="balance_review"{% if t.balance.review %} checked{% endif %}{% if not t.balance.on %} disabled{% endif %}> the techlead's queue past its bound</label>
-        </span>
-        <span class="note setnow">{% if t.balance.mark %}<span class="setover">{{ t.balance.mark }}</span><br>{% endif %}{% if not t.balance.live %}no live member: a team with none is not read<br>{% endif %}now — {% for line in t.balance.now %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</span>
-      </div>
+      <div class="note">Its running settings are on <a href="/teams/{{ t.name }}">its team page</a>.</div>
       {# **flow** (§4.5a, §4.9c, TD-309 slice 4b): `teams.<team>.flow`, a pick of the team's `flows:`, each it
          cannot follow disabled with the reason — written only when it moved, and nothing more (TD-356):
          Apply moves the team. The one pick since the team card's moved here (TD-418), whose flow chip
@@ -171,26 +145,7 @@
       {% if t.flows %}<label class="setrow"><span class="setlabel">flow</span>
         <select class="input setin" name="flow" data-was="{{ t.flow }}">{% for p in t.flows %}<option value="{{ p.name }}"{% if p.current %} selected{% endif %}{% if p.cannot %} disabled title="{{ p.cannot }}"{% endif %}>{{ p.name }}{% if p.cannot %} — cannot be followed{% endif %}</option>{% endfor %}</select>
         <span class="note">{{ t.flow_strip or "—" }} · written on Save and nothing more: the running team moves on its card's Apply</span></label>{% endif %}
-      {# **schedule** (§4.5a, §6 *Schedule*, TD-1346): `teams.<team>.schedule`, whole, written only when it moved;
-         off, the key is absent. The window pick is redrawn from `data-labels` on a profile pick (`app.js`),
-         a text field where the profile has no reading; `schedule_window` in both forms #}
-      {%- set sc = t.schedule %}
-      <div class="setrow setschedule" data-was="{{ sc.was }}" data-labels="{{ sc.labels }}">
-        <span class="setlabel">schedule</span>
-        <span class="setpicks">
-          <label title="{{ sc.why or help_title('schedule') }}"><input type="checkbox" name="schedule_on"{% if sc.on %} checked{% endif %}{% if not sc.can %} disabled{% endif %}> start at a reset</label>
-          <label>profile <select class="input setin" name="schedule_profile"{% if not sc.on %} disabled{% endif %}>{% for o in sc.options %}<option value="{{ o.name }}"{% if o.name == sc.profile %} selected{% endif %}{% if o.disabled %} disabled title="{{ o.title }}"{% endif %}>{{ o.name }}{{ o.mark }}</option>{% endfor %}</select></label>
-          <label>window <span class="setschedwin">
-            {%- if sc.fixed or sc.windows -%}
-            <select class="input setin" name="schedule_window"{% if not sc.on %} disabled{% endif %}>{% for w in sc.windows %}<option value="{{ w.label }}"{% if w.label == sc.window %} selected{% endif %}>{{ w.label }}{{ w.mark }}</option>{% endfor %}</select>
-            {%- else -%}
-            <input class="input setnum" name="schedule_window" value="{{ sc.window }}" placeholder="week" autocomplete="off" spellcheck="false"{% if not sc.on %} disabled{% endif %}>{% if sc.note %} <span class="note">{{ sc.note }}</span>{% endif %}
-            {%- endif -%}
-          </span></label>
-        </span>
-        <span class="note setstarts">{{ sc.starts }}</span>
-      </div>
-      {% call saverow("applies on the next tick") %}{% if t.until %}<button class="btn sm ghost" type="button" data-clear="until">Clear stop time</button>{% endif %}{% endcall %}
+      {% if t.flows %}{% call saverow("applies on the next tick") %}{% endcall %}{% endif %}
     </form>
     {% else %}
       <div class="note">The org defines no teams.</div>
@@ -440,6 +395,7 @@
       {#- §4.9b, TD-641: a `permissions:` rule the host cannot read is named here and acts on nothing #}
       {% for m in permissions_malformed %}<div class="note warn permbad">{{ m }} — ignored: no prompt is answered by it</div>{% endfor %}</div>
   </section>
+</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.settings();</script>{% endblock %}
