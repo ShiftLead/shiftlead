@@ -505,12 +505,17 @@ def work_left(git: Any) -> str | None:
     return None
 
 
-def _git(directory: Path | str, *args: str, timeout: float) -> str | None:
-    """One read-only git command, or None when it could not be run or failed. The host agent never
-    fetches for any of this: it reads the refs it has (design §4.2)."""
+def _git(directory: Path | str, *args: str, timeout: float, input: str | None = None) -> str | None:
+    """One read-only git command, `input` on its stdin, or None when it could not be run or failed. The host agent
+    never fetches for any of this: it reads the refs it has (design §4.2)."""
     try:
         cp = subprocess.run(
-            ["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=timeout, env=read_only_env()
+            ["git", "-C", str(directory), *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=read_only_env(),
+            input=input,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -1095,6 +1100,19 @@ def landed_since_edited(directory: Path | str, ref: str, base_ref: str, timeout:
         return None
     undone = _git_rc(directory, "diff", "--quiet", base, base_ref, "--", *names, timeout=timeout)
     return "reverted" if undone == 0 else "yes"
+
+
+def detached_landed(directory: Path | str, *, root: Path | str | None = None, timeout: float = REAP_STEP) -> str:
+    """A detached worktree's *landed* (§4.6 *The disk sweep*, TD-2103): `yes` when its `HEAD` is an ancestor of
+    `origin/<default>`, `no` when it is not, `unreadable` for any other exit, a read that timed out, a
+    `docs/cadence.toml` under `root` that cannot be parsed, or no `origin/<default>` ref."""
+    if not _pin_readable(root, False):
+        return "unreadable"
+    base_ref = f"origin/{default_branch(directory, timeout)}"
+    if _git(directory, "rev-parse", "--verify", "-q", f"refs/remotes/{base_ref}", timeout=timeout) is None:
+        return "unreadable"
+    rc = _git_rc(directory, "merge-base", "--is-ancestor", "HEAD", base_ref, timeout=timeout)
+    return {0: "yes", 1: "no"}.get(rc, "unreadable")
 
 
 def landed_of(

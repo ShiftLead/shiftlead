@@ -102,12 +102,11 @@ def test_a_landed_clean_old_worktree_goes_and_its_branch_stays_while_the_rest_ar
     for w in (landed, unpushed, untracked, detached, locked):
         age(w)
     got = run(repo)
-    assert got.removed == [str(landed)] and not landed.exists()
+    assert got.removed == [str(detached), str(landed)] and not landed.exists() and not detached.exists()
     kept = dict(got.kept)
     assert kept[str(unpushed)] == "1 commit only on this machine"
     assert kept[str(untracked)].endswith("uncommitted")
     assert kept[str(young)] == "written within 7 days"
-    assert kept[str(detached)] == "detached"
     assert kept[str(locked)] == "locked"
     assert str(repo) not in kept  # the main checkout is never weighed
     assert "landed" in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads").split()  # no branch deleted
@@ -216,9 +215,10 @@ def test_successive_passes_weigh_each_worktree_in_turn_from_the_cursor(repo, mon
     assert seen == ["a", "b", "c", "a"]  # a kept worktree never starves the next; past the end it wraps
 
 
-def test_the_pinned_script_reads_the_same_worktrees_the_same_way_but_for_empty(repo):
+def test_the_pinned_script_reads_the_same_worktrees_the_same_way_but_for_empty_and_detached(repo):
     """§4.6: the sweep holds `reap_worktrees.sh`'s five tests. Run without `--reap` over the same worktrees, the
-    script's REAPABLE are what the sweep removes, but for an *empty* branch, which the sweep takes past its keep."""
+    script's REAPABLE are what the sweep removes, but for an *empty* branch, which the sweep takes past its keep, and
+    a landed *detached* worktree, which the script never reaps and the sweep weighs by its own tests (TD-2103)."""
     from conftest import pinned_script
 
     made = {}
@@ -251,8 +251,8 @@ def test_the_pinned_script_reads_the_same_worktrees_the_same_way_but_for_empty(r
     for w in made.values():
         age(w)  # the script's own `git status` refreshed each index, a write; the sweep's reads write none
     got = run(repo, idle=lambda wt: None)
-    assert {Path(p).name for p in got.removed} == script | {"empty"}, got.kept
-    assert {Path(p).name for p, _ in got.kept} == set(made) - script - {"empty"}
+    assert {Path(p).name for p in got.removed} == script | {"empty", "detached"}, got.kept
+    assert {Path(p).name for p, _ in got.kept} == set(made) - script - {"empty", "detached"}
 
 
 def test_the_tick_reads_every_registered_root_even_two_of_one_name():
@@ -392,3 +392,151 @@ def test_a_worktree_path_that_is_a_symlink_is_kept_as_not_a_directory(repo):
     got = run(repo)
     assert got.removed == [] and dict(got.kept) == {str(w): "not a directory"}
     assert w.is_symlink() and moved.is_dir()
+
+
+def detached_at(repo: Path, name: str, ref: str = "origin/main") -> Path:
+    w = repo / ".claude/worktrees" / name
+    git(repo, "worktree", "add", "-q", "--detach", str(w), ref)
+    git(w, "config", "user.email", "t@t")
+    git(w, "config", "user.name", "t")
+    return w
+
+
+def test_a_detached_worktree_with_a_commit_not_on_origin_is_kept_and_counted(repo):
+    w = detached_at(repo, "ahead")
+    commit(w, "a", msg="one")
+    commit(w, "b", msg="two")
+    git(repo, "branch", "holds-it", git(w, "rev-parse", "HEAD"))  # a ref reaches them: the reflog test passes
+    age(w)
+    assert gitinfo.detached_landed(w, root=repo) == "no"
+    got = run(repo)
+    assert dict(got.kept) == {str(w): "detached: 2 commits not on origin/main"} and w.exists()
+
+
+def test_a_detached_worktree_with_a_commit_only_in_its_reflog_is_kept(repo):
+    w = detached_at(repo, "reflog")
+    commit(w, "a", msg="made here")
+    git(w, "checkout", "-q", "--detach", "origin/main")  # HEAD is landed; the commit survives only in the reflog
+    age(w)
+    assert dict(run(repo).kept) == {str(w): "detached: 1 commit only in its reflog"} and w.exists()
+
+
+def test_a_detached_worktree_whose_reflog_cannot_be_read_is_kept(repo, monkeypatch):
+    w = detached_at(repo, "noreflog")
+    age(w)
+    real = gitinfo._git
+
+    def fails(directory, *args, **kw):
+        return None if args[:2] == ("log", "-g") else real(directory, *args, **kw)
+
+    monkeypatch.setattr(gitinfo, "_git", fails)
+    assert dict(run(repo).kept) == {str(w): gitinfo.UNKNOWN} and w.exists()
+
+
+@pytest.mark.parametrize("name", worktreesweep.OPERATIONS)
+def test_a_detached_worktree_with_an_operation_in_progress_is_kept(repo, name):
+    w = detached_at(repo, "op")
+    marker = Path(git(w, "rev-parse", "--path-format=absolute", "--git-path", name))
+    if name.startswith("rebase"):
+        marker.mkdir()
+    else:
+        marker.write_text("")
+    age(w)
+    assert dict(run(repo).kept) == {str(w): "detached: operation in progress"} and w.exists()
+
+
+def test_a_detached_worktree_whose_landing_cannot_be_read_is_kept(repo):
+    w = detached_at(repo, "pin")
+    age(w)
+    (repo / "docs").mkdir()
+    (repo / "docs/cadence.toml").write_text("this is [not toml")
+    assert gitinfo.detached_landed(w, root=repo) == "unreadable"
+    assert dict(run(repo).kept) == {str(w): "detached: not landed (unreadable)"} and w.exists()
+
+
+def test_a_detached_worktree_with_changes_or_a_recent_write_is_kept(repo):
+    dirty = detached_at(repo, "dirty")
+    (dirty / "notes.txt").write_text("scratch")
+    age(dirty)
+    young = detached_at(repo, "young")
+    kept = dict(run(repo).kept)
+    assert kept[str(dirty)].endswith("uncommitted") and kept[str(young)] == "written within 7 days"
+
+
+def test_a_recorded_home_keeps_a_detached_worktree_and_is_asked_before_the_age_and_again_before_removal(repo):
+    home, late = detached_at(repo, "home"), detached_at(repo, "late")
+    age(home)
+    age(late)
+    asks = []
+
+    def record(wt):
+        asks.append(wt.name)
+        if wt.name == "home":
+            return "record: ao-seat"
+        return "record: ao-late" if asks.count("late") == 2 else None
+
+    got = run(repo, record=record)
+    assert dict(got.kept) == {str(home): "record: ao-seat", str(late): "record: ao-late"}
+    assert home.exists() and late.exists() and asks.count("home") == 1 and asks.count("late") == 2
+
+
+def test_a_branch_worktree_never_asks_the_recorded_home(repo):
+    w = landed_old(repo, "branchy")
+    got = run(repo, record=lambda wt: pytest.fail("a branch's worktree has no recorded-home test"))
+    assert got.removed == [str(w)]
+
+
+def test_a_head_that_moves_between_the_weigh_and_the_removal_keeps_the_worktree(repo):
+    w = detached_at(repo, "moved")
+    age(w)
+
+    def hold(wt, main):
+        commit(wt, "late", msg="made during the pass")
+        return lambda: None
+
+    assert dict(run(repo, hold=hold).kept) == {str(w): "detached: HEAD moved"} and w.exists()
+
+
+def test_a_dry_run_names_a_detached_worktrees_why_and_reads_no_head(repo, monkeypatch):
+    home, gone = detached_at(repo, "home"), detached_at(repo, "gone")
+    age(home)
+    age(gone)
+    monkeypatch.setattr(worktreesweep, "_head", lambda *a: pytest.fail("a dry run reads HEAD neither time"))
+    got = run(repo, dry=True, record=lambda wt: "record: ao-x" if wt.name == "home" else None)
+    assert got.removed == [str(gone)] and dict(got.kept) == {str(home): "record: ao-x"}
+    assert home.exists() and gone.exists()
+
+
+@pytest.mark.integration
+async def test_the_record_guard_reads_any_state_a_node_and_whole_path_components(agent, tmp_path, monkeypatch):
+    from conftest import park_ticks
+
+    from sessionorc import containers
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    wt = tmp_path / "grinder-ao-1"
+    (wt / "sub").mkdir(parents=True)
+    (tmp_path / "grinder-ao-10").mkdir()
+
+    def rec(rid, d, state):
+        s = Session(id=rid, name=rid, kind="interactive", adapter="shell", dir=d)
+        s.state = state
+        return s
+
+    agent.sessions.clear()
+    agent.sessions["ao-empty"] = rec("ao-empty", "", "exited")  # an empty dir is skipped, never resolved to the cwd
+    monkeypatch.chdir(wt)
+    agent.sessions["ao-sibling"] = rec("ao-sibling", str(tmp_path / "grinder-ao-10"), "idle")
+    assert agent._record_home(wt) is None
+    for state in ("exited", "closed", "idle"):
+        agent.sessions["ao-seat"] = rec("ao-seat", str(wt / "sub"), state)
+        assert agent._record_home(wt) == "record: ao-seat"
+    del agent.sessions["ao-seat"]
+    monkeypatch.setattr(agent, "mode", "home")
+    monkeypatch.setattr(containers, "container_nodes", lambda: ["node1"])
+    monkeypatch.setitem(agent.remote, "node1", {"ao-n": rec("ao-n", str(wt), "closed")})
+    monkeypatch.setitem(agent.links, "node1", {"up": True})
+    assert agent._record_home(wt) == "record: ao-n@node1"
+    monkeypatch.setitem(agent.links, "node1", {"up": False})
+    assert agent._record_home(wt) == "node1 unreachable"

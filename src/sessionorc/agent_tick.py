@@ -6131,6 +6131,7 @@ class TickMixin:
                 cursor="" if dry else self._worktree_cursor,
                 keep_days=hosts.local_host().worktree_keep_days,
                 idle=lambda wt: self._reap_idle(None, wt),
+                record=self._record_home,
                 hold=self._hold_create_locks,
                 transcript_roots=troots,
                 now=now.timestamp(),
