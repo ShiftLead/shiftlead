@@ -1647,11 +1647,12 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .fllist .pal small { display: block; color: var(--muted); font-size: var(--t-small); }
 .flhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .flhead .flname { font-size: var(--t-title); font-weight: 600; max-width: 100%; }
+.flhead input.flname { flex: 1 1 100%; }
 .flhead .act { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .fltag { border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; font-size: var(--t-small); color: var(--muted); }
 .flbad { color: var(--stalled); } .flok { color: var(--working); } .flwarn { color: var(--alarm); }
 .flcap { margin: 8px 0; color: var(--muted); }
-.flcap input, .flrec input[type=number] { width: 58px; }
+.flcap input.input, .flrec input.input[type=number] { display: inline-flex; width: 58px; height: 28px; padding: 0 6px; }
 .fltabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; overflow-x: auto; }
 .fltabs button { background: none; border: none; border-bottom: 2px solid transparent; padding: 5px 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .fltabs button.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
@@ -1669,7 +1670,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .flahead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: var(--t-btn); color: var(--muted); margin-bottom: 6px; }
 .flahead b { color: var(--fg); box-shadow: inset 3px 0 0 var(--k); padding-left: 8px; }
 .flahead span { flex: 1 1 180px; min-width: 0; }
-.flhrow, .flerow { display: grid; grid-template-columns: 140px minmax(0, 1fr) 250px; gap: 12px; align-items: baseline; }
+.flhrow, .flerow { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; align-items: baseline; }
 .flhrow { font-size: var(--t-cap); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
 .flerow { padding: 4px 0; border-bottom: 1px dashed var(--line2); font-size: var(--t-btn); }
 .flerow.err > span:first-child { color: var(--stalled); }
@@ -1680,7 +1681,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .flkey { font-family: var(--mono, monospace); font-size: var(--t-mono-s); background: var(--needs-bg); color: var(--needs-fg); border-radius: 3px; padding: 0 6px; }
 .flyou { border: 1px dashed var(--muted); border-radius: 3px; padding: 0 6px; }
 .flans { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.flans input { flex: 1 1 90px; min-width: 0; }
+.flans input.input, .flans select.input { flex: 1 1 90px; width: auto; min-width: 0; }
 .fllink { background: none; border: none; padding: 0; color: var(--link); text-decoration: underline; cursor: pointer; font-size: var(--t-small); }
 .flbrief { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; padding: 8px 10px; margin: 4px 0 6px; font-size: var(--t-btn); color: var(--fg); }
 .flbrief pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; max-height: 240px; overflow-y: auto; }
