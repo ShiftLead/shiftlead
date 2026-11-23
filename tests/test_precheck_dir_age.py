@@ -64,6 +64,24 @@ def test_removes_only_a_directory_over_a_day_old(tmp_path, index):
 
 
 @pytest.mark.parametrize("index", range(len(_commands())))
+def test_removes_a_directory_holding_a_read_only_tree(tmp_path, index):
+    root = tmp_path / "vartmp"
+    root.mkdir()
+    old = root / "pc.readonly"
+    tree = old / "p" / "cache" / "files"
+    tree.mkdir(parents=True)
+    (tree / "f").write_text("x")
+    tree.chmod(0o555)
+    tree.parent.chmod(0o555)
+    _aged(old, DAY_AND_A_BIT)
+
+    out = subprocess.run(["bash", "-c", _removal(_commands()[index], root)], capture_output=True, text=True)
+
+    assert out.returncode == 0 and out.stdout.strip() == "ran"
+    assert not old.exists()
+
+
+@pytest.mark.parametrize("index", range(len(_commands())))
 def test_a_failed_removal_does_not_stop_the_precheck(tmp_path, index):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
