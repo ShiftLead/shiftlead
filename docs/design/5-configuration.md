@@ -460,7 +460,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
-  exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent:
+  exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent (after the cut-over the host agent reads its `director:` and `projects:` alone, and `director:` holds `model` and `logins` in place of `profile`, §4.9d *How each one runs*, §4.9e):
 
 ```yaml
 projects:                                    # §4.9: headings on repos (TD-722); a repo in at most one, a repo in none its own heading
