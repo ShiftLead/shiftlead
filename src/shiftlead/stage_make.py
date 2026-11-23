@@ -129,15 +129,23 @@ def _archive_design(store: StageStore, record: dict[str, Any], _s: Reading, _doc
     return Made(True)
 
 
-def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any]) -> Made:
+def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any], person: str) -> Made:
     """An entry whose `Team:` line now names another team: its record closes here, keeping the branch and open pull
-    request for the new team's first record. One that waits on the person first has its question cleared, which is a
-    later slice's."""
-    if record.get("waits") == "person":
-        return Made(False, "clearing the question of a moved entry is a later slice's")
+    request for the new team's first record. One that waits on a question this record asked has that question cleared
+    first, in the order of a move to the person: the intent on the record, the pull request, and the close only once
+    that has merged. A refusal leaves the record, so the next pass tries again; a gate the record did not ask stands."""
+    nonce = (record.get("asked") or {}).get("nonce") if record.get("waits") == "person" else None
+    if nonce:
+        if record.get("clearing") != nonce:
+            record["clearing"] = nonce
+            store.put_entry(record, "moved to another team: its question is to be cleared")
+        try:
+            store.clear_question(str(record["id"]), person, str(nonce))
+        except board.Refused as e:
+            return Made(False, f"the question could not be cleared: {e}")
     pushed = s.pr_state not in ("merged", "closed") and (record.get("branch") or record.get("pr"))
     carried = {"branch": record.get("branch"), "pr": record.get("pr")} if pushed else None
-    record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None, carried=carried)
+    record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None, clearing=None, carried=carried)
     store.put_entry(record, "closed: its entry moved to another team")
     return Made(True)
 
@@ -203,6 +211,7 @@ _ASKS: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any], 
     "pr-closed": _pr_closed,
     "stage-gone": _stage_gone,
     "gate-again": _gate_again,
+    "team-moved": _team_moved,
 }
 
 _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any]], Made]] = {
@@ -214,7 +223,6 @@ _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, A
     "rewrite-flow": _rewrite_flow,
     "re-enter": _re_enter,
     "archive-design": _archive_design,
-    "team-moved": _team_moved,
 }
 
 

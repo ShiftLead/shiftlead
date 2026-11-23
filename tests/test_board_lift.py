@@ -332,3 +332,41 @@ def test_a_stray_file_a_crash_left_is_gone_at_the_next_press(repo):
     stray.write_text("left by a write a crash cut short\n")
     board._tree(repo, board._Clock())
     assert not stray.exists()
+
+
+MOVED_LOG = "\n**Log:**\n- 2026-11-20: asked by the stage record: n1\n"
+
+
+def test_a_moved_entrys_question_is_cleared_in_one_pull_request(repo):
+    """TD-2051, §4.9c: the gate and Ask go, the item covering them closes, and a second call writes nothing."""
+    _push(repo, [ASKED], {190: _entry(190) + MOVED_LOG})
+    got = board.clear_question(repo, "TD-190", "paul", "n1")
+    assert got["commit"] and len(got["closed"]) == 1
+    git(repo, "fetch", "-q", "origin")
+    entry = git(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "**Blocked by:**" not in entry and "**Ask:**" not in entry
+    assert "gate lifted: decision (paul) — by shiftlead; override: its entry moved to another team" in entry
+    item = _item(repo, ASKED)
+    assert item is not None and item.closed
+    head = git(repo, "rev-parse", "origin/main")
+    assert board.clear_question(repo, "TD-190", "paul", "n1") == {"nothing": True}
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+
+
+@pytest.mark.parametrize("nonce", ["another", "n1"])
+def test_a_gate_this_question_did_not_set_is_left_standing(repo, nonce):
+    log = MOVED_LOG if nonce == "another" else ""  # a different question's mark, or none at all
+    _push(repo, [ASKED], {190: _entry(190) + log})
+    head = git(repo, "rev-parse", "origin/main")
+    assert board.clear_question(repo, "TD-190", "paul", nonce) == {"nothing": True}
+    git(repo, "fetch", "-q", "origin")
+    assert git(repo, "rev-parse", "origin/main") == head
+
+
+def test_an_item_shared_with_another_gated_entry_stays_open_when_one_moves(repo):
+    _push(repo, [SHARED], {189: _entry(189), 190: _entry(190) + MOVED_LOG, 191: _entry(191)})
+    got = board.clear_question(repo, "TD-190", "paul", "n1")
+    assert got["closed"] == []
+    item = _item(repo, SHARED)
+    assert item is not None and not item.closed

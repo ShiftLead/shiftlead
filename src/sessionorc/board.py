@@ -1555,6 +1555,77 @@ def _archive_entry(root: Path, tid: str, why: str, clock: _Clock) -> dict[str, A
         raise Refused(f"the entry could not be archived, and the ledger is as it was: {e}") from None
 
 
+CLEAR_BODY = (
+    "shiftlead clears the question it set on an entry that has moved to another team: the entry's `decision (<p>)` "
+    "gate and Ask, and the board item covering them (design §4.9c, reconcile)."
+)
+MOVED_WHY = "its entry moved to another team"
+
+
+def clear_question(root: str | Path, tid: str, person: str, nonce: str) -> dict[str, Any]:
+    """**A moved entry's question cleared** (design §4.9c, reconcile, TD-2051): on origin's head, the `decision
+    (<person>)` that the stage record's question `nonce` set on `tid` is removed with its Ask, and the board item
+    covering it alone is closed, landed as one pull request of the host agent's own. The ledger's writer removes no
+    Answers, Lifts or Context section, so those stay, read by nothing while the entry carries no decision, and the
+    next question replaces them. Returns the landing's `{commit, message, pr}` with `closed`, or `{"nothing": True}`
+    where there is nothing of that question to clear (already cleared, answered, or the entry gone)."""
+    root = Path(root)
+    with _EDIT:
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+        return _twice(lambda: _clear_question(root, tid, person, nonce, clock))
+
+
+def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock) -> dict[str, Any]:
+    t, want = _tree(root, clock)
+    try:
+        led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
+        try:
+            path, archived = led.entry_file(tid)
+        except ledgerboard.Refused:
+            archived, path = True, ""
+        text = "" if archived else (led.read(path) or "")
+        gate = ledgerboard._carried(text, f"decision ({person})") if text else None
+        if gate is None or f"asked by the stage record: {nonce}" not in text:
+            _reset(t, want)
+            return {"nothing": True}
+        rel = workorders.board_rel(root)
+        b = _board(t, rel)
+        url = _git(root, "remote", "get-url", "origin").stdout.strip()
+        repo = ledgerboard.origin_path(url) or root.name
+        covering = [
+            it
+            for _, it, state in ledgerboard.covers(text, gate, [(url, root.name, b)], repo)
+            if state in ("open", "decided") and not _lists_other(it, tid, gate, led)
+        ]
+        day = datetime.now(UTC).date().isoformat()
+        out = ledgerboard.lift_gate(text, gate, TOOL, override=MOVED_WHY, today=day)
+        declared = tuple(ledgerboard.declared(led.texts()[0])[0])
+        out = ledgerboard.edit_entry(out, "edit", section="Ask", remove=True, today=day, declared_fields=declared)
+        lb_ledger.gate(led, {path: out}, today=day)
+        lb_ledger.write({path: out})
+        for it in covering:
+            _apply(_plan(lb_board.plan_edit, str(t / rel), "done", it.id, why=MOVED_WHY, tool=TOOL))
+        entry_rel = os.path.relpath(path, t)
+        landed = _land(
+            root,
+            t,
+            want,
+            f"{TOOL}: clear decision ({person}) on {tid}, moved to another team (session n/a)",
+            clock,
+            lambda: _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0,
+            body=CLEAR_BODY,
+            also=[entry_rel],
+        )
+        return {**landed, "closed": [item_ref(it) for it in covering]}
+    except (Refused, ledgerboard.Refused, OSError) as e:
+        _reset(t, want)
+        if isinstance(e, Refused):
+            raise
+        raise Refused(f"the question could not be cleared, and the ledger is as it was: {e}") from None
+
+
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
 
 BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone
