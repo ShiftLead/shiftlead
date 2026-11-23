@@ -359,3 +359,35 @@ async def test_an_entry_request_moves_to_no_first_shape_techlead_after_the_marke
     assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is True
     await _cut_over(agent)
     assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is False
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_handed_entry_ignores_a_first_shape_team_list_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc import agent_inbox
+
+    old = _asks_seat(agent, "old")
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    built_in.host = agent.host
+    monkeypatch.setattr(agent_inbox.hosts, "local_host", lambda: SimpleNamespace(repos=lambda: ["/tmp/repo"]))
+    monkeypatch.setattr(agent, "_question_seat", AsyncMock(return_value=built_in))
+    send = AsyncMock(return_value={"entry": {"id": "m-1"}})
+    monkeypatch.setattr(agent, "_msg", send)
+    await _cut_over(agent, marked=marked)
+    teams = [{"team": "g", "seat": old.id}]
+    await agent._entry_send("repo", "debt", "file this", teams, "", "g", "", None, "", "")
+    assert send.await_args.args[2] == [built_in.id if marked else old.id]
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_waiting_handed_entry_moves_to_no_first_shape_seat_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc.mail import MailEntry
+
+    seat = _asks_seat(agent, "seat", tags=False)
+    old = _asks_seat(agent, "old", tags=False)
+    monkeypatch.setattr(agent, "_mark", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent, "_close_entry", lambda *_a, **_k: None)
+    entry = MailEntry(id="m-1", from_="person", to=[seat.id], at="2026-11-23T00:00:00Z", kind="ask", text="file this")
+    entry.entry = {"teams": [{"team": "g", "seat": old.id}, {"team": "h", "seat": "ao-t-gone"}]}
+    await _cut_over(agent, marked=marked)
+    moved = agent._move_handed(entry, seat.id, seat, "unable", "2026-11-23T00:00:00Z", {})
+    assert moved is (not marked)

@@ -938,6 +938,8 @@ class MailMixin:
             if target == key or not self._seat_id_takes(target):  # able and not held (§6 rule 3, TD-1564)
                 continue
             r = records.get(target)
+            if self._first_shape_off and (r is None or not self._rules_reach(r)):
+                continue  # a list stored before the cut-over: only a built-in seat is read after it (§4.9d, §4.9e)
             if r is None:
                 continue  # a seat with no record yet: nothing to land in until rule 3 fills it
             if mail.MAILBOX_DEPTH is not None and r.unread() >= mail.MAILBOX_DEPTH:
