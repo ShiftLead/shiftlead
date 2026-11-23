@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from shiftlead.stage_acts import Act, Holder, Reading, choose
+from shiftlead.stage_end import ARCHIVE
 from shiftlead.stage_make import make, sweep_closed
 from shiftlead.stagerecord import OTHER, StageStore, new_record
 
@@ -134,11 +135,86 @@ def test_an_answer_at_a_limit_takes_the_stopped_move_and_restarts_its_counts(sto
     assert got["counts"] == {"review:ship": 1}
 
 
-def test_an_answer_that_names_no_stage_of_the_flow_writes_nothing(store):
-    before = put(store, waits="person", answers={"Gone": "nowhere", OTHER: None})
-    got = act_on(store, Reading(lifted="Gone"))
-    assert not got.made
-    assert store.entry(TID) == before
+def test_an_answer_that_names_no_stage_of_the_flow_is_asked_once_more(store):
+    put(store, waits="person", answers={"Gone": "nowhere", OTHER: None})
+    assert act_on(store, Reading(lifted="Gone")).made
+    got = store.entry(TID)
+    assert got["stage"] == "build", "the record stays until the new answer"
+    assert list(got["intent"]["answers"])[:3] == [
+        "build — a session takes it to this stage",
+        "review — a session takes it to this stage",
+        "polish — a session takes it to this stage",
+    ]
+
+
+def test_a_merged_entry_still_open_asks_with_the_archive_answer_and_ends_the_holder(store):
+    put(store, pr=4, holder="s1", waits="merging")
+    got = act_on(store, Reading(pr_state="merged"))
+    assert got.made and got.end == "s1"
+    record = store.entry(TID)
+    assert record["holder"] is None and record["waits"] is None
+    assert record["intent"]["answers"][ARCHIVE] == {"archive": True}
+
+
+def test_a_closed_pull_request_asks_and_its_answer_starts_from_no_pull_request(store):
+    put(store, pr=4, branch="td7", holder="s1")
+    assert act_on(store, Reading(pr_state="closed")).end == "s1"
+    record = store.entry(TID)
+    back = next(a for a in record["intent"]["answers"] if a.startswith("Back to build"))
+    label = back.split(" — ")[0]
+    record.update(intent=None, waits="person", answers={label: "build", OTHER: None})
+    store.put_entry(record, "landed")
+    assert act_on(store, Reading(pr_state="closed", lifted=label)).made
+    got = store.entry(TID)
+    assert (got["pr"], got["branch"], got["waits"]) == (None, None, None)
+    assert choose(got, Reading(may_start=True, within_size=True)) == Act("offer")
+
+
+def test_an_entry_already_carrying_a_gate_is_not_asked_again(store):
+    put(store, pr=4, holder="s1")
+    assert act_on(store, Reading(pr_state="closed", gate=True)).made
+    got = store.entry(TID)
+    assert got["waits"] == "person" and got["intent"] is None
+
+
+def test_an_answered_question_leaves_no_mark_to_refuse_a_later_gates_answer(store):
+    asked = {"nonce": "n1", "ask": "?", "context": "c", "answers": {}}
+    put(store, waits="person", asked=asked, answers={"Polish it": "polish", OTHER: None})
+    assert act_on(store, Reading(lifted="Polish it", lifted_for="n1")).made
+    assert store.entry(TID)["asked"] is None
+    assert act_on(store, Reading(gate=True)).made  # a gate placed by hand: marked as waiting
+    assert choose(store.entry(TID), Reading(lifted="Go")) == Act("answer")
+
+
+def test_a_gate_met_by_a_move_to_the_person_drops_the_earlier_question(store):
+    put(store, pr=4, asked={"nonce": "n1"}, answers={"Old": "polish"})
+    assert act_on(store, Reading(pr_state="closed", gate=True)).made
+    got = store.entry(TID)
+    assert (got["waits"], got["asked"], got["answers"]) == ("person", None, None)
+
+
+def test_a_stage_gone_asks_with_the_flows_stages(store):
+    put(store, stage="dropped", moves=2, holder="s1")
+    got = act_on(store, Reading(stage_known=False))
+    assert got.made and got.end == "s1"
+    assert "polish — a session takes it to this stage" in store.entry(TID)["intent"]["answers"]
+
+
+def test_a_lost_gate_is_asked_again_in_the_same_words_under_a_new_mark(store):
+    asked = {"nonce": "n1", "ask": "Why?", "context": "c", "answers": {"Go — a session goes": "build"}}
+    put(store, waits="person", asked=asked, blocked={"to": "polish", "count": "build:work-pushed"})
+    assert act_on(store, Reading()).made
+    intent = store.entry(TID)["intent"]
+    assert (intent["ask"], intent["context"]) == ("Why?", "c") and intent["nonce"] != "n1"
+    assert "Go — a session goes" in intent["answers"]
+    assert store.entry(TID)["blocked"] == {"to": "polish", "count": "build:work-pushed"}
+
+
+def test_a_lift_of_an_earlier_question_is_not_applied_to_the_new_one(store):
+    put(store, waits="person", asked={"nonce": "new"}, answers={"Polish it": "polish", OTHER: None})
+    stale = Reading(gate=True, lifted="Polish it", lifted_for="old")
+    assert choose(store.entry(TID), stale) is None
+    assert act_on(store, Reading(lifted="Polish it", lifted_for="new")).made
 
 
 def test_the_archive_answer_is_left_for_its_own_slice(store):
@@ -179,7 +255,7 @@ def test_a_record_that_moved_after_the_reading_is_not_overwritten(store):
 
 def test_a_case_of_a_later_slice_writes_nothing(store):
     before = put(store, pr=4, holder="s1")
-    got = make(store, TID, Act("reconcile", "pr-closed"), Reading(pr_state="closed"), FLOW, "paul")
+    got = make(store, TID, Act("reconcile", "team-moved"), Reading(team_moved=True), FLOW, "paul")
     assert not got.made and "later" in got.why
     assert store.entry(TID) == before
 
@@ -200,3 +276,10 @@ def test_closed_records_leave_after_thirty_days_in_one_commit(store):
         check=True,
     )
     assert count.stdout.strip() == "1"
+
+
+def test_a_malformed_closed_date_does_not_stop_the_sweep(store):
+    now = datetime(2026, 11, 23, tzinfo=UTC)
+    store.put_entry({**new_record("TD-1", "f", "build"), "closed_at": "yesterday"}, "test")
+    store.put_entry({**new_record("TD-2", "f", "build"), "closed_at": "2026-01-01T00:00:00Z"}, "test")
+    assert sweep_closed(store, now) == ["TD-2"]

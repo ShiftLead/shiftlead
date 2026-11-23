@@ -77,6 +77,7 @@ class Reading:
     flow_current: bool = True
     gate: bool = False  # the entry carries the home's `decision` gate
     lifted: str | None = None  # the label of the person's answer that lifted it
+    lifted_for: str | None = None  # the nonce of the question that answer lifted, from the entry's Log
     nothing_to_read: bool = False  # an `only-when` stage with nothing to read
     holder: Holder | None = None
     may_start: bool = False  # the team is started, inside its schedule and not held by the usage gate
@@ -104,6 +105,12 @@ def _merged(record: Mapping[str, Any], s: Reading) -> str | None:
         if s.had_parts:
             return _SETTLED if s.archive_open else "archive-design"
     return None if waits == "person" else "merged-entry-open"
+
+
+def _lifted(record: Mapping[str, Any], s: Reading) -> str | None:
+    """The lifted label, unless it answered an earlier question than the one the record now asks."""
+    asked = record.get("asked")
+    return None if asked and s.lifted_for != asked.get("nonce") else s.lifted
 
 
 def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
@@ -136,7 +143,7 @@ def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
             return "rewrite-flow"
         if s.gate and waits is None:
             return "mark-waiting"
-    elif not s.gate and s.lifted is None:
+    elif not s.gate and _lifted(record, s) is None:
         return "gate-again"
     return _SETTLED if settled else None
 
@@ -169,7 +176,7 @@ def choose(record: Mapping[str, Any] | None, s: Reading) -> Act | None:
         return Act("reconcile", case)
     waits = record.get("waits")
     if waits == "person":
-        return Act("answer") if s.lifted is not None else None
+        return Act("answer") if _lifted(record, s) is not None else None
     holder = s.holder if record.get("holder") else None
     if holder is None and not record.get("holder") and waits is None:
         if s.nothing_to_read:
@@ -185,5 +192,8 @@ def closed_expired(record: Mapping[str, Any], now: datetime | None = None) -> bo
     closed = record.get("closed_at")
     if not closed:
         return False
-    at = datetime.strptime(str(closed), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    try:
+        at = datetime.strptime(str(closed), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    except ValueError:
+        return False  # kept: one bad date must not stop the sweep of the others
     return (now or datetime.now(UTC)) - at >= CLOSED_KEPT

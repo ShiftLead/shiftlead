@@ -85,6 +85,7 @@ def new_record(tid: str, flow: str, stage: str, *, holder: str | None = None) ->
         "waits": None,
         "blocked": None,
         "answers": None,
+        "asked": None,
         "answer": None,
         "verdicts": {},
         "history": [],
@@ -357,5 +358,6 @@ class StageStore:
             return got
         record["waits"] = "person"
         record["answers"] = {a.split(" — ", 1)[0]: move for a, move in intent["answers"].items()}
+        record["asked"] = {k: intent[k] for k in ("nonce", "ask", "context", "answers")}
         self.put_entry(record, "waits on the person")
         return got
