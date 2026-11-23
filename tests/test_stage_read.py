@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from sessionorc import ledgerboard
 from shiftlead.stage_read import EntryAnswer, answer_on
 
 HEAD = "## TD-7: An entry\n\n**Priority:** Low\n**Status:** Open\n"
@@ -48,3 +51,9 @@ def test_a_note_quoting_a_mark_is_no_question():
 
 def test_an_entry_with_no_log_has_no_answer():
     assert answer_on(f"{HEAD}\n**Why:** Because.\n", "paul") == EntryAnswer(False, None, None)
+
+
+@pytest.mark.parametrize("text", ["", "not an entry"])
+def test_an_unreadable_entry_is_no_reading_rather_than_no_gate(text):
+    with pytest.raises(ledgerboard.Refused):
+        answer_on(text, "paul")

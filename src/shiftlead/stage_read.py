@@ -23,7 +23,9 @@ class EntryAnswer(NamedTuple):
 
 
 def answer_on(text: str, person: str) -> EntryAnswer:
-    """`Reading.gate`, `.lifted` and `.lifted_for` from the entry's `text`, for the gate `decision (<person>)`."""
+    """`Reading.gate`, `.lifted` and `.lifted_for` from the entry's `text`, for the gate `decision (<person>)`.
+    Raises `ledgerboard.Refused` on a text that is not one readable entry: the caller has no reading of that entry this
+    pass and acts on nothing, because reading it as *no gate, no answer* would ask the person a question again."""
     gate = f"decision ({person})"
     if ledgerboard._carried(text, gate) is not None:
         return EntryAnswer(True, None, None)
