@@ -311,7 +311,7 @@ def test_a_moved_entry_closes_here_and_its_new_team_carries_on_from_its_pull_req
     assert got.made and got.end == "s1"
     closed = store.entry(TID)
     assert closed["closed_at"] and closed["holder"] is None
-    ready = Reading(pickable=True, may_start=True, within_size=True, pr_state="open")
+    ready = Reading(pickable=True, may_start=True, within_size=True, carried_open=True)
     started: list[Work] = []
     made = offer(
         store,
@@ -327,6 +327,18 @@ def test_a_moved_entry_closes_here_and_its_new_team_carries_on_from_its_pull_req
     record = store.entry(TID)
     assert (record["team"], record["branch"], record["pr"], record["holder"]) == ("new", "td7-work", 4, "s2")
     assert "carried" not in record and record["closed_at"] is None
+
+
+@pytest.mark.parametrize("live", [False, True])
+def test_carried_work_needs_a_live_reading_and_yields_to_a_fresher_pull_request(store, live):
+    put(store, holder="s1", branch="td7-old", pr=4, team="old")
+    assert act_on(store, Reading(team_moved=True, pr_state="open")).made
+    work = EntryWork("take", {"branch": "td7-new", "number": 9}) if live else EntryWork("none")
+    ready = Reading(pickable=True, may_start=True, within_size=True, carried_open=live, work=work)
+    started: list[Work] = []
+    start = lambda _k, w: started.append(w) or "s2"  # noqa: E731
+    assert offer(store, TID, choose(store.entry(TID), ready), ready, FLOW, start, lambda *_a: None, team="new").made
+    assert started == [Work(TID, "td7-new", 9) if live else Work(TID, None, None)]
 
 
 def test_a_moved_entry_with_nothing_pushed_carries_nothing(store):

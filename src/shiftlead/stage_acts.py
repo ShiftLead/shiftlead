@@ -84,6 +84,7 @@ class Reading:
     within_size: bool = False
     pickable: bool = False
     work: EntryWork = EntryWork("none")
+    carried_open: bool = False  # a moved entry's carried work is still live, and it was not archived since the move
 
 
 @dataclass(frozen=True)

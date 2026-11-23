@@ -373,7 +373,7 @@ def offer(
             row = act.work.pr if act.work is not None and act.work.state == "take" else None
             branch, pr = (row.get("branch"), row.get("number")) if row else (None, None)
             carried = (record or {}).get("carried")  # an entry moved from another team goes on from what is pushed
-            if carried and s.pr_state not in ("merged", "closed"):
+            if carried and s.carried_open and row is None:  # never for a reopened entry, nor over a fresher find
                 branch, pr = carried.get("branch"), carried.get("pr")
         else:
             key, branch, pr = str(record["stage"]), record.get("branch"), record.get("pr")
