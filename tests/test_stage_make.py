@@ -260,6 +260,58 @@ def test_a_case_of_a_later_slice_writes_nothing(store):
     assert store.entry(TID) == before
 
 
+def test_a_record_with_no_move_re_enters_by_the_way_in_keeping_its_work(store):
+    put(store, stage="dropped", flow="old-flow", holder="s1", branch="td7", pr=4, offers=2)
+    got = act_on(store, Reading(stage_known=False))
+    assert got.made and got.end == "s1"
+    record = store.entry(TID)
+    assert (record["stage"], record["flow"], record["holder"], record["offers"]) == ("build", "new-flow", None, 0)
+    assert (record["branch"], record["pr"]) == ("td7", 4)
+    assert record["history"][-1]["outcome"] == "re-enter"
+
+
+def test_a_design_entry_re_enters_at_the_stage_that_takes_designs(store):
+    doc = {
+        **FLOW,
+        "stages": [{"name": "design", "does": "design", "model": "m", "takes": "design-first"}, *FLOW["stages"]],
+    }
+    put(store, stage="dropped", holder="s1")
+    assert act_on(store, Reading(stage_known=False, design=True), doc).made
+    assert store.entry(TID)["stage"] == "design"
+
+
+def test_a_re_entry_with_no_way_in_writes_nothing(store):
+    before = put(store, stage="dropped", holder="s1")
+    doc = {**FLOW, "stages": [{"name": "review", "does": "review", "model": "m"}]}
+    assert not act_on(store, Reading(stage_known=False), doc).made
+    assert store.entry(TID) == before
+
+
+@pytest.mark.parametrize("holder", [Holder(ended=True), Holder(lease_lapsed=True), Holder(idle_for=timedelta(hours=3))])
+def test_a_first_loss_clears_the_holder_and_counts_the_offer(store, holder):
+    put(store, holder="s1", offers=1)
+    got = act_on(store, Reading(holder=holder, may_start=True))
+    assert got.made and got.end == "s1"
+    record = store.entry(TID)
+    assert (record["holder"], record["offers"], record["intent"]) == (None, 2, None)
+
+
+def test_a_holder_ended_by_a_stop_spends_no_offer(store):
+    put(store, holder="s1", offers=1)
+    assert act_on(store, Reading(holder=Holder(ended=True, stopped=True), may_start=True)).made
+    record = store.entry(TID)
+    assert (record["holder"], record["offers"]) == (None, 1)
+
+
+def test_a_second_loss_goes_to_the_person_with_the_stage_to_start_again(store):
+    put(store, holder="s1", offers=2)
+    got = act_on(store, Reading(holder=Holder(ended=True), may_start=True))
+    assert got.made and got.end == "s1"
+    record = store.entry(TID)
+    assert record["holder"] is None and record["offers"] == 2
+    assert "Back to build — a session starts this stage again" in record["intent"]["answers"]
+
+
 def test_closed_records_leave_after_thirty_days_in_one_commit(store):
     now = datetime(2026, 11, 23, tzinfo=UTC)
     old = (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
