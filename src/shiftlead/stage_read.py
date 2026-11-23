@@ -20,8 +20,11 @@ archiving the entry is open. A pull request the rows do not hold is no reading, 
 entry's `Team:` line now names another team, and `carried_on` whether the work a moved entry carried is still live.
 
 `nothing_to_read_on` reads whether an `only-when` stage has nothing to read (act 3). Passing it lets a pull request by
-a review, so only a whole reading of its files at its current head that touches no protected file says so. The tick's
-wiring calls all nine; none writes anything.
+a review, so only a whole reading of its files at its current head that touches no protected file says so.
+
+`pickable_on` reads whether an entry with no record may be offered (§4.9c *Ways in*), and `held_on` which open pull
+requests a live session holds, the `held` that `stage_work.entry_work` is given. The tick's wiring calls all eleven;
+none writes anything.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, NamedTuple
 
-from sessionorc import board, held, ledger, ledgerboard, work
+from sessionorc import board, held, ledger, ledgerboard, work, workorders
 from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
@@ -212,6 +215,31 @@ def nothing_to_read_on(
     if not head or read_at != head or not files or protected is None:
         return False
     return not held.match(files, protected)
+
+
+def pickable_on(entry: dict[str, Any], team: str) -> bool:
+    """`Reading.pickable` of an entry from the repo's reading, for `team`: what a lane of that team would take by §6
+    rule 6's one test, of a kind a flow has a way in for, whose `Owner:` is neither the person nor the anchor. A live
+    check whose gates have lifted is taken as a lane takes it, by the stage for `other`; a work order is no entry."""
+    kind = str(entry.get("kind") or "")
+    if entry.get("work_order") or kind not in ("", "build", "live-check", "design-first"):
+        return False
+    if str(entry.get("owner") or "").lower() in (ledger.PERSON_OWNER, "person", "anchor"):
+        return False
+    return ledger.lane_matches(["design-first" if kind == "design-first" else "free-pick"], entry, team)
+
+
+def held_on(prs: Iterable[dict[str, Any]], records: Iterable[Any]) -> frozenset[int]:
+    """The numbers of the open pull requests in `prs` that a live session holds, by the test the red-PR orders use.
+    `records` are the sessions of the pull requests' own repo: a number or a branch name means nothing across repos."""
+    live = list(records)
+    return frozenset(
+        pr["number"]
+        for pr in prs
+        if isinstance(pr.get("number"), int)
+        and pr.get("state") == "open"
+        and any(workorders.holds_pr(r, pr) for r in live)
+    )
 
 
 def _instant(value: str | None) -> datetime | None:

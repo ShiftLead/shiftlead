@@ -19,9 +19,11 @@ from shiftlead.stage_read import (
     carried_on,
     flow_on,
     forge_on,
+    held_on,
     holder_on,
     ledger_on,
     nothing_to_read_on,
+    pickable_on,
     renumbered_on,
     team_moved_on,
 )
@@ -434,3 +436,60 @@ def test_no_whole_reading_at_the_head_keeps_the_review(head, read_at, files, pro
 @pytest.mark.parametrize("stage", ["build", "gone"])
 def test_a_stage_that_is_not_only_when_is_never_passed(stage):
     assert not nothing_to_read_on({"stage": stage}, ONLY, "h1", "h1", ["a.py"], GLOBS)
+
+
+def open_entry(**over):
+    return {"id": "TD-7", "kind": "build", "owner": "grinder", "pickable": "yes", "team": "", **over}
+
+
+@pytest.mark.parametrize("kind", ["", "build", "live-check", "design-first"])
+def test_an_entry_a_flow_has_a_way_in_for_is_pickable(kind):
+    assert pickable_on(open_entry(kind=kind), "ao-grind")
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"pickable": "no"},
+        {"kind": "live-check", "pickable": "no"},  # its event (live) gate stands
+        {"kind": "live-check", "owner": "paul"},
+        {"kind": "evaluation"},
+        {"owner": "Paul"},
+        {"owner": "person"},
+        {"owner": "anchor"},
+        {"settling": True},
+        {"waiting": {"until": "2026-12-01"}},
+        {"needs_team": True},
+        {"team": "other"},
+        {"work_order": True},
+    ],
+)
+def test_an_entry_no_lane_of_the_team_would_take_is_not_pickable(over):
+    assert not pickable_on(open_entry(**over), "ao-grind")
+
+
+def test_an_entry_naming_the_team_in_another_case_is_pickable():
+    assert pickable_on(open_entry(team="AO-Grind"), "ao-grind")
+
+
+def live_record(**over):
+    return Session(
+        **{"id": "s1", "name": "s1", "dir": "/r", "kind": "agent", "adapter": "claude-code", "state": "working", **over}
+    )
+
+
+def test_a_pull_request_a_live_claim_or_checkout_holds_is_held():
+    prs = [
+        {"number": 1, "state": "open", "branch": "td1-a"},
+        {"number": 2, "state": "open", "branch": "td2-b"},
+        {"number": 3, "state": "open", "branch": "td3-c"},
+    ]
+    claim = ProgressEntry(ref="TD-1", status="claimed", review_pr=1)
+    records = [live_record(progress=[claim]), live_record(id="s2", name="s2", git={"branch": "td2-b"})]
+    assert held_on(prs, records) == {1, 2}
+
+
+def test_an_ended_session_and_a_closed_pull_request_hold_nothing():
+    claim = ProgressEntry(ref="pr:1", status="claimed")
+    assert held_on([{"number": 1, "state": "open"}], [live_record(state="exited", progress=[claim])]) == frozenset()
+    assert held_on([{"number": 1, "state": "closed"}], [live_record(progress=[claim])]) == frozenset()
