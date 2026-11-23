@@ -255,6 +255,7 @@ PERSON_ONLY = frozenset(
         "add_repo",
         "tools_install",
         "tools_check",
+        "brief_save",
         "login_label",
         "account_label",
         "login_note",

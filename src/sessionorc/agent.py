@@ -56,6 +56,7 @@ from sessionorc import (
     work,
 )
 from sessionorc import balance as balance_mod
+from sessionorc import briefs as briefs_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import digest as digest_mod
 from sessionorc import ledger as ledger_mod
@@ -4200,6 +4201,27 @@ class HostAgent(
         — the PATH, the versions, the default homes — and keep it. A person's own act."""
         agent_common.person_only(caller, "check this host's tools again", "§4.2b *The page*", self._graph())
         return await self._tools_gauges(await self._tools_reread())
+
+    async def rpc_briefs(self, caller: Any = None) -> dict[str, Any]:
+        """The person's own briefs, for the Briefs page (design §4.9c *Where a brief lives*, TD-2055)."""
+        return {"briefs": briefs_mod.own()}
+
+    async def rpc_brief_save(
+        self,
+        name: str = "",
+        kind: str = "",
+        text: str = "",
+        version: str | None = None,
+        delete: bool = False,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """The Briefs page's **Save** and **Delete** (§4.5a *Briefs page*, TD-2055), a person's own act: `version` is
+        what the page read, none for a new brief; a delete is refused while a flow names the brief."""
+        agent_common.person_only(caller, "save a brief", "§4.9c *Where a brief lives*", self._graph())
+        try:
+            return briefs_mod.delete(name, version) if delete else briefs_mod.save(name, kind, text, version)
+        except briefs_mod.BriefError as e:
+            raise RpcError(str(e)) from None
 
     def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
         self.tmux.ensure_server()

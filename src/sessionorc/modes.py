@@ -83,6 +83,7 @@ HOME_EDITS = frozenset(
         "notify_test",
         "ci_rerun",
         "witness_press",
+        "brief_save",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
@@ -116,7 +117,8 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # `queue`: the Queue's reading (§4.4, TD-769); `shape`: the teams' shape (§4.4 *Team shape*, TD-834); `seats`: the
 # seat ledger's (§4.4 *Spend per seat*, TD-830)
 # `pr_wait`: `ao pr wait`, a block on the PRs' reading (§4.7, TD-940)
-HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait"})
+# `briefs`: the person's own, the home's files (§4.9c *Where a brief lives*, TD-2055)
+HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait", "briefs"})
 # The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
 # a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own
 BLOCKING = frozenset({"wait", "pr_wait"})
