@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from sessionorc.models import Session
+from sessionorc.models import MailEntry, Session
 from shiftlead import stage_fetch, stage_work
 from shiftlead.stage_fetch import (
     EntryOn,
@@ -21,6 +21,7 @@ from shiftlead.stage_fetch import (
     ledger_read,
     protected_at,
     rows_of,
+    sessions_read,
 )
 from shiftlead.stage_read import EntryLedger
 
@@ -336,3 +337,29 @@ def test_a_record_pull_request_outside_the_reads_is_read_by_number() -> None:
 @pytest.mark.parametrize("prs", [None, {"error": "gh failed", "open": [{"number": 5, "state": "open"}]}])
 def test_a_failed_reading_is_no_rows(prs: dict | None) -> None:
     assert rows_of(prs, [5], no_read) is None
+
+
+def sent(kind: str, **over: Any) -> MailEntry:
+    return MailEntry(id="m-1", from_="s1", to=["s2"], text="q", at="2026-11-23T00:00:00Z", kind=kind, **over)
+
+
+@pytest.mark.parametrize(
+    ("entry", "waits"),
+    [
+        (sent("ask"), True),
+        (sent("steer", default="go"), True),
+        (sent("note"), False),
+        (sent("ask", closed_reason="answered"), False),
+    ],
+)
+def test_an_open_ask_or_steer_it_sent_is_a_sessions_own_wait(entry: MailEntry, waits: bool) -> None:
+    s = session("s1")
+    s.outbox.append(entry)
+    assert ("s1@node" in sessions_read({"s1@node": s}, {"node"}).open_asks) is waits
+
+
+def test_only_a_snapshotted_node_counts_as_read(repo: Path) -> None:
+    got = sessions_read({}, {"up"})
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@down"}
+    assert got.read_nodes == {"up"}
+    assert facts_on(pass_read(repo, sessions=got.sessions, read_nodes=got.read_nodes), "TD-7", record) is None
