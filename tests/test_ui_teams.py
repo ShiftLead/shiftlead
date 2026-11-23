@@ -1456,6 +1456,17 @@ def test_a_switched_teams_page_draws_its_running_rows_and_saves_them(world, clie
     assert client.post("/api/settings/teams", json={"team": "nobody", "reserve": 7}).status_code == 400
 
 
+def test_a_switched_teams_balance_reads_its_own_repo_with_no_live_session():
+    """§6 *Balance*, after the cut-over: the numbers are the `repo` key's, and the reader's-queue line is gone."""
+    prs = {"open": [{"created": "2026-01-01T00:00:00Z"}, {"created": "2026-01-02T00:00:00Z"}]}
+    readings = {"/r/mine": {"name": "mine", "prs": prs}, "/r/other": {"name": "other", "prs": {"open": [{}] * 9}}}
+    got = setmod.balance_card("solo", {"prs": 1, "review": True}, [], readings, root="/r/mine")
+    assert got["now"][0] == "open PRs: 2 (line 1) — over" and len(got["now"]) == 2
+    assert not got["review"] and "review" not in got["was"]
+    assert setmod.balance_card("solo", {"prs": 1}, [], readings, root="")["now"][0].startswith("open PRs: could not")
+    assert len(setmod.balance_card("solo", {"prs": 1}, [], readings)["now"]) == 3  # a first-shape team keeps its three
+
+
 def test_a_switched_team_that_cannot_run_has_a_dot_on_its_tab(world, client, monkeypatch):
     """§4.9d *The page*: the dot is on the tab of the team that cannot run, read the cheap way, on any team's page."""
     _tmp_path, fleet = world
