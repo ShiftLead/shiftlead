@@ -1577,6 +1577,13 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qbar.notlive .qbarlive { color: var(--warn-fg); }
 .qbar .qbarask { color: var(--needs-fg); font-weight: 600; }
 .qbar .qrefresh { margin-left: 4px; }
+/* §4.5 screen 12 *The page holds still* (TD-2117): while something waits the bar follows the scroll under the top bar,
+   above the cards (5 and below), under the top bar (30), a card's menu (40) and the toasts (50). The shadows are its
+   ground and edge, so its box, and so nothing under it, moves when it starts or stops following */
+.qbar.qwaits { position: sticky; top: var(--barh); z-index: 20; background: var(--bg); box-shadow: 0 0 0 4px var(--bg), 0 5px 0 0 var(--line); }
+html:has(.topbar.away) .qbar.qwaits { top: 0; }
+html:has(.qbar.qwaits) { scroll-padding-top: calc(var(--barh) + var(--qbarh, 32px) + 13px); }
+html:has(.qbar.qwaits):has(.topbar.away) { scroll-padding-top: calc(var(--qbarh, 32px) + 13px); }
 .qheldw { display: none; }
 .queuepage .qheldw { display: inline-block; visibility: hidden; margin: 0 4px; font-size: var(--t-mono-s); color: var(--muted); }
 .queuepage .qcard[data-waits] .qheldw { visibility: visible; }
