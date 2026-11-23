@@ -327,3 +327,35 @@ async def test_a_send_reads_no_seat_s_extras_after_the_marker(agent, monkeypatch
     await _cut_over(agent, marked=marked)
     assert agent._seat_pick(agent._graph(), seat.id, "ao-t-x", "ask", None, None) is None
     assert read == ([] if marked else [seat])
+
+
+async def test_a_first_shape_sweeper_does_not_stand_in_for_a_built_in_one_after_the_marker(agent, monkeypatch):
+    from sessionorc import agent_tick
+
+    monkeypatch.setattr(agent_tick.settings_mod, "sweep", lambda _doc: {"on": True, "off": []})
+    old = _asks_seat(agent, "old")
+    old.seat = {"trigger": "swept"}
+    built_in = _asks_seat(agent, "sweeper", builtin="sweeper")
+    built_in.seat = {"trigger": "swept", "by": "settings"}
+    records = [old, built_in]
+    await _cut_over(agent, marked=False)
+    assert agent._sweep_idle(built_in, records) == "other"
+    await _cut_over(agent)
+    assert agent._sweep_idle(built_in, records) == ""
+
+
+async def test_an_entry_request_moves_to_no_first_shape_techlead_after_the_marker(agent, monkeypatch):
+    from sessionorc.mail import MailEntry
+
+    seat = _asks_seat(agent, "seat", tags=False)
+    _asks_seat(agent, "lead")
+    asker = _asks_seat(agent, "asker", tags=False)
+    asker.seat = None
+    monkeypatch.setattr(agent, "_landing_refusal", lambda *_a: "full")  # it stays, so the move's answer is all we read
+    monkeypatch.setattr(agent, "_mark", lambda *_a, **_k: None)
+    entry = MailEntry(id="m-1", from_=asker.id, to=[seat.id], at="2026-11-23T00:00:00Z", kind="ask", text="file this")
+    now = datetime.now(UTC)
+    await _cut_over(agent, marked=False)
+    assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is True
+    await _cut_over(agent)
+    assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is False
