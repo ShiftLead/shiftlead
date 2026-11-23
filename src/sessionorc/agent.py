@@ -856,6 +856,11 @@ class HostAgent(
         self._worktree_scope: bool | None = None
         self._sweep_loop: asyncio.AbstractEventLoop | None = None
         self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)
+        # the pressure pass (§4.6, TD-2081): its own lock and task; the first reading a `PRESSURE_EVERY` after start
+        self._pressure_lock = threading.Lock()
+        self._pressure_task: asyncio.Task[None] | None = None
+        self._pressure_at = datetime.now(UTC)
+        self._pressure_backoff = scratch_mod.Backoff()
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
