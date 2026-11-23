@@ -206,11 +206,18 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 def write(
-    home: str | Path, host: str, result: dict[str, Any], free: dict[str, Any], started: str, now: datetime
+    home: str | Path,
+    host: str,
+    result: dict[str, Any],
+    free: dict[str, Any],
+    started: str,
+    now: datetime,
+    seat_free: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Write one pass's `result` (`Book.close`'s) to `disk.json` in `home`: the pass's kinds, `free`, the host agent's
-    `started` (a reading by a later run says *partial*, its memory being empty), and the dated lines of the passes
-    in the last `KEEP_DAYS`, this one's appended. Through a temporary file and one rename; returns what it wrote."""
+    """Write one pass's `result` (`Book.close`'s) to `disk.json` in `home`: the pass's kinds, `free`, `seat_free`
+    where the host sets a `seat_root` (TD-2082), the host agent's `started` (a reading by a later run says *partial*,
+    its memory being empty), and the dated lines of the passes in the last `KEEP_DAYS`, this one's appended. Through
+    a temporary file and one rename; returns what it wrote."""
     path = Path(home) / FILE
     cutoff = now - timedelta(days=KEEP_DAYS)
     lines = []
@@ -220,15 +227,25 @@ def write(
             lines.append(line)
     lines.append({"at": _stamp(now), "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS}})
     out = {"host": host, "at": _stamp(now), "started": started, "kinds": result, "free": free, "passes": lines}
+    if seat_free is not None:
+        out["seat_free"] = seat_free
     _atomic_write(path, json.dumps(out, indent=1) + "\n")
     return out
 
 
-def read(home: str | Path, host: str, started: str, now: datetime, free: dict[str, Any]) -> dict[str, Any]:
+def read(
+    home: str | Path,
+    host: str,
+    started: str,
+    now: datetime,
+    free: dict[str, Any],
+    seat_free: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The reading `ao disk` prints for this host (§4.6 *The sweep's reading*): `disk.json`'s last pass, each kind's
     `removed_30d` summed over the dated lines inside `KEEP_DAYS` of `now`, every kind *partial* where the file was
-    written by an earlier run of the host agent than `started`, `free` as read now, and `warnings` from it. Before
-    any pass, `at` is None and every kind holds nothing and is *partial*."""
+    written by an earlier run of the host agent than `started`, `free` as read now, and `warnings` from it; with a
+    `seat_root`, `seat_free` as read now and `seat_warnings` from it (TD-2082). Before any pass, `at` is None and
+    every kind holds nothing and is *partial*."""
     got = _load(Path(home) / FILE)
     cutoff = now - timedelta(days=KEEP_DAYS)
     totals = dict.fromkeys(KINDS, 0)
@@ -253,4 +270,8 @@ def read(home: str | Path, host: str, started: str, now: datetime, free: dict[st
             "removed_30d": totals[k],
             "kept": [x for x in one.get("kept") or [] if isinstance(x, dict)],
         }
-    return {"host": host, "at": got.get("at"), "kinds": kinds, "free": free, "warnings": warnings(free)}
+    out = {"host": host, "at": got.get("at"), "kinds": kinds, "free": free, "warnings": warnings(free)}
+    if seat_free is not None:
+        out["seat_free"] = seat_free
+        out["seat_warnings"] = warnings(seat_free)
+    return out

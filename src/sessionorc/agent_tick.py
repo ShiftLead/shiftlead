@@ -5693,7 +5693,15 @@ class TickMixin:
             self._disk_result = self._disk_book.close(tallies)
             try:
                 free = diskbook.free_space(self._scratch_root())
-                diskbook.write(paths.home(), self.host, self._disk_result, free, self.started_at, datetime.now(UTC))
+                diskbook.write(
+                    paths.home(),
+                    self.host,
+                    self._disk_result,
+                    free,
+                    self.started_at,
+                    datetime.now(UTC),
+                    seat_free=self._seat_free(),
+                )
             except Exception:  # noqa: BLE001 — the reading never stops a pass
                 log.exception("writing the sweep's reading failed")
         return self._disk_result
@@ -5702,11 +5710,31 @@ class TickMixin:
     def _scratch_root() -> str:
         return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
 
+    @staticmethod
+    def _seat_root() -> str:
+        return getattr(hosts.local_host(), "seat_root", "") or ""
+
+    def _scratch_pools(self) -> list[str]:
+        """The roots the hourly sweep walks (§4.6, TD-2082): `scratch_root`, and a `seat_root` that differs from it
+        and has a reading, so roots set equal are swept once and a missing mount is never made."""
+        root, seat = self._scratch_root(), self._seat_root()
+        return [root, seat] if seat and seat != root and scratch_mod.has_reading(seat) else [root]
+
+    def _seat_free(self) -> dict[str, Any] | None:
+        """`seat_root`'s free space, `not_mounted` where it has no reading; None where it is unset or is `scratch_root`,
+        whose reading is already drawn (§4.6, TD-2082)."""
+        seat = self._seat_root()
+        if not seat or seat == self._scratch_root():
+            return None
+        return diskbook.free_space(seat) if scratch_mod.has_reading(seat) else {"path": seat, "not_mounted": True}
+
     def _disk_here(self) -> dict[str, Any]:
         """This host's reading (§4.6 *The sweep's reading*, TD-1946): `disk.json`'s last pass, the 30-day totals and
-        the free space under `scratch_root` as it is now. Touches files: run off the loop."""
+        the free space under `scratch_root` and `seat_root` as it is now. Touches files: run off the loop."""
         free = diskbook.free_space(self._scratch_root())
-        return diskbook.read(paths.home(), self.host, self.started_at, datetime.now(UTC), free)
+        return diskbook.read(
+            paths.home(), self.host, self.started_at, datetime.now(UTC), free, seat_free=self._seat_free()
+        )
 
     async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:
         """`ao disk` (§4.7, §4.6 *The sweep's reading*, TD-1946): a read, under no grant. With `host` naming another
@@ -5804,7 +5832,7 @@ class TickMixin:
         reads `self.sessions` only through a list copy. `dry` (a dry run's, TD-1946) removes and touches nothing,
         each item a rule would remove counted gone in its kind's tally (the runs rules' through `_Removal`), every
         kind under `deadline` (monotonic), checked between steps, a kind it never reached *partial*."""
-        root = self._scratch_root()
+        roots = self._scratch_pools()  # §4.6 *Temporary space is a pool of its own*: each distinct root, one tally
         rm = _Removal(tallies["runs"] if dry else None)
 
         def late(kind: str) -> bool:
@@ -5814,11 +5842,12 @@ class TickMixin:
             return False
 
         if scratch and not dry:
-            try:
-                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
-            except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
-                log.exception("scratch sweep failed")
-                large = []
+            large: list[str] = []
+            for root in roots:
+                try:
+                    large += scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
+                except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
+                    log.exception("scratch sweep failed")
             for rid in large:
                 tallies["scratch"].keep(scratch[rid], "large scratch")
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
@@ -5835,18 +5864,19 @@ class TickMixin:
                     tallies["scratch"].unlisted = True
                     log.warning("scratch removal skipped: %s named no transcript roots", ", ".join(blind))
                 else:
-                    kept = scratch_mod.sweep(
-                        root,
-                        paths.home(),
-                        named,
-                        hosts.local_host().scratch_keep_hours,
-                        time.time(),
-                        live_now,
-                        troots,
-                        tallies["scratch"],
-                        dry=dry,
-                        deadline=deadline,
-                    )
+                    for root in roots:
+                        kept += scratch_mod.sweep(
+                            root,
+                            paths.home(),
+                            named,
+                            hosts.local_host().scratch_keep_hours,
+                            time.time(),
+                            live_now,
+                            troots,
+                            tallies["scratch"],
+                            dry=dry,
+                            deadline=deadline,
+                        )
             except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
                 tallies["scratch"].unlisted = True
                 log.exception("scratch removal failed")
