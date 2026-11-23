@@ -152,7 +152,8 @@ def test_a_stage_with_nothing_to_read_passes_as_ship_to_merge_with_the_head(stor
     assert act_on(store, Reading(nothing_to_read=True, head="a" * 40)).made
     got = store.entry(TID)
     assert got["waits"] == "merging" and got["merging"]["head"] == "a" * 40
-    assert got["history"][-1]["by"] == "home" and got["verdicts"] == {}
+    assert got["history"][-1]["by"] == "home"
+    assert got["verdicts"] == {"review": {"head": "a" * 40, "passed": True}}
 
 
 def test_a_pass_to_merge_with_no_head_read_writes_nothing(store):

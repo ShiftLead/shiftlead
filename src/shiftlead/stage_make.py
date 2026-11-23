@@ -127,7 +127,8 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
 
 
 def _pass(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
-    """An `only-when` stage with nothing to read counts as `ship`, and posts no review (§4.9c)."""
+    """An `only-when` stage with nothing to read counts as `ship` at its head: it writes `{head, passed}` and posts
+    no review (§4.9c)."""
     key = str(record["stage"])
     stage = _stage_or_none(doc, key)
     if stage is None or not stage.get("only-when"):
@@ -135,6 +136,7 @@ def _pass(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, 
     where = destination(stage, "ship")
     if where["to"] == "merge" and not s.head:
         return Made(False, "the pull request's head was not read")
+    record.setdefault("verdicts", {})[key] = {"head": s.head, "passed": True}
     _apply(
         store, record, doc, stage, key, "ship", "passed: nothing for this stage to read", where, s.head, person, "home"
     )
