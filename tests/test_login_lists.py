@@ -110,12 +110,19 @@ async def test_a_node_is_not_refused_for_the_homes_lists(agent):
 async def test_the_tools_read_carries_each_logins_lists_on_the_home_only(agent):
     from conftest import park_ticks
 
+    from sessionorc import paths
+
     await park_ticks(agent)
     _home(agent, f"builtins: {{default: {{logins: ['{LK}']}}}}\n")
     kept = {"switched": True, "tools": [{"adapter": "claude-code", "accounts": [], "logins": [{"name": "grind"}]}]}
     row = (await agent._tools_gauges(kept))["tools"][0]["logins"][0]
     assert row["lists"]["sets"] == [{"name": "default", "label": None}]
     assert "lists" not in kept["tools"][0]["logins"][0]  # the kept read is never written
+    settings = paths.home() / "settings.yml"
+    settings.write_text("teams: [broken\n")  # what it lists is unknown: no line, never *in no team's list*
+    assert "lists" not in (await agent._tools_gauges(kept))["tools"][0]["logins"][0]
+    settings.unlink()  # no file: no list names it
+    assert (await agent._tools_gauges(kept))["tools"][0]["logins"][0]["lists"] == {"teams": [], "sets": []}
     agent.mode = "node"
     try:
         assert "lists" not in (await agent._tools_gauges(kept))["tools"][0]["logins"][0]

@@ -6123,7 +6123,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = add_login("note", help="the note shown under a login (never a secret: the file is committed); empty clears it")
     q.add_argument("login", help=login_help)
     q.add_argument("text", nargs="*")
-    q = add_login("forget", help="forget a login, leaving its folder on disk; refused while a session runs on it")
+    q = add_login(
+        "forget",
+        help="forget a login, leaving its folder on disk; "
+        "refused while a session runs on it or a team's or built-in set's list names it",
+    )
     q.add_argument("login", help=login_help)
     q = add_login("add", help="add a login: a folder that is the tool's home, or a new or empty one made one")
     q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")

@@ -133,8 +133,11 @@ class SettingsMixin:
         gate, now = await self.rpc_gate(), datetime.now(UTC)
         whole = settings_mod.load()
         max_age = settings_mod.max_age(whole)
-        # the lists are the home's: a node cannot read them, so its page draws no line rather than *in no team's list*
-        lists = builtinstore.login_lists(whole) if self.mode == "home" else None
+        # the lists are the home's: a node cannot read them, nor can anyone a broken file's, so the page draws no line
+        # rather than a false *in no team's list*
+        held_doc = settings_mod.read() if self.mode == "home" else None
+        readable = held_doc is not None or (self.mode == "home" and not settings_mod.settings_file().exists())
+        lists = builtinstore.login_lists(held_doc or {}) if readable else None
         cards = []
         for card in read.get("tools") or []:
             accounts, caps = [], {}
