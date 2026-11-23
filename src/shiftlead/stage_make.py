@@ -4,21 +4,23 @@
 write. The record is read again under that lock and the choice made again, so an `ao stage end` that landed after the
 home's reading is never overwritten: the act is simply not made, and the next pass reads afresh.
 
-This slice makes reconcile's cases that need no session and no new question (`close`, `renumbered`, `land-intent`,
-`wait-for-parts`, `mark-waiting`, `rewrite-flow`), the person's answer, and the pass; `sweep_closed` removes a closed
-record after its thirty days. Every other case returns `Made(False, …)` and writes nothing. Nothing calls this yet.
+It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
+`mark-waiting`, `rewrite-flow`) and those that put a question to the person (`merged-entry-open`, `pr-closed`,
+`stage-gone`, `gate-again`), the person's answer, and the pass; `sweep_closed` removes a closed record after its thirty
+days. Every other case returns `Made(False, …)` and writes nothing. A write that takes a record from its holder names
+that session in `Made.end`, for the caller to end outside the lock. Nothing calls this yet.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
 from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
-from shiftlead.stage_end import _apply, _stage_or_none, destination
+from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stagerecord import StageStore, _now, answer_move
 
 
@@ -26,6 +28,7 @@ from shiftlead.stagerecord import StageStore, _now, answer_move
 class Made:
     made: bool
     why: str = ""
+    end: str | None = None  # the session this write took the record from
 
 
 def _close(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
@@ -77,6 +80,63 @@ def _rewrite_flow(store: StageStore, record: dict[str, Any], _s: Reading, doc: d
     return Made(True)
 
 
+def _ask(
+    store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
+) -> Made:
+    """A move to the person, as its intent. An entry already carrying the gate is not asked a second time."""
+    record.update(holder=None, waits="person" if s.gate else None)
+    if s.gate:
+        store.put_entry(record, "carries the home's gate: waits on the person")
+    else:
+        store.record_intent(
+            str(record["id"]), person, ask, context, answers, blocked=record.get("blocked"), base=record
+        )
+    return Made(True)
+
+
+def _to_stages(doc: dict[str, Any]) -> dict[str, Any]:
+    """The flow's stages as the answers to a question about where the entry goes."""
+    stages = [st for st in doc.get("stages") or [] if isinstance(st, dict)]
+    return {f"{st['name']} — a session takes it to this stage": flow3.key_of(st["name"]) for st in stages}
+
+
+def _merged_open(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+    ask = "Its pull request merged but the entry is still open, what next?"
+    context = f"Pull request {record.get('pr')} merged and did not archive this entry."
+    return _ask(store, record, s, person, ask, context, {ARCHIVE: {"archive": True}})
+
+
+def _pr_closed(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+    key = str(record["stage"])
+    stage = _stage_or_none(doc, key)
+    back = {f"Back to {stage['name']} — a session starts this stage again": key} if stage else _to_stages(doc)
+    ask = "Its pull request was closed without merging, what next?"
+    return _ask(store, record, s, person, ask, f"Pull request {record.get('pr')} was closed unmerged.", back)
+
+
+def _stage_gone(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+    ask = "The stage this entry was in has left its flow, which stage next?"
+    context = f"The flow no longer has the stage {record['stage']}."
+    return _ask(store, record, s, person, ask, context, _to_stages(doc))
+
+
+def _gate_again(store: StageStore, record: dict[str, Any], _s: Reading, doc: dict[str, Any], person: str) -> Made:
+    """The gate and its item are gone with no answer: the same question again, under a new mark."""
+    asked = record.get("asked") or {}
+    ask = asked.get("ask") or "This entry was waiting on you and its question is gone, what next?"
+    context = asked.get("context") or "The entry's decision was removed with no answer recorded."
+    answers = asked.get("answers") or _to_stages(doc)
+    store.record_intent(str(record["id"]), person, ask, context, answers, blocked=record.get("blocked"), base=record)
+    return Made(True)
+
+
+_ASKS: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any], str], Made]] = {
+    "merged-entry-open": _merged_open,
+    "pr-closed": _pr_closed,
+    "stage-gone": _stage_gone,
+    "gate-again": _gate_again,
+}
+
 _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any]], Made]] = {
     "close": _close,
     "renumbered": _renumbered,
@@ -103,8 +163,11 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
         to = str(stopped)
     else:
         to = str(record["stage"]) if move is None else str(move)
-    if to in flow3.FIXED or _stage_or_none(doc, to) is None:
-        return Made(False, f"the answer {label!r} goes to {to}, which is not a stage of the flow")
+    if to in flow3.FIXED:
+        return Made(False, f"the answer {label!r} goes to {to}, which is a later slice's move")
+    if _stage_or_none(doc, to) is None:
+        ask = "The stage that answer names has left the flow, which stage next?"
+        return _ask(store, record, s, person, ask, f"The answer {label} goes to {to}.", _to_stages(doc))
     if isinstance(move, dict):
         record.setdefault("counts", {}).pop(blocked.get("count"), None)
         record["moves"] = 0
@@ -122,6 +185,8 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
     record.update(
         stage=to, holder=None, waits=None, answers=None, blocked=None, answer=words, offers=0, entered_at=_now()
     )
+    if s.pr_state in ("merged", "closed"):  # that pull request is over: the stage starts from a fresh one
+        record.update(branch=None, pr=None)
     store.put_entry(record, f"the person's answer: to {to}")
     return Made(True)
 
@@ -151,14 +216,18 @@ def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any],
             return Made(False, f"{tid} has no stage record")
         if choose(record, s) != act:
             return Made(False, "the record moved since it was read")
+        held = record.get("holder")
         if act.name == "answer":
-            return _answer(store, record, s, doc, person)
-        if act.name == "pass":
-            return _pass(store, record, s, doc, person)
-        maker = _RECONCILE.get(act.case) if act.name == "reconcile" else None
-        if maker is None:
+            got = _answer(store, record, s, doc, person)
+        elif act.name == "pass":
+            got = _pass(store, record, s, doc, person)
+        elif act.name == "reconcile" and act.case in _ASKS:
+            got = _ASKS[act.case](store, record, s, doc, person)
+        elif act.name == "reconcile" and act.case in _RECONCILE:
+            got = _RECONCILE[act.case](store, record, s, doc)
+        else:
             return Made(False, f"{act.name} {act.case} is a later slice's")
-        return maker(store, record, s, doc)
+        return replace(got, end=held) if got.made and held and not record.get("holder") else got
 
 
 def sweep_closed(store: StageStore, now: datetime | None = None) -> list[str]:
