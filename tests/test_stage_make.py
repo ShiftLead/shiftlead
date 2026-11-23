@@ -231,6 +231,32 @@ def test_the_archive_answer_archives_and_leaves_the_record_until_the_ledger_read
     assert act_on(store, Reading(entry="archived")).made and store.entry(TID)["closed_at"]
 
 
+DESIGN_DONE = Reading(pr_state="merged", design=True, had_parts=True)
+
+
+def test_a_design_left_open_after_its_last_part_is_archived_by_the_home(store, monkeypatch):
+    before = put(store, pr=4, waits="parts")
+    asked: list[tuple[str, str]] = []
+    monkeypatch.setattr(store, "archive", lambda tid, why: asked.append((tid, why)) or {"pr": 5})
+    assert act_on(store, DESIGN_DONE).made
+    assert [tid for tid, _ in asked] == [TID]
+    assert store.entry(TID) == before  # it closes when the ledger reads the entry archived
+    assert choose(store.entry(TID), replace(DESIGN_DONE, archive_open=True)) is None
+    assert act_on(store, replace(DESIGN_DONE, entry="archived")).made and store.entry(TID)["closed_at"]
+
+
+def test_a_design_archive_the_ledger_refuses_leaves_the_record(store, monkeypatch):
+    before = put(store, pr=4, waits="parts")
+
+    def refuse(_tid: str, _why: str) -> None:
+        raise board.Refused("no")
+
+    monkeypatch.setattr(store, "archive", refuse)
+    got = act_on(store, DESIGN_DONE)
+    assert not got.made and "could not be archived" in got.why
+    assert store.entry(TID) == before
+
+
 def test_an_archive_the_ledger_refuses_leaves_the_record_waiting(store, monkeypatch):
     before = put(store, waits="person", answers={"Archive the entry": {"archive": True}, OTHER: None})
 
