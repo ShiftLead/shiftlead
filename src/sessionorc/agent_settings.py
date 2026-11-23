@@ -582,14 +582,15 @@ class SettingsMixin:
     ) -> dict[str, Any]:
         """The team page's write of a label, the login list, a stage's number or the team limit (§4.9d *Controls and
         verbs*, TD-2060), one per call: a person's own act, version-checked, refused before the cut-over. The client
-        sends no parameter that is None, so a clear is named: `clear="most"` or `clear="label"`."""
+        sends no parameter that is None, so Remove on the team limit is named, `clear="most"`; an empty label clears
+        the label."""
         agent_common.person_only(caller, "change a team", "§4.9d *Controls and verbs*", self._graph())
         given = {"label": label, "logins": logins, "at_once": at_once, "most": most}
         change = {k: v for k, v in given.items() if v is not None}
         if clear is not None:
-            if clear not in ("label", "most") or change:
-                raise RpcError("team_set clears label or most, and sets nothing else in that call")
-            change = {clear: None}
+            if clear != "most" or change:
+                raise RpcError("team_set clears most alone, and sets nothing else in that call")
+            change = {"most": None}
         doc = settings_mod.load()
         before = copy.deepcopy(doc)
         try:

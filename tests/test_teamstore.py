@@ -202,20 +202,22 @@ def test_team_set_writes_the_file_and_answers_the_new_version(agent):
 
 def test_team_set_passes_a_null_as_a_clear_and_no_key_as_a_refusal(agent):
     doc = settings_mod.load()
-    doc["teams"]["a"]["most"] = 3
+    doc["teams"]["a"].update(most=3, label="shown")
     settings_mod.save(doc)
 
     async def run():
         with pytest.raises(RpcError, match="takes one of"):
             await agent.rpc_team_set(team="a", version=ts.version(settings_mod.load(), "a"))
-        for bad in ({"clear": "logins"}, {"clear": "most", "label": "x"}):
-            with pytest.raises(RpcError, match="clears label or most"):
+        for bad in ({"clear": "logins"}, {"clear": "label"}, {"clear": "most", "label": "x"}):
+            with pytest.raises(RpcError, match="clears most alone"):
                 await agent.rpc_team_set(team="a", version=ts.version(settings_mod.load(), "a"), **bad)
         await agent.rpc_team_set(team="a", clear="most", version=ts.version(settings_mod.load(), "a"))
+        await agent.rpc_team_set(team="a", label="", version=ts.version(settings_mod.load(), "a"))
         await asyncio.gather(*agent._bg)
 
     asyncio.run(run())
-    assert "most" not in settings_mod.load()["teams"]["a"]
+    held = settings_mod.load()["teams"]["a"]
+    assert "most" not in held and "label" not in held
 
 
 def test_a_saved_rename_reaches_the_teams_numbers(agent):
