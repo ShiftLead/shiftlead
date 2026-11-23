@@ -11,6 +11,7 @@ import yaml
 from test_cli_teams import creates, org_doc, world  # noqa: F401 — `world` is a fixture
 
 from sessionorc import work
+from sessionorc.store import HostStore
 from shiftlead import cli, teamrun
 from shiftlead import org as orgmod
 
@@ -233,6 +234,23 @@ def test_a_live_sweep_seat_refuses_with_its_clause_and_an_idle_clean_one_is_clos
     sweep["state"], state["verdicts"]["sweep-ao-grind"]["holder_state"] = "idle", "idle"
     _, result = teamrun.start(cli.call_sync, cli._org_here(), "ao-grind", "kmaster")
     assert "sweep-ao-grind" in [c["name"] for c in result["closed"]]
+
+
+def test_startable_is_none_after_the_switch_over_marker(world):  # noqa: F811
+    """Its `closes` is the *concluded* reading, which §4.9e draws for no team (TD-2076)."""
+    tmp_path, state = world
+    _seated(tmp_path)
+    _team(state, members="idle")
+    org = cli._org_here()
+    (before,) = [r for r in teamrun.rows(org, state["sessions"], {}) if r["name"] == "ao-grind"]
+    assert before["startable"] is not None
+    (tmp_path / "home" / "settings.yml").write_text("cut_over: 2026-12-01\n")
+    (after,) = [r for r in teamrun.rows(org, state["sessions"], {}) if r["name"] == "ao-grind"]
+    assert after["startable"] is None and after["concluded"] is None
+    HostStore().save({"first_shape_off": True})  # the tick's last reading, which a broken file falls back on (§4.9e)
+    (tmp_path / "home" / "settings.yml").write_text("cut_over: [unclosed\n")
+    (kept,) = [r for r in teamrun.rows(org, state["sessions"], {}) if r["name"] == "ao-grind"]
+    assert kept["startable"] is None and kept["concluded"] is None
 
 
 def test_startable_is_none_for_an_orphan_and_with_no_waiting_reading(world):  # noqa: F811

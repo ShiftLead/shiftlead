@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import balance as balance_mod
-from sessionorc import hosts, naming
+from sessionorc import hosts, naming, teamstore
 from sessionorc import ledger as ledger_mod
 from sessionorc import reports as reports_mod
 from sessionorc import seams as seams_mod
@@ -669,20 +669,26 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
     crew = [s for s in sessions if not persons(s)]
     up = live(crew)
     names = {str(s.get("id")): str(s.get("name") or "") for s in sessions}
+    first_shape_off = teamstore.first_shape_off()  # no *concluded* after it (§4.9e)
     rows_out = []
     for t in org.teams.values():
         mine = badged(t.name, crew)
         n_live = len(badged(t.name, up))
         down = None if n_live else wound_down(mine, seat_names(t, mine))
         # the home's reading (§6 rule 9), asked once: it holds when `why` is empty
-        f = finished(mine, seat_names(t, mine), waiting) if n_live else None
+        f = finished(mine, seat_names(t, mine), waiting) if n_live and not first_shape_off else None
         # the busy seats a person's start leaves running, and whether it may start so (§4.9a, TD-1569): no
         # orphan, a waiting reading given, and the crew less its busy seats has nothing live or reads concluded
         reading = busy_reading(t, mine, waiting) if n_live else None
         busy = [{"name": b["name"], "state": b["state"]} for b in reading["busy"]] if reading else []
         startable = (
             {"closes": reading["closes"], "leaves": busy}
-            if reading and busy and not reading["orphans"] and waiting is not None and not reading["why"]
+            if reading
+            and busy
+            and not first_shape_off  # its `closes` is the *concluded* reading, drawn for no team after the marker
+            and not reading["orphans"]
+            and waiting is not None
+            and not reading["why"]
             else None
         )
         rows_out.append(
