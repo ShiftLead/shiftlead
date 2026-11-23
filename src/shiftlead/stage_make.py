@@ -32,7 +32,7 @@ class Made:
 
 
 def _close(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
-    record.update(closed_at=_now(), holder=None, waits=None, intent=None)
+    record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None)
     store.put_entry(record, "closed: the entry is archived")
     return Made(True)
 
@@ -85,7 +85,8 @@ def _ask(
 ) -> Made:
     """A move to the person, as its intent. An entry already carrying the gate is not asked a second time."""
     record.update(holder=None, waits="person" if s.gate else None)
-    if s.gate:
+    if s.gate:  # a gate this record did not ask: no earlier question's map or mark applies to its answer
+        record.update(answers=None, asked=None)
         store.put_entry(record, "carries the home's gate: waits on the person")
     else:
         store.record_intent(
@@ -183,7 +184,15 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
         }
     )
     record.update(
-        stage=to, holder=None, waits=None, answers=None, blocked=None, answer=words, offers=0, entered_at=_now()
+        stage=to,
+        holder=None,
+        waits=None,
+        answers=None,
+        asked=None,
+        blocked=None,
+        answer=words,
+        offers=0,
+        entered_at=_now(),
     )
     if s.pr_state in ("merged", "closed"):  # that pull request is over: the stage starts from a fresh one
         record.update(branch=None, pr=None)

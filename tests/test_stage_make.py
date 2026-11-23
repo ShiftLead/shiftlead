@@ -177,6 +177,22 @@ def test_an_entry_already_carrying_a_gate_is_not_asked_again(store):
     assert got["waits"] == "person" and got["intent"] is None
 
 
+def test_an_answered_question_leaves_no_mark_to_refuse_a_later_gates_answer(store):
+    asked = {"nonce": "n1", "ask": "?", "context": "c", "answers": {}}
+    put(store, waits="person", asked=asked, answers={"Polish it": "polish", OTHER: None})
+    assert act_on(store, Reading(lifted="Polish it", lifted_for="n1")).made
+    assert store.entry(TID)["asked"] is None
+    assert act_on(store, Reading(gate=True)).made  # a gate placed by hand: marked as waiting
+    assert choose(store.entry(TID), Reading(lifted="Go")) == Act("answer")
+
+
+def test_a_gate_met_by_a_move_to_the_person_drops_the_earlier_question(store):
+    put(store, pr=4, asked={"nonce": "n1"}, answers={"Old": "polish"})
+    assert act_on(store, Reading(pr_state="closed", gate=True)).made
+    got = store.entry(TID)
+    assert (got["waits"], got["asked"], got["answers"]) == ("person", None, None)
+
+
 def test_a_stage_gone_asks_with_the_flows_stages(store):
     put(store, stage="dropped", moves=2, holder="s1")
     got = act_on(store, Reading(stage_known=False))
