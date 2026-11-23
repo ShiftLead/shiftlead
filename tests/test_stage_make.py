@@ -373,7 +373,7 @@ def offer_it(store: StageStore, reading: Reading = READY, refused: str | None = 
 
     act = choose(store.entry(TID), reading)
     assert act is not None and act.name == "offer"
-    return offer(store, TID, act, reading, FLOW, start, claim), started, claims
+    return offer(store, TID, act, reading, FLOW, start, claim, team="t"), started, claims
 
 
 def test_a_first_offer_starts_the_way_in_claims_and_writes_the_record(store):
@@ -381,6 +381,7 @@ def test_a_first_offer_starts_the_way_in_claims_and_writes_the_record(store):
     assert got.made and started == [("build", Work(TID))] and claims == [("s9", TID)]
     record = store.entry(TID)
     assert (record["flow"], record["stage"], record["holder"], record["offers"]) == ("new-flow", "build", "s9", 1)
+    assert record["team"] == "t"
 
 
 def test_a_first_offer_carries_the_pull_request_that_is_its_work(store):
@@ -432,7 +433,7 @@ def test_any_failure_after_the_start_names_the_session_to_end(store):
     def broken(*_a: Any) -> str | None:
         raise ValueError("a bad reply")
 
-    got = offer(store, TID, choose(None, READY), READY, FLOW, lambda *_a: "s9", broken)
+    got = offer(store, TID, choose(None, READY), READY, FLOW, lambda *_a: "s9", broken, team="t")
     assert not got.made and got.end == "s9" and "a bad reply" in got.why
     assert store.entry(TID) is None
 
@@ -440,5 +441,5 @@ def test_any_failure_after_the_start_names_the_session_to_end(store):
 def test_an_offer_whose_record_moved_starts_nothing(store):
     act = choose(None, READY)
     put(store, holder="other")
-    got = offer(store, TID, act, READY, FLOW, lambda *_a: pytest.fail("started"), lambda *_a: None)
+    got = offer(store, TID, act, READY, FLOW, lambda *_a: pytest.fail("started"), lambda *_a: None, team="t")
     assert not got.made and store.entry(TID)["holder"] == "other"

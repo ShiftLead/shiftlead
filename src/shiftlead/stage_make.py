@@ -329,11 +329,13 @@ def offer(
     doc: dict[str, Any],
     start: Callable[[str, Work], str | None],
     claim: Callable[[str, str], str | None],
+    *,
+    team: str,
 ) -> Made:
     """Act 5: a fresh session of the stage holds the entry, with its claim, and the record says so. `start` returns the
     holder's address or None; `claim` returns why it was refused or None. The lock is held throughout, so an entry is
     never offered twice. A session whose claim or record could not be written is named in `Made.end` for the caller to
-    end, and the next pass offers afresh."""
+    end, and the next pass offers afresh. `team` is the team whose flow `doc` is, written on a new record."""
     with store.locked():
         record = store.entry(tid)
         if act.name != "offer" or choose(record, s) != act:
@@ -355,7 +357,7 @@ def offer(
             if refused := claim(holder, tid):
                 return Made(False, f"the claim was refused: {refused}", end=holder)
             if record is None or first:
-                record = {**new_record(tid, str(name), key, holder=holder), "branch": branch, "pr": pr}
+                record = {**new_record(tid, str(name), key, team=team, holder=holder), "branch": branch, "pr": pr}
             else:  # a count a loss left stands, so the next loss is the second
                 record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
             store.put_entry(record, f"offered at {key} to {holder}")

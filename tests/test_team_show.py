@@ -142,10 +142,10 @@ def test_a_team_not_switched_says_after_the_switch_over():
 def test_the_show_names_each_stages_login_number_and_entries():
     rows = {"claude:a": _row(["opus"], state="limited"), "claude:b": _row(["opus", "fable", "sonnet"], account="b")}
     records = [
-        {"id": "TD-2", "flow": "build", "stage": "check", "holder": None, "waits": "person"},
-        {"id": "TD-1", "flow": "build", "stage": "build", "holder": "x"},
-        {"id": "TD-3", "flow": "build", "stage": "build", "closed_at": "2026-11-01T00:00:00Z"},
-        {"id": "TD-4", "flow": "other", "stage": "build"},
+        {"id": "TD-2", "team": "t", "flow": "build", "stage": "check", "holder": None, "waits": "person"},
+        {"id": "TD-1", "team": "t", "flow": "build", "stage": "build", "holder": "x"},
+        {"id": "TD-3", "team": "t", "flow": "build", "stage": "build", "closed_at": "2026-11-01T00:00:00Z"},
+        {"id": "TD-4", "team": "other", "flow": "other", "stage": "build"},
     ]
     doc = _doc(at_once={"build": 2, "gone": 1}, most=4, label="Grind")
     got = team_show.view("t", doc, rows, HEAD, "home", FLOW, records)
@@ -157,6 +157,18 @@ def test_the_show_names_each_stages_login_number_and_entries():
     assert got["audits"][0]["now"]["login"] == "claude:b"
     assert got["head"]["most"] == 4 and got["label"] == "Grind" and got["builtins"] == "default"
     assert [lg["why"] for lg in got["logins"]] == ["limited", None] and got["cannot_run"] is None
+
+
+def test_two_teams_of_one_repo_on_one_flow_each_list_only_their_own_entries():
+    entry = {"repo": "shiftlead", "host": "home", "flow": "build", "logins": ["claude:a"]}
+    doc = {"cut_over": "2026-12-01", "teams": {"t": dict(entry), "u": dict(entry)}}
+    records = [
+        {"id": "TD-1", "team": "t", "flow": "build", "stage": "build"},
+        {"id": "TD-2", "team": "u", "flow": "build", "stage": "build"},
+    ]
+    for team, tid in (("t", "TD-1"), ("u", "TD-2")):
+        build = team_show.view(team, doc, {}, HEAD, "home", FLOW, records)["flow"]["stages"][0]
+        assert [e["id"] for e in build["entries"]] == [tid]
 
 
 def test_a_model_no_login_offers_is_cannot_run_and_a_login_off_the_flow_says_so():
