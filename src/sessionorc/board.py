@@ -1351,6 +1351,154 @@ def _lift_on_press(
     }
 
 
+# -- A move to the person is the entry's decision (design §4.9c, §4.4 *The stage record*, TD-2048) -------------
+
+ASK_BODY = (
+    "shiftlead's move to the person: one entry's `decision (<p>)` gate, its Ask and lifting Answers, and the decide "
+    "item the gate sweep would file for it (design §4.9c *A move to the person is the entry's decision*)."
+)
+
+
+def ask_on_entry(
+    root: str | Path,
+    tid: str,
+    person: str,
+    ask: str,
+    context: str,
+    answers: list[str],
+    lifts: list[str],
+    *,
+    nonce: str,
+    today: str | None = None,
+) -> dict[str, Any]:
+    """**A move to the person** (design §4.9c, TD-2048): on origin's head, `decision (<person>)` added to `tid`'s
+    Blocked by beside what it already names, its Ask, Context, Answers and Lifts written, and the covering decide
+    item ledgerboard's `sweep` would file for that gate, landed as one pull request of the host agent's own.
+
+    Returns the landing's `{commit, message, pr}` with `id` and `key`, the item's; `{"already": True}`
+    where the entry's Log already holds this question's `nonce`, answered or not (a crash after the merge, so
+    reconcile's second landing writes nothing); `{"gone": True}` for an entry archived or missing. Any other
+    decision on the entry refuses."""
+    root = Path(root)
+    with _EDIT:
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+        return _twice(lambda: _ask_on_entry(root, tid, person, ask, context, answers, lifts, nonce, today, clock))
+
+
+def _ask_on_entry(
+    root: Path,
+    tid: str,
+    person: str,
+    ask: str,
+    context: str,
+    answers: list[str],
+    lifts: list[str],
+    nonce: str,
+    today: str | None,
+    clock: _Clock,
+) -> dict[str, Any]:
+    t, want = _tree(root, clock)
+    try:
+        return _ask_in_tree(root, t, want, tid, person, ask, context, answers, lifts, nonce, today, clock)
+    except (Refused, ledgerboard.Refused, OSError) as e:
+        _reset(t, want)
+        if isinstance(e, Refused):
+            raise
+        raise Refused(f"the question could not be written, and the ledger is as it was: {e}") from None
+
+
+def _ask_in_tree(
+    root: Path,
+    t: Path,
+    want: str,
+    tid: str,
+    person: str,
+    ask: str,
+    context: str,
+    answers: list[str],
+    lifts: list[str],
+    nonce: str,
+    today: str | None,
+    clock: _Clock,
+) -> dict[str, Any]:
+    led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
+    try:
+        path, archived = led.entry_file(tid)
+    except ledgerboard.Refused:
+        _reset(t, want)
+        return {"gone": True}
+    if archived:
+        _reset(t, want)
+        return {"gone": True}
+    text = led.read(path) or ""
+    gate = f"decision ({person})"
+    rel = workorders.board_rel(root)
+    b = _board(t, rel)
+    url = _git(root, "remote", "get-url", "origin").stdout.strip()
+    repo = ledgerboard.origin_path(url) or root.name
+    raw = ledgerboard.entries(text)[0]["blocked_raw"] or ""
+    mark = f"asked by the stage record: {nonce}"
+    if mark in text:
+        _reset(t, want)
+        return {"already": True}
+    standing = next(
+        (g for g in ledgerboard.gate_items(ledgerboard.parse_gates(raw)) if ledgerboard.GATE_DECISION_RE.match(g)),
+        None,
+    )  # any person's: an entry is asked of one person at a time
+    if standing is not None:
+        _reset(t, want)
+        raise Refused(f"{tid} already waits on {standing}: it is asked once at a time")
+    day = datetime.now(UTC).date().isoformat()
+    blocked = f"{raw}, {gate}" if raw.strip() else gate
+    plan = _plan(
+        lb_ledger.plan_edit, led, "set", tid, fields={"Blocked by": blocked}, ask=ask, context=context, today=day
+    )
+    out = plan.changes.get(path, text)
+    declared = tuple(ledgerboard.declared(led.texts()[0])[0])
+    for name, words in (("Lifts", " | ".join(lifts)), ("Answers", " | ".join(answers))):
+        out = ledgerboard.edit_entry(out, "edit", section=name, words=words, today=day, declared_fields=declared)
+    out = ledgerboard.edit_entry(out, "note", words=mark, today=day)
+    lb_ledger.gate(led, {path: out}, today=day)
+    # reask 0: a question asked again soon after the last is this write's to file, never the sweep's to hold back
+    swept = ledgerboard.sweep([out], [(url, root.name, b)], {}, day, today or date.today(), reask_days=0, repo=repo)
+    items = [it for got in swept["to_file"].values() for it in got if it["kind"] == "decide"]
+    if len(items) != 1:
+        raise Refused(f"the gate sweep would file {len(items)} items for {tid}'s {gate}, not one: nothing was written")
+    it = items[0]
+    lb_ledger.write({path: out})  # the writer's own all-or-nothing write
+    add = _plan(
+        lb_board.plan_add,
+        str(t / rel),
+        it["text"],
+        due=(today or date.today().isoformat()),
+        context=it["context"],
+        kind=it["kind"],
+        answers=it["answers"],
+        default=it["default"],
+        detail=it["detail"],
+        lifts=it["lifts"],
+        today=today or date.today().isoformat(),
+        tool=TOOL,
+    )
+    _apply(add)
+    new = str(add.info["id"])
+    msg = f"{TOOL}: ask {person} on {tid} (session n/a)"
+    entry_rel = os.path.relpath(path, t)
+    landed = _land(
+        root,
+        t,
+        want,
+        msg,
+        clock,
+        lambda: _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0,
+        body=ASK_BODY,
+        also=[entry_rel],
+    )
+    return {**landed, "id": new, "key": workorders.PREFIX + new[-8:]}
+
+
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
 
 BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone
