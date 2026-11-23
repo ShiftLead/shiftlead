@@ -1955,6 +1955,40 @@ async def test_a_tick_inside_a_create_does_not_adopt_the_pane_it_is_starting(age
         assert not agent._starting
 
 
+async def test_a_tick_while_a_create_writes_its_scratch_owner_does_not_adopt_the_pane(agent, tmp_path, monkeypatch):
+    """TD-2096: the pane is up and the record not yet in while the run's `owner.json` is written in a thread. A tick
+    there adopted the pane as a nameless `shell`, and on a node the home then refused the real record."""
+    from sessionorc import scratch as scratch_mod
+
+    started, release, seen = asyncio.Event(), asyncio.Event(), {}
+    loop, write = asyncio.get_running_loop(), scratch_mod.write_owner
+
+    def held_write(path, sid, home):
+        write(path, sid, home)
+        if not sid:  # the directory's first write, before the pane has an id
+            return
+        seen["sid"] = sid
+        loop.call_soon_threadsafe(started.set)
+        asyncio.run_coroutine_threadsafe(release.wait(), loop).result(timeout=10)
+
+    monkeypatch.setattr(scratch_mod, "write_owner", held_write)
+    async with LocalClient() as person:
+        making = asyncio.ensure_future(
+            person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=10)
+            panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+            assert seen["sid"] in panes and seen["sid"] not in agent.sessions  # the gap, as the tick sees it
+            agent._reconcile(panes, {}, datetime.now(UTC))
+            assert seen["sid"] not in agent.sessions  # the create's pane, not a stranger's
+        finally:
+            release.set()  # a failed assertion still lets the write's thread go
+        made = await making
+        assert made["id"] == seen["sid"] and agent.sessions[made["id"]].adapter == "agentshell"
+        assert not agent._starting
+
+
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):
     """Found in the review of PR #147, which put a button in front of this.
 
