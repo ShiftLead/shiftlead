@@ -2698,7 +2698,8 @@ def _schedule_words(t: dict[str, Any]) -> str:
     rule = t.get("schedule")
     if not isinstance(rule, dict):
         return "no schedule"
-    head = f"starts at the reset of {rule.get('profile')}'s {rule.get('window')}"
+    whose = rule.get("profile") or rule.get("login") or "the first login"  # a switched team's rule (§4.9d)
+    head = f"starts at the reset of {whose}'s {rule.get('window')}"
     starts = t.get("starts") if isinstance(t.get("starts"), dict) else {}
     if not starts.get("at"):
         return f"{head} — no reading of it yet"

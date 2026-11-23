@@ -308,3 +308,62 @@ async def test_the_settings_read_answers_each_named_profiles_window_labels(agent
         assert "labels" not in await person.call("settings")
         assert "labels" not in await person.call("settings", profiles="grind")
         assert "labels" not in await person.call("settings", profiles=["grind", 3])
+
+
+LOGIN_RULE = {"start": "reset", "login": "claude-code:a", "window": "week"}
+
+
+def test_a_login_rule_is_a_switched_teams_alone():
+    """§4.9d *When it runs* (TD-2091): a team that is not switched still needs its profile."""
+    assert settings_mod.parse_team({"schedule": LOGIN_RULE}, switched=True) == {"schedule": LOGIN_RULE}
+    no_login = {"start": "reset", "window": "week"}
+    assert settings_mod.parse_team({"schedule": no_login}, switched=True) == {"schedule": no_login}
+    for bad in (LOGIN_RULE, no_login):
+        with pytest.raises(ValueError):
+            settings_mod.parse_team({"schedule": bad})
+    with pytest.raises(ValueError):
+        settings_mod.parse_team({"schedule": RULE}, switched=True)
+    doc = {"teams": {"sw": {"repo": "r", "schedule": LOGIN_RULE}, "old": {"schedule": LOGIN_RULE, "reserve": 3}}}
+    assert settings_mod.teams(doc) == {"sw": {"schedule": LOGIN_RULE}, "old": {"reserve": 3}}
+
+
+async def test_a_login_is_checked_when_saved_and_a_stale_one_stands(agent, monkeypatch):
+    """Saved: in the list, not metered, a reported window. Read after the list moved: kept (TD-2091's ruling)."""
+    await park_ticks(agent)
+    here = agent.host
+    entry = {"repo": "r", "host": here, "logins": ["claude-code:a", "claude-code:m"]}
+    settings_mod.save({"teams": {"sw": {**entry}}})
+    held = {"claude-code:a": {"account": "claude-code:acct"}, "claude-code:m": {"billing": "metered"}}
+    monkeypatch.setattr("sessionorc.logins.load", lambda *_a: {"logins": held, "forgotten": {}})
+    agent._usage_acct["claude-code:acct"] = {"windows": [{"label": "week", "pct": 1}]}
+    async with LocalClient(paths.socket_path(), caller=None) as person:
+        got = await person.call("set_settings", teams={"sw": {"schedule": LOGIN_RULE}})
+        assert got["teams"]["sw"]["schedule"] == LOGIN_RULE and not got.get("unchecked")
+        for rule, word in (
+            ({**LOGIN_RULE, "login": "claude-code:z"}, "not in sw's logins"),
+            ({**LOGIN_RULE, "login": "claude-code:m"}, "metered"),
+            ({**LOGIN_RULE, "window": "5h"}, "reports no window"),
+            (RULE, "names a login"),
+        ):
+            with pytest.raises(AgentError, match=word):
+                await person.call("set_settings", teams={"sw": {"schedule": rule}})
+    doc = settings_mod.load()
+    doc["teams"]["sw"]["logins"] = ["claude-code:m"]
+    settings_mod.save(doc)
+    assert settings_mod.teams(settings_mod.load())["sw"]["schedule"] == LOGIN_RULE
+
+
+async def test_a_nodes_team_cannot_save_a_schedule(agent):
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"sw": {"repo": "r", "host": "elsewhere", "logins": ["claude-code:a"]}}})
+    async with LocalClient(paths.socket_path(), caller=None) as person:
+        with pytest.raises(AgentError, match="node's logins are not read here"):
+            await person.call("set_settings", teams={"sw": {"schedule": LOGIN_RULE}})
+
+
+async def test_a_login_rule_fires_nothing_until_its_build(agent, monkeypatch):
+    replays = await _setup(agent, monkeypatch, _rec("w"))
+    settings_mod.save({"teams": {"g": {"repo": "r", "schedule": LOGIN_RULE}}})
+    _reading(agent, datetime.now(UTC) - timedelta(minutes=1))
+    await agent._schedules(datetime.now(UTC))
+    assert replays.calls == [] and "schedule_next" not in _rec_of(agent)

@@ -22,6 +22,7 @@ from sessionorc import (
     defs,
     gitinfo,
     hosts,
+    logins,
     teamstore,
 )
 from sessionorc import cadence as cadence_mod
@@ -308,12 +309,41 @@ class SettingsMixin:
             )
         return True
 
+    def _schedule_login_known(self, doc: dict[str, Any], team: str, rule: dict[str, str]) -> bool:
+        """A switched team's schedule, checked when it is saved and never on a load (§4.9d *When it runs*, TD-2091):
+        its login is one of the team's list, none meaning the first; a metered login is refused, and so is a team on
+        a node, whose logins are not read here; the window is checked against the login's account's reading. False
+        when there is no login or no reading to check it against."""
+        entry = (doc.get("teams") or {}).get(team) or {}
+        if str(entry.get("host") or hosts.local_host().name) != hosts.local_host().name:
+            raise RpcError("schedule: a node's logins are not read here (design §4.9d)")
+        order = [str(lk) for lk in entry.get("logins") or ()]
+        login = rule.get("login")
+        if login and login not in order:
+            raise RpcError(f"schedule: {login} is not in {team}'s logins: {', '.join(order) or 'none'} (design §4.9d)")
+        login = login or (order[0] if order else None)
+        if login is None:
+            return False
+        held = ((logins.load() or logins.empty()).get("logins") or {}).get(login) or {}
+        if held.get("billing") == "metered":
+            raise RpcError(f"schedule: {login} is metered, so it has no reset to start at (design §4.9d)")
+        reading = self._usage_acct.get(logins.account_of(login, held)) or {}
+        reported = [str(w.get("label")) for w in reading.get("windows") or [] if isinstance(w, dict)]
+        if not reported:
+            return False
+        if rule["window"] not in reported:
+            raise RpcError(
+                f"schedule: login {login} reports no window {rule['window']}: "
+                f"its windows are {', '.join(reported)} (design §4.9d)"
+            )
+        return True
+
     def _schedule_starts(self, team: str, rule: Any, now: datetime) -> dict[str, Any]:
         """When a team's schedule next fires (§4.7 `ao schedule`, §4.5a *starts* note, TD-133): the
         upcoming reset the tick last read for this rule (`schedule_next` on the home's host record), else
         the reset in the profile's reading while it is ahead — `{at}`, with `held` while a passed reset
         waits for a node's link; `{at: None}` when nothing is known to wait for."""
-        if not isinstance(rule, dict):
+        if not isinstance(rule, dict) or not rule.get("profile"):  # a login's rule fires from TD-2065
             return {"at": None}
 
         def utc(value: Any) -> datetime | None:  # an offset-carrying instant, else None: never a guessed clock
@@ -489,14 +519,17 @@ class SettingsMixin:
                     # a clear of a mistyped key is refused too: a typo is never a silent no-op
                     raise RpcError(f"{key}.{name}: unknown key {', '.join(unknown)} (known: {', '.join(known)})")
                 kept = {k: v for k, v in fields.items() if v is not None}
+                by_login = key == "teams" and teamstore.switched(doc, str(name))
                 try:
-                    parsed = parse(kept)
+                    parsed = parse(kept, switched=True) if by_login else parse(kept)
                 except ValueError as e:
                     raise RpcError(f"{key}.{name}: {e}") from None
                 if "until" in parsed and _parse(parsed["until"]) <= now:
                     raise RpcError(f"{key}.{name}: until {parsed['until']} has passed — a stop time is ahead (§6)")
-                if key == "teams" and "schedule" in parsed and not self._schedule_window_known(parsed["schedule"]):
-                    out["unchecked"] = True  # no reading of the profile yet: its labels cannot be checked
+                if key == "teams" and "schedule" in parsed:
+                    check = self._schedule_login_known if by_login else self._schedule_window_known
+                    if not (check(doc, str(name), parsed["schedule"]) if by_login else check(parsed["schedule"])):
+                        out["unchecked"] = True  # no reading of the profile or login yet: its labels are not checked
                 change[str(name)] = {**{k: None for k in fields if fields[k] is None}, **parsed}
             doc[key] = settings_mod.merge(doc.get(key), change)
             out[key] = getattr(settings_mod, key)(doc)

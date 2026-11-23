@@ -421,6 +421,7 @@ def team_cards(
     return out
 
 
+NODE_LOGINS = "a node's logins are not read here"  # why a node's team has no schedule at a reset (§4.9d)
 NODE_NOTE = "not checked: a node's logins are not read here"  # `team_show`'s words, read to know a node's team
 
 
@@ -497,6 +498,14 @@ def _route(flow: Mapping[str, Any], stages: list[dict[str, Any]]) -> list[dict[s
     return out
 
 
+def _window_labels(account: Mapping[str, Any] | None) -> list[str]:
+    """The windows an account's reading reports, for the **Starts** row; none where it has no reading."""
+    g = (account or {}).get("gauges")
+    if not isinstance(g, Mapping) or g.get("unread"):
+        return []
+    return [str(w.get("label")) for w in g.get("windows") or () if isinstance(w, Mapping)]
+
+
 def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
     """What the team page draws of a switched team (§4.9d *The page*, TD-2060), from `team_show` and the host's `tools`
     read: the head, the login rows with each account's gauge, the logins that can be added, and the numbers."""
@@ -515,6 +524,7 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
                 "shown": lg.get("label") or lg.get("name"),
                 "metered": (held.get("settings") or {}).get("billing") == "metered",
                 "gauge": gauge_view(account.get("gauges"), account.get("billing")) if account else None,
+                "windows": _window_labels(account),
             }
         )
     listed = {str(lg.get("login")) for lg in rows}
@@ -657,6 +667,65 @@ def schedule_card(
         "was": was,
         "labels": json.dumps(readings, separators=(",", ":")),
         "starts": (uiconf.team_starts(team) or "starts at the reset · no reading yet") if standing else "no schedule",
+    }
+
+
+def switched_schedule(rule: Any, sw: Mapping[str, Any]) -> dict[str, Any]:
+    """A switched team's **Starts** row (§4.9d *When it runs*, TD-2091), in `schedule_card`'s shape, from the team's
+    login rows: a pick of its logins, a metered one disabled, and the windows its account reports. A rule whose login
+    left the list reads the first, and the row says so; an empty list, or a metered first login, starts nothing and
+    the row says why. A team on a node cannot set one, since its logins are not read here."""
+    rows = list(sw.get("logins") or ())
+    shown = {str(r.get("login")): str(r.get("shown") or r.get("name")) for r in rows}
+    metered = {str(r.get("login")) for r in rows if r.get("metered")}
+    offered = [k for k in shown if k not in metered]
+    readings = {str(r.get("login")): list(r.get("windows") or ()) for r in rows if r.get("windows")}
+    standing = rule if isinstance(rule, dict) and "window" in rule else None
+    named = str(standing.get("login") or "") if standing else ""
+    if standing:
+        login = named if named in shown else next(iter(shown), "")
+        window = str(standing.get("window") or "")
+    else:
+        login = offered[0] if offered else ""
+        # the week's with no reading yet: the row saves as it is ticked, and a rule needs its window (§4.9d)
+        window = (readings.get(login) or ["week"])[0]
+    said = ""
+    if standing and not login:
+        said = "the schedule names no login and starts nothing: the team's login list is empty"
+    elif standing and login in metered:
+        said = f"{shown[login]} is metered, so the schedule starts nothing"
+    elif standing and named and named != login:
+        said = f"the schedule now reads {shown[login]}"
+    windows = [{"label": w, "mark": ""} for w in readings.get(login) or ()]
+    if windows and window and window not in readings[login]:
+        windows.append({"label": window, "mark": " (not reported)"})
+    why = NODE_LOGINS if sw.get("on_node") else "" if offered else SCHEDULE_METERED
+    was = {"start": "reset", "login": login, "window": window}
+    return {
+        "who": "login",
+        "on": bool(standing),
+        "can": bool(offered) and not sw.get("on_node"),
+        "why": why,
+        "profile": login,
+        "window": window,
+        "options": [
+            {
+                "name": k,
+                "shown": v,
+                "disabled": k in metered,
+                "title": SCHEDULE_METERED if k in metered else "",
+                "mark": "",
+            }
+            for k, v in shown.items()
+        ],
+        "windows": windows,
+        "fixed": False,
+        "note": f"no reading of {shown[login]} yet — the label is not checked" if login and not windows else "",
+        "was": json.dumps(was, separators=(",", ":"), ensure_ascii=False) if standing else "null",
+        "labels": json.dumps(readings, separators=(",", ":")),
+        "starts": said
+        or (why if sw.get("on_node") else "")
+        or (f"at the reset of {shown[login]}'s {window}" if standing else "no schedule"),
     }
 
 
