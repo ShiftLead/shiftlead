@@ -142,8 +142,26 @@ def test_a_push_that_lost_the_race_is_made_again_on_the_new_tip(repo, tmp_path):
 
 def test_the_ask_is_one_line_with_the_reason_in_its_context():
     ask, context = ask_words("build", "not-needed", "The fix landed with TD-1900.\nNothing is left.")
-    assert ask == "Build ended as not needed: The fix landed with TD-1900. What next?"
+    assert ask == "Build ended as not needed, what next?"
     assert context == "The fix landed with TD-1900. Nothing is left."
+
+
+@pytest.mark.parametrize(
+    ("stage", "reason"),
+    [
+        ("build", " ".join(["a long reason"] * 13)),
+        ("build", "It broke in `src/shiftlead/stagerecord.py` at ask_words()."),
+        ("protected-read", "Fine."),
+        ("src/x.py", "A stage name holding code."),
+        ("one two three four five six", "A long stage name."),
+    ],
+)
+def test_the_ask_passes_the_sentence_rule_whatever_the_reason_or_stage(stage, reason):
+    ask, context = ask_words(stage, "not-needed", reason)
+    assert ledgerboard.person_text_problems(ask, question=True) == []
+    assert ledgerboard.sentence_problems(ask, question=True, max_words=ledgerboard.SENTENCE_WORDS) == []
+    assert "`" not in ask and "/" not in ask and "_" not in ask
+    assert context == " ".join(reason.split())
 
 
 def test_a_move_to_the_person_is_one_pull_request_with_the_gate_and_its_item(repo):

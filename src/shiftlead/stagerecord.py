@@ -93,13 +93,18 @@ def new_record(tid: str, flow: str, stage: str, *, holder: str | None = None) ->
     }
 
 
+PLAIN_STAGE_WORDS = 4  # the most of a stage's name an Ask says (§4.9c)
+
+
 def ask_words(stage: str, outcome: str, reason: str) -> tuple[str, str]:
-    """The Ask and its Context (§4.9c): the Ask one line, the stage's name, the outcome and the first sentence of the
-    session's reason, ending *What next?*; the Context the whole reason."""
+    """The Ask and its Context (§4.9c): the Ask one plain sentence from the stage and the outcome alone, the Context
+    the session's whole reason. A stage's name is the flow's to choose, so one that is not a few plain words is said
+    as *This stage*; the reason never enters the Ask, whose rules (§4.10 rule 1) it could break."""
     said = " ".join(reason.split())
-    first = re.split(r"(?<=[.!?])\s", said, maxsplit=1)[0].rstrip(".!?") if said else ""
-    head = f"{stage.capitalize()} ended as {outcome.replace('-', ' ')}"
-    return (f"{head}: {first}. What next?" if first else f"{head}. What next?"), (said or f"{head}.")
+    words = stage.replace("-", " ").split()
+    name = " ".join(words) if 0 < len(words) <= PLAIN_STAGE_WORDS and all(w.isalpha() for w in words) else "this stage"
+    head = f"{name[0].upper()}{name[1:]} ended as {outcome.replace('-', ' ')}"
+    return f"{head}, what next?", (said or f"{head}.")
 
 
 class StageStore:
