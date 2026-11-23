@@ -4603,7 +4603,6 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str, request: Request):
-        _first_shape_gone()
         body: Any = {}
         if request.headers.get("content-type", "").startswith("application/json"):
             with contextlib.suppress(ValueError):  # a body that is not JSON reads as none, never a 500

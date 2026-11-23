@@ -1201,8 +1201,6 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     refuses the whole start, so there is never half a team; an exited or closed holder is
     superseded, which makes this the restart too. What is left here is the terminal's half: the
     messages and the exit code."""
-    if (gone := _first_shape_gone(args)) is not None:
-        return gone
     try:
         org = _org_here()
     except ValueError as e:

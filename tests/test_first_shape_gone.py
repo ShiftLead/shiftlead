@@ -16,7 +16,6 @@ from shiftlead import cli
 from shiftlead.ui import app as uiapp
 
 VERBS = [
-    ["team", "start", "t"],
     ["team", "flow", "t"],
     ["team", "size", "t", "w", "2"],
     ["team", "max", "t", "w", "2"],
@@ -61,7 +60,6 @@ def test_pr_held_answers_that_none_is_held(marked, capsys):
 @pytest.mark.parametrize(
     ("method", "url"),
     [
-        ("post", "/api/teams/t/start"),
         ("post", "/api/teams/t/flow/apply"),
         ("get", "/api/teams/t/members"),
         ("post", "/api/teams/t/members"),
@@ -88,3 +86,10 @@ async def test_settings_still_take_a_stop_time_after_the_marker(agent):
     (paths.home() / "settings.yml").write_text(yaml.safe_dump({"cut_over": "2026-12-01"}))
     async with LocalClient() as person:
         await person.call("set_settings", teams={"t": {"reserve": 5}})
+
+
+def test_the_team_start_stays_after_the_marker(marked):
+    """Design 4.7 and 4.9d keep `ao team start` and the page's Start: they set the started mark."""
+    with TestClient(uiapp.create_app()) as c:
+        got = c.post("/api/teams/t/start", json={})
+    assert teamstore.GONE not in got.text
