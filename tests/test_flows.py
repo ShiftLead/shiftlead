@@ -61,6 +61,7 @@ def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
         "auditor": "seat",
         "sweeper": "seat",
         "fact-checker": "seat",
+        "reviewer": "worker",
         "plain": "plain",
     }
     with pytest.raises(ValueError, match=r"grinder.kind: a role's kind is its definition's"):

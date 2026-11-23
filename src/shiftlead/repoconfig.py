@@ -527,6 +527,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "grants": [],
         "message": "a design-first entry, a control's shape, a screen",
     },
+    # A format-3 flow's review stage (design §4.8 *Under a format-3 flow*, TD-2049): its template is the mechanics of
+    # reading a pull request and recording a verdict; what to look for is the stage's brief.
+    "reviewer": {
+        "kind": "worker",
+        "brief": "reviewer.md",
+        "lane": [],
+        "grants": [],
+        "icon": "eye",
+        "label": "Reviewer",
+        "context": WORKER_CONTEXT,
+        "message": "the one pull request its stage reads",
+    },
     "plain": {"kind": "plain", "brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
@@ -564,6 +576,7 @@ class UnderFlow:
 
     text: str
     stage: Path | None = None
+    brief: str | None = None  # a format-3 stage's brief and `also`, whole: fills `{stage}` in place of a file (§4.9c)
 
 
 def _stage_default(template: str) -> Path | None:
@@ -753,8 +766,12 @@ class Role:
             stage = flow.stage if flow is not None else default_stage
             text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
             slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}
-            text = text.replace(STAGE_PLACEHOLDER, _stage_text(stage, read) if stage else NO_STAGE)
-            slots[STAGE_PLACEHOLDER] = {"file": str(stage)} if stage else {"text": NO_STAGE}
+            if flow is not None and flow.brief is not None:
+                text = text.replace(STAGE_PLACEHOLDER, flow.brief)
+                slots[STAGE_PLACEHOLDER] = {"text": flow.brief}
+            else:
+                text = text.replace(STAGE_PLACEHOLDER, _stage_text(stage, read) if stage else NO_STAGE)
+                slots[STAGE_PLACEHOLDER] = {"file": str(stage)} if stage else {"text": NO_STAGE}
         if self.template is not None and ENTRY_PLACEHOLDER in text:  # the techlead's template alone carries it
             handed = entry_text(*(HANDED_ENTRY[slot] for slot in ENTRY_SLOTS))
             text = text.replace(ENTRY_PLACEHOLDER, handed)

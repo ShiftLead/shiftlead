@@ -37,6 +37,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
         "sweeper",
         "fact-checker",
         "designer",
+        "reviewer",
         "plain",
     ]
 
@@ -60,7 +61,7 @@ roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
   hunter: {brief: docs/briefs/hunter.md}
   manager: {brief: docs/briefs/manager.md, grants: [control]}
-  reviewer: {grants: [], lane: [ui, tests], controllers: [ui-orc]}
+  inspector: {grants: [], lane: [ui, tests], controllers: [ui-orc]}
 controllers: [orchestrator-ao-1]
 ledger: docs/debt.md
 teams:
@@ -70,7 +71,7 @@ commands:
   - {name: test, run: pdm run test}
 """
     )
-    define(tmp_path / ".shiftlead" / "roles", "reviewer")  # a `roles:` key names a definition (§4.9c)
+    define(tmp_path / ".shiftlead" / "roles", "inspector")  # a `roles:` key names a definition (§4.9c)
     cfg = repoconfig.load(tmp_path)
     assert cfg.path == tmp_path / ".shiftlead.yml"
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
@@ -85,7 +86,7 @@ commands:
     assert g.source == "built-in + repo"
     o = repoconfig.resolve_role(cfg, "manager")
     assert o.grants == ["control"] and o.lane == [] and o.controllers == []
-    r = repoconfig.resolve_role(cfg, "reviewer")
+    r = repoconfig.resolve_role(cfg, "inspector")
     assert (
         r.source == "repo role + repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
     )
@@ -98,8 +99,9 @@ commands:
         "sweeper",
         "fact-checker",
         "designer",
-        "plain",
         "reviewer",
+        "plain",
+        "inspector",
     ]
     with pytest.raises(KeyError, match="unknown role 'nope' — no preset, .*; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
@@ -422,7 +424,7 @@ def test_entry_rules_are_written_once_and_read_both_ways():
 
 def test_grants_orchestrate_in_a_role_is_an_unknown_grant(tmp_path):
     """TD-107: `grants: [orchestrate]` in a `roles:` block is refused like any unknown grant."""
-    (tmp_path / ".shiftlead.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  inspector: {grants: [orchestrate, control]}\n")
     with pytest.raises(ValueError, match="unknown grant 'orchestrate'"):
         repoconfig.load(tmp_path)
 
@@ -443,18 +445,19 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "sweeper": "Sweeper",
         "fact-checker": "Fact-check",
         "designer": "Designer",
+        "reviewer": "Reviewer",
         "plain": "Plain",
     }
     assert "label" in repoconfig.ROLE_KEYS
     assert repoconfig.default_label("orchestrator") == "Orchestrator"
-    assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
+    assert repoconfig.default_label("inspector") == "Inspector" and repoconfig.default_label("") == ""
     # a layer's label wins per key, as every other key does, and to_dict says what the page shows
-    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")
-    define(tmp_path / ".shiftlead" / "roles", "reviewer")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  inspector: {icon: eye}\n")
+    define(tmp_path / ".shiftlead" / "roles", "inspector")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.display == "TD grinder" and grinder.icon == "wrench" and grinder.to_dict()["label"] == "TD grinder"
-    assert repoconfig.resolve_role(cfg, "reviewer").display == "Reviewer"  # no label: the default
+    assert repoconfig.resolve_role(cfg, "inspector").display == "Inspector"  # no label: the default
     assert repoconfig.resolve_role(cfg, "hunter", {"hunter": {"label": "Bug hunter"}}).display == "Bug hunter"
     # a label is one short line of text, checked when the file is read
     for bad, why in (("label: ''", "one line"), ("label: 7", "one line"), ("label: [a]", "one line"),
@@ -479,18 +482,19 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
         "sweeper": "shield",
         "fact-checker": "eye",
         "designer": None,
+        "reviewer": "eye",
         "plain": None,
     }
     assert "icon" in repoconfig.ROLE_KEYS
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched
-    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {icon: terminal}\n  reviewer: {icon: eye}\n")
-    define(tmp_path / ".shiftlead" / "roles", "reviewer")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {icon: terminal}\n  inspector: {icon: eye}\n")
+    define(tmp_path / ".shiftlead" / "roles", "inspector")
     define(tmp_path / ".shiftlead" / "roles", "lead")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.icon == "terminal" and grinder.brief == "grinder.md" and grinder.lane == ["free-pick"]
-    assert repoconfig.resolve_role(cfg, "reviewer").icon == "eye"
+    assert repoconfig.resolve_role(cfg, "inspector").icon == "eye"
     assert grinder.to_dict()["icon"] == "terminal"
     # built-in < org < repo, per key: the org layer speaks for a role the repo's file leaves alone
     overlay = {"hunter": {"icon": "book"}, "grinder": {"icon": "shield"}}

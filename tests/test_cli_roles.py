@@ -169,12 +169,12 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
         and "grants: control" in out
     )
     (root / ".shiftlead.yml").write_text(
-        "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  reviewer: {lane: [ui]}\n"
+        "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  inspector: {lane: [ui]}\n"
     )
-    d = root / ".shiftlead" / "roles" / "reviewer"  # a `roles:` key overlays a definition (§4.9c)
+    d = root / ".shiftlead" / "roles" / "inspector"  # a `roles:` key overlays a definition (§4.9c)
     d.mkdir(parents=True)
     (d / "role.yml").write_text("{}\n")
-    (d / "template.md").write_text("# reviewer\n")
+    (d / "template.md").write_text("# inspector\n")
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0] == f"roles from {root / '.shiftlead.yml'}"
@@ -182,15 +182,15 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert re.search(
         r"^grinder +\[built-in \+ repo\]  lane: free-pick  grants: none  profile: grind  controllers: orc", out, re.M
     )
-    assert "brief: docs/briefs/g.md" in out and re.search(r"^reviewer +\[repo role \+ repo\]  lane: ui", out, re.M)
+    assert "brief: docs/briefs/g.md" in out and re.search(r"^inspector +\[repo role \+ repo\]  lane: ui", out, re.M)
     # the fact-check seat (design §4.9b *The fact-check*, TD-1212): a built-in seat with its label
     assert re.search(r"^fact-checker +\[built-in\]  lane: -  grants: none", out, re.M) and "label: Fact-check" in out
-    assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
+    assert "label: Grinder" in out and "label: Inspector" in out  # what the page shows (design §4.8 *The names*)
     # when to message it (design §4.8, TD-171): its own line under the role's, where a role has one
     assert "  message: its own card only: the entry it holds, a finding on its PR" in out
     assert cli.main(["roles", "--json", "-d", str(root)]) == 0
     data = json.loads(capsys.readouterr().out)
-    assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "reviewer"
+    assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "inspector"
     assert next(r for r in data["roles"] if r["name"] == "plain")["message"] is None
     assert next(r for r in data["roles"] if r["name"] == "grinder")["source"] == "built-in + repo"
     # its saved prompts (design §4.8, TD-170): the labels, on their own line; the text is the file's
