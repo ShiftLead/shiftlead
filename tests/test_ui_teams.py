@@ -43,6 +43,8 @@ class Fleet:
             return {}
         if method == "repos":  # the home's repo readings: the Start's lane line reads their ledgers (TD-265)
             return dict(self.repos)
+        if method == "settings":  # the team page's read (TD-2059)
+            return {"teams": {}, "labels": {}}
         if method == "recent_dirs":
             return []
         if method == "adapters":
@@ -425,6 +427,21 @@ def test_a_live_teams_card_carries_stop_and_stop_now_and_its_fold(world, client)
     adhoc = html[html.index('<section class="tgroup" data-team="adhoc"') :]
     adhoc = adhoc[: adhoc.index('<div class="grid">')]
     assert "data-team-act" not in adhoc
+
+
+def test_the_team_pages_head_presses_start_and_wind_down_as_the_card_does(world, client):
+    """§4.5a *Team page: the head* (TD-2059): the card's Start and Wind down, and no Stop now, which the row omits."""
+    _tmp_path, fleet = world
+    page = client.get("/teams/ao-grind").text
+    head = page.split('id="teamhead"')[1].split("</div>")[0]
+    assert 'data-team-act="start" data-team="ao-grind"' in head and 'data-team-act="stop' not in head
+    assert "Start or wind down on Sessions" not in head
+    fleet.sessions = [badged("orc-ao", "ao-grind")]
+    head = client.get("/teams/ao-grind").text.split('id="teamhead"')[1].split("</div>")[0]
+    assert 'data-team-act="stop" data-team="ao-grind"' in head
+    assert 'data-team-act="start"' not in head and 'data-team-act="stopnow"' not in head
+    card = client.get("/").text
+    assert 'data-team-act="stop" data-team="ao-grind"' in card and 'data-team-act="stopnow"' in card
 
 
 def test_the_state_pill_has_a_glyph_for_every_state_the_view_can_name():

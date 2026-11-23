@@ -5433,7 +5433,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         info = {} if isinstance(info, HTTPException) else info
         fleet = [] if isinstance(fleet, HTTPException) else fleet
         readings = {} if isinstance(readings, HTTPException) else readings
-        card, head = None, None
+        card, head, group = None, None, None
         if team in org.teams:
             card = setmod.team_cards(
                 {team: org.teams[team]},
@@ -5448,16 +5448,17 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             seats, waits = await h.seats_of(fleet), await h.person_waits()
             rows = await h.team_rows(fleet)
             views = [view(s, fleet, seats=seats, repos=readings, waits=waits) for s in fleet]
-            groups = team_groups(views, rows, readings) or []
-            head = setmod.team_head(
-                team, org.teams[team], next((g for g in groups if g.get("team") == team), None), host_name()
-            )
+            # the flows too: Start's confirm names the definition's renames and removals, as the card's does (§4.5a)
+            groups = team_groups(views, rows, readings, flows=await h.flow_views(fleet, org)) or []
+            group = next((g for g in groups if g.get("team") == team), None)
+            head = setmod.team_head(team, org.teams[team], group, host_name())
         return templates.TemplateResponse(
             request,
             "team.html",
             {
                 "t": card,
                 "head": head,
+                "group": group,
                 "tabs": tabs,
                 "notes": notes,
                 "agent_down": down,
