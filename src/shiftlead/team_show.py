@@ -240,6 +240,7 @@ def builtins_view(
         ],
         "used_by": builtinstore.using(doc, name, repos),
         "named_by": builtinstore.named_by(doc, name),
+        "stored_models": dict(entry["models"]),  # what a model pick sends back, a seat with no pick kept
         "seats": seats,
         "logins": [_login_row(lk, rows, models, False, whys[lk]) if lk in rows else _unread_login(lk) for lk in order],
         "order": order,

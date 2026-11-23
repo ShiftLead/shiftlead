@@ -621,7 +621,7 @@ def builtins_page(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
         "label": show.get("label") or "",
         "tabs": [{"name": x["name"], "dot": "; ".join(x.get("cannot_run") or ())} for x in show.get("sets") or ()],
         "seats": seats,
-        "models": {s["key"]: s["model"] for s in seats if s.get("model")},
+        "models": dict(show.get("stored_models") or {}),
         "logins": rows,
         "can_add": [
             {"key": k, "shown": f"{lg.get('label') or lg.get('name')} ({k.partition(':')[0]})"}

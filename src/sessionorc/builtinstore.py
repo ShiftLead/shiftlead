@@ -86,7 +86,10 @@ def sets(doc: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     models and an empty list (§4.9d *The store*)."""
     held = _held(doc)
     first = _read(held[DEFAULT]) if DEFAULT in held else {"label": None, "models": dict(PACKAGE_MODELS), "logins": []}
-    rest = {str(n): _read(held[n]) for n in sorted(held, key=lambda x: str(x).casefold()) if n != DEFAULT}
+    names = sorted(
+        (n for n in held if isinstance(n, str) and n != DEFAULT), key=str.casefold
+    )  # a hand edit's other key
+    rest = {n: _read(held[n]) for n in names}
     return {DEFAULT: first, **rest}
 
 
@@ -212,7 +215,10 @@ def apply(doc: dict[str, Any], name: str, change: Mapping[str, Any], sent: str |
         new_value = _models(value)
     else:
         new_value = teamstore._logins(value)
-    entry = _writable(doc).setdefault(name, {})
+    store = _writable(doc)
+    entry = store[name] if isinstance(store.get(name), dict) else store.setdefault(name, {})
+    if not isinstance(entry, dict):  # a hand edit's non-mapping: this write replaces it
+        entry = store[name] = {}
     if new_value is None:
         entry.pop(key, None)
     else:

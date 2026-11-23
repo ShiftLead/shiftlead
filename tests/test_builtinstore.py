@@ -16,6 +16,7 @@ from sessionorc.agent_common import RpcError
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.teamstore import TeamError
 from shiftlead import team_show
+from shiftlead.ui import settings_page as setmod
 
 pytestmark = pytest.mark.unit
 
@@ -169,6 +170,21 @@ def test_the_pages_read_says_what_each_band_draws():
     assert [x["name"] for x in got["sets"]] == ["default", "cheap"] and got["sets"][1]["cannot_run"]
     with pytest.raises(ValueError, match="no built-in set"):
         team_show.builtins_view(name="gone", doc=doc, rows=rows, roots=[], director=False)
+
+
+def test_a_model_pick_under_a_director_keeps_the_stored_prompts_model_and_adds_no_package_model():
+    doc = _doc(builtins={"default": {"models": {"prompts": "opus"}, "logins": []}})
+    got = team_show.builtins_view(name="default", doc=doc, rows={}, roots=[], director=True)
+    assert setmod.builtins_page(got, None)["models"] == {"prompts": "opus"}
+
+
+def test_a_hand_edited_key_or_entry_refuses_or_is_replaced_rather_than_crashing():
+    doc = _doc(builtins={1: {}, "odd": "text"})
+    assert list(bs.sets(doc)) == ["default", "odd"]
+    with pytest.raises(TeamError, match="no built-in set"):
+        bs.delete(doc, "1", bs.version(doc))
+    bs.apply(doc, "odd", {"label": "x"}, bs.version(doc))
+    assert doc["builtins"]["odd"] == {"label": "x"}
 
 
 def test_a_team_page_says_when_its_repos_set_cannot_run_a_seat_and_a_node_team_is_not_checked():
