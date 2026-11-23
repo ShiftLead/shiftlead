@@ -19,15 +19,21 @@
   const form = document.getElementById("teamnew");
   if (form) {
     const hosts = JSON.parse(form.dataset.hosts), teams = JSON.parse(form.dataset.teams);
+    const declared = JSON.parse(form.dataset.declared);
     const said = document.getElementById("teamnewsaid");
     const second = document.getElementById("teamnewsecond");
+    // the names the ledger declares first, a deleted one among them, as the page's own `declared_line` writes them
+    const drawLine = () => {
+      const repo = form.elements.repo.value, seen = new Set();
+      const names = [...(declared[repo] || []), ...(teams[repo] || []), form.elements.name.value.trim() || "<name>"];
+      const line = names.filter((n) => !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+      document.getElementById("teamnewline").textContent = `Team = ${line.join(" | ")}`;
+    };
     const redraw = () => {
       const repo = form.elements.repo.value;
       form.elements.host.replaceChildren(...(hosts[repo] || []).map((h) => new Option(h, h)));
-      const have = teams[repo] || [];
-      second.hidden = !have.length;
-      const name = form.elements.name.value.trim() || "<name>";
-      document.getElementById("teamnewline").textContent = `Team = ${[...have, name].join(" | ")}`;
+      second.hidden = !(teams[repo] || []).length;
+      drawLine();
     };
     document.getElementById("teamnewopen").addEventListener("click", () => {
       form.hidden = false;
@@ -36,10 +42,7 @@
     });
     document.getElementById("teamnewcancel").addEventListener("click", () => { form.hidden = true; });
     form.elements.repo.addEventListener("change", redraw);
-    form.elements.name.addEventListener("input", () => {
-      document.getElementById("teamnewline").textContent =
-        `Team = ${[...(teams[form.elements.repo.value] || []), form.elements.name.value.trim() || "<name>"].join(" | ")}`;
-    });
+    form.elements.name.addEventListener("input", drawLine);
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       said.hidden = true;

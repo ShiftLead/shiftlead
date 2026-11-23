@@ -4,6 +4,7 @@ stage, and the one pick of a login for a model."""
 from __future__ import annotations
 
 import asyncio
+import copy
 from types import SimpleNamespace
 
 import pytest
@@ -307,6 +308,13 @@ def _agent_on(monkeypatch, body, live=()):
     )
     a = _Agent()
     a._graph = lambda: {r.id: r for r in live}
+    a._host_rec = {}
+    a.host_store = SimpleNamespace(save=lambda rec: a.__dict__.setdefault("host_saves", []).append(copy.deepcopy(rec)))
+
+    async def pushed():
+        a.__dict__["host_pushes"] = a.__dict__.get("host_pushes", 0) + 1
+
+    a._push_changes = pushed
     return a
 
 
@@ -344,6 +352,36 @@ def test_team_delete_names_what_refuses_it_and_keeps_the_team(agent, monkeypatch
         held.clear()
         await a.rpc_team_delete(team="a", version=v)
         assert dropped and "a" not in (settings_mod.load().get("teams") or {})
+
+    asyncio.run(go())
+
+
+def test_a_settings_write_during_new_teams_check_is_kept(agent, monkeypatch):
+    """The refusal runs in a thread: what another write saved meanwhile is not overwritten by the older copy."""
+
+    def checked(**_kw):
+        doc = settings_mod.load()
+        doc["teams"]["a"]["logins"] = ["claude:meanwhile"]
+        settings_mod.save(doc)
+
+    a = _agent_on(monkeypatch, SimpleNamespace(new_refusal=checked))
+    asyncio.run(a.rpc_team_new(name="db", repo="shiftlead", flow="build"))
+    doc = settings_mod.load()
+    assert "db" in doc["teams"] and doc["teams"]["a"]["logins"] == ["claude:meanwhile"]
+
+
+def test_delete_removes_the_home_record_so_a_remade_name_starts_clean(agent, monkeypatch):
+    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *_: None, new_refusal=lambda **_: None)
+    a = _agent_on(monkeypatch, body)
+    a._host_rec = {"teams": {"a": {"schedule_fired": "x", "work_waiting": {"stopped": True}}, "b": {"keep": 1}}}
+    repo = settings_mod.load()["teams"]["a"]["repo"]
+
+    async def go():
+        await a.rpc_team_delete(team="a", version=ts.version(settings_mod.load(), "a"))
+        assert a._host_rec["teams"] == {"b": {"keep": 1}}, "another team's record stands"
+        assert a.host_saves[-1]["teams"] == {"b": {"keep": 1}} and a.host_pushes == 1
+        await a.rpc_team_new(name="a", repo=repo, flow="build")
+        assert "a" not in a._host_rec["teams"]
 
     asyncio.run(go())
 

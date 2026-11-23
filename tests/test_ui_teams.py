@@ -1605,6 +1605,16 @@ def test_the_second_team_line_keeps_the_declared_names_first():
     assert setmod.undeclared("b", "r", teams, {}) is None, "a ledger not read marks nothing"
 
 
+def test_the_new_team_form_carries_what_the_ledger_declares():
+    """§4.9d: a deleted name stays declared, so the form's line must not drop it."""
+    org = SimpleNamespace(checkouts={})
+    read = {"/x/r": {"name": "r", "ledger": {"declared_teams": ["solo", "old"]}}, "/x/s": {"name": "s", "ledger": {}}}
+    got = setmod.new_team_form(org, {"r": ["solo"]}, ["r", "s"], ["build"], "home", read)
+    assert got["declared"] == {"r": ["solo", "old"], "s": []}
+    script = (Path(setmod.__file__).parent / "static" / "team.js").read_text()
+    assert "declared[repo]" in script and script.index("declared[repo]") < script.index("teams[repo] || []), form")
+
+
 def test_new_team_is_disabled_before_the_cut_over_and_a_form_after(world, client, monkeypatch):
     _tmp_path, fleet = world
     plain = fleet.handle

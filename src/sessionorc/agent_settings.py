@@ -656,14 +656,16 @@ class SettingsMixin:
         agent_common.person_only(caller, "make a team", "§4.9d *New team*", self._graph())
         here = hosts.local_host().name
         where = str(host or here)
-        doc = settings_mod.load()
-        before = copy.deepcopy(doc)
-        try:
-            words = teamstore.new(
-                doc, str(name or ""), label=label, repo=str(repo or ""), host=where, flow=str(flow or "")
-            )
-        except teamstore.TeamError as e:
-            raise RpcError(str(e)) from None
+
+        def write(doc: dict[str, Any]) -> str:
+            try:
+                return teamstore.new(
+                    doc, str(name or ""), label=label, repo=str(repo or ""), host=where, flow=str(flow or "")
+                )
+            except teamstore.TeamError as e:
+                raise RpcError(str(e)) from None
+
+        write(copy.deepcopy(settings_mod.load()))  # its refusals first, on a copy nothing saves
         if where != here and where not in (getattr(self, "links", None) or {}):
             raise RpcError(f"{where} is neither this home nor a linked node")
         why = await asyncio.to_thread(
@@ -671,6 +673,9 @@ class SettingsMixin:
         )
         if why:
             raise RpcError(why)
+        doc = settings_mod.load()  # read after the wait, so nothing awaits between this load and the save
+        before = copy.deepcopy(doc)
+        words = write(doc)
         await self._team_store_saved(before, doc)
         return {"team": name, "change": words, "version": teamstore.version(doc, str(name))}
 
@@ -707,6 +712,13 @@ class SettingsMixin:
         except teamstore.TeamError as e:
             raise RpcError(str(e)) from None
         await self._team_store_saved(before, doc)
+        # the home's team record goes too, so a new team of this name inherits no schedule or stopped mark (§4.9d)
+        if self._host_rec.get("teams", {}).pop(name, None) is not None:
+            try:
+                self.host_store.save(self._host_rec)
+            except OSError:
+                log.exception("writing the home's host record failed")
+            await self._push_changes()
         return {"team": name, "change": words}
 
     def _team_head(self, team: str) -> dict[str, Any]:

@@ -5533,7 +5533,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if cut:  # **+ New team** is drawn disabled until the cut-over's marker (§4.9d *Before and after the cut-over*)
             listed = await read("flows")
             flows = [] if isinstance(listed, HTTPException) else [str(f["name"]) for f in listed.get("flows") or ()]
-            new_team = setmod.new_team_form(org, by_repo, repo_roots(readings), flows, host_name())
+            new_team = setmod.new_team_form(org, by_repo, repo_roots(readings), flows, host_name(), readings)
         card, head, group = None, None, None
         if team in org.teams or team in held:
             names = repo_roots(readings) if team in held else {}
