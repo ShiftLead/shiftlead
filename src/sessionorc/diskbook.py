@@ -191,7 +191,9 @@ def fs_type(path: str | Path, mountinfo: str = MOUNTINFO) -> str | None:
                 fields = left.split()
                 if not sep or len(fields) < 5 or not right.split():
                     continue
-                point = re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), fields[4])
+                point = os.fsdecode(
+                    re.sub(rb"\\([0-7]{3})", lambda m: bytes([int(m.group(1), 8)]), os.fsencode(fields[4]))
+                )
                 over = at == point or point == "/" or at.startswith(point.rstrip("/") + "/")
                 if over and (best is None or len(point) >= best[0]):
                     best = (len(point), right.split()[0])

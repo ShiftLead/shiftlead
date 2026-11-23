@@ -197,6 +197,16 @@ def test_share_free_by_file_system_type(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_a_mount_point_with_escaped_bytes_is_matched(tmp_path):
+    (tmp_path / "café x").mkdir()
+    escaped = str(tmp_path).encode() + rb"/caf\303\251\040x"
+    table = tmp_path / "mountinfo"
+    table.write_bytes(b"1 0 8:1 / / rw - ext4 /dev/sda rw\n2 1 0:1 / " + escaped + b" rw - tmpfs tmpfs rw\n")
+    assert diskbook.fs_type(tmp_path / "café x", str(table)) == "tmpfs"
+    assert diskbook.fs_type(tmp_path, str(table)) == "ext4"
+
+
+@pytest.mark.unit
 def test_a_seat_root_with_no_reading_is_skipped_without_being_made(pool, monkeypatch):
     root, home = pool
     monkeypatch.setenv("SHIFTLEAD_HOME", str(home))

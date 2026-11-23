@@ -500,6 +500,7 @@ def sweep(
     log = logging.getLogger(__name__)
     p = parent(root)
     kept: list[tuple[str, str]] = []
+    weigh = None if stop is not None else tally  # under pressure only what goes is measured
     try:
         st = p.lstat()
         if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
@@ -528,7 +529,7 @@ def sweep(
                 continue
             got = owner(path)
             if not got or not isinstance(got.get("home"), str):
-                _keep(kept, tally, path, "no owner")
+                _keep(kept, weigh, path, "no owner")
                 continue
             rid, ended = named.get(str(path), (None, None))
             if got["home"] != str(home):
@@ -543,23 +544,23 @@ def sweep(
                 tally.list(path)
             if rid is not None:
                 if ended is None or now_s - ended < keep_hours * 3600:
-                    _measure_once(tally, path, ended is None)
+                    _measure_once(weigh, path, ended is None)
                     continue
             elif now_s - _newest_write(path) < UNNAMED_AFTER_S:
-                _measure_once(tally, path, False)
+                _measure_once(weigh, path, False)
                 continue
             if live_now(str(path)):
-                _keep(kept, tally, path, "live record")
+                _keep(kept, weigh, path, "live record")
                 continue
             if any(overlaps(path, t) for t in transcript_roots):
-                _keep(kept, tally, path, "transcripts")
+                _keep(kept, weigh, path, "transcripts")
                 continue
             if git_work(path) if stop is None else git_work(path, weigh_tests=False):
-                _keep(kept, tally, path, GIT_WORK)
+                _keep(kept, weigh, path, GIT_WORK)
                 continue
             mains = _worktree_mains(path)
             if live_now(str(path)):  # read again just before the removal: the weigh can take a while
-                _keep(kept, tally, path, "live record")
+                _keep(kept, weigh, path, "live record")
                 continue
             size = None
             if tally is not None:
