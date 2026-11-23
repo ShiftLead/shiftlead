@@ -214,24 +214,34 @@ def unusable(row: Mapping[str, Any]) -> str | None:
     return None
 
 
-def pick(order: Iterable[str], model: str, rows: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
-    """The first usable login of `order` that offers `model` (§4.9d *The logins, in order*): `{login, state, why}`,
-    `state` `usable`, `waits` (only unusable logins offer it) or `none` (no login offers it). A login on an account an
-    earlier unusable login of the list shares is unusable too, whichever models that earlier login offers."""
+def reasons(order: Iterable[str], rows: Mapping[str, Mapping[str, Any]]) -> dict[str, str | None]:
+    """Why each login of the list is not usable, in order, or None: `unusable`, and a login on an account an earlier
+    unusable login of the list shares is unusable too (§4.9d *The logins, in order*). The pick and the page read it."""
     barred: set[str] = set()
-    waiting: list[str] = []
+    out: dict[str, str | None] = {}
     for lk in order:
         row = rows.get(lk) or {}
         account = row.get("account")
         why = unusable(row)
         if why is None and account in barred:
             why = "shares an account with an unusable login above it"
+        if why is not None and account:
+            barred.add(str(account))
+        out[lk] = why
+    return out
+
+
+def pick(order: Iterable[str], model: str, rows: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """The first usable login of `order` that offers `model` (§4.9d *The logins, in order*): `{login, state, why}`,
+    `state` `usable`, `waits` (only unusable logins offer it) or `none` (no login offers it). A login on an account an
+    earlier unusable login of the list shares is unusable too, whichever models that earlier login offers."""
+    waiting: list[str] = []
+    for lk, why in reasons(order, rows).items():
+        row = rows.get(lk) or {}
         if why is None:
             if offers(row, model):
                 return {"login": lk, "state": "usable", "why": None}
             continue
-        if account:
-            barred.add(str(account))
         if offers(row, model):
             waiting.append(f"{lk}: {why}")
     if waiting:

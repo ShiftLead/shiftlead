@@ -262,6 +262,12 @@ class SettingsMixin:
             "file": str(settings_mod.settings_file()),
             "usage_accounts": reply["accounts"],  # `ao settings` prints by account (TD-1610)
             "teams": teams,
+            # the team page's tabs (§4.9d *The page*): a switched team is in this file and in no `org.yml`
+            "switched_teams": {
+                str(n): str(t["repo"])
+                for n, t in (doc.get("teams") if isinstance(doc.get("teams"), dict) else {}).items()
+                if teamstore.switched(doc, str(n))
+            },
             "repos": settings_mod.repos(doc),
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             # the install's `settle:` as written, `{}` for the built-in alone (§4.4, TD-710)

@@ -416,9 +416,81 @@ def team_cards(
     return out
 
 
-def team_tabs(defs: Mapping[str, Any]) -> list[str]:
-    """The team page's tabs (§4.9d *The page*): by repo and then by name, both compared case-folded."""
-    return sorted(defs, key=lambda n: (str(getattr(defs[n], "repo", "") or "").casefold(), n.casefold()))
+NODE_NOTE = "not checked: a node's logins are not read here"  # `team_show`'s words, read to know a node's team
+
+
+def team_tabs(defs: Mapping[str, Any], switched: Mapping[str, str] | None = None) -> list[str]:
+    """The team page's tabs (§4.9d *The page*): by repo and then by name, both compared case-folded. `switched` is the
+    settings' switched teams, `{team: repo}`, whose repo stands over a definition's."""
+    held = switched or {}
+
+    def order(n: str) -> tuple[str, str]:
+        return str(held.get(n) or getattr(defs.get(n), "repo", "") or "").casefold(), n.casefold()
+
+    return sorted({*defs, *held}, key=order)
+
+
+def _switched_word(head: Mapping[str, Any]) -> str:
+    """The head's state (§4.9d *The page*). *n finishing* and a wound-down team's who wait on the started mark
+    (TD-2065)."""
+    if head.get("word") == "running":
+        n, most = head.get("sessions") or 0, head.get("most")
+        return f"Running · {n} of {most} sessions" if most else f"Running · {n} session{'' if n == 1 else 's'}"
+    return {"person": "Stopped by you", "until": "Stopped at its stop time"}.get(str(head.get("by") or ""), "Stopped")
+
+
+def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
+    """What the team page draws of a switched team (§4.9d *The page*, TD-2060), from `team_show` and the host's `tools`
+    read: the head, the login rows with each account's gauge, the logins that can be added, and the numbers."""
+    cards = list((tools or {}).get("tools") or ())
+    accounts = {str(a.get("key")): a for c in cards for a in c.get("accounts") or ()}
+    known = {f"{c.get('adapter')}:{lg.get('name')}": lg for c in cards for lg in c.get("logins") or ()}
+    flow = show.get("flow") or {}
+    on_node = any(lg.get("state") == "not_read" for lg in show.get("logins") or ()) or show.get("note") == NODE_NOTE
+    rows = []
+    for lg in show.get("logins") or ():
+        account = accounts.get(str(lg.get("account")))
+        held = known.get(str(lg.get("login"))) or {}
+        rows.append(
+            {
+                **lg,
+                "shown": lg.get("label") or lg.get("name"),
+                "metered": (held.get("settings") or {}).get("billing") == "metered",
+                "gauge": gauge_view(account.get("gauges"), account.get("billing")) if account else None,
+            }
+        )
+    listed = {str(lg.get("login")) for lg in rows}
+    stages = [{**s, "number": s.get("at_once") or 1} for s in flow.get("stages") or ()]
+    most = (show.get("head") or {}).get("most")
+    return {
+        "team": show.get("team"),
+        "title": show.get("label") or show.get("team"),
+        "name_beside": show.get("team") if show.get("label") else None,
+        "label": show.get("label") or "",
+        "repo": show.get("repo"),
+        "host": show.get("host"),
+        "version": show.get("version"),
+        "word": _switched_word(show.get("head") or {}),
+        "running": (show.get("head") or {}).get("word") == "running",
+        "cannot_run": show.get("cannot_run"),
+        "note": show.get("note"),
+        "unread": show.get("unread"),
+        "flow": flow.get("name"),
+        "flow_read": bool(flow.get("read")),
+        "on_node": on_node,
+        "logins": rows,
+        "order": [str(lg.get("login")) for lg in rows],
+        "can_add": [
+            {"key": k, "shown": f"{lg.get('label') or lg.get('name')} ({k.partition(':')[0]})"}
+            for k, lg in known.items()
+            if k not in listed
+        ],
+        "stages": stages,
+        "no_such_stage": flow.get("no_such_stage") or {},
+        "most": most,
+        "sum": sum(s["number"] for s in stages),
+        "held_back": [s["name"] for s in stages if most and s["number"] > most],
+    }
 
 
 def team_head(name: str, d: Any, group: Mapping[str, Any] | None, host: str) -> dict[str, Any]:

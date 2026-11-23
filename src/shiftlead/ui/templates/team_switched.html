@@ -1,0 +1,34 @@
+{#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's and the flow pick TD-2062's -#}
+<div class="note warn" id="teamsaid" role="status" hidden></div>
+{% if sw.unread %}<div class="note warn">{{ sw.unread }}</div>{% endif %}
+<div id="teamset" data-team="{{ sw.team }}" data-version="{{ sw.version }}" data-order="{{ sw.order | tojson | forceescape }}">
+<section class="isec"><div class="h2">The flow it runs</div>
+  {% if sw.cannot_run %}<div class="note warn">{{ sw.cannot_run }}</div>{% endif %}
+  <div class="note">{% if sw.flow %}<b>{{ sw.flow }}</b>{% if not sw.flow_read %} · not read{% endif %} · {% endif %}<a href="/flows">Edit on Flows</a></div>
+  {% if sw.note %}<div class="note">{{ sw.note }}</div>{% endif %}
+  <div class="teamnums">
+    {% for s in sw.stages %}<div class="teamnum" data-key="{{ s.key }}"><span class="grow"><b>{{ s.name }}</b> <span class="note">{{ s.does }} · {{ s.model }}</span></span><span class="note">at most</span><button class="btn sm ghost" type="button" data-number="-1" aria-label="One fewer in {{ s.name }}"{% if s.number <= 1 %} disabled{% endif %}>−</button><span class="mono">{{ s.number }}</span><button class="btn sm ghost" type="button" data-number="1" aria-label="One more in {{ s.name }}">+</button><span class="note">at once</span></div>{% endfor %}
+    {% for key, n in sw.no_such_stage.items() %}<div class="teamnum" data-key="{{ key }}"><span class="grow mono">{{ key }}</span><span class="note">at most {{ n }} · no such stage</span><button class="btn sm link" type="button" data-remove-number>Remove</button></div>{% endfor %}
+  </div>
+  <div class="teamnum teamlimit" data-most="{{ sw.most or '' }}">{% if sw.most %}<span class="grow">at most <b>{{ sw.most }}</b> stage and audit sessions at once</span><button class="btn sm ghost" type="button" data-most-step="-1" aria-label="Lower the team limit"{% if sw.most <= 1 %} disabled{% endif %}>−</button><button class="btn sm ghost" type="button" data-most-step="1" aria-label="Raise the team limit">+</button><button class="btn sm link" type="button" data-most-clear>Remove</button>{% else %}<span class="grow">no team limit <span class="note">· its stages add up to {{ sw.sum }}</span></span><button class="btn sm ghost" type="button" data-most-set="{{ sw.sum or 1 }}">Set one</button>{% endif %}</div>
+  {% if sw.held_back %}<div class="note">The team limit holds back {{ sw.held_back | join(', ') }}.</div>{% endif %}
+</section>
+<section class="isec"><div class="h2">Logins, in the order they are tried</div>
+  {% if not sw.logins %}<div class="note">No logins yet, so this team cannot run.</div>{% endif %}
+  <ol class="teamlogins">
+    {% for lg in sw.logins %}
+    {% if not loop.first %}<li class="teamthen note" aria-hidden="true">if not usable, then</li>{% endif %}
+    <li class="teamlogin" data-login="{{ lg.login }}">
+      <div class="row gap wrap"><span class="mono">{{ loop.index }}</span><b>{{ lg.shown }}</b>{% if lg.metered %}<span class="teamspends">spends money</span>{% endif %}
+        {% if lg.state == "not_read" %}<span class="note">on {{ sw.host }}: not read here</span>{% else %}<span class="note">{{ lg.tool }}{% if lg.account %} · {{ lg.account }}{% endif %}{% if lg.models %} · {{ lg.models | join(', ') }}{% endif %}</span>
+        {% if lg.why %}<span class="teampassed">Passed over: {{ lg.why }}</span>{% else %}<span class="teamusable">Usable</span>{% endif %}{% endif %}
+        <span class="grow"></span>
+        <button class="btn sm ghost" type="button" data-move="-1" aria-label="Move {{ lg.shown }} up"{% if loop.first %} disabled{% endif %}>▲</button><button class="btn sm ghost" type="button" data-move="1" aria-label="Move {{ lg.shown }} down"{% if loop.last %} disabled{% endif %}>▼</button><button class="btn sm ghost" type="button" data-drop aria-label="Remove {{ lg.shown }}">×</button></div>
+      {% if lg.runs_nothing %}<div class="note">{{ sw.flow }} names none of its models, so nothing runs on it yet</div>{% endif %}
+      {% if lg.gauge and lg.gauge.mixed %}<div class="note">its account's logins disagree on billing, so it takes no reserve</div>{% elif lg.gauge %}{% for w in lg.gauge.gauges %}<div class="teamgauge"><div class="gauge{% if w.used is none %} unread{% endif %}{% if lg.gauge.stale %} stale{% endif %}">{% if w.used is not none %}<div class="used" style="width:{{ w.used }}%"></div>{% endif %}{% if w.keep %}<div class="keep" style="width:{{ w.keep }}%"></div>{% endif %}</div><span class="note">{% if lg.gauge.metered %}{{ w.label }} · {{ w.line }}{% elif w.used is none %}No usage reading yet · {{ w.label }}{% else %}{{ w.used | round | int }}% of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% endif %}</span></div>{% endfor %}{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  <div class="row gap wrap">{% if sw.on_node %}<input class="input setin" id="teamaddtyped" placeholder="tool:name" aria-label="Add a login" autocomplete="off" spellcheck="false"><button class="btn sm" type="button" id="teamadd">Add a login</button>{% else %}<select class="input setin" id="teamaddpick" aria-label="A login to add"{% if not sw.can_add %} disabled{% endif %}>{% for o in sw.can_add %}<option value="{{ o.key }}">{{ o.shown }}</option>{% else %}<option value="">no other login on this host</option>{% endfor %}</select><button class="btn sm" type="button" id="teamadd"{% if not sw.can_add %} disabled{% endif %}>Add a login</button>{% endif %}<a class="note" href="/tools">Tools</a></div>
+</section>
+</div>

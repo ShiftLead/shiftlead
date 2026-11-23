@@ -5449,8 +5449,20 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.get("/teams")
     async def teams_first():
         """`/teams` opens the first team of the tabs' order (§4.9d *The page*, TD-2059)."""
-        tabs = setmod.team_tabs(org_here()[0].teams)
+        try:
+            held = (await call("settings")).get("switched_teams")
+        except HTTPException:  # the tabs a definition gives, with the host agent away
+            held = None
+        tabs = setmod.team_tabs(org_here()[0].teams, held)
         return RedirectResponse(f"/teams/{quote(tabs[0], safe='')}" if tabs else "/teams/-", status_code=303)
+
+    @app.post("/api/teams/{name}/set")
+    async def team_set(name: str, request: Request):
+        """§4.5a *Team page* (TD-2060): the label, the login list, a stage's number or the team limit, each the
+        person's own act and version-checked by the host agent (`team_set`). Only what the page sent is passed on."""
+        body = await body_of(request)
+        keys = ("label", "logins", "at_once", "most", "clear", "version")
+        return await call("team_set", team=name, **{k: body[k] for k in keys if k in body})
 
     @app.get("/teams/{team}", response_class=HTMLResponse)
     async def team_page(request: Request, team: str):
@@ -5464,9 +5476,6 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 return e
 
         org = org_here()[0]
-        tabs = setmod.team_tabs(org.teams)
-        if team not in org.teams and (tabs or team != "-"):
-            raise HTTPException(404, f"no team {team!r}: the org defines {', '.join(tabs) or 'none'}")
         profiles, default, notes = await asyncio.to_thread(settings_profiles)
         got, info, fleet, readings = await asyncio.gather(
             read("settings", profiles=list(profiles)),
@@ -5476,10 +5485,25 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (got, info))
         notes = [*notes, *(str(r.detail) for r in (got, info) if isinstance(r, HTTPException) and r.status_code != 503)]
-        got = {} if isinstance(got, HTTPException) else got
+        teams_unread = isinstance(got, HTTPException)  # a team held only in settings cannot be told from no team
+        got = {} if teams_unread else got
         info = {} if isinstance(info, HTTPException) else info
         fleet = [] if isinstance(fleet, HTTPException) else fleet
         readings = {} if isinstance(readings, HTTPException) else readings
+        held = got.get("switched_teams") or {}
+        tabs = setmod.team_tabs(org.teams, held)
+        team_unread = teams_unread and team not in tabs and team != "-"
+        if team_unread:
+            tabs = [*tabs, team]
+        elif team not in tabs and not teams_unread and (tabs or team != "-"):
+            raise HTTPException(404, f"no team {team!r}: the org defines {', '.join(tabs) or 'none'}")
+        switched = None
+        if team in held:  # the head, logins and numbers from the one read `ao team show` prints (§4.9d)
+            show, tools = await asyncio.gather(read("team_show", team=team), read("tools"))
+            if isinstance(show, HTTPException):
+                notes = [*notes, f"the team could not be read: {show.detail}"]
+            else:
+                switched = setmod.switched_team(show, None if isinstance(tools, HTTPException) else tools)
         card, head, group = None, None, None
         if team in org.teams:
             card = setmod.team_cards(
@@ -5504,6 +5528,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "team.html",
             {
                 "t": card,
+                "sw": switched,
+                "team": team if team in tabs else None,
+                "teams_unread": teams_unread,
+                "team_unread": team_unread,
                 "head": head,
                 "group": group,
                 "tabs": tabs,
