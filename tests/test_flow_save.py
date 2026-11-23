@@ -88,7 +88,7 @@ def test_a_flow_that_fails_the_check_is_not_written(home):
     assert not (home / "flows" / "mine").exists()
 
 
-@pytest.mark.parametrize("name", ["build", "design-wise", "build-review"])
+@pytest.mark.parametrize("name", ["build", "design-wise", "build-review", "td"])
 def test_a_built_ins_name_is_refused(home, name):
     with pytest.raises(FlowError, match="built-in"):
         flow_save.save(name, _flow(name=name))
@@ -223,6 +223,21 @@ def test_a_delete_is_refused_while_a_repo_that_may_run_the_flow_cannot_be_read(h
     monkeypatch.setattr(flow_save.orgmod, "with_repos", lambda o, roots: (o, [note]))
     assert note in _call(delete=True, version=v)["refused"]
     assert "no checkout" in _call(delete=True, version=v, roots=[tmp_path / "gone"])["refused"]
+    assert (home / "flows" / "mine").exists()
+
+
+@pytest.mark.parametrize(
+    ("flows", "pick"),
+    [(["build", "mine"], "build"), (["mine"], ""), (["build"], "mine")],
+    ids=["listed second", "listed first", "picked but no longer listed"],
+)
+def test_a_delete_is_refused_while_a_team_lists_or_picks_the_flow(home, monkeypatch, flows, pick):
+    v = _call(text=_flow())["version"]
+    org = SimpleNamespace(teams={"alpha": SimpleNamespace(name="alpha", flows=flows, flow=pick)}, unlanded={})
+    monkeypatch.setattr(flow_save.orgmod, "load", lambda: org)
+    monkeypatch.setattr(flow_save.orgmod, "with_repos", lambda o, roots: (o, []))
+    monkeypatch.setattr(flow_save.orgmod, "with_home_settings", lambda o: o)
+    assert "alpha" in _call(delete=True, version=v)["refused"]
     assert (home / "flows" / "mine").exists()
 
 

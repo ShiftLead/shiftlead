@@ -19,7 +19,7 @@ from typing import Any
 import yaml
 
 from sessionorc import briefs, paths
-from shiftlead import flow3, repoconfig, teams
+from shiftlead import flow3, flowdefs, repoconfig
 from shiftlead import org as orgmod
 from shiftlead.stagerecord import StageStore, StateError
 
@@ -33,7 +33,7 @@ class FlowError(ValueError):
 def _path(name: Any) -> Path:
     if not isinstance(name, str) or not briefs.NAME.fullmatch(name):
         raise FlowError("a flow's name is letters, digits, - and _, starting with a letter or digit")
-    if name in flow3.BUILTIN:
+    if name in flow3.BUILTIN or name in flowdefs.BUILTIN:  # the first shape's `td` is a built-in's name too
         raise FlowError(f"{name} is a built-in flow's name: copy it under another name")
     return paths.home() / "flows" / name / flow3.FILE
 
@@ -213,8 +213,9 @@ _delete = delete  # `call`'s parameter of the same name is the RPC's
 
 
 def running(name: str, roots: Iterable[str | Path]) -> list[str]:
-    """The teams that run `name`, or whose setting picks it (a pick the team no longer lists still names it). A repo
-    that could not be read may hold a team that runs it, so that refuses rather than answering none."""
+    """The teams that list `name`, or whose setting picks it (a pick the team no longer lists still names it): a team's
+    start reads every flow it lists. A repo that could not be read may hold such a team, so that refuses rather than
+    answering none."""
     roots = list(roots)
     if gone := [str(r) for r in roots if not Path(r).is_dir()]:
         raise FlowError(f"cannot tell which teams run {name}: no checkout at {', '.join(gone)}")
@@ -223,7 +224,7 @@ def running(name: str, roots: Iterable[str | Path]) -> list[str]:
     if unread:
         raise FlowError(f"cannot tell which teams run {name}: {'; '.join(unread)}")
     org = orgmod.with_home_settings(org)
-    return sorted(t.name for t in org.teams.values() if name in (teams.current_flow(t), t.flow))
+    return sorted(t.name for t in org.teams.values() if name in {*t.flows, t.flow})
 
 
 def call(
