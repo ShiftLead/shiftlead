@@ -151,7 +151,9 @@ def version(doc: Mapping[str, Any]) -> str:
         if isinstance(repos, Mapping)
         else {}
     )
-    return hashlib.sha256(json.dumps([_held(doc), picks], sort_keys=True, default=str).encode()).hexdigest()[:12]
+    return hashlib.sha256(
+        json.dumps([{str(k): v for k, v in _held(doc).items()}, picks], sort_keys=True, default=str).encode()
+    ).hexdigest()[:12]
 
 
 def _gate(doc: Mapping[str, Any], sent: str | None) -> None:
