@@ -383,6 +383,18 @@ def _scratch_root():
             _forget_owner(name)
 
 
+@pytest.fixture
+def short(_scratch_root):
+    """A root of this test's own under the run's short one: `tmp_path` is past the 48 bytes a root may hold, and the
+    run's root may lie in a seat's directory (TD-2084), so its name is one letter. A worker runs one test at a time."""
+    d = Path(_scratch_root) / "s"
+    d.mkdir()
+    try:
+        yield d
+    finally:
+        _rmtree_writable(str(d))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _sweep_stale_test_servers():
     sweep_stale_test_servers()

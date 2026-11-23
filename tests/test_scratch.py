@@ -13,7 +13,7 @@ import stat
 from pathlib import Path
 
 import pytest
-from conftest import _rmtree_writable, park_ticks, wait_for
+from conftest import park_ticks, wait_for
 
 from sessionorc import hosts, paths, scratch
 from sessionorc.agent import HostAgent, RpcError
@@ -23,18 +23,6 @@ from shiftlead.adapters import claude_code, gemini, grok
 from shiftlead.ui import settings_page
 
 CLEAN = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
-
-
-@pytest.fixture
-def short(_scratch_root):
-    """A root of this test's own under the run's short one: `tmp_path` is past the 48 bytes a root may hold, and the
-    run's root may lie in a seat's directory (TD-2084), so its name is one letter. A worker runs one test at a time."""
-    d = Path(_scratch_root) / "s"
-    d.mkdir()
-    try:
-        yield d
-    finally:
-        _rmtree_writable(str(d))
 
 
 def _owner(path: str) -> dict:
