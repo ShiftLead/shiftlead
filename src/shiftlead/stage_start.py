@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sessionorc.client import AgentError
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
 
@@ -204,3 +205,18 @@ def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) ->
     if call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on).get("verdict") in ("live", "suspended"):
         return None
     return call("create", **got.create_params([]))
+
+
+def holder_of(got: StageLaunch, created: dict[str, Any]) -> str:
+    """The created session as its record's holder: on a node, the home's `id@node` form (§4.4a)."""
+    sid, host = str(created["id"]), got.launch.host
+    return sid if not host or "@" in sid else f"{sid}@{host}"
+
+
+def claim(call: Any, holder: str, tid: str) -> str | None:
+    """Write the holder's claim on the entry (§4.9c act 5): None, or why it was refused."""
+    try:
+        call("progress", id=holder, ref=tid, status="claimed")
+    except AgentError as e:
+        return str(e)
+    return None

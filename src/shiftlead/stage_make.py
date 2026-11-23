@@ -7,7 +7,8 @@ home's reading is never overwritten: the act is simply not made, and the next pa
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
 `mark-waiting`, `rewrite-flow`, `re-enter`) and those that put a question to the person (`merged-entry-open`,
 `pr-closed`, `stage-gone`, `gate-again`), the person's answer, the pass, and the record's half of offering again (the
-holder cleared, the offer counted, or a second loss sent to the person); the next pass's offer starts the session.
+holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
+takes its claim and writes the record.
 `sweep_closed` removes a closed record after its thirty days. Every other case returns `Made(False, …)` and writes
 nothing. A write that takes a record from its holder names that session in `Made.end`, for the caller to end outside
 the lock. Nothing calls this yet.
@@ -23,7 +24,8 @@ from typing import Any
 from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
-from shiftlead.stagerecord import StageStore, _now, answer_move
+from shiftlead.stage_start import Work
+from shiftlead.stagerecord import StageStore, _now, answer_move, new_record
 
 
 @dataclass(frozen=True)
@@ -294,6 +296,49 @@ def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any],
         else:
             return Made(False, f"{act.name} {act.case} is a later slice's")
         return replace(got, end=held) if got.made and held and not record.get("holder") else got
+
+
+def offer(
+    store: StageStore,
+    tid: str,
+    act: Act,
+    s: Reading,
+    doc: dict[str, Any],
+    start: Callable[[str, Work], str | None],
+    claim: Callable[[str, str], str | None],
+) -> Made:
+    """Act 5: a fresh session of the stage holds the entry, with its claim, and the record says so. `start` returns the
+    holder's address or None; `claim` returns why it was refused or None. The lock is held throughout, so an entry is
+    never offered twice. A session whose claim or record could not be written is named in `Made.end` for the caller to
+    end, and the next pass offers afresh."""
+    with store.locked():
+        record = store.entry(tid)
+        if act.name != "offer" or choose(record, s) != act:
+            return Made(False, "the record moved since it was read")
+        name = doc.get("name")
+        first = record is None or bool(record.get("closed_at"))
+        if record is None or first:  # a reopened entry's closed record carries nothing over (§4.9c)
+            key = _way_in(doc, s.design)
+            row = act.work.pr if act.work is not None and act.work.state == "take" else None
+            branch, pr = (row.get("branch"), row.get("number")) if row else (None, None)
+        else:
+            key, branch, pr = str(record["stage"]), record.get("branch"), record.get("pr")
+        if key is None or not name:
+            return Made(False, "the flow has no stage that takes this entry")
+        holder = start(key, Work(tid, branch, pr))
+        if holder is None:
+            return Made(False, "no session was started")
+        try:
+            if refused := claim(holder, tid):
+                return Made(False, f"the claim was refused: {refused}", end=holder)
+            if record is None or first:
+                record = {**new_record(tid, str(name), key, holder=holder), "branch": branch, "pr": pr}
+            else:  # a count a loss left stands, so the next loss is the second
+                record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
+            store.put_entry(record, f"offered at {key} to {holder}")
+        except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
+            return Made(False, f"the offer did not finish: {e}", end=holder)
+        return Made(True)
 
 
 def sweep_closed(store: StageStore, now: datetime | None = None) -> list[str]:

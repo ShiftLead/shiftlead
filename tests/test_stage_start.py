@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import yaml
 
+from sessionorc.client import AgentError
 from shiftlead import flow3, repoconfig, stage_start, teams
 
 pytestmark = pytest.mark.unit
@@ -177,3 +179,22 @@ def test_an_unknown_or_shell_profile_is_refused(world, monkeypatch):
     monkeypatch.setattr(teams.profiles, "get", lambda _n: SimpleNamespace(adapter=teams.profiles.SHELL_ADAPTER))
     with pytest.raises(teams.TeamError, match="runs a shell"):
         made(world, builtin("build"), "build")
+
+
+def test_a_holder_on_a_node_is_written_in_the_homes_form(world):
+    got = made(world, builtin("build"), "build")
+    node = replace(got, launch=replace(got.launch, host="n1"))
+    assert stage_start.holder_of(got, {"id": "s1"}) == "s1"
+    assert stage_start.holder_of(node, {"id": "s1"}) == "s1@n1"
+    assert stage_start.holder_of(node, {"id": "s1@n1"}) == "s1@n1"
+
+
+def test_the_claim_is_the_holders_and_a_refusal_is_returned():
+    calls = []
+    assert stage_start.claim(lambda m, **k: calls.append((m, k)), "s1", "TD-7") is None
+    assert calls == [("progress", {"id": "s1", "ref": "TD-7", "status": "claimed"})]
+
+    def refuse(*_a, **_k):
+        raise AgentError("held")
+
+    assert stage_start.claim(refuse, "s1", "TD-7") == "held"

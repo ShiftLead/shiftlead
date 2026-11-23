@@ -4,6 +4,7 @@ on a real `shiftlead/state` branch in a scratch repo and its bare origin."""
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,8 +13,10 @@ import pytest
 
 from shiftlead.stage_acts import Act, Holder, Reading, choose
 from shiftlead.stage_end import ARCHIVE
-from shiftlead.stage_make import make, sweep_closed
-from shiftlead.stagerecord import OTHER, StageStore, new_record
+from shiftlead.stage_make import make, offer, sweep_closed
+from shiftlead.stage_start import Work
+from shiftlead.stage_work import EntryWork
+from shiftlead.stagerecord import OTHER, StageStore, StateError, new_record
 
 TID = "TD-7"
 FLOW: dict[str, Any] = {
@@ -335,3 +338,91 @@ def test_a_malformed_closed_date_does_not_stop_the_sweep(store):
     store.put_entry({**new_record("TD-1", "f", "build"), "closed_at": "yesterday"}, "test")
     store.put_entry({**new_record("TD-2", "f", "build"), "closed_at": "2026-01-01T00:00:00Z"}, "test")
     assert sweep_closed(store, now) == ["TD-2"]
+
+
+READY = Reading(pickable=True, may_start=True, within_size=True)
+
+
+def offer_it(store: StageStore, reading: Reading = READY, refused: str | None = None, holder: str | None = "s9") -> Any:
+    started: list[tuple[str, Work]] = []
+    claims: list[tuple[str, str]] = []
+
+    def start(key: str, work: Work) -> str | None:
+        started.append((key, work))
+        return holder
+
+    def claim(who: str, tid: str) -> str | None:
+        claims.append((who, tid))
+        return refused
+
+    act = choose(store.entry(TID), reading)
+    assert act is not None and act.name == "offer"
+    return offer(store, TID, act, reading, FLOW, start, claim), started, claims
+
+
+def test_a_first_offer_starts_the_way_in_claims_and_writes_the_record(store):
+    got, started, claims = offer_it(store)
+    assert got.made and started == [("build", Work(TID))] and claims == [("s9", TID)]
+    record = store.entry(TID)
+    assert (record["flow"], record["stage"], record["holder"], record["offers"]) == ("new-flow", "build", "s9", 1)
+
+
+def test_a_first_offer_carries_the_pull_request_that_is_its_work(store):
+    work = EntryWork("take", {"number": 12, "branch": "td7-x"})
+    got, started, _ = offer_it(store, replace(READY, work=work))
+    assert got.made and started[0][1] == Work(TID, "td7-x", 12)
+    record = store.entry(TID)
+    assert (record["branch"], record["pr"]) == ("td7-x", 12)
+
+
+def test_an_offer_after_a_loss_keeps_the_count_and_the_work(store):
+    put(store, stage="polish", offers=2, branch="b", pr=3)
+    got, started, _ = offer_it(store)
+    assert got.made and started == [("polish", Work(TID, "b", 3))]
+    record = store.entry(TID)
+    assert (record["holder"], record["offers"], record["pr"]) == ("s9", 2, 3)
+
+
+def test_a_reopened_entry_is_offered_afresh_with_nothing_carried_over(store):
+    put(store, stage="polish", closed_at="2026-11-01T00:00:00Z", branch="old", pr=3, offers=2)
+    got, started, _ = offer_it(store)
+    assert got.made and started == [("build", Work(TID))]
+    record = store.entry(TID)
+    assert record["closed_at"] is None and record["pr"] is None and record["offers"] == 1
+
+
+def test_no_session_started_writes_nothing(store):
+    got, _, claims = offer_it(store, holder=None)
+    assert not got.made and got.end is None and claims == []
+    assert store.entry(TID) is None
+
+
+def test_a_refused_claim_writes_nothing_and_names_the_session_to_end(store):
+    got, _, _ = offer_it(store, refused="claimed by another")
+    assert not got.made and got.end == "s9" and "claimed by another" in got.why
+    assert store.entry(TID) is None
+
+
+def test_a_record_that_cannot_be_written_names_the_session_to_end(store, monkeypatch):
+    def refuse(*_a: Any, **_k: Any) -> str:
+        raise StateError("no push")
+
+    monkeypatch.setattr(store, "put_entry", refuse)
+    got, _, _ = offer_it(store)
+    assert not got.made and got.end == "s9" and "no push" in got.why
+
+
+def test_any_failure_after_the_start_names_the_session_to_end(store):
+    def broken(*_a: Any) -> str | None:
+        raise ValueError("a bad reply")
+
+    got = offer(store, TID, choose(None, READY), READY, FLOW, lambda *_a: "s9", broken)
+    assert not got.made and got.end == "s9" and "a bad reply" in got.why
+    assert store.entry(TID) is None
+
+
+def test_an_offer_whose_record_moved_starts_nothing(store):
+    act = choose(None, READY)
+    put(store, holder="other")
+    got = offer(store, TID, act, READY, FLOW, lambda *_a: pytest.fail("started"), lambda *_a: None)
+    assert not got.made and store.entry(TID)["holder"] == "other"
