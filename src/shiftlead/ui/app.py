@@ -17,7 +17,7 @@ import mimetypes
 import os
 import re
 import time
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -615,21 +615,44 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
 
 
 def doer_target(
-    org: orgmod.Org, board_root: str, doer: str, host: str, declared: Mapping[str, Collection[str]] | None = None
+    org: orgmod.Org,
+    board_root: str,
+    doer: str,
+    host: str,
+    declared: Mapping[str, Collection[str]] | None = None,
+    records: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any] | None:
     """Where an `act` line's `Doer:` hands its step (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660),
     read synchronously from `org.yml` — one function for the press and the draw. None where it does not resolve:
     a value that does not read, a repo with no registered root, no team servicing it, a named team that does not
     service its `repo:`, or no techlead seat. `{own: True}` where it names the board's own repo (compared by
     resolved root) or a team whose `repo:` it is: TD-1624's press. Else `{root, repo, team, teams}`, `teams` the
-    servicing teams (`entry_teams`, the ledger's declared order) with the named team first, `team` it or ''."""
+    servicing teams (`entry_teams`, the ledger's declared order) with the named team first, `team` it or ''.
+    After the cut-over a team and its seat are read from `records`' built-in tech leads alone (§4.9d, §4.9e)."""
     parsed = lb.doer_value(str(doer or ""))
     if parsed is None:
         return None
     kind, name = parsed
+    records = list(records)
+    off = teams.first_shape_off()
     roots = {str(Path(r).expanduser().resolve()): Path(r).name for r in hosts.local_host().repos()}
     team = ""
-    if kind == "team":
+    if kind == "team" and off:
+        seat = next(
+            (
+                r
+                for r in records
+                if r.get("builtin") == "techlead"
+                and not r.get("superseded_by")
+                and r.get("repo")
+                and str(r.get("team") or "").casefold() == name.casefold()
+            ),
+            None,
+        )
+        if seat is None:
+            return None
+        team, root = str(seat["team"]), str(Path(str(seat["repo"])).expanduser().resolve())
+    elif kind == "team":
         t = next((t for n, t in org.teams.items() if n.casefold() == name.casefold()), None)
         if t is None:
             return None
@@ -645,7 +668,8 @@ def doer_target(
         return None
     if root == str(Path(board_root).expanduser().resolve()):
         return {"own": True}
-    servicing = entry_teams(org, root, host, (declared or {}).get(root, ()))
+    said = (declared or {}).get(root, ())
+    servicing = teams.builtin_servicing(records, root, said) if off else entry_teams(org, root, host, said)
     if team:
         named = next((t for t in servicing if t["team"] == team), None)
         if named is None or not named["seat"]:
@@ -657,7 +681,10 @@ def doer_target(
 
 
 def doer_hands(
-    org: orgmod.Org, host: str, declared: Mapping[str, Collection[str]] | None = None
+    org: orgmod.Org,
+    host: str,
+    declared: Mapping[str, Collection[str]] | None = None,
+    records: Iterable[Mapping[str, Any]] = (),
 ) -> Callable[[str, str], dict[str, Any] | None]:
     """`doer_target` bound to one read of the org, for the board's draw (§4.5 screen 12 *Three verbs: Have a session
     do it*, TD-1660): `(board root, doer) → target`, each pair resolved once per read — the press's own function, so
@@ -666,7 +693,7 @@ def doer_hands(
 
     def hands(root: str, doer: str) -> dict[str, Any] | None:
         if (root, doer) not in seen:
-            seen[(root, doer)] = doer_target(org, root, doer, host, declared)
+            seen[(root, doer)] = doer_target(org, root, doer, host, declared, records)
         return seen[(root, doer)]
 
     return hands
@@ -1359,7 +1386,8 @@ async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str
         # 2. the doer resolved, by the function the draw reads
         org, _notes = await asyncio.to_thread(org_here)
         declared = await declared_teams(facts)
-        target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared)
+        records = await call("list") if await asyncio.to_thread(teams.first_shape_off) else []
+        target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared, records)
         if target is None:
             return await fallback(f"{doer} does not resolve to a techlead seat")
         if target.get("own"):
@@ -1667,7 +1695,11 @@ class Readings:
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
         org, host = await self.defs(), host_name()
         boards_of = repo_boards(org, host)
-        hands = doer_hands(org, host, declared_of(repos))
+        fleet: list[dict[str, Any]] = []
+        if await asyncio.to_thread(teams.first_shape_off):  # a Doer then resolves to a built-in tech lead (§4.9e)
+            with contextlib.suppress(Exception):  # no list: a doer reads as unresolved, drawn by the lane test
+                fleet = await self.call("list")
+        hands = doer_hands(org, host, declared_of(repos), fleet)
         # off the loop (TD-670): every repo's board rows and their standings run to ~40 ms on the live
         # home, on every recount of the Inbox's counts as on the page's read
         return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, boards_of, hands)
@@ -3730,7 +3762,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ),
             {},
         )
-        servicing = entry_teams(org, root, host_name(), led.get("declared_teams") or ())
+        servicing = teams.entry_servicing(org, root, host_name(), led.get("declared_teams") or (), records.values())
         picked = next((t for t in servicing if t["team"] == pick), None)
         servicing = [picked, *(t for t in servicing if t is not picked)] if picked else servicing
         return {
