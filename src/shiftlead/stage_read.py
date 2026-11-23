@@ -11,18 +11,22 @@ is `stopped`. A claim released by `done` or `drop` is not a lapsed lease, so a l
 judged by the silent rule.
 
 `ledger_on` reads where the entry stands in the ledger and its archive, and whether it is a design with parts.
-`renumbered_on` reads the id an entry that left both was renumbered to, from the commit that removed its file. The
-tick's wiring calls all four; none writes anything.
+`renumbered_on` reads the id an entry that left both was renumbered to, from the commit that removed its file.
+
+`forge_on` reads what became of the record's pull request from the repo's rows, and whether the home's own pull request
+archiving the entry is open. A pull request the rows do not hold is no reading, never a pull request that is gone. The
+tick's wiring calls all five; none writes anything.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
-from typing import Literal, NamedTuple
+from typing import Any, Literal, NamedTuple
 
-from sessionorc import ledger, ledgerboard, work
+from sessionorc import board, ledger, ledgerboard, work
 from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
@@ -100,6 +104,28 @@ def renumbered_on(root: Path | str, ref: str, rel: str, tid: str) -> str | None:
             found = _ENTRY_FILE.fullmatch(new.name)
             return found.group(1) if found and new.parent == PurePosixPath(old).parent else None
     return None
+
+
+class EntryForge(NamedTuple):
+    pr_state: Literal["open", "merged", "closed"] | None = None
+    head: str | None = None
+    archive_open: bool = False
+
+
+def forge_on(tid: str, pr: int | None, rows: Iterable[Mapping[str, Any]]) -> EntryForge | None:
+    """`Reading.pr_state`, `.head` and `.archive_open` of `tid`, whose record carries pull request `pr`, from the repo's
+    rows. None: the rows do not hold `pr`, or hold it in a state this cannot read, so the caller has no reading of the
+    entry this pass and acts on nothing. Only an open pull request has a head a move can carry."""
+    rows = list(rows)
+    subject = board.archive_subject(tid)
+    archive_open = any(r.get("state") == "open" and r.get("title") == subject for r in rows)
+    if pr is None:
+        return EntryForge(archive_open=archive_open)
+    row = next((r for r in rows if r.get("number") == pr), None)
+    state = row.get("state") if row else None
+    if state not in ("open", "merged", "closed"):
+        return None
+    return EntryForge(state, (row.get("head") or None) if state == "open" else None, archive_open)
 
 
 def _instant(value: str | None) -> datetime | None:
