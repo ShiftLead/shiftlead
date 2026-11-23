@@ -219,18 +219,38 @@ def test_an_entry_with_no_team_line_names_none(repo: Path) -> None:
 def test_the_holders_session_and_open_ask_are_read_by_its_address(repo: Path) -> None:
     s = session("s1")
     record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@node"}
-    got = facts_on(pass_read(repo, sessions={"s1@node": s}, open_asks={"s1@node"}), "TD-7", record)
+    got = facts_on(pass_read(repo, sessions={"s1@node": s}, read_nodes={"node"}, open_asks={"s1@node"}), "TD-7", record)
     assert got is not None and got.session is s and got.open_ask
 
 
 def test_a_holder_on_an_unread_node_is_no_reading(repo: Path) -> None:
     record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@node"}
-    assert facts_on(pass_read(repo, sessions={}, unread_nodes={"node"}), "TD-7", record) is None
+    assert facts_on(pass_read(repo, sessions={}, read_nodes={"other"}), "TD-7", record) is None
 
 
 def test_a_holder_with_no_session_read_at_all_is_no_reading(repo: Path) -> None:
     record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1"}
     assert facts_on(pass_read(repo), "TD-7", record) is None
+
+
+def test_a_holder_on_a_node_that_was_read_and_lacks_it_is_gone(repo: Path) -> None:
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@node"}
+    got = facts_on(pass_read(repo, sessions={}, read_nodes={"node"}), "TD-7", record)
+    assert got is not None and got.session is None
+
+
+def test_a_bare_holder_is_found_by_its_id(repo: Path) -> None:
+    s = session("s1")
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1"}
+    got = facts_on(pass_read(repo, sessions={"s1": s}), "TD-7", record)
+    assert got is not None and got.session is s
+
+
+def test_a_padded_row_is_the_entrys_and_a_work_order_never_is(repo: Path) -> None:
+    row = {"id": "TD-007", "team": "t"}
+    orders = ({"id": "pr:12", "work_order": True}, {"id": "2026-01-05-67209175"}, {"id": "TD-7", "work_order": True})
+    got = facts_on(pass_read(repo, entries=(*orders, row)), "TD-7", None)
+    assert got is not None and got.entry is row
 
 
 def test_a_holder_read_as_gone_has_no_session(repo: Path) -> None:
@@ -241,7 +261,7 @@ def test_a_holder_read_as_gone_has_no_session(repo: Path) -> None:
 
 def test_a_closed_records_old_holder_on_an_unread_node_stops_nothing(repo: Path) -> None:
     record = {"tid": "TD-7", "holder": "s1@node", "closed_at": "2026-11-20T00:00:00Z"}
-    got = facts_on(pass_read(repo, unread_nodes={"node"}), "TD-7", record)
+    got = facts_on(pass_read(repo), "TD-7", record)
     assert got is not None and got.session is None
 
 

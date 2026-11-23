@@ -11,7 +11,8 @@ Nothing calls this yet, and none of it writes anything.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Mapping
+import re
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,8 @@ from sessionorc import held, ledger, ledgerboard, reports
 from sessionorc.models import Session
 from shiftlead import repoconfig
 from shiftlead.stage_read import EntryFacts, EntryLedger, ledger_on, only_when_protected, renumbered_on
+
+TD_ID = re.compile(r"TD-[0-9]+")
 
 
 class LedgerRead(NamedTuple):
@@ -107,8 +110,8 @@ def files_at(root: Path | str, pr: int, head: str | None) -> list[str] | None:
 class RepoFacts:
     """What the tick's pass read once for a team of a repo, for `facts_on` to take each entry's part of.
 
-    `sessions` are the records by the address a stage record's holder is written in, and `unread_nodes` the nodes whose
-    sessions could not be read this pass. `open_asks` are the addresses with an open ask of their own, `merging` the
+    `sessions` are the records by the address a stage record's holder is written in, and `read_nodes` the nodes whose
+    sessions were read this pass, so a node nobody reached is never read as its session gone. `open_asks` are the addresses with an open ask of their own, `merging` the
     entries whose merge is in flight, and `was` the flow the team's records were written under, read before its copy is
     replaced. `may_start` and `within_size` are TD-2065's.
     """
@@ -127,7 +130,7 @@ class RepoFacts:
     branches: Collection[str] = ()
     protected: Collection[str] | None = None
     sessions: Mapping[str, Session] | None = None
-    unread_nodes: Collection[str] = ()
+    read_nodes: Collection[str] = ()
     open_asks: Collection[str] = ()
     merging: Collection[str] = ()
     was: Mapping[str, Any] | None = None
@@ -144,17 +147,25 @@ def _files_for(repo: RepoFacts, live: Mapping[str, Any] | None) -> tuple[str | N
     return (head, files_at(repo.root, live["pr"], head)) if head else (None, None)
 
 
+def _row_of(entries: Iterable[dict[str, Any]], tid: str) -> dict[str, Any] | None:
+    """`tid`'s row, by number since a file's id may be padded. A work order's row is no entry's, whatever its id."""
+    n = ledgerboard._num(tid)
+    for e in entries:
+        if not e.get("work_order") and TD_ID.fullmatch(str(e.get("id"))) and ledgerboard._num(str(e["id"])) == n:
+            return e
+    return None
+
+
 def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> EntryFacts | None:
     """`tid`'s `EntryFacts` from the pass's reads. None: its holder's sessions could not be read (`sessions` None, or
     its node unread), so its absence says nothing, and reading it as gone would offer a live session's entry again."""
     live = record if record is not None and not record.get("closed_at") else None
     holder = str(live.get("holder") or "") if live else ""
     _, at, node = holder.partition("@")
-    if holder and (repo.sessions is None or (at and node in repo.unread_nodes)):
+    if holder and (repo.sessions is None or (at and node not in repo.read_nodes)):
         return None
     on = entry_on(repo.root, repo.ref, repo.read, tid)
-    n = ledgerboard._num(tid)
-    row = next((e for e in repo.entries if ledgerboard._num(str(e.get("id"))) == n), None)
+    row = _row_of(repo.entries, tid)
     read_at, files = _files_for(repo, live)
     written_under = live.get("flow") if live else None
     return EntryFacts(
