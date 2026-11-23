@@ -5,8 +5,9 @@ all call, so the three can never disagree. It reads the rows `sessionorc.reports
 changes nothing.
 
 The match is the **branch name** holding the entry's id as a whole token, whatever its case; the title is not read. A
-fork's pull request, a filing pull request and a branch holding two entries' ids are never an entry's work. Of several
-matches the newest is taken. Where that one is a draft or is held by a live session the entry waits, offered to nobody.
+fork's pull request, a filing pull request (the gate sweep's and a sync's among them, which only touch records) and a
+branch holding two entries' ids are never an entry's work. Of several matches the newest is taken. Where that one is
+a draft or is held by a live session the entry waits, offered to nobody.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import re
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
+
+from sessionorc import reports
 
 _TOKEN = re.compile(r"(?<![a-z0-9])td-?(\d+)(?![a-z0-9])", re.IGNORECASE)
 
@@ -64,6 +67,8 @@ def entry_work(tid: str, prs: Iterable[Mapping[str, Any]], *, held: Collection[i
         if isinstance(row.get("number"), int)
         and row.get("state") == "open"
         and not row.get("fork")
+        and not row.get("sync")
+        and not reports.gate_head(row.get("branch"))  # the sweep's own: its files are never read for `filing`
         and branch_ids(row.get("branch")) == {tid}
         and _filing(row) is not True
     ]

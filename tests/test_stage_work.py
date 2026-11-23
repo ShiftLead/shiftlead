@@ -109,6 +109,23 @@ def test_a_pull_request_whose_files_are_unread_at_its_head_decides_nothing(over)
     assert (got.state, got.pr["number"]) == ("unread", 4)
 
 
+@pytest.mark.parametrize(
+    "other",
+    [
+        {"number": 9, "branch": "lift/TD-2051/until-2026-11-23", "filing": None, "filing_head": None},
+        {"number": 9, "branch": "lift/TD-2051/live", "filing": None, "filing_head": None},
+        {"number": 9, "branch": "td2051-sync", "sync": True, "filing": None, "filing_head": None},
+    ],
+)
+def test_a_gate_sweep_or_sync_pull_request_is_never_the_work_and_hides_none(other: dict[str, Any]):
+    """The reading never sets `filing` on these heads, so counting one would leave its entry unread for as long as it
+    stays open, and would hide the real pull request beside it."""
+    row = pr(**{"number": other["number"], "branch": other["branch"]}) | other
+    assert entry_work("TD-2051", [row]).state == "none"
+    got = entry_work("TD-2051", [pr(3, "td2051-a"), row])
+    assert (got.state, got.pr["number"]) == ("take", 3)
+
+
 def test_a_filing_word_from_an_older_head_is_not_trusted():
     got = entry_work("TD-2051", [pr(4, "td2051-a", filing=True, filing_head="older")])
     assert got.state == "unread"
