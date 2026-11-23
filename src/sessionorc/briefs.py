@@ -142,7 +142,8 @@ def _write(path: Path, text: str) -> None:
 
 def save(name: str, kind: str, text: str, version: str | None = None) -> dict[str, Any]:
     """Write a brief. With no `version` it is new and may not exist; with one, the file must still be that version. A
-    brief a flow names keeps its kind, since the flow's stage is of that kind (§4.9c rule 10)."""
+    brief a flow names keeps a kind it has, since the flow's stage is of that kind (§4.9c rule 10); a file naming no
+    kind of `KINDS` has none to keep, so Save can repair it."""
     path = _path(name)
     if name in STANDARD:
         raise BriefError(f"{name} is a standard brief's name: pick another")
@@ -155,7 +156,7 @@ def save(name: str, kind: str, text: str, version: str | None = None) -> dict[st
         raise BriefError(f"a brief named {name} already exists")
     if version is not None and (was is None or version_of(was) != version):
         raise BriefError(STALE)
-    if was is not None and kind_of(was) != kind and (using := flows_naming(name)):
+    if was is not None and kind_of(was) in KINDS and kind_of(was) != kind and (using := flows_naming(name)):
         raise BriefError(f"{name} keeps its kind while a flow names it: {', '.join(using)}")
     full = f"---\nkind: {kind}\n---\n\n{text.strip()}\n"
     _write(path, full)

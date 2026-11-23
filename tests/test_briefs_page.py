@@ -63,6 +63,15 @@ def test_a_brief_a_flow_names_keeps_its_kind(home):
         briefs.save("careful", "review", "Go slowly.", got["version"])
 
 
+@pytest.mark.parametrize("head", ["", "---\nkind: reviw\n---\n"])
+def test_a_brief_with_no_known_kind_can_be_repaired_while_a_flow_names_it(home, head):
+    (home / "briefs").mkdir()
+    (home / "briefs" / "old.md").write_text(f"{head}text\n")
+    flow(home, "mine", "old")
+    was = briefs.own()[0]["version"]
+    assert briefs.save("old", "build", "text", was)["kind"] == "build"
+
+
 @pytest.mark.parametrize("name", ["build", "../evil", "", ".hidden", "a/b"])
 def test_a_name_that_is_standard_or_leaves_the_directory_is_refused(home, name):
     with pytest.raises(briefs.BriefError):
@@ -118,14 +127,16 @@ def test_the_page_draws_standard_read_only_and_own_with_controls(home, monkeypat
     assert text.count("choose a kind") == 1  # the blank form's; a brief with a kind keeps its own
 
 
-def test_a_brief_with_no_kind_is_never_saved_as_the_first_kind(home, monkeypatch):
+@pytest.mark.parametrize("kind", [None, "reviw"])
+def test_a_brief_with_no_kind_is_never_saved_as_the_first_kind(home, monkeypatch, kind):
     from fastapi.testclient import TestClient
 
     async def call(method, **params):
-        return {"briefs": [{"name": "old", "kind": None, "text": "t", "version": "v"}]} if method == "briefs" else {}
+        return {"briefs": [{"name": "old", "kind": kind, "text": "t", "version": "v"}]} if method == "briefs" else {}
 
     monkeypatch.setattr(app_mod, "agent_call", call)
     with TestClient(app_mod.create_app()) as c:
         text = c.get("/briefs").text
     form = text[text.index('data-brief="old"') :]
     assert '<option value="" disabled selected>choose a kind</option>' in form
+    assert "names no kind this page knows" in form
