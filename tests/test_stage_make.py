@@ -298,11 +298,59 @@ def test_a_record_that_moved_after_the_reading_is_not_overwritten(store):
     assert store.entry(TID) == moved
 
 
-def test_a_case_of_a_later_slice_writes_nothing(store):
-    before = put(store, pr=4, holder="s1")
-    got = make(store, TID, Act("reconcile", "team-moved"), Reading(team_moved=True), FLOW, "paul")
+def test_a_moved_entry_that_waits_on_the_person_is_left_for_its_question_to_be_cleared(store):
+    before = put(store, pr=4, waits="person", answers={OTHER: None})
+    got = make(store, TID, Act("reconcile", "team-moved"), Reading(team_moved=True, gate=True), FLOW, "paul")
     assert not got.made and "later" in got.why
     assert store.entry(TID) == before
+
+
+def test_a_moved_entry_closes_here_and_its_new_team_carries_on_from_its_pull_request(store):
+    put(store, holder="s1", branch="td7-work", pr=4, team="old")
+    got = act_on(store, Reading(team_moved=True, pr_state="open"))
+    assert got.made and got.end == "s1"
+    closed = store.entry(TID)
+    assert closed["closed_at"] and closed["holder"] is None
+    ready = Reading(pickable=True, may_start=True, within_size=True, carried_open=True)
+    started: list[Work] = []
+    made = offer(
+        store,
+        TID,
+        choose(closed, ready),
+        ready,
+        FLOW,
+        lambda _k, w: started.append(w) or "s2",
+        lambda *_a: None,
+        team="new",
+    )
+    assert made.made and started == [Work(TID, "td7-work", 4)]
+    record = store.entry(TID)
+    assert (record["team"], record["branch"], record["pr"], record["holder"]) == ("new", "td7-work", 4, "s2")
+    assert "carried" not in record and record["closed_at"] is None
+
+
+@pytest.mark.parametrize("live", [False, True])
+def test_carried_work_needs_a_live_reading_and_yields_to_a_fresher_pull_request(store, live):
+    put(store, holder="s1", branch="td7-old", pr=4, team="old")
+    assert act_on(store, Reading(team_moved=True, pr_state="open")).made
+    work = EntryWork("take", {"branch": "td7-new", "number": 9}) if live else EntryWork("none")
+    ready = Reading(pickable=True, may_start=True, within_size=True, carried_open=live, work=work)
+    started: list[Work] = []
+    start = lambda _k, w: started.append(w) or "s2"  # noqa: E731
+    assert offer(store, TID, choose(store.entry(TID), ready), ready, FLOW, start, lambda *_a: None, team="new").made
+    assert started == [Work(TID, "td7-new", 9) if live else Work(TID, None, None)]
+
+
+def test_a_moved_entry_with_nothing_pushed_carries_nothing(store):
+    put(store, holder="s1", team="old")
+    assert act_on(store, Reading(team_moved=True)).made
+    assert store.entry(TID)["carried"] is None
+
+
+def test_a_moved_entry_whose_pull_request_is_over_carries_nothing(store):
+    put(store, holder="s1", branch="td7-work", pr=4, waits="parts")
+    assert act_on(store, Reading(team_moved=True, pr_state="merged", design=True, open_parts=1)).made
+    assert store.entry(TID)["carried"] is None
 
 
 def test_a_record_with_no_move_re_enters_by_the_way_in_keeping_its_work(store):
