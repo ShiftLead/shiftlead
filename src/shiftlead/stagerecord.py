@@ -340,6 +340,11 @@ class StageStore:
         touched: it closes when the ledger on the default branch reads the entry archived."""
         return board.archive_entry(self.root, tid, why)
 
+    def clear_question(self, tid: str, person: str, nonce: str) -> dict[str, Any]:
+        """The pull request clearing the question this record set on an entry moved to another team (§4.9c). The record
+        is not touched: its caller closes it once this returns."""
+        return board.clear_question(self.root, tid, person, nonce)
+
     def land_intent(self, tid: str) -> dict[str, Any]:
         """The second and third writes: the one pull request, then the record's wait. Run again after a crash it
         writes nothing twice. An entry gone meanwhile clears the intent, and the reply says `gone`."""

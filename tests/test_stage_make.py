@@ -298,11 +298,51 @@ def test_a_record_that_moved_after_the_reading_is_not_overwritten(store):
     assert store.entry(TID) == moved
 
 
-def test_a_moved_entry_that_waits_on_the_person_is_left_for_its_question_to_be_cleared(store):
-    before = put(store, pr=4, waits="person", answers={OTHER: None})
-    got = make(store, TID, Act("reconcile", "team-moved"), Reading(team_moved=True, gate=True), FLOW, "paul")
-    assert not got.made and "later" in got.why
-    assert store.entry(TID) == before
+def _moved_waiting(store, **kw):
+    return put(store, pr=4, branch="td7-work", waits="person", answers={OTHER: None}, asked={"nonce": "n1"}, **kw)
+
+
+def test_a_moved_entry_closes_only_after_its_question_is_cleared(store, monkeypatch):
+    _moved_waiting(store)
+    seen = []
+
+    def clear(tid, person, nonce):
+        seen.append((tid, person, nonce, store.entry(TID)["clearing"], store.entry(TID)["closed_at"]))
+        return {"commit": "abc"}
+
+    monkeypatch.setattr(store, "clear_question", clear)
+    reading = Reading(team_moved=True, gate=True, pr_state="open")
+    got = make(store, TID, Act("reconcile", "team-moved"), reading, FLOW, "paul")
+    assert got.made
+    assert seen == [(TID, "paul", "n1", "n1", None)]  # the intent is on the record, and the record open, at the PR
+    closed = store.entry(TID)
+    assert closed["closed_at"] and closed["clearing"] is None and closed["waits"] is None
+    assert closed["carried"] == {"branch": "td7-work", "pr": 4}
+
+
+def test_a_refused_clear_leaves_the_record_waiting_for_the_next_pass(store, monkeypatch):
+    _moved_waiting(store)
+
+    def refused(*_a):
+        raise board.Refused("the forge is away")
+
+    monkeypatch.setattr(store, "clear_question", refused)
+    act = Act("reconcile", "team-moved")
+    got = make(store, TID, act, Reading(team_moved=True, gate=True), FLOW, "paul")
+    assert not got.made and "the forge is away" in got.why
+    record = store.entry(TID)
+    assert record["waits"] == "person" and record["clearing"] == "n1" and not record.get("closed_at")
+
+    monkeypatch.setattr(store, "clear_question", lambda *_a: {"nothing": True})  # as after a crash past the merge
+    assert make(store, TID, act, Reading(team_moved=True), FLOW, "paul").made
+    assert store.entry(TID)["closed_at"]
+
+
+def test_a_moved_entry_under_a_gate_this_record_did_not_ask_clears_nothing(store, monkeypatch):
+    put(store, pr=4, waits="person", answers=None, asked=None)
+    monkeypatch.setattr(store, "clear_question", lambda *_a: pytest.fail("not this record's question"))
+    assert make(store, TID, Act("reconcile", "team-moved"), Reading(team_moved=True, gate=True), FLOW, "paul").made
+    assert store.entry(TID)["closed_at"]
 
 
 def test_a_moved_entry_closes_here_and_its_new_team_carries_on_from_its_pull_request(store):
