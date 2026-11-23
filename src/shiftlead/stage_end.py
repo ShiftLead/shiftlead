@@ -23,6 +23,7 @@ from shiftlead.stagerecord import StageStore, StateError, _now, ask_words
 
 GIT_TIMEOUT = 30.0
 GH_TIMEOUT = 30.0
+FILES_CAP = 100  # what `gh pr view --json files` returns at most
 NEEDS_NO_REASON = ("work-pushed", "ship")
 AUDIT_OUTCOMES = ("findings-filed", "nothing-found")
 CARRY_ON = "Carry on — a session takes the move that was stopped, and its counts start again"
@@ -112,13 +113,23 @@ class ForgeFacts:
             state=str(r.get("state") or "").upper(),
             fork=bool(r.get("isCrossRepository")),
             precheck=green,
-            files=tuple(str(f.get("path")) for f in r.get("files") or []),
+            files=self._files(r),
         )
+
+    def _files(self, row: dict[str, Any]) -> tuple[str, ...]:
+        """The pull request's files: the JSON field stops at 100, so a list that long is read from its diff."""
+        files = tuple(str(f.get("path")) for f in row.get("files") or [])
+        if len(files) < FILES_CAP:
+            return files
+        return tuple(self._gh("pr", "diff", str(row["number"]), "--name-only").split("\n")[:-1])
 
     def post_review(self, number: int, body: str) -> None:
         said = json.loads(self._gh("pr", "view", str(number), "--json", "comments"))
-        if any(c.get("body") == body for c in said.get("comments") or []):
-            return  # a repeated call after a crash: the comment is already there
+        reviews = [
+            c.get("body") for c in said.get("comments") or [] if str(c.get("body")).startswith("cadence-review:")
+        ]
+        if reviews and reviews[-1] == body:
+            return  # a repeated call after a crash; only the latest counts, since the gate's row reads the latest
         with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8") as f:
             f.write(body)
             f.flush()
@@ -167,7 +178,7 @@ def _check_pushed(
     if facts.worktree_head() != pr.head:
         raise Refused(f"this worktree's head is not pull request #{pr.number}'s head: push your work")
     after = _stage_or_none(doc, where["to"])
-    if not (after is not None and after["does"] == "build") and not pr.precheck:
+    if not (stage["does"] == "build" and after is not None and after["does"] == "build") and not pr.precheck:
         raise Refused(f"pull request #{pr.number}'s precheck is not green at its head")
     if stage["does"] == "build" and (where["to"] == "merge" or (after is not None and after["does"] == "review")):
         archived = f"docs/ledger/archive/{tid}.md"

@@ -154,6 +154,18 @@ def test_a_build_whose_next_is_a_build_may_end_red_and_unarchived():
     assert _end(store, "work-pushed", facts=Fake(_pr(precheck=False, files=())), doc=doc)["went"] == "build"
 
 
+def test_a_design_stage_whose_next_is_a_build_still_needs_a_green_precheck():
+    doc = {
+        **FLOW,
+        "stages": [
+            {"name": "Design", "does": "design", "model": "opus", "takes": "any", "work-pushed": "build"},
+            {"name": "Build", "does": "build", "model": "opus", "work-pushed": "person"},
+        ],
+    }
+    with pytest.raises(Refused, match="precheck"):
+        _end(_store("design"), "work-pushed", facts=Fake(_pr(precheck=False)), doc=doc)
+
+
 def test_ship_records_the_verdict_posts_the_comment_and_marks_merging():
     store = _store("review", branch="td7-thing", pr=9)
     facts = Fake(_pr())
@@ -318,6 +330,29 @@ def test_a_stage_end_is_refused_offline_and_its_show_too():
         said = modes.offline_refusal(method, ME, {"id": ME}, host="node", home="home", records={})
         assert said and "unreachable" in said
     assert "stage_end" not in modes.PERSON_NODE_BOUND
+
+
+def test_a_review_comment_is_skipped_only_when_it_is_the_latest(monkeypatch):
+    facts = stage_end.ForgeFacts("/nowhere")
+    calls: list[tuple] = []
+    ship, block = "cadence-review: SHIP · a", "cadence-review: BLOCK · b"
+
+    def gh(*args):
+        calls.append(args)
+        return json.dumps({"comments": [{"body": ship}, {"body": block}, {"body": "a remark"}]})
+
+    monkeypatch.setattr(facts, "_gh", gh)
+    facts.post_review(9, block)
+    assert len(calls) == 1
+    facts.post_review(9, ship)  # an earlier SHIP under a later BLOCK is posted again
+    assert calls[-1][:3] == ("pr", "comment", "9")
+
+
+def test_a_pull_request_of_a_hundred_files_is_read_from_its_diff(monkeypatch):
+    facts = stage_end.ForgeFacts("/nowhere")
+    monkeypatch.setattr(facts, "_gh", lambda *_a: "a.py\ndocs/ledger/archive/TD-7.md\n")
+    row = {"number": 9, "files": [{"path": f"f{i}"} for i in range(stage_end.FILES_CAP)]}
+    assert facts._files(row) == ("a.py", "docs/ledger/archive/TD-7.md")
 
 
 def test_the_forge_facts_read_one_open_pull_request_of_this_repo(monkeypatch):
