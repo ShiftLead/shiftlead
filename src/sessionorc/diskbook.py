@@ -1,9 +1,9 @@
 """The disk sweep's pass result (design §4.6 *The sweep's reading*, TD-1945): per kind (scratch, worktrees, runs,
 caches, home files) the bytes held, each item's size as last measured and kept in the host agent's memory so a walk
 stays inside its pass's bounds, the total *partial* until every listed item has been measured (after a host-agent
-restart, the memory is empty); the bytes the pass removed; and each item it kept that a rule would otherwise take, with why.
-Each pass writes it to `disk.json` in the host's home with the free space under `scratch_root` and a dated line per
-pass kept 30 days, from which the reading's 30-day totals are read (TD-1946, `write` and `read`)."""
+restart, the memory is empty); the bytes the pass removed; and each item it kept that a rule would otherwise take,
+with why. Each pass writes it to `disk.json` in the host's home with the free space under `scratch_root` and a dated
+line per pass kept 30 days, from which the reading's 30-day totals are read (TD-1946, `write` and `read`)."""
 
 from __future__ import annotations
 
