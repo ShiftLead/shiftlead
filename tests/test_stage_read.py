@@ -12,13 +12,17 @@ from sessionorc.models import Pending, ProgressEntry, Session
 from shiftlead.stage_acts import Holder
 from shiftlead.stage_read import (
     EntryAnswer,
+    EntryFlow,
     EntryForge,
     EntryLedger,
     answer_on,
+    carried_on,
+    flow_on,
     forge_on,
     holder_on,
     ledger_on,
     renumbered_on,
+    team_moved_on,
 )
 
 HEAD = "## TD-7: An entry\n\n**Priority:** Low\n**Status:** Open\n"
@@ -315,3 +319,74 @@ def test_the_homes_open_archive_pull_request_is_seen():
 )
 def test_a_finished_or_another_entrys_archive_pull_request_is_not_this_ones(row):
     assert not forge_on("TD-7", None, [row]).archive_open
+
+
+FLOW = {"name": "f", "stages": [{"name": "Build", "does": "build"}, {"name": "Second read", "does": "review"}]}
+
+
+def test_a_record_in_a_stage_of_its_flow_is_known_and_current():
+    assert flow_on({"flow": "f", "stage": "second-read"}, FLOW) == EntryFlow(True, True)
+
+
+def test_a_stage_the_copy_lacks_is_not_known():
+    assert not flow_on({"flow": "f", "stage": "gone"}, FLOW).stage_known
+
+
+def test_a_record_written_under_another_flow_is_not_current():
+    assert flow_on({"flow": "old", "stage": "build"}, FLOW) == EntryFlow(True, False)
+
+
+def test_a_key_the_flow_it_was_written_under_had_as_another_kind_is_not_known():
+    was = {"name": "old", "stages": [{"name": "Build", "does": "review"}]}
+    assert not flow_on({"flow": "old", "stage": "build"}, FLOW, was).stage_known
+
+
+def test_a_key_of_one_kind_in_both_flows_is_known():
+    was = {"name": "old", "stages": [{"name": "Build", "does": "build"}]}
+    assert flow_on({"flow": "old", "stage": "build"}, FLOW, was).stage_known
+
+
+@pytest.mark.parametrize(
+    "team, named, moved",
+    [("a", "b", True), ("a", "B", True), ("a", "a", False), ("a", "A", False), ("a", None, False), (None, "b", False)],
+)
+def test_a_team_line_moves_an_entry_only_to_another_team_of_the_repo(team, named, moved):
+    assert team_moved_on(team, named, ["a", "b"]) is moved
+
+
+def test_a_team_line_naming_no_team_of_the_repo_moves_nothing():
+    assert not team_moved_on("a", "stale", ["a", "b"])
+
+
+CLOSED = {"closed_at": "2026-11-20T10:00:00Z", "carried": {"branch": "td7-x", "pr": 4}}
+
+
+def test_a_carried_pull_request_still_open_is_live():
+    assert carried_on(CLOSED, entry(), [pr_row(4)], [])
+
+
+@pytest.mark.parametrize("state", ["merged", "closed"])
+def test_a_carried_pull_request_that_ended_is_not_live_even_with_its_branch_pushed(state):
+    assert not carried_on(CLOSED, entry(), [pr_row(4, state)], ["td7-x"])
+
+
+def test_a_carried_branch_still_pushed_is_live_where_the_rows_lack_its_pull_request():
+    assert carried_on(CLOSED, entry(), [], ["td7-x"])
+    assert not carried_on(CLOSED, entry(), [], ["other"])
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["- 2026-11-20: reopened — again\n", "- 2026-11-22: reopened — again\n", "- 2026-11-21: archived: Resolved — x\n"],
+)
+def test_an_entry_archived_or_reopened_since_the_move_carries_nothing(line):
+    assert not carried_on(CLOSED, entry(line), [pr_row(4)], ["td7-x"])
+
+
+def test_a_reopen_before_the_move_does_not_count():
+    assert carried_on(CLOSED, entry("- 2026-11-19: reopened — earlier\n"), [pr_row(4)], [])
+
+
+@pytest.mark.parametrize("record", [{"closed_at": "2026-11-20T10:00:00Z"}, {"carried": {"branch": "b", "pr": 4}}])
+def test_a_record_with_nothing_carried_or_not_closed_carries_nothing(record):
+    assert not carried_on(record, entry(), [pr_row(4)], ["b"])

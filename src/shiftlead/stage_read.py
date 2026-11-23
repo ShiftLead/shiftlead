@@ -14,14 +14,17 @@ judged by the silent rule.
 `renumbered_on` reads the id an entry that left both was renumbered to, from the commit that removed its file.
 
 `forge_on` reads what became of the record's pull request from the repo's rows, and whether the home's own pull request
-archiving the entry is open. A pull request the rows do not hold is no reading, never a pull request that is gone. The
-tick's wiring calls all five; none writes anything.
+archiving the entry is open. A pull request the rows do not hold is no reading, never a pull request that is gone.
+
+`flow_on` reads whether a record's stage and flow still match its team's copy of the flow, `team_moved_on` whether the
+entry's `Team:` line now names another team, and `carried_on` whether the work a moved entry carried is still live. The
+tick's wiring calls all eight; none writes anything.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, NamedTuple
@@ -30,6 +33,7 @@ from sessionorc import board, ledger, ledgerboard, work
 from sessionorc.agent_common import OPEN_TOOL_CEILING, _parse, shells_live, subagents_live
 from sessionorc.mail import LEASE_TTL
 from sessionorc.models import Session
+from shiftlead.flow3 import key_of
 from shiftlead.stage_acts import Holder
 
 _ASKED = re.compile(r"asked by the stage record: (\S+)")
@@ -126,6 +130,61 @@ def forge_on(tid: str, pr: int | None, rows: Iterable[Mapping[str, Any]]) -> Ent
     if state not in ("open", "merged", "closed"):
         return None
     return EntryForge(state, (row.get("head") or None) if state == "open" else None, archive_open)
+
+
+class EntryFlow(NamedTuple):
+    stage_known: bool
+    flow_current: bool
+
+
+def _kind_of(doc: Mapping[str, Any] | None, key: str) -> str | None:
+    """What the stage `key` of `doc` does, or None where `doc` has no such stage."""
+    for st in (doc or {}).get("stages") or []:
+        if isinstance(st, Mapping) and key_of(st.get("name")) == key:
+            return str(st.get("does"))
+    return None
+
+
+def flow_on(record: Mapping[str, Any], doc: Mapping[str, Any], was: Mapping[str, Any] | None = None) -> EntryFlow:
+    """`Reading.stage_known` and `.flow_current` of `record` against `doc`, its team's copy of the flow. A record stores
+    no stage's kind, so a key both flows have under different kinds is seen only through `was`, the flow the record was
+    written under, where the caller still holds it; without it a key the copy has reads as known."""
+    key = str(record.get("stage"))
+    kind = _kind_of(doc, key)
+    before = _kind_of(was, key)
+    return EntryFlow(kind is not None and (before is None or before == kind), record.get("flow") == doc.get("name"))
+
+
+def team_moved_on(team: str | None, named: str | None, teams: Collection[str]) -> bool:
+    """`Reading.team_moved`: the entry's `Team:` line, `named`, names another of the repo's `teams` than the record's
+    `team`. No line, or a name no team of the repo holds, moves nothing: closing a record for a team that cannot take
+    the entry would strand it."""
+    if not team or not named:
+        return False
+    word = named.casefold()
+    return word != team.casefold() and any(word == t.casefold() for t in teams)
+
+
+def carried_on(
+    record: Mapping[str, Any], text: str, rows: Iterable[Mapping[str, Any]], branches: Collection[str]
+) -> bool:
+    """`Reading.carried_open` of a closed `record`: what it carried is still an open pull request, or a branch still
+    pushed where the rows do not hold that pull request, and the entry's `text` logs no archive or reopen on or after
+    the day the record closed. A Log's dates are days, so one of the same day counts as since the move."""
+    carried = record.get("carried") or {}
+    closed = str(record.get("closed_at") or "")[:10]
+    if not carried or not closed:
+        return False
+    try:
+        lines = ledgerboard.log_lines(text)
+    except ledgerboard.Refused:
+        return False
+    if any(ln.get("kind") in ("archived", "reopened") and str(ln.get("date")) >= closed for ln in lines):
+        return False
+    row = next((r for r in rows if carried.get("pr") and r.get("number") == carried["pr"]), None)
+    if row is not None:
+        return row.get("state") == "open"
+    return bool(carried.get("branch")) and carried["branch"] in branches
 
 
 def _instant(value: str | None) -> datetime | None:
