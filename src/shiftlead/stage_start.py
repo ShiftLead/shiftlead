@@ -47,9 +47,9 @@ class StageLaunch:
     model: str
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
-        """The `create` RPC's arguments. Not `supervised`: a lost stage session is the tick's to offer again
-        (§4.9c *The home acts only where no session will*), never a crash restart of the same brief."""
-        return {**self.launch.create_params(controllers), "supervised": False}
+        """The `create` RPC's arguments: a team session's, supervised, so the tick's nudge and context bound reach it
+        and the home never reads it as one the person started (`by_person`)."""
+        return self.launch.create_params(controllers)
 
 
 def team_started(_org: orgmod.Org, _team: orgmod.TeamDef) -> bool:
@@ -67,8 +67,11 @@ def stage_of(doc: dict[str, Any], key: str) -> dict[str, Any]:
 
 def _body(text: str) -> str:
     """A brief's text without its front matter."""
-    if text.startswith("---\n") and (end := text.find("\n---", 3)) != -1:
-        return text[end + 4 :].strip()
+    lines = text.splitlines()
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == "---":
+                return "\n".join(lines[i + 1 :]).strip()
     return text.strip()
 
 
@@ -80,7 +83,10 @@ def brief_for(stage: dict[str, Any], place: str, flow_dir: Path | None, read: re
         text = (flow3.STANDARD_DIR / f"{name}.md").read_text(encoding="utf-8")
     else:
         reader = read or flow3._read
-        text = reader(flow_dir / "briefs" / f"{name}.md") if flow_dir is not None and place != "package" else None
+        try:
+            text = reader(flow_dir / "briefs" / f"{name}.md") if flow_dir is not None and place != "package" else None
+        except (OSError, ValueError) as e:
+            raise teams.TeamError(f"{stage.get('name')}: brief {name!r} cannot be read ({e})") from None
         if text is None and place not in ("repo", "package"):
             text = flow3._read(flow3.org_briefs() / f"{name}.md")
         if text is None:
@@ -160,6 +166,14 @@ def launch(
     except ValueError as e:
         raise teams.TeamError(f"{where}: {e}") from None
     profile = (line.profile if line is not None else None) or role.profile or ""
+    adapter = teams.profiles.DEFAULT_ADAPTER
+    if profile:
+        try:
+            adapter = teams.profiles.get(profile).adapter
+        except (KeyError, ValueError) as e:
+            raise teams.TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+        if adapter == teams.profiles.SHELL_ADAPTER:
+            raise teams.TeamError(f"{where}: profile {profile!r} runs a shell, and a stage's session is an agent's")
     x = teams.Launch(
         name=name,
         role=role.name,
@@ -168,7 +182,7 @@ def launch(
         team=team.name,
         project=org.project_of(team.repo),
         profile=profile,
-        adapter=teams.profiles.get(profile).adapter if profile else teams.profiles.DEFAULT_ADAPTER,
+        adapter=adapter,
         prompt=prompt,
         grants=list(role.grants),
         lane=[work.entry],
@@ -186,6 +200,7 @@ def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) ->
     if not team_started(org, team):
         return None
     x = got.launch
-    if call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir)).get("verdict") in ("live", "suspended"):
+    on = {"host": x.host} if x.host else {}
+    if call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on).get("verdict") in ("live", "suspended"):
         return None
     return call("create", **got.create_params([]))

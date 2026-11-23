@@ -114,7 +114,7 @@ def test_nothing_starts_while_the_team_is_not_started(world):
     assert calls == []
 
 
-def test_a_started_team_creates_it_unsupervised_unless_the_name_is_held(world, monkeypatch):
+def test_a_started_team_creates_it_supervised_unless_the_name_is_held(world, monkeypatch):
     org, team, _ = world
     monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
     got = made(world, builtin("build"), "build")
@@ -125,7 +125,7 @@ def test_a_started_team_creates_it_unsupervised_unless_the_name_is_held(world, m
         return {"verdict": "free"} if method == "name_check" else {"id": "new"}
 
     assert stage_start.start(call, org, team, got) == {"id": "new"}
-    assert calls[1][1]["supervised"] is False and calls[1][1]["lane"] == ["TD-7"]
+    assert calls[1][1]["supervised"] is True and calls[1][1]["lane"] == ["TD-7"]
     assert stage_start.start(lambda *_a, **_k: {"verdict": "live"}, org, team, got) is None
 
 
@@ -133,3 +133,47 @@ def test_the_grinder_name_is_unchanged_and_reviewer_is_a_preset():
     assert "grinder" in repoconfig.PRESETS and "builder" not in repoconfig.PRESETS
     assert repoconfig.PRESETS["reviewer"]["brief"] == "reviewer.md"
     assert Path(repoconfig.__file__).with_name("briefs").joinpath("stage.md").is_file()
+
+
+def test_the_name_is_checked_on_the_node_the_session_lands_on(world, monkeypatch):
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+    got = stage_start.launch(org, team, builtin("build"), "build", stage_start.Work("TD-7"), host="node", here="h")
+    seen = []
+
+    def call(method, **kw):
+        seen.append((method, kw.get("host")))
+        return {"verdict": "free"}
+
+    stage_start.start(call, org, team, got)
+    assert seen == [("name_check", "node"), ("create", "node")]
+
+
+@pytest.mark.parametrize("head", ["---\r\nkind: build\r\n---\r\n", "--- \nkind: build\n---\n"])
+def test_front_matter_the_check_accepts_is_left_out_of_the_prompt(world, head):
+    _, _, root = world
+    flow = root / ".shiftlead" / "flows" / "mine"
+    (flow / "briefs").mkdir(parents=True)
+    (flow / "briefs" / "own.md").write_bytes((head + "MY OWN BRIEF\n").encode())
+    assert flow3.brief_kind((flow / "briefs" / "own.md").read_bytes().decode()) == "build"
+    text = stage_start.brief_for({"name": "B", "does": "build", "brief": "own"}, "repo", flow)
+    assert text == "MY OWN BRIEF"
+
+
+def test_a_brief_a_node_cannot_read_is_a_refusal_not_a_crash(world):
+    def read(_path):
+        raise OSError("no link")
+
+    with pytest.raises(teams.TeamError, match="cannot be read"):
+        stage_start.brief_for({"name": "B", "does": "build", "brief": "own"}, "repo", world[2], read)
+
+
+def test_an_unknown_or_shell_profile_is_refused(world, monkeypatch):
+    org, team, _ = world
+    team.members[0].profile = "nope"
+    monkeypatch.setattr(teams.profiles, "get", lambda _n: (_ for _ in ()).throw(KeyError("no profile nope")))
+    with pytest.raises(teams.TeamError, match="no profile nope"):
+        made(world, builtin("build"), "build")
+    monkeypatch.setattr(teams.profiles, "get", lambda _n: SimpleNamespace(adapter=teams.profiles.SHELL_ADAPTER))
+    with pytest.raises(teams.TeamError, match="runs a shell"):
+        made(world, builtin("build"), "build")
