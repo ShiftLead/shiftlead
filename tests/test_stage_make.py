@@ -412,6 +412,15 @@ def test_a_record_that_cannot_be_written_names_the_session_to_end(store, monkeyp
     assert not got.made and got.end == "s9" and "no push" in got.why
 
 
+def test_any_failure_after_the_start_names_the_session_to_end(store):
+    def broken(*_a: Any) -> str | None:
+        raise ValueError("a bad reply")
+
+    got = offer(store, TID, choose(None, READY), READY, FLOW, lambda *_a: "s9", broken)
+    assert not got.made and got.end == "s9" and "a bad reply" in got.why
+    assert store.entry(TID) is None
+
+
 def test_an_offer_whose_record_moved_starts_nothing(store):
     act = choose(None, READY)
     put(store, holder="other")

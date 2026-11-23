@@ -25,7 +25,7 @@ from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, StateError, _now, answer_move, new_record
+from shiftlead.stagerecord import StageStore, _now, answer_move, new_record
 
 
 @dataclass(frozen=True)
@@ -328,16 +328,16 @@ def offer(
         holder = start(key, Work(tid, branch, pr))
         if holder is None:
             return Made(False, "no session was started")
-        if refused := claim(holder, tid):
-            return Made(False, f"the claim was refused: {refused}", end=holder)
-        if record is None or first:
-            record = {**new_record(tid, str(name), key, holder=holder), "branch": branch, "pr": pr}
-        else:  # a count a loss left stands, so the next loss is the second
-            record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
         try:
+            if refused := claim(holder, tid):
+                return Made(False, f"the claim was refused: {refused}", end=holder)
+            if record is None or first:
+                record = {**new_record(tid, str(name), key, holder=holder), "branch": branch, "pr": pr}
+            else:  # a count a loss left stands, so the next loss is the second
+                record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
             store.put_entry(record, f"offered at {key} to {holder}")
-        except StateError as e:
-            return Made(False, f"the record could not be written: {e}", end=holder)
+        except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
+            return Made(False, f"the offer did not finish: {e}", end=holder)
         return Made(True)
 
 
