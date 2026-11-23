@@ -1626,6 +1626,60 @@ def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock
         raise Refused(f"the question could not be cleared, and the ledger is as it was: {e}") from None
 
 
+UNAPPLIED_BODY = (
+    "shiftlead notes on an entry that the person's answer was applied to nothing, because the entry's pull request "
+    "merged after the question was asked (design §4.9c, act 2)."
+)
+
+
+def note_unapplied(root: str | Path, tid: str, label: str, mark: str) -> dict[str, Any]:
+    """**A lift applied to nothing** (design §4.9c act 2, TD-2051): on origin's head, `tid`'s Log says the answer
+    `label` to the question `mark` moved nothing, landed as one pull request of the host agent's own. Returns the
+    landing's `{commit, message, pr}`, or `{"nothing": True}` where the Log already says so or the entry is archived
+    or missing, so a second call after a crash writes nothing."""
+    root = Path(root)
+    with _EDIT:
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+        return _twice(lambda: _note_unapplied(root, tid, label, mark, clock))
+
+
+def _note_unapplied(root: Path, tid: str, label: str, mark: str, clock: _Clock) -> dict[str, Any]:
+    t, want = _tree(root, clock)
+    words = (
+        f'the person\'s answer "{" ".join(label.split())}" was applied to nothing: '
+        f"its pull request merged after the question was asked (question {mark})"
+    )
+    try:
+        led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
+        try:
+            path, archived = led.entry_file(tid)
+        except ledgerboard.Refused:
+            archived, path = True, ""
+        if archived or words in (led.read(path) or ""):
+            _reset(t, want)
+            return {"nothing": True}
+        plan = _plan(lb_ledger.plan_edit, led, "note", tid, words=words)
+        lb_ledger.write(plan.changes)
+        entry_rel = os.path.relpath(path, t)
+        return _land(
+            root,
+            t,
+            want,
+            f"{TOOL}: {tid}'s answer applied to nothing (session n/a)",
+            clock,
+            lambda: _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0,
+            body=UNAPPLIED_BODY,
+            also=[os.path.relpath(p, t) for p in plan.changes],
+        )
+    except (Refused, ledgerboard.Refused, OSError) as e:
+        _reset(t, want)
+        if isinstance(e, Refused):
+            raise
+        raise Refused(f"the entry's Log could not be written, and the ledger is as it was: {e}") from None
+
+
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
 
 BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone

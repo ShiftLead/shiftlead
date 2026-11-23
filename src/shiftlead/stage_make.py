@@ -7,7 +7,7 @@ home's reading is never overwritten: the act is simply not made, and the next pa
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
 `mark-waiting`, `rewrite-flow`, `re-enter`, `archive-design`, `team-moved`) and those that put a question to the person
 (`merged-entry-open`, `pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own
-pull request), the
+pull request, a lift on a record whose pull request has since merged applied to nothing and said on the Log), the
 pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
 takes its claim and writes the record.
@@ -160,7 +160,14 @@ def _ask(
         store.put_entry(record, "carries the home's gate: waits on the person")
     else:
         store.record_intent(
-            str(record["id"]), person, ask, context, answers, blocked=record.get("blocked"), base=record
+            str(record["id"]),
+            person,
+            ask,
+            context,
+            answers,
+            blocked=record.get("blocked"),
+            base=record,
+            after_merge=s.pr_state == "merged",
         )
     return Made(True)
 
@@ -202,7 +209,16 @@ def _gate_again(store: StageStore, record: dict[str, Any], _s: Reading, doc: dic
     ask = asked.get("ask") or "This entry was waiting on you and its question is gone, what next?"
     context = asked.get("context") or "The entry's decision was removed with no answer recorded."
     answers = asked.get("answers") or _to_stages(doc)
-    store.record_intent(str(record["id"]), person, ask, context, answers, blocked=record.get("blocked"), base=record)
+    store.record_intent(
+        str(record["id"]),
+        person,
+        ask,
+        context,
+        answers,
+        blocked=record.get("blocked"),
+        base=record,
+        after_merge=bool(asked.get("after_merge")),  # the same question: a merge since it was asked still moved it on
+    )
     return Made(True)
 
 
@@ -237,11 +253,27 @@ def _merge_again(store: StageStore, record: dict[str, Any], words: str) -> Made:
     return Made(True)
 
 
+def _unapplied(store: StageStore, record: dict[str, Any], label: str) -> Made:
+    """A lift on a record that has moved on: its pull request merged after the question was asked. The Log says so
+    first, and only then does the record stop waiting, so a crash between them repeats no line and loses none. The next
+    pass reconciles the merge, closing the record or asking about the entry still open."""
+    mark = str((record.get("asked") or {}).get("nonce") or "none")
+    try:
+        store.note_unapplied(str(record["id"]), label, mark)
+    except board.Refused as e:  # the record still waits, so the next pass tries again
+        return Made(False, f"the entry's Log could not be written: {e}")
+    record.update(waits=None, answers=None, asked=None, blocked=None, merging=None)
+    store.put_entry(record, "the person's answer: applied to nothing, its pull request merged")
+    return Made(True)
+
+
 def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
     """The person's lifted label, mapped to a move by the record's answer map (act 2). An answer at a limit or the cap
     takes the stopped move, in the person's own words too, and only it starts that move's count and the cap's again.
     The move is not counted."""
     label = str(s.lifted)
+    if s.pr_state == "merged" and not (record.get("asked") or {}).get("after_merge"):
+        return _unapplied(store, record, label)
     move, words = answer_move(record.get("answers") or {}, label)
     if isinstance(move, dict) and move.get("merge"):
         return _merge_again(store, record, words)

@@ -314,11 +314,14 @@ class StageStore:
         *,
         blocked: Any = None,
         base: dict[str, Any] | None = None,
+        after_merge: bool = False,
     ) -> dict[str, Any]:
         """The first of the move's three writes: that the entry is to go to the person, with the answer map (each
         offered `<label> — <consequence>` to the move it makes) and what was `blocked`. Returns at once; the tick
         lands it. *Something else* is always offered, its move the record's default. `base` is the record as a caller
-        holding the lock has already changed it, so the move and its intent are one commit."""
+        holding the lock has already changed it, so the move and its intent are one commit.
+        `after_merge`: the question is asked knowing the pull request has merged, so that merge does not make its
+        answer one applied to nothing."""
         record = base if base is not None else self.entry(tid)
         if record is None:
             raise StateError(f"{tid} has no stage record")
@@ -331,6 +334,7 @@ class StageStore:
             "answers": offered,
             "at": _now(),
             "nonce": uuid.uuid4().hex[:12],  # names this question in the entry's Log, so it is never landed twice
+            "after_merge": after_merge,
         }
         record["blocked"] = blocked
         self.put_entry(record, "to the person: intent")
@@ -344,6 +348,11 @@ class StageStore:
         """The home archives the entry in a pull request of its own (§4.9c *Who archives the entry*). The record is not
         touched: it closes when the ledger on the default branch reads the entry archived."""
         return board.archive_entry(self.root, tid, why)
+
+    def note_unapplied(self, tid: str, label: str, mark: str) -> dict[str, Any]:
+        """The pull request saying on the entry's Log that the person's answer moved nothing (§4.9c act 2). The record
+        is not touched: its caller clears the question once this returns."""
+        return board.note_unapplied(self.root, tid, label, mark)
 
     def clear_question(self, tid: str, person: str, nonce: str) -> dict[str, Any]:
         """The pull request clearing the question this record set on an entry moved to another team (§4.9c). The record
@@ -377,6 +386,10 @@ class StageStore:
             return got
         record["waits"] = "person"
         record["answers"] = {a.split(" — ", 1)[0]: move for a, move in intent["answers"].items()}
-        record["asked"] = {**{k: intent[k] for k in ("nonce", "ask", "context", "answers")}, "at": intent.get("at")}
+        record["asked"] = {
+            **{k: intent[k] for k in ("nonce", "ask", "context", "answers")},
+            "at": intent.get("at"),
+            "after_merge": bool(intent.get("after_merge")),
+        }
         self.put_entry(record, "waits on the person")
         return got
