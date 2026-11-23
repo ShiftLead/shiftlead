@@ -260,3 +260,134 @@ async def test_a_built_in_seat_keeps_its_mark_across_a_replay(agent, tmp_path, w
         assert agent.sessions[sid].builtin == "techlead"
         assert agent._rules_reach(agent.sessions[sid])
         await person.call("kill", id=sid)
+
+
+def _asks_seat(agent, name: str, builtin: str | None = None, tags: bool = True) -> Session:
+    seat = Session(
+        id=f"ao-t-{name}", name=name, kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g",
+        repo="/tmp/repo", supervised=True, unattended=True, seat={"trigger": "asks", "tags": tags}, builtin=builtin,
+    )  # fmt: skip
+    agent.sessions[seat.id] = seat
+    return seat
+
+
+async def _cut_over(agent, marked: bool = True) -> None:
+    await park_ticks(agent)
+    if marked:
+        _mark()
+    agent._read_cut_over()
+
+
+@pytest.mark.parametrize("address", [{"team": "g"}, {"repo": "repo"}], ids=["team", "repo"])
+async def test_a_question_address_reads_only_a_built_in_seat_after_the_marker(agent, address):
+    old = _asks_seat(agent, "old")
+    await _cut_over(agent, marked=False)
+    assert await agent._question_seat(**address) is old
+    await _cut_over(agent)
+    with pytest.raises(RpcError, match="no question seat|no registered repo"):
+        await agent._question_seat(**address)
+    assert not old.inbox
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    assert await agent._question_seat(**address) is built_in
+
+
+async def test_a_seat_s_route_and_pool_read_no_first_shape_seat_after_the_marker(agent):
+    seat = _asks_seat(agent, "seat", tags=False)
+    seat.seat = {**seat.seat, "pool": "p", "rank": 1}
+    lead = _asks_seat(agent, "lead")
+    later = _asks_seat(agent, "later", tags=False)
+    later.seat = {**later.seat, "pool": "p", "rank": 2}
+    records, now = agent._graph(), datetime.now(UTC)
+    await _cut_over(agent, marked=False)
+    assert agent._route_lead(seat, records, now) is lead
+    assert agent._pool_next(seat, records, now) is later
+    await _cut_over(agent)
+    assert agent._route_lead(seat, records, now) is None
+    assert agent._pool_next(seat, records, now) is None
+
+
+async def test_the_tagging_seat_is_a_built_in_one_after_the_marker(agent):
+    old = _asks_seat(agent, "old")
+    records = [old]
+    await _cut_over(agent, marked=False)
+    assert agent._tagging_seat("/tmp/repo", records) is old
+    await _cut_over(agent)
+    assert agent._tagging_seat("/tmp/repo", records) is None
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    assert agent._tagging_seat("/tmp/repo", [old, built_in]) is built_in
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_send_reads_no_seat_s_extras_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc import seat_send
+
+    seat = _asks_seat(agent, "seat")
+    read = []
+    monkeypatch.setattr(seat_send, "extras_in_place", lambda own, records: read.append(own) or [])
+    await _cut_over(agent, marked=marked)
+    assert agent._seat_pick(agent._graph(), seat.id, "ao-t-x", "ask", None, None) is None
+    assert read == ([] if marked else [seat])
+
+
+async def test_a_first_shape_sweeper_does_not_stand_in_for_a_built_in_one_after_the_marker(agent, monkeypatch):
+    from sessionorc import agent_tick
+
+    monkeypatch.setattr(agent_tick.settings_mod, "sweep", lambda _doc: {"on": True, "off": []})
+    old = _asks_seat(agent, "old")
+    old.seat = {"trigger": "swept"}
+    built_in = _asks_seat(agent, "sweeper", builtin="sweeper")
+    built_in.seat = {"trigger": "swept", "by": "settings"}
+    records = [old, built_in]
+    await _cut_over(agent, marked=False)
+    assert agent._sweep_idle(built_in, records) == "other"
+    await _cut_over(agent)
+    assert agent._sweep_idle(built_in, records) == ""
+
+
+async def test_an_entry_request_moves_to_no_first_shape_techlead_after_the_marker(agent, monkeypatch):
+    from sessionorc.mail import MailEntry
+
+    seat = _asks_seat(agent, "seat", tags=False)
+    _asks_seat(agent, "lead")
+    asker = _asks_seat(agent, "asker", tags=False)
+    asker.seat = None
+    monkeypatch.setattr(agent, "_landing_refusal", lambda *_a: "full")  # it stays, so the move's answer is all we read
+    monkeypatch.setattr(agent, "_mark", lambda *_a, **_k: None)
+    entry = MailEntry(id="m-1", from_=asker.id, to=[seat.id], at="2026-11-23T00:00:00Z", kind="ask", text="file this")
+    now = datetime.now(UTC)
+    await _cut_over(agent, marked=False)
+    assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is True
+    await _cut_over(agent)
+    assert agent._move_entry(entry, seat.id, seat, agent._graph(), now, "2026-11-23T00:00:00Z", {}) is False
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_handed_entry_ignores_a_first_shape_team_list_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc import agent_inbox
+
+    old = _asks_seat(agent, "old")
+    built_in = _asks_seat(agent, "lead", builtin="tech-lead")
+    built_in.host = agent.host
+    monkeypatch.setattr(agent_inbox.hosts, "local_host", lambda: SimpleNamespace(repos=lambda: ["/tmp/repo"]))
+    monkeypatch.setattr(agent, "_question_seat", AsyncMock(return_value=built_in))
+    send = AsyncMock(return_value={"entry": {"id": "m-1"}})
+    monkeypatch.setattr(agent, "_msg", send)
+    await _cut_over(agent, marked=marked)
+    teams = [{"team": "g", "seat": old.id}]
+    await agent._entry_send("repo", "debt", "file this", teams, "", "g", "", None, "", "")
+    assert send.await_args.args[2] == [built_in.id if marked else old.id]
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
+async def test_a_waiting_handed_entry_moves_to_no_first_shape_seat_after_the_marker(agent, monkeypatch, marked):
+    from sessionorc.mail import MailEntry
+
+    seat = _asks_seat(agent, "seat", tags=False)
+    old = _asks_seat(agent, "old", tags=False)
+    monkeypatch.setattr(agent, "_mark", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent, "_close_entry", lambda *_a, **_k: None)
+    entry = MailEntry(id="m-1", from_="person", to=[seat.id], at="2026-11-23T00:00:00Z", kind="ask", text="file this")
+    entry.entry = {"teams": [{"team": "g", "seat": old.id}, {"team": "h", "seat": "ao-t-gone"}]}
+    await _cut_over(agent, marked=marked)
+    moved = agent._move_handed(entry, seat.id, seat, "unable", "2026-11-23T00:00:00Z", {})
+    assert moved is (not marked)

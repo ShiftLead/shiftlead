@@ -4599,6 +4599,7 @@ class TickMixin:
             and not r.superseded_by
             and (r.seat or {}).get("trigger") == "swept"
             and (r.seat or {}).get("by") != "settings"
+            and self._rules_reach(r)  # a team-defined sweeper is no seat after the cut-over (§4.9e)
             for r in records
         ):
             return "other"
@@ -4629,6 +4630,7 @@ class TickMixin:
             and r.unattended
             and not r.superseded_by
             and not r.suspended
+            and self._rules_reach(r)  # after the cut-over a built-in seat's record alone (§4.9e)
         ]
 
         def order(r: Session) -> tuple[int, int, str]:

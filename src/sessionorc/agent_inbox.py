@@ -638,9 +638,10 @@ class InboxMixin:
             raise RpcError("the entry has no words: say what it is — a title is enough")
         pick = str(team or "").strip()
         order: list[dict[str, str]] = []  # a blank pick's teams, kept for the tick's move (§4.9b, TD-1480)
-        if teams is None:
+        if teams is None or self._first_shape_off:
             # the person's shell on a node, whose registry has no such repo and which has no `org.yml`
-            # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is
+            # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is. After the
+            # cut-over a caller's list of teams is the first shape's, and only a built-in seat is read (§4.9d, §4.9e)
             found_seat = await self._question_seat(team=pick, repo=name, entry=True)
             team = str(found_seat.team or "").strip()
             pick = team if pick else ""
