@@ -1499,6 +1499,56 @@ def _ask_in_tree(
     return {**landed, "id": new, "key": workorders.PREFIX + new[-8:]}
 
 
+ARCHIVE_BODY = (
+    "shiftlead archives an entry no pull request will archive, through the ledger's writer (design §4.9c *Who archives "
+    "the entry*)."
+)
+
+
+def archive_entry(root: str | Path, tid: str, why: str) -> dict[str, Any]:
+    """**The home archives an entry** (design §4.9c *Who archives the entry*, TD-2051): on origin's head, `tid` archived
+    as it stands, landed as one pull request of the host agent's own. Returns the landing's `{commit, message, pr}`, or
+    `{"gone": True}` for an entry already archived or missing, so a second call after a crash writes nothing."""
+    root = Path(root)
+    with _EDIT:
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+        return _twice(lambda: _archive_entry(root, tid, why, clock))
+
+
+def _archive_entry(root: Path, tid: str, why: str, clock: _Clock) -> dict[str, Any]:
+    t, want = _tree(root, clock)
+    try:
+        led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
+        try:
+            path, archived = led.entry_file(tid)
+        except ledgerboard.Refused:
+            _reset(t, want)
+            return {"gone": True}
+        if archived:
+            _reset(t, want)
+            return {"gone": True}
+        plan = _plan(lb_ledger.plan_archive, led, tid, why, as_is=True)
+        lb_ledger.write(plan.changes)
+        rel = os.path.relpath(path, t)
+        return _land(
+            root,
+            t,
+            want,
+            f"{TOOL}: archive {tid} (session n/a)",
+            clock,
+            lambda: _git(t, "cat-file", "-e", f"origin/{want}:{rel}").returncode == 0,
+            body=ARCHIVE_BODY,
+            also=[os.path.relpath(p, t) for p in plan.changes],
+        )
+    except (Refused, ledgerboard.Refused, OSError) as e:
+        _reset(t, want)
+        if isinstance(e, Refused):
+            raise
+        raise Refused(f"the entry could not be archived, and the ledger is as it was: {e}") from None
+
+
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
 
 BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone

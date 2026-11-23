@@ -331,6 +331,11 @@ class StageStore:
         """The entries with a question recorded and not yet landed, for reconcile."""
         return sorted(tid for tid, r in self.entries().items() if r.get("intent"))
 
+    def archive(self, tid: str, why: str) -> dict[str, Any]:
+        """The home archives the entry in a pull request of its own (§4.9c *Who archives the entry*). The record is not
+        touched: it closes when the ledger on the default branch reads the entry archived."""
+        return board.archive_entry(self.root, tid, why)
+
     def land_intent(self, tid: str) -> dict[str, Any]:
         """The second and third writes: the one pull request, then the record's wait. Run again after a crash it
         writes nothing twice. An entry gone meanwhile clears the intent, and the reply says `gone`."""

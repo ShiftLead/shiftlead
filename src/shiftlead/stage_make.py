@@ -6,7 +6,8 @@ home's reading is never overwritten: the act is simply not made, and the next pa
 
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
 `mark-waiting`, `rewrite-flow`, `re-enter`) and those that put a question to the person (`merged-entry-open`,
-`pr-closed`, `stage-gone`, `gate-again`), the person's answer, the pass, and the record's half of offering again (the
+`pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own pull request), the
+pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
 takes its claim and writes the record.
 `sweep_closed` removes a closed record after its thirty days. Every other case returns `Made(False, …)` and writes
@@ -21,6 +22,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
+from sessionorc import board
 from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
@@ -199,6 +201,12 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
     stopped = blocked.get("to")
     if move is None and stopped:
         move = {"blocked": True}
+    if isinstance(move, dict) and move.get("archive"):
+        try:
+            store.archive(str(record["id"]), f"the person's answer: {words}")
+        except board.Refused as e:  # the record still waits, so the next pass tries again
+            return Made(False, f"the entry could not be archived: {e}")
+        return Made(True)  # the record closes when the ledger reads the entry archived
     if isinstance(move, dict):
         if not move.get("blocked") or not stopped:
             return Made(False, f"the answer {label!r} is a later slice's move")
