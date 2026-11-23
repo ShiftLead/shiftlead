@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import subprocess
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,10 +15,10 @@ from typing import ClassVar
 
 import pytest
 
-from sessionorc import agent_stage, modes
+from sessionorc import agent_stage, identity, modes
 from sessionorc.agent_common import RpcError
 from shiftlead import stage_end
-from shiftlead.stage_end import PullRequest, Refused, end, names_entry
+from shiftlead.stage_end import PullRequest, Refused, end
 from shiftlead.stagerecord import new_record
 
 ME = "ao-repo-build-td-7"
@@ -250,10 +251,42 @@ def test_not_needed_offers_archive_and_build_it_anyway():
 
 @pytest.mark.parametrize(
     ("branch", "held"),
-    [("td7-thing", True), ("TD-7-x", True), ("td-007", True), ("td70-x", False), ("td7-td8", False), ("x", False)],
+    [("td7-thing", True), ("TD-7-x", True), ("td-007", False), ("td70-x", False), ("td7-td8", False), ("x", False)],
 )
-def test_a_branch_names_its_entry_alone(branch, held):
-    assert names_entry(branch, "TD-7") is held
+def test_a_branch_names_its_entry_alone_by_the_match_the_offer_uses(branch, held):
+    store = _store()
+    facts = Fake(pr=_pr(branch=branch), on=branch)
+    if held:
+        assert _end(store, "work-pushed", facts=facts)["went"] == "review"
+    else:
+        with pytest.raises(Refused, match="does not name"):
+            _end(store, "work-pushed", facts=facts)
+
+
+def _git(cwd, *args):
+    cmd = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", str(cwd), *args]
+    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def test_a_siblings_push_does_not_move_what_a_reviewers_worktree_fetched(tmp_path):
+    origin, builder, reviewer = tmp_path / "origin.git", tmp_path / "builder", tmp_path / "reviewer"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    _git(tmp_path, "clone", "-q", str(origin), str(builder))
+    _git(builder, "checkout", "-q", "-b", "td-7")
+    _git(builder, "commit", "-q", "--allow-empty", "-m", "A")
+    a = _git(builder, "rev-parse", "HEAD")
+    _git(builder, "push", "-q", "origin", "td-7")
+    _git(builder, "worktree", "add", "-q", "--detach", str(reviewer), a)
+    facts = stage_end.ForgeFacts(reviewer)
+    assert facts.fetched_head("td-7") is None  # this worktree has fetched nothing yet
+    _git(reviewer, "fetch", "-q", "origin")  # a plain fetch: its FETCH_HEAD has a line per branch
+    assert facts.fetched_head("td-7") == a
+    assert facts.fetched_head("td") is None
+    _git(builder, "commit", "-q", "--allow-empty", "-m", "B")
+    b = _git(builder, "rev-parse", "HEAD")
+    _git(builder, "push", "-q", "origin", "td-7")
+    assert _git(reviewer, "rev-parse", "refs/remotes/origin/td-7") == b  # the shared ref moved
+    assert facts.fetched_head("td-7") == a
 
 
 # -- the host agent's layer ------------------------------------------------------------------------------------------
@@ -323,6 +356,19 @@ def test_every_home_call_in_pyproject_resolves():
     for target in group.values():
         module = importlib.import_module(target)
         assert callable(module.call) and callable(module.show)
+
+
+def test_stage_show_from_a_persons_shell_reads_the_named_entry_of_a_registered_repo(monkeypatch):
+    seen = {}
+    body = SimpleNamespace(show=lambda **kw: seen.update(kw) or {"id": kw["tid"]})
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    monkeypatch.setattr("sessionorc.agent._registered_checkout", lambda r: Path(r) if r == "/repo" else None)
+    assert asyncio.run(_Agent().rpc_stage_show(entry="TD-7", repo="/repo")) == {"id": "TD-7"}
+    assert seen == {"root": "/repo", "tid": "TD-7"}
+    for kw in ({"entry": "TD-7", "repo": "/elsewhere"}, {"repo": "/repo"}):
+        with pytest.raises(RpcError, match="registered repo"):
+            asyncio.run(_Agent().rpc_stage_show(**kw))
+    assert "stage_show" in identity.READS
 
 
 def test_a_stage_end_is_refused_offline_and_its_show_too():

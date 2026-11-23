@@ -1029,11 +1029,16 @@ def cmd_stage_end(args: argparse.Namespace) -> int:
 
 
 def cmd_stage_show(args: argparse.Namespace) -> int:
-    """`ao stage show [TD-n]` (design §4.7, TD-2050): an entry's stage record, by default the one this session holds."""
-    sid = _own_session(args)
-    if sid is None:
-        return 2
-    got = call_sync("stage_show", id=sid, entry=args.entry)
+    """`ao stage show [TD-n]` (design §4.7, TD-2050): an entry's stage record, by default the one this session holds;
+    from a person's shell, the named entry of the registered repo this directory is in."""
+    entry = str(args.entry).strip().upper() if args.entry else None
+    sid = getattr(args, "id", None) or os.environ.get("SHIFTLEAD_SESSION")
+    if sid:
+        got = call_sync("stage_show", id=sid, entry=entry)
+    elif entry:
+        got = call_sync("stage_show", entry=entry, repo=_td_repo(None)[1])
+    else:
+        return fail(args, "outside a session, name the entry: ao stage show TD-n", 2)
     return emit(args, got, lambda: print(json.dumps(got, indent=1)))
 
 
@@ -5830,7 +5835,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(fn=cmd_stage_end)
     q = ssub.add_parser("show", help="print an entry's stage record")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
-    q.add_argument("entry", nargs="?", help="the entry (TD-n); by default the one this session holds")
+    q.add_argument("entry", nargs="?", help="the entry (TD-n); in a session, by default the one it holds")
     q.set_defaults(fn=cmd_stage_show)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")

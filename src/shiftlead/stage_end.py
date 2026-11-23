@@ -10,7 +10,6 @@ this until a stage's session exists (TD-2051's offer); an audit's outcomes are T
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -18,7 +17,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from sessionorc import board, ledgerboard, reports, workorders
-from shiftlead import flow3, repoconfig
+from shiftlead import flow3, repoconfig, stage_work
 from shiftlead.stagerecord import StageStore, StateError, _now, ask_words
 
 GIT_TIMEOUT = 30.0
@@ -29,7 +28,6 @@ AUDIT_OUTCOMES = ("findings-filed", "nothing-found")
 CARRY_ON = "Carry on — a session takes the move that was stopped, and its counts start again"
 ARCHIVE = "Archive the entry — the home archives it"
 BUILD_ANYWAY = "Build it anyway — a session builds it in this stage again"
-_ENTRY_ID = re.compile(r"(?<![a-z0-9])td-?0*(\d+)(?![a-z0-9])", re.IGNORECASE)
 
 
 class Refused(Exception):
@@ -91,7 +89,21 @@ class ForgeFacts:
         return self._git("rev-parse", "HEAD")
 
     def fetched_head(self, branch: str) -> str | None:
-        return self._git("rev-parse", "-q", "--verify", f"refs/remotes/origin/{branch}^{{commit}}")
+        """The commit this worktree last fetched for `branch`, from its own `FETCH_HEAD`: `refs/remotes/origin/*` are
+        shared by every worktree of the repo, so a sibling's push moves them under a reviewer that never read it."""
+        where = self._git("rev-parse", "--git-path", "FETCH_HEAD")
+        if not where:
+            return None
+        try:
+            text = (Path(self.directory) / where).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        for line in text.splitlines():
+            sha, _, rest = line.partition("\t")
+            _merge, _, said = rest.partition("\t")
+            if said.startswith(f"branch '{branch}' of "):
+                return sha
+        return None
 
     def pull_request(self, branch: str | None, number: int | None) -> PullRequest | None:
         fields = "number,headRefOid,headRefName,state,isCrossRepository,statusCheckRollup,files"
@@ -136,11 +148,6 @@ class ForgeFacts:
             self._gh("pr", "comment", str(number), "--body-file", f.name)
 
 
-def names_entry(branch: str, tid: str) -> bool:
-    """Whether a branch's name holds this entry's id as a whole token and no other entry's (§4.9e *Work in flight*)."""
-    return {int(n) for n in _ENTRY_ID.findall(branch)} == {int(tid.split("-")[1])}
-
-
 def destination(stage: dict[str, Any], outcome: str) -> dict[str, Any]:
     """Where `outcome` goes from `stage`, as `{to, limit, answers, refused}`; unwritten, to the person."""
     raw = stage.get(outcome, "person")
@@ -168,7 +175,7 @@ def _check_pushed(
     branch = record.get("branch") or facts.branch()
     if not branch:
         raise Refused("this worktree is on no branch: work on the entry's branch and push it")
-    if not record.get("branch") and not names_entry(branch, tid):
+    if not record.get("branch") and stage_work.branch_ids(branch) != {tid}:
         raise Refused(f"the branch {branch} does not name {tid} alone: an entry's branch holds its id and no other")
     pr = facts.pull_request(branch, record.get("pr"))
     if pr is None:

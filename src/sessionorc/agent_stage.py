@@ -64,11 +64,22 @@ class StageMixin:
             await self.rpc_progress(s.id, ref=tid, status="done", caller=caller)  # type: ignore[attr-defined]
         return got
 
-    async def rpc_stage_show(self, id: str, entry: str | None = None) -> dict[str, Any]:
-        """`ao stage show [TD-n]`: the entry's record; with no id, the one the session holds."""
-        s = self._find(id)  # type: ignore[attr-defined]
-        tid = entry or self._stage_entry(s)
-        got = await asyncio.to_thread(stage_calls().show, root=s.repo or s.dir, tid=tid)
+    async def rpc_stage_show(
+        self, id: str | None = None, entry: str | None = None, repo: str | None = None
+    ) -> dict[str, Any]:
+        """`ao stage show [TD-n]`: the entry's record; with no id, the one the session holds. From a person's shell
+        there is no session: it names the entry, and `repo` is the registered checkout it was run in (§4.7)."""
+        if id:
+            s = self._find(id)  # type: ignore[attr-defined]
+            tid, root = entry or self._stage_entry(s), s.repo or s.dir
+        else:
+            from sessionorc.agent import _registered_checkout  # the agent imports this mixin
+
+            checkout = await asyncio.to_thread(_registered_checkout, repo)
+            if not entry or checkout is None:
+                raise RpcError("name the entry and a registered repo, or run this inside a stage's session")
+            tid, root = entry, str(checkout)
+        got = await asyncio.to_thread(stage_calls().show, root=root, tid=tid)
         if "refused" in got:
             raise RpcError(str(got["refused"]))
         return got
