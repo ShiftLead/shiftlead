@@ -1626,7 +1626,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 /* The Briefs page (§4.5a *Briefs page*, TD-2055) */
 .inboxpage.briefspage { max-width: 880px; display: flex; flex-direction: column; gap: 12px; }
 .briefspage .toolshead { align-items: baseline; border-bottom: 2px solid var(--strong); padding-bottom: 6px; }
-.briefspage h2 { font-size: 15px; margin: 8px 0 0; }
+.briefspage h2 { font-size: var(--t-body); margin: 8px 0 0; }
 .briefspage .briefform { display: flex; flex-direction: column; gap: 8px; }
 .briefspage textarea { width: 100%; box-sizing: border-box; resize: vertical; }
 .briefspage .briefbody { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; }

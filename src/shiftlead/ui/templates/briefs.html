@@ -29,7 +29,7 @@
   {% for b in own %}<div class="card" data-brief="{{ b.name }}">{{ brief_form(b, kinds) }}{% if not b.kind %}<div class="note toolwarn">this file names no kind, so no stage is offered it</div>{% endif %}</div>
   {% else %}<div class="note">None yet.</div>{% endfor %}
   <h2>Standard briefs</h2>
-  {% for b in standard %}<details class="card" data-standard="{{ b.name }}"><summary><span class="mono">{{ b.name }}</span> <span class="note">{{ b.kind }}</span></summary><pre class="mono briefbody">{{ b.text }}</pre></details>{% endfor %}
+  {% for b in standard %}<div class="card"><details class="fold" data-standard="{{ b.name }}"><summary><span class="mono">{{ b.name }}</span> <span class="note">{{ b.kind }}</span></summary><pre class="mono briefbody">{{ b.text }}</pre></details></div>{% endfor %}
 </div></div>
 {% endblock %}
 {% block scripts %}<script>AO.briefs();</script>{% endblock %}
