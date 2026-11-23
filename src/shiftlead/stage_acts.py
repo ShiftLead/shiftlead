@@ -40,7 +40,11 @@ class Holder:
 
     @property
     def lost(self) -> bool:
-        return not self.person and not self.held and (self.ended or self.lease_lapsed)
+        return not self.person and not self.held and not self.stopped and (self.ended or self.lease_lapsed)
+
+    @property
+    def ended_by_stop(self) -> bool:
+        return self.ended and self.stopped and not self.held
 
     @property
     def silent(self) -> bool:
@@ -102,20 +106,25 @@ def _merged(record: Mapping[str, Any], s: Reading) -> str | None:
 
 def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
     waits = record.get("waits")
+    if waits == "merging" and s.merge_running:  # the home's own merge closes the record itself
+        return _SETTLED
     if s.renumbered_to:
         return "renumbered"
     if s.entry == "archived":
         return "close"
     if record.get("intent"):
         return "land-intent"
+    settled = False
     if s.pr_state == "merged":
         case = _merged(record, s)
-        if case:
+        if case == _SETTLED:
+            settled = True  # no later act takes it, but a later case of reconcile still may
+        elif case:
             return case
     elif s.pr_state == "closed" and waits != "person":
         return "pr-closed"
     if waits == "merging":
-        return _SETTLED if s.merge_running else "merging"
+        return "merging"
     if s.team_moved:
         return "team-moved"
     if waits != "person":
@@ -123,11 +132,11 @@ def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
             return "re-enter" if not record.get("moves") else "stage-gone"
         if not s.flow_current:
             return "rewrite-flow"
-        if s.gate:
+        if s.gate and waits is None:
             return "mark-waiting"
     elif not s.gate and s.lifted is None:
         return "gate-again"
-    return None
+    return _SETTLED if settled else None
 
 
 def _first_offer(s: Reading) -> Act | None:
@@ -140,7 +149,7 @@ def _first_offer(s: Reading) -> Act | None:
 def _offer_again(record: Mapping[str, Any], holder: Holder, s: Reading) -> Act | None:
     if not s.may_start:
         return None
-    if holder.ended and holder.stopped:
+    if holder.ended_by_stop:
         return Act("offer-again", "stopped", counted=False)
     if int(record.get("offers") or 0) >= SECOND_LOSS:
         return Act("offer-again", "to-person")
@@ -164,7 +173,7 @@ def choose(record: Mapping[str, Any] | None, s: Reading) -> Act | None:
         if s.nothing_to_read:
             return Act("pass")
         return Act("offer") if s.may_start and s.within_size else None
-    if holder is not None and (holder.lost or holder.silent or (holder.ended and holder.stopped)):
+    if holder is not None and (holder.lost or holder.silent or holder.ended_by_stop):
         return _offer_again(record, holder, s)
     return None
 

@@ -44,6 +44,17 @@ def named(act: Any) -> tuple[str, str] | None:
         (held(), Reading(flow_current=False), ("reconcile", "rewrite-flow")),
         (held(), Reading(gate=True), ("reconcile", "mark-waiting")),
         (rec(waits="person"), Reading(), ("reconcile", "gate-again")),
+        (rec(waits="merging", pr=4), Reading(pr_state="merged"), ("reconcile", "merged-entry-open")),
+        (
+            rec(waits="parts", pr=4),
+            Reading(pr_state="merged", design=True, open_parts=1, team_moved=True),
+            ("reconcile", "team-moved"),
+        ),
+        (
+            rec(waits="parts", pr=4, moves=1),
+            Reading(pr_state="merged", design=True, open_parts=1, stage_known=False),
+            ("reconcile", "stage-gone"),
+        ),
     ],
 )
 def test_reconciles_each_case(record: dict[str, Any], reading: Reading, want: tuple[str, str]) -> None:
@@ -56,6 +67,10 @@ def test_reconciles_each_case(record: dict[str, Any], reading: Reading, want: tu
         (rec(waits="parts", pr=4), Reading(pr_state="merged", design=True, open_parts=1, **GO)),
         (rec(waits="parts", pr=4), Reading(pr_state="merged", design=True, had_parts=True, archive_open=True, **GO)),
         (rec(waits="merging"), Reading(merge_running=True, **GO)),
+        (rec(waits="merging", pr=4), Reading(pr_state="merged", merge_running=True, **GO)),
+        (rec(waits="merging", pr=4), Reading(pr_state="merged", design=True, open_parts=1, merge_running=True, **GO)),
+        (rec(waits="merging", pr=4), Reading(entry="archived", pr_state="merged", merge_running=True, **GO)),
+        (rec(waits="parts", pr=4), Reading(pr_state="merged", design=True, open_parts=1, gate=True, **GO)),
         (rec(waits="person", pr=4), Reading(pr_state="merged", gate=True, **GO)),
         (rec(waits="person", pr=4), Reading(pr_state="closed", gate=True, **GO)),
         (rec(waits="person"), Reading(stage_known=False, gate=True, **GO)),
@@ -111,6 +126,7 @@ def test_a_lost_or_silent_holder_is_offered_again_then_goes_to_the_person(holder
         Holder(ended=True, person=True),
         Holder(idle_for=SILENT_AFTER, held=True),
         Holder(lease_lapsed=True, held=True),
+        Holder(ended=True, stopped=True, held=True),
     ],
 )
 def test_a_holder_neither_lost_nor_silent_keeps_its_entry(holder: Holder) -> None:
