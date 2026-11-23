@@ -4,7 +4,7 @@
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
   you sit at), `volatile: true|false`, `repos_registry` path (unset: the home's own roster, `repos.txt` under the home, into which agent-cadence's `~/.config/agent-cadence/repos.txt` is imported when it exists — *Repos*, below; TD-584), `runs_keep_days`, the disk sweep's `runs_keep_mb`, `scratch_root`, `seat_root` (§4.6 *Temporary space is a pool of its own*, TD-2080; unset by default), `scratch_keep_hours`,
-  `worktree_keep_days` and `cache_keep_days` (§4.6 *A session's scratch*, *The disk sweep*, TD-1921; each
+  `worktree_keep_days` (also the age the disk sweep's *branches* rule reads, TD-2104) and `cache_keep_days` (§4.6 *A session's scratch*, *The disk sweep*, TD-1921; each
   shown read-only on the Settings page's Hosts card as `runs_keep_days` is, `settings_page.host_card`), `identity` (§4.8a)
   and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). There are
   no per-host `transport:` or `ssh` target entries: the hub-and-spoke ssh transport they were for
