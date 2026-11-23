@@ -647,18 +647,36 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
     except KeyboardInterrupt:
         return failed("stopped", "interrupted")
     finally:
+        hold_signals()
         if sid and call is not None:
             with contextlib.suppress(Exception):
                 call("kill", id=sid)
         look_home.stop(agent)
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        look_home.end_server(sock)
         if args.keep:
             print(f"kept: {home} (the scratch home, the clone under it)")
         else:
             look_home.remove_home(home)
+
+
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+
+
+def hold_signals() -> None:
+    """From here the teardown runs to its end: a second signal must not cut it short and leave a tool running."""
+    for sig in STOP_SIGNALS:
+        signal.signal(sig, signal.SIG_IGN)
+
+
+def interrupt_on_signals() -> None:
+    """A stop signal ends the run through its `finally`, the walk's and the seat smoke's alike (TD-2102)."""
+
+    def on_signal(_signum, _frame):
+        hold_signals()
+        raise KeyboardInterrupt
+
+    for sig in STOP_SIGNALS:
+        signal.signal(sig, on_signal)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -703,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as e:
         print(f"conformance: refused — {e}", file=sys.stderr)
         return 2
+    interrupt_on_signals()
     if args.smoke:
         return run_smoke(args, entry, start_env)
 
@@ -712,11 +731,6 @@ def main(argv: list[str] | None = None) -> int:
     env = agent_env(home, sock, capture)
     agent: subprocess.Popen | None = None
 
-    def on_signal(signum, _frame):
-        raise KeyboardInterrupt
-
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, on_signal)
     try:
         work = write_home(home, args.profile, entry)
         if capture is not None:
@@ -760,11 +774,9 @@ def main(argv: list[str] | None = None) -> int:
         print("conformance: stopped", file=sys.stderr)
         return 1
     finally:
+        hold_signals()
         look_home.stop(agent)
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        look_home.end_server(sock)
         look_home.remove_home(home)
 
 
