@@ -175,7 +175,7 @@ def test_the_pages_read_says_what_each_band_draws():
 def test_a_model_pick_under_a_director_keeps_the_stored_prompts_model_and_adds_no_package_model():
     doc = _doc(builtins={"default": {"models": {"prompts": "opus"}, "logins": []}})
     got = team_show.builtins_view(name="default", doc=doc, rows={}, roots=[], director=True)
-    assert setmod.builtins_page(got, None)["models"] == {"prompts": "opus"}
+    assert setmod.builtins_page(got)["models"] == {"prompts": "opus"}
 
 
 def test_a_hand_edited_key_or_entry_refuses_or_is_replaced_rather_than_crashing():
@@ -246,3 +246,41 @@ def test_a_saved_settings_file_keeps_the_pick_through_a_repos_other_switch(agent
     held["repos"] = settings_mod.merge(held.get("repos"), {"r": {"pull": False}})
     settings_mod.save(held)
     assert settings_mod.load()["repos"]["r"] == {"builtins": "cheap", "pull": False}
+
+
+def _card(who):
+    return {
+        "tools": [
+            {
+                "adapter": "claude-code",
+                "logins": [{"name": f"{who}login"}],
+                "accounts": [{"key": f"{who}-acct", "models": {"families": [f"{who}model"]}}],
+            }
+        ]
+    }
+
+
+def test_a_page_opened_at_a_node_lists_the_homes_logins_and_models(monkeypatch):
+    """§4.9d *The page*: the show carries the home's `tools` read; the node's own is not asked for (TD-2066)."""
+    from fastapi.testclient import TestClient
+
+    from shiftlead.ui import app as app_mod
+
+    view = team_show.builtins_view(name="default", doc=_doc(), rows={}, roots=[], director=False)
+    asked = []
+
+    async def call(method, **params):
+        asked.append(method)
+        if method == "builtins_show":
+            return {**view, "tools": _card("home")}
+        return _card("node") if method == "tools" else {}
+
+    page = setmod.builtins_page({**view, "tools": _card("home")})
+    assert [x["key"] for x in page["can_add"]] == ["claude-code:homelogin"] and "tools" not in page
+    assert all("homemodel" in s["options"] for s in page["seats"] if not s["director"])
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        text = c.get("/builtins/default").text
+    assert "tools" not in asked
+    assert "homelogin" in text and "homemodel" in text
+    assert "nodelogin" not in text and "nodemodel" not in text

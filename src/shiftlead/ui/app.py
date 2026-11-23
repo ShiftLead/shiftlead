@@ -5521,14 +5521,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             except HTTPException as e:
                 return e
 
-        show, tools, info = await asyncio.gather(read("builtins_show", set=name), read("tools"), read("host"))
+        show, info = await asyncio.gather(read("builtins_show", set=name), read("host"))
         down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (show, info))
         notes: list[str] = []
         if isinstance(show, HTTPException) and not down:
             if str(show.detail).startswith("no built-in set"):
                 raise HTTPException(404, str(show.detail))
             notes.append(str(show.detail))
-        b = None if isinstance(show, HTTPException) else setmod.builtins_page(show, _or_none(tools))
+        b = None if isinstance(show, HTTPException) else setmod.builtins_page(show)
         info = {} if isinstance(info, HTTPException) else info
         return templates.TemplateResponse(
             request,

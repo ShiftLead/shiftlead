@@ -789,19 +789,21 @@ class SettingsMixin:
 
     async def rpc_builtins_show(self, set: str = "", caller: Any = None) -> dict[str, Any]:  # noqa: A002
         """`ao builtins show [<set>]` and the page's read (§4.9d): the home's reading of the home's logins, no team's
-        reserve added; the body is `shiftlead.team_show`."""
+        reserve added; the body is `shiftlead.team_show`. It carries the home's `tools` read, which the page's login
+        and model lists are built from, so a page opened at a node lists the home's."""
         doc = settings_mod.load()
         read, gate = await self.rpc_tools(), await self.rpc_gate()
         now = datetime.now(UTC)
         rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), 0, now)
         try:
-            return await asyncio.to_thread(
+            view = await asyncio.to_thread(
                 home_call(TEAM).builtins_view,
                 name=str(set or builtinstore.DEFAULT),
                 doc=doc,
                 rows=rows,
                 roots=hosts.local_host().repos(),
             )
+            return {**view, "tools": read}
         except ValueError as e:  # a set of no such name
             raise RpcError(str(e)) from None
 

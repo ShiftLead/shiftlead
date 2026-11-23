@@ -1455,8 +1455,9 @@ def _builtins_show_prose(got: dict[str, Any]) -> None:
 
 def cmd_builtins_show(args: argparse.Namespace) -> int:
     """`ao builtins show [<set>]` (§4.9d *The built-in seats and their page*, TD-2066): what the page shows; `--json` is
-    the host agent's `builtins_show` read, the one the page draws from."""
+    the host agent's `builtins_show` read, the one the page draws from, less the `tools` read it carries for it."""
     got = call_sync("builtins_show", set=args.set or "default")
+    got.pop("tools", None)
     return emit(args, got, lambda: _builtins_show_prose(got))
 
 

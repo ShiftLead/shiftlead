@@ -589,10 +589,10 @@ def _band_rows(
     return rows
 
 
-def builtins_page(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> dict[str, Any]:
-    """What the Built-in seats page draws (§4.9d *The page*, TD-2066), from `builtins_show` and the host's `tools`
-    read. A seat's pick lists the models the Tools page lists, with the one it holds kept among them."""
-    cards = list((tools or {}).get("tools") or ())
+def builtins_page(show: Mapping[str, Any]) -> dict[str, Any]:
+    """What the Built-in seats page draws (§4.9d *The page*, TD-2066), from `builtins_show` and the home's `tools` read
+    it carries. A seat's pick lists the models the Tools page lists, with the one it holds kept among them."""
+    cards = list((show.get("tools") or {}).get("tools") or ())
     accounts = {str(a.get("key")): a for c in cards for a in c.get("accounts") or ()}
     known = {f"{c.get('adapter')}:{lg.get('name')}": lg for c in cards for lg in c.get("logins") or ()}
     listed = list(
@@ -615,7 +615,7 @@ def builtins_page(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
     using = list(show.get("named_by") or ())
     held = {str(lg.get("login")) for lg in rows}
     return {
-        **show,
+        **{k: v for k, v in show.items() if k != "tools"},
         "title": show.get("label") or name,
         "name_beside": name if show.get("label") else None,
         "label": show.get("label") or "",
