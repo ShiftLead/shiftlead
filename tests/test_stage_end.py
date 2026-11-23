@@ -314,6 +314,9 @@ class _Agent(agent_stage.StageMixin):
     def _is_self(self, s, caller):
         return caller == s.id
 
+    def _address(self, s):
+        return s.id
+
 
 def test_only_the_session_itself_ends_its_stage(monkeypatch):
     monkeypatch.setattr(agent_stage, "stage_calls", lambda: pytest.fail("the body was reached"))
@@ -321,12 +324,95 @@ def test_only_the_session_itself_ends_its_stage(monkeypatch):
         asyncio.run(_Agent().rpc_stage_end(ME, "work-pushed", caller="someone-else"))
 
 
-def test_a_session_on_a_node_is_refused_until_the_home_can_read_its_worktree(monkeypatch):
-    monkeypatch.setattr(agent_stage, "stage_calls", lambda: pytest.fail("the body was reached"))
+class _NodeAgent(_Agent):
+    """The home, with a node whose worktree reads as `reading` and a registry holding `/home-checkout`."""
+
+    def __init__(self, s, reading):
+        super().__init__(s)
+        self.reading = reading
+        self.asked: list = []
+        self.reported: list = []
+
+    def _address(self, s):
+        return f"{s.id}@{s.host}"
+
+    def _is_self(self, s, caller):
+        return caller == self._address(s)
+
+    async def _ask_node(self, host, method, **params):
+        self.asked.append((host, method, params))
+        return self.reading
+
+    async def _ids_repo(self, want, _by):
+        if want != "o/r":
+            raise RpcError(f"no registered checkout has the origin {want!r}")
+        return "/home-checkout", want, "r"
+
+    async def rpc_progress(self, id, **kw):
+        self.reported.append((id, kw))
+        return {}
+
+
+def _node_session():
     s = _Session()
     s.host = "node"
-    with pytest.raises(RpcError, match="runs on node"):
-        asyncio.run(_Agent(s).rpc_stage_end(ME, "work-pushed", caller=ME))
+    s.repo, s.dir = "/node/repo", "/node/repo/wt"
+    s.progress = [SimpleNamespace(ref="TD-7", status="claimed")]
+    return s
+
+
+NODE_READING = {"branch": "td7-x", "head": "a" * 40, "fetched": {"td7-x": "b" * 40}, "origin": "git@github.com:o/r.git"}
+
+
+def test_a_session_on_a_node_ends_its_stage_with_its_own_worktrees_facts(monkeypatch):
+    got = {}
+    body = SimpleNamespace(call=lambda **kw: got.update(kw) or {"entry": "TD-7", "went": "review"})
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    agent = _NodeAgent(_node_session(), NODE_READING)
+    asyncio.run(agent.rpc_stage_end(ME, "work-pushed", caller=f"{ME}@node"))
+    assert agent.asked == [("node", "stage_worktree", {"dir": "/node/repo/wt"})]
+    assert got["root"] == "/home-checkout" and got["seen"] == NODE_READING and got["caller"] == f"{ME}@node"
+    assert agent.reported == [(f"{ME}@node", {"ref": "TD-7", "status": "done", "caller": f"{ME}@node"})]
+
+
+def test_node_facts_are_the_nodes_reading_and_the_forge_is_asked_from_the_homes_checkout():
+    facts = stage_end.NodeFacts("/home-checkout", NODE_READING)
+    assert facts.branch() == "td7-x" and facts.worktree_head() == "a" * 40
+    assert facts.fetched_head("td7-x") == "b" * 40 and facts.fetched_head("other") is None
+    assert facts.directory == "/home-checkout"
+
+
+def test_a_worktree_reading_holds_what_the_home_checks(tmp_path):
+    work = tmp_path / "w"
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", str(work)]
+    work.mkdir()
+    for args in (["init", "-q", "-b", "td7-x"], ["commit", "-q", "--allow-empty", "-m", "c"]):
+        subprocess.run([*git, *args], check=True)
+    subprocess.run([*git, "remote", "add", "origin", "git@github.com:o/r.git"], check=True)
+    head = subprocess.run([*git, "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+    (work / ".git" / "FETCH_HEAD").write_text(f"{'c' * 40}\t\tbranch 'td7-x' of github.com:o/r\n", encoding="utf-8")
+    assert stage_end.worktree_reading(str(work)) == {
+        "branch": "td7-x",
+        "head": head,
+        "fetched": {"td7-x": "c" * 40},
+        "origin": "git@github.com:o/r.git",
+    }
+
+
+@pytest.mark.parametrize(
+    ("reading", "words"),
+    [
+        ({"refused": "the session's worktree could not be read: try again"}, "could not be read"),
+        ({**NODE_READING, "origin": None}, "no origin"),
+        ({**NODE_READING, "origin": "git@github.com:someone/else.git"}, "no registered checkout"),
+        (None, "no reading"),
+    ],
+)
+def test_a_node_session_the_home_cannot_place_is_refused_in_words(monkeypatch, reading, words):
+    body = SimpleNamespace(call=lambda **_kw: pytest.fail("the body was reached"))
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    with pytest.raises(RpcError, match=words):
+        asyncio.run(_NodeAgent(_node_session(), reading).rpc_stage_end(ME, "work-pushed", caller=f"{ME}@node"))
 
 
 def test_a_refusal_from_the_body_is_the_calls_error(monkeypatch):

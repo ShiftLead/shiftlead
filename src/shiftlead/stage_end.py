@@ -91,19 +91,24 @@ class ForgeFacts:
     def fetched_head(self, branch: str) -> str | None:
         """The commit this worktree last fetched for `branch`, from its own `FETCH_HEAD`: `refs/remotes/origin/*` are
         shared by every worktree of the repo, so a sibling's push moves them under a reviewer that never read it."""
+        return self.fetched_heads().get(branch)
+
+    def fetched_heads(self) -> dict[str, str]:
+        """Every branch this worktree's `FETCH_HEAD` names, with the commit fetched for it (the first line of each)."""
         where = self._git("rev-parse", "--git-path", "FETCH_HEAD")
         if not where:
-            return None
+            return {}
         try:
             text = (Path(self.directory) / where).read_text(encoding="utf-8", errors="replace")
         except OSError:
-            return None
+            return {}
+        out: dict[str, str] = {}
         for line in text.splitlines():
             sha, _, rest = line.partition("\t")
             _merge, _, said = rest.partition("\t")
-            if said.startswith(f"branch '{branch}' of "):
-                return sha
-        return None
+            if said.startswith("branch '") and (cut := said.rfind("' of ")) > 0:
+                out.setdefault(said[len("branch '") : cut], sha)
+        return out
 
     def pull_request(self, branch: str | None, number: int | None) -> PullRequest | None:
         fields = "number,headRefOid,headRefName,state,isCrossRepository,statusCheckRollup,files"
@@ -146,6 +151,38 @@ class ForgeFacts:
             f.write(body)
             f.flush()
             self._gh("pr", "comment", str(number), "--body-file", f.name)
+
+
+class NodeFacts(ForgeFacts):
+    """A node session's facts: its worktree as the node read it (`worktree_reading`), the forge from the home's own
+    checkout of the same origin, since the session's directory is not on this machine."""
+
+    def __init__(self, root: str | Path, seen: dict[str, Any]) -> None:
+        super().__init__(root)
+        self.seen = seen
+
+    def branch(self) -> str | None:
+        return self.seen.get("branch") or None
+
+    def worktree_head(self) -> str | None:
+        return self.seen.get("head") or None
+
+    def fetched_heads(self) -> dict[str, str]:
+        return {str(k): str(v) for k, v in (self.seen.get("fetched") or {}).items()}
+
+
+def worktree_reading(directory: str) -> dict[str, Any]:
+    """What the home needs of a worktree on this node: `{branch, head, fetched, origin}`, or `{refused: …}`."""
+    facts = ForgeFacts(directory)
+    try:
+        return {
+            "branch": facts.branch(),
+            "head": facts.worktree_head(),
+            "fetched": facts.fetched_heads(),
+            "origin": facts._git("remote", "get-url", "origin"),
+        }
+    except Refused as e:
+        return {"refused": str(e)}
 
 
 def destination(stage: dict[str, Any], outcome: str) -> dict[str, Any]:
@@ -345,8 +382,19 @@ def _person_of(root: Path) -> str:
     return people[0]
 
 
-def call(*, root: str, directory: str, team: str | None, tid: str, caller: str, outcome: str, reason: str) -> dict:
-    """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`."""
+def call(
+    *,
+    root: str,
+    directory: str,
+    team: str | None,
+    tid: str,
+    caller: str,
+    outcome: str,
+    reason: str,
+    seen: dict[str, Any] | None = None,
+) -> dict:
+    """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`. `seen` is a
+    node session's worktree as its node read it; `root` is then the home's checkout of that repo."""
     store = StageStore(root)
     try:
         text = store.flow(team) if team else None
@@ -359,7 +407,7 @@ def call(*, root: str, directory: str, team: str | None, tid: str, caller: str, 
             outcome,
             reason,
             repoconfig.parse_yaml(text),
-            ForgeFacts(directory),
+            ForgeFacts(directory) if seen is None else NodeFacts(root, seen),
             _person_of(Path(root)),
         )
     except (Refused, StateError) as e:
