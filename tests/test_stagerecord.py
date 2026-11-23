@@ -298,7 +298,13 @@ def test_the_person_s_own_words_fill_the_form_and_lift(repo):
 def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
     src = Path(stagerecord.__file__).parent
     users = sorted(p.name for p in src.rglob("*.py") if p.name != "stagerecord.py" and "stagerecord" in p.read_text())
-    assert users == ["flow_save.py", "stage_end.py", "stage_make.py", "team_show.py"]  # the last only reads
+    assert users == [
+        "flow_save.py",
+        "stage_end.py",
+        "stage_make.py",
+        "stage_merge.py",
+        "team_show.py",
+    ]  # the last only reads
 
 
 def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):

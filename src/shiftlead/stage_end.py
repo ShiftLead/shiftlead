@@ -28,6 +28,7 @@ AUDIT_OUTCOMES = ("findings-filed", "nothing-found")
 CARRY_ON = "Carry on — a session takes the move that was stopped, and its counts start again"
 ARCHIVE = "Archive the entry — the home archives it"
 BUILD_ANYWAY = "Build it anyway — a session builds it in this stage again"
+TRY_AGAIN = "Try the merge again — the home runs the gate and merges"
 
 
 class Refused(Exception):
