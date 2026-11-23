@@ -166,3 +166,28 @@ def test_an_act_that_raises_is_that_entrys_failure_and_never_the_pass(store, mon
     got = step(store, record, facts(ledger=EntryLedger("archived")), world.reach)
     assert not got.made.made and "the disk is full" in got.made.why
     assert world.ended == []
+
+
+def test_an_entry_with_no_record_is_offered_and_its_record_written(store):
+    world = World()
+    entry = {"id": TID, "kind": "build", "owner": "grinder", "pickable": "yes", "team": ""}
+    got = step(store, None, facts(entry=entry, may_start=True, within_size=True), world.reach)
+    assert got.act.name == "offer" and got.made.made
+    assert (store.entry(TID)["holder"], store.entry(TID)["stage"]) == ("s2", "build")
+
+
+def test_a_lost_holder_is_ended_and_its_offer_counted(store):
+    world = World()
+    got = step(store, put(store, holder="s1", offers=1), facts(may_start=True, within_size=True), world.reach)
+    assert (got.act.name, got.act.case) == ("offer-again", "lost") and got.made.made
+    assert world.ended == ["s1"]
+    assert (store.entry(TID)["holder"], store.entry(TID)["offers"]) == (None, 2)
+
+
+def test_a_record_that_moved_since_its_reading_ends_no_session(store):
+    world = World()
+    stale = put(store, holder="s1")
+    store.put_entry({**stale, "holder": None, "closed_at": "2026-11-23T11:00:00Z"}, "closed meanwhile")
+    got = step(store, stale, facts(ledger=EntryLedger("archived")), world.reach)
+    assert got.act.case == "close" and not got.made.made
+    assert world.ended == []
