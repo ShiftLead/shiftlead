@@ -5,7 +5,7 @@ write. The record is read again under that lock and the choice made again, so an
 home's reading is never overwritten: the act is simply not made, and the next pass reads afresh.
 
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
-`mark-waiting`, `rewrite-flow`, `re-enter`, `archive-design`) and those that put a question to the person
+`mark-waiting`, `rewrite-flow`, `re-enter`, `archive-design`, `team-moved`) and those that put a question to the person
 (`merged-entry-open`, `pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own
 pull request), the
 pass, and the record's half of offering again (the
@@ -129,6 +129,19 @@ def _archive_design(store: StageStore, record: dict[str, Any], _s: Reading, _doc
     return Made(True)
 
 
+def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any]) -> Made:
+    """An entry whose `Team:` line now names another team: its record closes here, keeping the branch and open pull
+    request for the new team's first record. One that waits on the person first has its question cleared, which is a
+    later slice's."""
+    if record.get("waits") == "person":
+        return Made(False, "clearing the question of a moved entry is a later slice's")
+    pushed = s.pr_state not in ("merged", "closed") and (record.get("branch") or record.get("pr"))
+    carried = {"branch": record.get("branch"), "pr": record.get("pr")} if pushed else None
+    record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None, carried=carried)
+    store.put_entry(record, "closed: its entry moved to another team")
+    return Made(True)
+
+
 def _ask(
     store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
 ) -> Made:
@@ -201,6 +214,7 @@ _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, A
     "rewrite-flow": _rewrite_flow,
     "re-enter": _re_enter,
     "archive-design": _archive_design,
+    "team-moved": _team_moved,
 }
 
 
@@ -358,6 +372,9 @@ def offer(
             key = _way_in(doc, s.design)
             row = act.work.pr if act.work is not None and act.work.state == "take" else None
             branch, pr = (row.get("branch"), row.get("number")) if row else (None, None)
+            carried = (record or {}).get("carried")  # an entry moved from another team goes on from what is pushed
+            if carried and s.pr_state not in ("merged", "closed"):
+                branch, pr = carried.get("branch"), carried.get("pr")
         else:
             key, branch, pr = str(record["stage"]), record.get("branch"), record.get("pr")
         if key is None or not name:
