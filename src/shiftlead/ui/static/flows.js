@@ -47,7 +47,7 @@
     S.sel = r ? idOf(r) : null; S.tab = r && !r.doc ? "file" : "stages"; S.open = null; S.brief = null; S.walk = null; S.del = false;
     S.check = r ? { problems: r.problems || [], info: r.info || [], text: r.text || "" } : null;
     S.pending = false; S.seq++; clearTimeout(S.timer);
-    if (r && r.place === "own" && r.doc && !r.version) ask();
+    if (editable(r)) ask(); // the row's saved text is not what an edit left in it: Save waits on the check of the flow as it is
   }
 
   // ---- a destination, as the file writes it and as the page reads it
@@ -90,6 +90,7 @@
       const got = await post("/api/flows/check", { name: r.name, doc: clean(r.doc), version: r.version || null });
       if (seq !== S.seq) return;
       S.check = { problems: got.problems || [], info: got.info || [], text: got.text || "" };
+      r.problems = S.check.problems; // the list's dot follows the check (§4.5a)
     } catch (e) {
       if (seq !== S.seq) return;
       S.check = { problems: [`the check did not answer: ${e.message}`], info: [], text: S.check ? S.check.text : "" };
@@ -101,7 +102,8 @@
     if (!res.ok) { let t = res.statusText; try { t = (await res.json()).detail || t; } catch (e) { /* the status says it */ } throw new Error(t); }
     return res.json();
   }
-  const touched = () => { say(""); ask(); render(); };
+  // A walk holds stage indexes, so any edit of the flow ends it.
+  const touched = () => { S.walk = null; say(""); ask(); render(); };
 
   // A problem is drawn on the row it is about, in the check's words: `<name>: \`<outcome>…`.
   function problemsOf(name) { const at = `${name}: `; return (S.check ? S.check.problems : []).filter((p) => p.startsWith(at)).map((p) => p.slice(at.length)); }
@@ -379,7 +381,13 @@
       case "maxm": { const v = parseInt(el.value, 10); if (Number.isNaN(v)) delete f.doc["max-moves"]; else f.doc["max-moves"] = v; return touched(); }
       case "sname": {
         const v = el.value.trim(); if (!v) return render();
-        const old = keyOf(s.name), now = keyOf(v); s.name = v;
+        const old = keyOf(s.name), now = keyOf(v);
+        // A Next names a stage by its key: two stages on one key could never be told apart again, so nothing is changed.
+        if (now !== old && (FIXED.includes(now) || [...stagesOf(f), ...auditsOf(f)].some((x) => x !== s && keyOf(x.name) === now))) {
+          say(FIXED.includes(now) ? `${v}: a Next already means this word, so the stage keeps the name ${s.name}.` : `${v}: another stage or audit has this name, so the stage keeps the name ${s.name}.`);
+          return render();
+        }
+        s.name = v;
         stagesOf(f).forEach((x) => outs(x).forEach((o) => { if (x[o] !== undefined) x[o] = renameIn(x[o], old, now); }));
         return touched();
       }
