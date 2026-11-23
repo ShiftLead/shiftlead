@@ -5464,6 +5464,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         keys = ("label", "logins", "at_once", "most", "clear", "version")
         return await call("team_set", team=name, **{k: body[k] for k in keys if k in body})
 
+    @app.post("/api/teams/new")
+    async def team_new(request: Request):
+        """§4.5a *Team page: + New team* (TD-2063): `{name, label?, repo, host, flow}`, the person's own act."""
+        body = await body_of(request)
+        return await call("team_new", **{k: body[k] for k in ("name", "label", "repo", "host", "flow") if k in body})
+
+    @app.post("/api/teams/{name}/delete")
+    async def team_delete(name: str, request: Request):
+        """§4.5a *Team page: Delete* (TD-2063): the person's own act, at the version the page was drawn at."""
+        body = await body_of(request)
+        return await call("team_delete", team=name, version=body.get("version"))
+
     @app.get("/teams/{team}", response_class=HTMLResponse)
     async def team_page(request: Request, team: str):
         """A team's page, before the cut-over (§4.9d *Before and after the cut-over*, TD-2059): the head and **When it
@@ -5513,6 +5525,15 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for x, s in zip(held, shows, strict=True)
             if isinstance(s, dict) and s.get("cannot_run")
         }
+        by_repo = setmod.repo_teams(org.teams, held)
+        if switched is not None:
+            switched["undeclared"] = setmod.undeclared(team, str(switched.get("repo") or ""), by_repo, readings)
+        cut = got.get("cut_over")
+        new_team = None
+        if cut:  # **+ New team** is drawn disabled until the cut-over's marker (§4.9d *Before and after the cut-over*)
+            listed = await read("flows")
+            flows = [] if isinstance(listed, HTTPException) else [str(f["name"]) for f in listed.get("flows") or ()]
+            new_team = setmod.new_team_form(org, by_repo, repo_roots(readings), flows, host_name())
         card, head, group = None, None, None
         if team in org.teams or team in held:
             names = repo_roots(readings) if team in held else {}
@@ -5542,6 +5563,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "t": card,
                 "sw": switched,
                 "is_switched": team in held,
+                "cut_over": cut,
+                "new_team": new_team,
                 "dots": dots,
                 "team": team if team in tabs else None,
                 "teams_unread": teams_unread,

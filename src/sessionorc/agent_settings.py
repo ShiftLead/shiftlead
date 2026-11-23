@@ -269,6 +269,7 @@ class SettingsMixin:
                 for n, t in (doc.get("teams") if isinstance(doc.get("teams"), dict) else {}).items()
                 if teamstore.switched(doc, str(n))
             },
+            "cut_over": teamstore.cut_over(doc),  # what **+ New team** and Delete are gated on (§4.9d)
             "repos": settings_mod.repos(doc),
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             # the install's `settle:` as written, `{}` for the built-in alone (§4.4, TD-710)
@@ -640,6 +641,73 @@ class SettingsMixin:
             raise RpcError(str(e)) from None
         await self._team_store_saved(before, doc)
         return {"team": team, "change": words, "version": teamstore.version(doc, str(team))}
+
+    async def rpc_team_new(
+        self,
+        name: str = "",
+        label: Any = None,
+        repo: str = "",
+        host: str = "",
+        flow: str = "",
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """**+ New team** (§4.9d *New team*, §4.5a, TD-2063): a person's own act, refused before the cut-over. The team
+        is made stopped with an empty login list, on a registered checkout, the home or a linked node, and a flow."""
+        agent_common.person_only(caller, "make a team", "§4.9d *New team*", self._graph())
+        here = hosts.local_host().name
+        where = str(host or here)
+        doc = settings_mod.load()
+        before = copy.deepcopy(doc)
+        try:
+            words = teamstore.new(
+                doc, str(name or ""), label=label, repo=str(repo or ""), host=where, flow=str(flow or "")
+            )
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        if where != here and where not in (getattr(self, "links", None) or {}):
+            raise RpcError(f"{where} is neither this home nor a linked node")
+        why = await asyncio.to_thread(
+            home_call(TEAM).new_refusal, repo=str(repo), flow=str(flow), roots=hosts.local_host().repos()
+        )
+        if why:
+            raise RpcError(why)
+        await self._team_store_saved(before, doc)
+        return {"team": name, "change": words, "version": teamstore.version(doc, str(name))}
+
+    async def rpc_team_delete(self, team: str = "", version: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Delete** (§4.9d *Delete*, §4.5a, TD-2063): a person's own act, version-checked, refused before the
+        cut-over, while any session of the team is live and while it has open stage records, naming them. The state
+        branch's copy goes first, so a failed removal leaves the team whole and a new team of this name never inherits
+        an old flow. Until TD-2065 writes the started mark, a started team is one with a live session."""
+        agent_common.person_only(caller, "delete a team", "§4.9d *Delete*", self._graph())
+        name = str(team or "")
+        checked = settings_mod.load()
+        try:
+            teamstore.delete(copy.deepcopy(checked), name, version)
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        repo = str(checked["teams"][name]["repo"])
+        live = sorted(r.id for r in self._graph().values() if r.team == name and r.state not in work_mod.DEAD)
+        if live:
+            raise RpcError(f"{name} still has live sessions: {', '.join(live)}")
+        roots = hosts.local_host().repos()
+        body = home_call(TEAM)
+        try:
+            held = await asyncio.to_thread(body.open_records, name, repo, roots)
+            if not held:
+                await asyncio.to_thread(body.drop_copy, name, repo, roots)
+        except Exception as e:  # noqa: BLE001 — a state branch not read or not written refuses, and changes no setting
+            raise RpcError(f"{name} was not deleted: {e}") from None
+        if held:
+            raise RpcError(f"{name} has open stage records: {'; '.join(held)}")
+        doc = settings_mod.load()  # read again: the state branch's calls ran outside any lock on this file
+        before = copy.deepcopy(doc)
+        try:
+            words = teamstore.delete(doc, name, version)
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        await self._team_store_saved(before, doc)
+        return {"team": name, "change": words}
 
     def _team_head(self, team: str) -> dict[str, Any]:
         """A team's head from the records the home holds (§4.9d *The page*): running with its live count, else wound

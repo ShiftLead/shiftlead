@@ -253,3 +253,16 @@ def test_a_record_the_flow_cannot_place_is_drawn_as_such():
     assert [e["id"] for e in flow["gone"]] == ["TD-2"] and [e["id"] for e in flow["unplaced"]] == ["TD-3"]
     unread = team_show.view("t", _doc(), {}, HEAD, "home", None, records)["flow"]
     assert unread["gone"] == [] and [e["id"] for e in unread["unplaced"]] == ["TD-1", "TD-2", "TD-3"]
+
+
+def test_open_records_are_named_for_delete_and_another_teams_are_not(tmp_path, monkeypatch):
+    root = tmp_path / "shiftlead"
+    root.mkdir()
+    rows = {
+        "TD-2": {"id": "TD-2", "team": "t", "stage": "build", "waits": "person"},
+        "TD-1": {"id": "TD-1", "team": "t", "stage": "check", "waits": None},
+        "TD-3": {"id": "TD-3", "team": "other", "stage": "build", "waits": None},
+        "TD-4": {"id": "TD-4", "team": "t", "stage": "build", "closed_at": "2026-11-20"},
+    }
+    monkeypatch.setattr(team_show, "StageStore", lambda r: SimpleNamespace(entries=lambda: rows))
+    assert team_show.open_records("t", "shiftlead", [root]) == ["TD-1 is in check", "TD-2 waits on you"]

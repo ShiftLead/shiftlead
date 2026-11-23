@@ -1,6 +1,81 @@
 // A switched team's page (design §4.9d *The page*, §4.5a *Team page*, TD-2060). Every press is one `team_set`, the
 // person's own act, with the version the page was drawn at; the host agent refuses a stale one, and the page reloads.
 (function () {
+  const post = async (url, body) => {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) return { ok: true, got: await r.json() };
+    let why = r.statusText;
+    try { why = (await r.json()).detail || why; } catch (e) { /* the status line stands */ }
+    return { ok: false, why };
+  };
+  const shout = (el, words) => { el.textContent = words; el.hidden = false; };
+  const AWAY = "The host agent did not answer, so nothing was changed.";
+
+  // **+ New team** (§4.9d *New team*, TD-2063)
+  const form = document.getElementById("teamnew");
+  if (form) {
+    const hosts = JSON.parse(form.dataset.hosts), teams = JSON.parse(form.dataset.teams);
+    const said = document.getElementById("teamnewsaid");
+    const second = document.getElementById("teamnewsecond");
+    const redraw = () => {
+      const repo = form.elements.repo.value;
+      form.elements.host.replaceChildren(...(hosts[repo] || []).map((h) => new Option(h, h)));
+      const have = teams[repo] || [];
+      second.hidden = !have.length;
+      const name = form.elements.name.value.trim() || "<name>";
+      document.getElementById("teamnewline").textContent = `Team = ${[...have, name].join(" | ")}`;
+    };
+    document.getElementById("teamnewopen").addEventListener("click", () => {
+      form.hidden = false;
+      redraw();
+      form.elements.name.focus();
+    });
+    document.getElementById("teamnewcancel").addEventListener("click", () => { form.hidden = true; });
+    form.elements.repo.addEventListener("change", redraw);
+    form.elements.name.addEventListener("input", () => {
+      document.getElementById("teamnewline").textContent =
+        `Team = ${[...(teams[form.elements.repo.value] || []), form.elements.name.value.trim() || "<name>"].join(" | ")}`;
+    });
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      said.hidden = true;
+      const body = Object.fromEntries(["name", "label", "repo", "host", "flow"].map((k) => [k, form.elements[k].value.trim()]));
+      if (!body.label) delete body.label;
+      try {
+        const r = await post("/api/teams/new", body);
+        if (r.ok) { location.href = `/teams/${encodeURIComponent(r.got.team)}`; return; }
+        shout(said, r.why);
+      } catch (e) { shout(said, AWAY); }
+    });
+  }
+
+  // **Delete** (§4.9d *Delete*, TD-2063): a second press, as §4.5a's row says
+  const del = document.getElementById("teamdelete");
+  if (del) {
+    const said = document.getElementById("teamdeletesaid");
+    del.addEventListener("click", async () => {
+      if (del.dataset.armed !== "1") {
+        del.dataset.armed = "1";
+        del.textContent = "Really delete?";
+        return;
+      }
+      said.hidden = true;
+      del.disabled = true;
+      try {
+        const r = await post(`/api/teams/${encodeURIComponent(del.dataset.team)}/delete`, { version: del.dataset.version });
+        if (r.ok) { location.href = "/teams"; return; }
+        shout(said, r.why);
+      } catch (e) { shout(said, AWAY); }
+      del.disabled = false;
+      del.dataset.armed = "";
+      del.textContent = `Delete ${del.dataset.team}`;
+    });
+  }
+
   const box = document.getElementById("teamset");
   if (!box) return;
   const said = document.getElementById("teamsaid");

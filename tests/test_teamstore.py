@@ -259,3 +259,101 @@ def test_team_show_reads_this_hosts_logins_with_the_teams_reserve(agent, monkeyp
     monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: SimpleNamespace(call=call))
     assert asyncio.run(agent.rpc_team_show(team="a")) == {"team": "a"}
     assert seen["rows"]["claude:x"]["at_reserve"] is True and seen["head"]["word"] == "stopped"
+
+
+# -- New team and Delete (design §4.9d *New team*, *Delete*, TD-2063) ------------------------------------------------
+
+
+def _cut(**teams):
+    return {"cut_over": "2026-12-01", "teams": teams}
+
+
+def test_a_new_team_is_stopped_with_an_empty_login_list():
+    doc = _cut()
+    assert ts.new(doc, "db", label=" Data ", repo="shiftlead", host="home", flow="build") == "db made"
+    assert doc["teams"]["db"] == {"repo": "shiftlead", "host": "home", "flow": "build", "logins": [], "label": "Data"}
+    assert ts.switched(doc, "db")
+
+
+@pytest.mark.parametrize(
+    ("doc", "name", "words"),
+    [
+        ({"teams": {}}, "db", ts.BEFORE),
+        (_cut(), "no spaces", "not a team's name"),
+        (_cut(DB={"repo": "r"}), "db", "already a team"),
+    ],
+)
+def test_a_new_team_is_refused(doc, name, words):
+    with pytest.raises(ts.TeamError, match=words):
+        ts.new(doc, name, label=None, repo="r", host="h", flow="build")
+
+
+def test_delete_takes_the_version_and_the_marker():
+    doc = _cut(a={"repo": "r", "logins": []}, b={"repo": "r"})
+    for bad, words in ((None, "changed since"), ("old", "changed since")):
+        with pytest.raises(ts.TeamError, match=words):
+            ts.delete(doc, "a", bad)
+    before = {"teams": {"a": {"repo": "r"}}}
+    with pytest.raises(ts.TeamError, match=ts.BEFORE):
+        ts.delete(before, "a", ts.version(before, "a"))
+    assert ts.delete(doc, "a", ts.version(doc, "a")) == "a deleted" and list(doc["teams"]) == ["b"]
+
+
+def _agent_on(monkeypatch, body, live=()):
+    monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: body)
+    monkeypatch.setattr(
+        "sessionorc.agent_settings.hosts.local_host",
+        lambda: SimpleNamespace(name="home", repos=lambda: ["/x/shiftlead"]),
+    )
+    a = _Agent()
+    a._graph = lambda: {r.id: r for r in live}
+    return a
+
+
+def test_team_new_writes_the_team_and_refuses_an_unknown_repo(agent, monkeypatch):
+    body = SimpleNamespace(new_refusal=lambda **kw: None if kw["repo"] == "shiftlead" else "not registered")
+    a = _agent_on(monkeypatch, body)
+
+    async def go():
+        with pytest.raises(RpcError, match="not registered"):
+            await a.rpc_team_new(name="db", repo="other", flow="build")
+        assert "db" not in settings_mod.load()["teams"]
+        with pytest.raises(RpcError, match="neither this home"):
+            await a.rpc_team_new(name="db", repo="shiftlead", host="far", flow="build")
+        got = await a.rpc_team_new(name="db", repo="shiftlead", flow="build")
+        assert got["team"] == "db" and settings_mod.load()["teams"]["db"]["host"] == "home"
+
+    asyncio.run(go())
+
+
+def test_team_delete_names_what_refuses_it_and_keeps_the_team(agent, monkeypatch):
+    dropped = []
+    held = ["TD-2101 is in build", "TD-2084 waits on you"]
+    body = SimpleNamespace(open_records=lambda *_: held, drop_copy=lambda *a: dropped.append(a))
+
+    async def go():
+        live = [SimpleNamespace(id="ao-a-1", team="a", state="working")]
+        a = _agent_on(monkeypatch, body, live)
+        v = ts.version(settings_mod.load(), "a")
+        with pytest.raises(RpcError, match="live sessions: ao-a-1"):
+            await a.rpc_team_delete(team="a", version=v)
+        a = _agent_on(monkeypatch, body)
+        with pytest.raises(RpcError, match="TD-2101 is in build; TD-2084 waits on you"):
+            await a.rpc_team_delete(team="a", version=v)
+        assert not dropped and "a" in settings_mod.load()["teams"]
+        held.clear()
+        await a.rpc_team_delete(team="a", version=v)
+        assert dropped and "a" not in (settings_mod.load().get("teams") or {})
+
+    asyncio.run(go())
+
+
+def test_a_state_branch_not_read_refuses_the_delete(agent, monkeypatch):
+    def broken(*_):
+        raise OSError("origin away")
+
+    a = _agent_on(monkeypatch, SimpleNamespace(open_records=broken, drop_copy=broken))
+    v = ts.version(settings_mod.load(), "a")
+    with pytest.raises(RpcError, match="not deleted: origin away"):
+        asyncio.run(a.rpc_team_delete(team="a", version=v))
+    assert "a" in settings_mod.load()["teams"]

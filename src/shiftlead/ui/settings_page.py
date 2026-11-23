@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -434,6 +434,48 @@ def team_tabs(defs: Mapping[str, Any], switched: Mapping[str, str] | None = None
         return str(held.get(n) or getattr(defs.get(n), "repo", "") or "").casefold(), n.casefold()
 
     return sorted({*defs, *held}, key=order)
+
+
+def repo_teams(defs: Mapping[str, Any], switched: Mapping[str, str] | None) -> dict[str, list[str]]:
+    """`{repo: its teams}`, by name: a definition's and the settings', whose repo stands over a definition's."""
+    held = switched or {}
+    out: dict[str, list[str]] = {}
+    for n in sorted({*defs, *held}, key=str.casefold):
+        repo = str(held.get(n) or getattr(defs.get(n), "repo", "") or "")
+        if repo:
+            out.setdefault(repo, []).append(n)
+    return out
+
+
+def declared_line(names: Iterable[str], declared: Iterable[str]) -> str:
+    """What a repo's ledger writes on its `Fields:` line to declare `names` (§4.4 *The move from one team to two*): the
+    names it already declares first, in their order."""
+    have = [str(d) for d in declared]
+    known = {d.casefold() for d in have}
+    return "Team = " + " | ".join([*have, *(n for n in names if n.casefold() not in known)])
+
+
+def undeclared(team: str, repo: str, teams: Mapping[str, list[str]], readings: Mapping[str, Any]) -> str | None:
+    """The line a repo's ledger still needs while it has two or more teams and does not declare `team` (§4.9d *New
+    team*, TD-2063), or None. A ledger not read marks nothing, as a Start on it passes."""
+    names = teams.get(repo) or []
+    r = next((v for v in readings.values() if isinstance(v, Mapping) and v.get("name") == repo), None)
+    led = (r or {}).get("ledger")
+    if len(names) < 2 or not isinstance(led, Mapping) or "error" in led or "declared_teams" not in led:
+        return None
+    declared = [str(t) for t in led.get("declared_teams") or ()]
+    return None if team.casefold() in {d.casefold() for d in declared} else declared_line(names, declared)
+
+
+def new_team_form(
+    org: Any, teams: Mapping[str, list[str]], names: Iterable[str], flows: Iterable[str], here: str
+) -> dict[str, Any]:
+    """What **+ New team**'s form offers (§4.9d *New team*, TD-2063): the registered checkouts, each repo's hosts (the
+    home, then the nodes the org lists it on) and its teams, and the flows with the built-in `build` first."""
+    repos = sorted({str(n) for n in names}, key=str.casefold)
+    hosts_of = {r: [here, *sorted(h for h in (org.checkouts.get(r) or {}) if h != here)] for r in repos}
+    listed = sorted({str(f) for f in flows}, key=lambda f: (f != "build", f.casefold()))
+    return {"repos": repos, "hosts": hosts_of, "teams": {r: list(teams.get(r) or ()) for r in repos}, "flows": listed}
 
 
 def _switched_word(head: Mapping[str, Any]) -> str:
