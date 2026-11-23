@@ -103,7 +103,7 @@ def org_briefs() -> Path:
 
 
 def brief_kind(text: str) -> str | None:
-    """A person's brief's kind: the `kind:` line of its front matter (§4.9c *Where a brief lives*); None if unwritten."""
+    """A person's brief's kind: the `kind:` line of its front matter (§4.9c *Where a brief lives*), or None."""
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return None
