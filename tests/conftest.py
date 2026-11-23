@@ -23,6 +23,7 @@ import contextlib
 import glob
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -393,6 +394,20 @@ def short(_scratch_root):
         yield d
     finally:
         _rmtree_writable(str(d))
+
+
+TMP_NAME_MAX = 10  # bytes of a test's name in its `tmp_path`; pytest's own is 30
+
+
+@pytest.fixture
+def tmp_path(request, tmp_path_factory):
+    """pytest's `tmp_path` with a shorter directory name, so a home under it can hold its socket (TD-2097).
+
+    A seat's `TMPDIR` is `/tmp/shiftlead-<uid>/<token>`, and under xdist pytest's own name put `<home>/agent.sock` past
+    the 108 bytes of a Unix socket path, for some tests and run numbers and not others. The numbered runs, their
+    retention and their sweep are pytest's and stay as they are."""
+    name = re.sub(r"\W", "_", request.node.name)[:TMP_NAME_MAX]
+    return tmp_path_factory.mktemp(name, numbered=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
