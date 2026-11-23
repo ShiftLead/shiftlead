@@ -69,10 +69,14 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def new_record(tid: str, flow: str, stage: str, *, holder: str | None = None) -> dict[str, Any]:
-    """A record of an entry entering its flow's first stage, with every field §4.4 names."""
+def new_record(
+    tid: str, flow: str, stage: str, *, team: str | None = None, holder: str | None = None
+) -> dict[str, Any]:
+    """A record of an entry entering its flow's first stage, with every field §4.4 names. `team` is whose it is: two
+    teams of one repo may run one flow, so the flow's name does not tell their entries apart (§4.9d)."""
     return {
         "id": tid,
+        "team": team,
         "flow": flow,
         "stage": stage,
         "holder": holder,

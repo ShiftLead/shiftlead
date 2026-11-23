@@ -48,8 +48,8 @@ def _now_on(order: list[str], model: Any, rows: Mapping[str, Mapping[str, Any]],
     return teamstore.pick(order, str(model), rows)
 
 
-def _entries(records: Iterable[Mapping[str, Any]], flow: str, key: str) -> list[dict[str, Any]]:
-    held = [r for r in records if r.get("flow") == flow and not r.get("closed_at") and r.get("stage") == key]
+def _entries(records: Iterable[Mapping[str, Any]], team: str, key: str) -> list[dict[str, Any]]:
+    held = [r for r in records if r.get("team") == team and not r.get("closed_at") and r.get("stage") == key]
     return [
         {"id": r.get("id"), "holder": r.get("holder"), "waits": r.get("waits"), "since": r.get("entered_at")}
         for r in sorted(held, key=lambda r: str(r.get("id")))
@@ -131,7 +131,7 @@ def view(
                 "model": s.get("model"),
                 "now": _now_on(order, s.get("model"), rows, on_node),
                 "at_once": numbers.get(key),
-                "entries": _entries(held, name, key),
+                "entries": _entries(held, team, key),
             }
             for key, s in zip(keys, stages, strict=True)
         ],
