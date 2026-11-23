@@ -255,6 +255,7 @@ def test_team_show_reads_this_hosts_logins_with_the_teams_reserve(agent, monkeyp
 
     agent.rpc_tools, agent.rpc_gate = tools, gate
     agent._graph = lambda: {}
+    agent._usage, agent._usage_acct = {}, {}
     monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: SimpleNamespace(call=call))
     assert asyncio.run(agent.rpc_team_show(team="a")) == {"team": "a"}
     assert seen["rows"]["claude:x"]["at_reserve"] is True and seen["head"]["word"] == "stopped"

@@ -612,19 +612,42 @@ class SettingsMixin:
         word = "running" if live else "wound down" if wound else "stopped"
         return {"word": word, "sessions": live, "by": (stopped or {}).get("by")}
 
-    async def rpc_team_show(self, team: str = "", caller: Any = None) -> dict[str, Any]:
+    def _projected(self, accounts: dict[str, Any], doc: dict[str, Any], now: datetime) -> dict[str, Any]:
+        """The `gate` reply's accounts with every window as the gate would read it at a launch (`usage.project`): the
+        reply projects only an account with a live unattended session, and a stopped team's usually has none."""
+        max_age = settings_mod.max_age(doc)
+        out: dict[str, Any] = {}
+        for key, entry in accounts.items():
+            names = entry.get("profiles") or []
+            reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), None)
+            read = usage_mod.project((reading or {}).get("windows"), now, max_age, (reading or {}).get("fetched"))
+            seen = {str(w.get("label")): w for w in read or ()}
+            marks = ("pct", "unknown", "projected", "age")
+            rows = [
+                {**r, **{k: seen[str(r.get("label"))][k] for k in marks if k in seen.get(str(r.get("label")), {})}}
+                for r in entry.get("windows") or ()
+            ]
+            out[key] = {**entry, "windows": rows}
+        return out
+
+    async def rpc_team_show(self, team: str = "", entries: bool = True, caller: Any = None) -> dict[str, Any]:
         """`ao team show <team>` (design §4.9d *Controls and verbs*, TD-2060): what the team page shows, read only. The
-        logins are this host's `tools` read with the team's reserve added; the body is `shiftlead.team_show`."""
+        logins are this host's `tools` read with the team's reserve added; the body is `shiftlead.team_show`.
+        `entries=False` leaves out the stage records, for `ao org`, which wants only *cannot run*."""
         name = str(team or "")
         doc = settings_mod.load()
         read, gate = await self.rpc_tools(), await self.rpc_gate()
-        rows = teamstore.login_rows(read, gate["accounts"], settings_mod.team_extra(doc, name))
+        now = datetime.now(UTC)
+        rows = teamstore.login_rows(
+            read, self._projected(gate["accounts"], doc, now), settings_mod.team_extra(doc, name), now
+        )
         return await asyncio.to_thread(
             home_call(TEAM).call,
             team=name,
             doc=doc,
             rows=rows,
             head=self._team_head(name),
+            entries=entries,
             here=hosts.local_host().name,
             roots=hosts.local_host().repos(),
         )

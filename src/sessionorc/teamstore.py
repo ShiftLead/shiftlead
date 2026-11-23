@@ -151,15 +151,17 @@ def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[st
     return changed
 
 
-def _at_reserve(entry: Mapping[str, Any] | None, extra: int, now: datetime) -> bool:
-    """Whether an account's `gate` entry is at its reserve, the team's `reserve` added (§6 *Usage gate*). A metered
-    account is at it once a window's spend reaches its amount; a window the gate has no number for is never over."""
-    rows = [r for r in (entry or {}).get("windows") or () if isinstance(r, Mapping)]
-    if any(r.get("metered") and isinstance(r.get("pct"), int | float) and r["pct"] >= 100 for r in rows):
-        return True
-    plain = [dict(r) for r in rows if not r.get("metered") and r.get("reserve") is not None]
-    by_label = {str(r.get("label")): r["reserve"] for r in plain}
-    return settings_mod.crossed(settings_mod.lines(by_label, plain, now, extra)) is not None
+def _at_reserve(entry: Mapping[str, Any] | None, extra: int, now: datetime, metered: bool = False) -> bool:
+    """Whether an account's `gate` entry is at its reserve for one login, the team's `reserve` added (§6 *Usage gate*).
+    A metered window's line is its amount, reserve 0 as the gate reads it, since its `pct` is the spend over the amount.
+    An account whose logins disagree on billing is read by the rows of this login's billing alone. A window the gate
+    has no number for is never over."""
+    rows = [dict(r) for r in (entry or {}).get("windows") or () if isinstance(r, Mapping)]
+    if (entry or {}).get("billing") == "mixed":
+        rows = [r for r in rows if bool(r.get("metered")) == metered]
+    rows = [r for r in rows if r.get("metered") or r.get("reserve") is not None]
+    by_label = {str(r.get("label")): 0 if r.get("metered") else r["reserve"] for r in rows}
+    return settings_mod.crossed(settings_mod.lines(by_label, rows, now, extra)) is not None
 
 
 def login_rows(
@@ -180,7 +182,13 @@ def login_rows(
                 "account": account,
                 "pin": lg.get("pin"),
                 "models": list((held.get("models") or {}).get("families") or ()),
-                "at_reserve": _at_reserve(accounts.get(str(account)), extra, when) if account else False,
+                "at_reserve": bool(account)
+                and _at_reserve(
+                    accounts.get(str(account)),
+                    extra,
+                    when,
+                    (lg.get("settings") or {}).get("billing") == "metered",
+                ),
             }
     return out
 

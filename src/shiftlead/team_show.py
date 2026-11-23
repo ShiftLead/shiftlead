@@ -12,12 +12,15 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from sessionorc import logins, teamstore
 from shiftlead import flow3, flow_save, repoconfig
 from shiftlead.stagerecord import StageStore, StateError
 
 RUNNING_KEYS = ("schedule", "until", "reserve", "balance", "on_work")
 NODE_NOTE = "not checked: a node's logins are not read here"
+UNREADABLE = (StateError, ValueError, OSError, yaml.YAMLError)
 
 
 def _root(repo: str, roots: Iterable[str | Path]) -> Path | None:
@@ -34,6 +37,11 @@ def _flow_doc(team: str, name: str, store: StageStore | None, roots: Iterable[st
     return row["doc"] if row else None
 
 
+def _maps(value: Any) -> list[Mapping[str, Any]]:
+    """A flow's `stages:` or `audits:`, each row a mapping; a hand-edited copy may hold anything there."""
+    return [x for x in value if isinstance(x, Mapping)] if isinstance(value, list) else []
+
+
 def _now_on(order: list[str], model: Any, rows: Mapping[str, Mapping[str, Any]], on_node: bool) -> dict[str, Any]:
     if on_node:
         return {"login": None, "state": "not_read", "why": NODE_NOTE}
@@ -43,7 +51,7 @@ def _now_on(order: list[str], model: Any, rows: Mapping[str, Mapping[str, Any]],
 def _entries(records: Iterable[Mapping[str, Any]], flow: str, key: str) -> list[dict[str, Any]]:
     held = [r for r in records if r.get("flow") == flow and not r.get("closed_at") and r.get("stage") == key]
     return [
-        {"id": r.get("id"), "holder": r.get("holder"), "waits": bool(r.get("waits")), "since": r.get("entered_at")}
+        {"id": r.get("id"), "holder": r.get("holder"), "waits": r.get("waits"), "since": r.get("entered_at")}
         for r in sorted(held, key=lambda r: str(r.get("id")))
     ]
 
@@ -105,8 +113,8 @@ def view(
     on_node = str(entry.get("host") or here) != here
     name = str(entry.get("flow") or "")
     good = isinstance(flow_doc, Mapping)
-    stages = [s for s in flow_doc.get("stages") or () if isinstance(s, Mapping)] if good else []
-    audits = [a for a in flow_doc.get("audits") or () if isinstance(a, Mapping)] if good else []
+    stages = _maps(flow_doc.get("stages")) if good else []
+    audits = _maps(flow_doc.get("audits")) if good else []
     models = list(dict.fromkeys(str(x["model"]) for x in (*stages, *audits) if x.get("model")))
     numbers = entry.get("at_once") if isinstance(entry.get("at_once"), Mapping) else {}
     keys = [flow3.key_of(s.get("name")) for s in stages]
@@ -154,6 +162,7 @@ def call(
     head: Mapping[str, Any],
     here: str,
     roots: Iterable[str | Path],
+    entries: bool = True,
 ) -> dict[str, Any]:
     """The `team_show` RPC's body, in a thread of the host agent. A state branch that cannot be read costs the entries
     and the team's own copy of its flow, said in `unread`, and never the rest of the read."""
@@ -166,11 +175,16 @@ def call(
     unread = None if root is not None else f"{teams[team]['repo']} is not a registered checkout here"
     records: list[dict[str, Any]] = []
     name = str(teams[team].get("flow") or "")
+    flow_doc = None
     try:
         flow_doc = _flow_doc(team, name, store, where)
-        if store is not None:
+        if store is not None and entries:
             records = list(store.entries().values())
-    except (StateError, ValueError, OSError) as e:
+    except UNREADABLE as e:
         unread = f"the state branch could not be read: {e}"
-        flow_doc = _flow_doc(team, name, None, where)
+        if flow_doc is None:
+            try:
+                flow_doc = _flow_doc(team, name, None, where)
+            except UNREADABLE as again:
+                unread = f"{unread}; the flow could not be read: {again}"
     return {**view(team, doc, rows, head, here, flow_doc, records), "unread": unread}

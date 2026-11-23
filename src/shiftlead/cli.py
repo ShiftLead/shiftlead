@@ -1069,9 +1069,14 @@ def _cannot_run() -> dict[str, str]:
     out: dict[str, str] = {}
     for team in sorted(doc.get("teams") or {}):
         if teamstore.switched(doc, team):
-            with contextlib.suppress(AgentError, AgentUnavailable):
-                if why := call_sync("team_show", team=team).get("cannot_run"):
-                    out[team] = why
+            try:
+                got = call_sync("team_show", team=team, entries=False)
+            except AgentUnavailable:  # down or stuck: the next team would wait as long
+                break
+            except AgentError:
+                continue
+            if got.get("cannot_run"):
+                out[team] = got["cannot_run"]
     return out
 
 
@@ -1370,6 +1375,9 @@ def cmd_team_status(args: argparse.Namespace) -> int:
     return emit(args, {"team": args.name, "sessions": rows, "finished": finished, "waiting": waiting}, prose)
 
 
+_WAITS = {"person": " (waits on you)", "parts": " (waits on its parts)", "merging": " (merging)"}
+
+
 def _team_show_prose(got: dict[str, Any]) -> None:
     """`ao team show`'s text: the same read as `--json`, in the page's order (§4.9d *Controls and verbs*)."""
     head = got["head"]
@@ -1391,7 +1399,7 @@ def _team_show_prose(got: dict[str, Any]) -> None:
                 s["now"]["state"], "not read"
             )
             number = f"  at most {s['at_once']}" if s.get("at_once") else ""
-            held = ", ".join(str(e["id"]) + (" (waits on you)" if e["waits"] else "") for e in s["entries"])
+            held = ", ".join(str(e["id"]) + _WAITS.get(str(e["waits"]), "") for e in s["entries"])
             print(f"  {s['name']} [{s['does']}]  {s['model']} on {now}{number}" + (f"  {held}" if held else ""))
         for key, n in flow["no_such_stage"].items():
             print(f"  {key}: at most {n}, no such stage")
