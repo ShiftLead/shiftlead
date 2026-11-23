@@ -127,6 +127,7 @@ def test_a_lost_or_silent_holder_is_offered_again_then_goes_to_the_person(holder
         Holder(idle_for=SILENT_AFTER, held=True),
         Holder(lease_lapsed=True, held=True),
         Holder(ended=True, stopped=True, held=True),
+        Holder(idle_for=SILENT_AFTER, stopped=True, lease_lapsed=True),
     ],
 )
 def test_a_holder_neither_lost_nor_silent_keeps_its_entry(holder: Holder) -> None:

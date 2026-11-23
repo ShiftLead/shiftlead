@@ -51,6 +51,7 @@ class Holder:
         return (
             not self.person
             and not self.held
+            and not self.stopped
             and not self.ended
             and not self.waiting
             and not self.permission
