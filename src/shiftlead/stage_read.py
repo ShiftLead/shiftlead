@@ -219,6 +219,16 @@ def carried_on(
     return bool(carried.get("branch")) and carried["branch"] in branches
 
 
+def only_when_protected(record: Mapping[str, Any], doc: Mapping[str, Any]) -> bool:
+    """Whether the record's stage in `doc` runs `only-when: protected-files`."""
+    key = str(record.get("stage"))
+    stage = next(
+        (s for s in doc.get("stages") or [] if isinstance(s, Mapping) and key_of(s.get("name")) == key),
+        None,
+    )
+    return stage is not None and stage.get("only-when") == "protected-files"
+
+
 def nothing_to_read_on(
     record: Mapping[str, Any],
     doc: Mapping[str, Any],
@@ -231,12 +241,7 @@ def nothing_to_read_on(
     request's changed files as read at commit `read_at`, touch none of `protected`, the repo's `held:` globs. `head` is
     the pull request's head now, so a push since the read is no reading. `files` None or empty, or `protected` None,
     is no reading either and the stage keeps its review; `protected` empty is a repo read to have no protected files."""
-    key = str(record.get("stage"))
-    stage = next(
-        (s for s in doc.get("stages") or [] if isinstance(s, Mapping) and key_of(s.get("name")) == key),
-        None,
-    )
-    if stage is None or stage.get("only-when") != "protected-files":
+    if not only_when_protected(record, doc):
         return False
     if not head or read_at != head or not files or protected is None:
         return False

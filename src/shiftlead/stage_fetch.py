@@ -3,20 +3,24 @@ TD-2051).
 
 `ledger_read` reads the ledger and its archive once at a ref, and `entry_on` takes one entry's standing and own text
 from that read. `protected_at` reads the repo's protected files from `.shiftlead.yml` at a ref, and `files_at` a pull
-request's changed files at the head the caller read. Each answers None where it could not read, which is no reading:
-above all a failed read of the protected files or of a pull request's files never passes a review. Nothing calls this
-yet, and none of it writes anything.
+request's changed files at the head the caller read. `facts_on` takes one entry's `EntryFacts` from what the pass read
+once. Each answers None where it could not read, which is no reading: above all a failed read of the protected files
+or of a pull request's files never passes a review, and a holder whose sessions were not read is never read as gone.
+Nothing calls this yet, and none of it writes anything.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from sessionorc import held, ledger, ledgerboard, reports
+from sessionorc.models import Session
 from shiftlead import repoconfig
-from shiftlead.stage_read import EntryLedger, ledger_on, renumbered_on
+from shiftlead.stage_read import EntryFacts, EntryLedger, ledger_on, only_when_protected, renumbered_on
 
 
 class LedgerRead(NamedTuple):
@@ -97,3 +101,84 @@ def files_at(root: Path | str, pr: int, head: str | None) -> list[str] | None:
         return None
     row = reports.pr_state_row(root, pr)
     return files if row is not None and row.get("state") == "open" and row.get("head") == head else None
+
+
+@dataclass(frozen=True)
+class RepoFacts:
+    """What the tick's pass read once for a team of a repo, for `facts_on` to take each entry's part of.
+
+    `sessions` are the records by the address a stage record's holder is written in, and `unread_nodes` the nodes whose
+    sessions could not be read this pass. `open_asks` are the addresses with an open ask of their own, `merging` the
+    entries whose merge is in flight, and `was` the flow the team's records were written under, read before its copy is
+    replaced. `may_start` and `within_size` are TD-2065's.
+    """
+
+    root: Path | str
+    ref: str
+    read: LedgerRead
+    person: str
+    team: str
+    now: datetime
+    doc: Mapping[str, Any]
+    entries: tuple[dict[str, Any], ...] = ()
+    teams: Collection[str] = ()
+    rows: tuple[Mapping[str, Any], ...] = ()
+    held: Collection[int] = ()
+    branches: Collection[str] = ()
+    protected: Collection[str] | None = None
+    sessions: Mapping[str, Session] | None = None
+    unread_nodes: Collection[str] = ()
+    open_asks: Collection[str] = ()
+    merging: Collection[str] = ()
+    was: Mapping[str, Any] | None = None
+    may_start: bool = False
+    within_size: bool = False
+
+
+def _files_for(repo: RepoFacts, live: Mapping[str, Any] | None) -> tuple[str | None, list[str] | None]:
+    """The head and files an `only-when` stage is judged on. Nothing is asked of the forge for any other record."""
+    if live is None or repo.protected is None or not live.get("pr") or not only_when_protected(live, repo.doc):
+        return None, None
+    row = next((r for r in repo.rows if r.get("number") == live["pr"]), None)
+    head = row.get("head") if row is not None and row.get("state") == "open" else None
+    return (head, files_at(repo.root, live["pr"], head)) if head else (None, None)
+
+
+def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> EntryFacts | None:
+    """`tid`'s `EntryFacts` from the pass's reads. None: its holder's sessions could not be read (`sessions` None, or
+    its node unread), so its absence says nothing, and reading it as gone would offer a live session's entry again."""
+    live = record if record is not None and not record.get("closed_at") else None
+    holder = str(live.get("holder") or "") if live else ""
+    _, at, node = holder.partition("@")
+    if holder and (repo.sessions is None or (at and node in repo.unread_nodes)):
+        return None
+    on = entry_on(repo.root, repo.ref, repo.read, tid)
+    n = ledgerboard._num(tid)
+    row = next((e for e in repo.entries if ledgerboard._num(str(e.get("id"))) == n), None)
+    read_at, files = _files_for(repo, live)
+    written_under = live.get("flow") if live else None
+    return EntryFacts(
+        tid=tid,
+        person=repo.person,
+        team=repo.team,
+        now=repo.now,
+        doc=repo.doc,
+        ledger=on.ledger,
+        renumbered_to=on.renumbered_to,
+        text=on.text,
+        entry=row,
+        named=str(row.get("team") or "") or None if row else None,
+        teams=repo.teams,
+        rows=repo.rows,
+        held=repo.held,
+        branches=repo.branches,
+        was=repo.was if repo.was is not None and repo.was.get("name") == written_under else None,
+        session=repo.sessions.get(holder) if holder and repo.sessions is not None else None,
+        open_ask=bool(holder) and holder in repo.open_asks,
+        read_at=read_at,
+        files=files,
+        protected=repo.protected,
+        merge_running=tid in repo.merging,
+        may_start=repo.may_start,
+        within_size=repo.within_size,
+    )

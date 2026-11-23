@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from sessionorc.models import Session
 from shiftlead import stage_fetch
-from shiftlead.stage_fetch import EntryOn, entry_on, entry_text, files_at, ledger_read, protected_at
+from shiftlead.stage_fetch import (
+    EntryOn,
+    RepoFacts,
+    entry_on,
+    entry_text,
+    facts_on,
+    files_at,
+    ledger_read,
+    protected_at,
+)
 from shiftlead.stage_read import EntryLedger
 
 README = "# Ledger\n\nLedgerboard: 2\n"
@@ -164,3 +176,109 @@ def test_no_head_reads_no_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
 
     monkeypatch.setattr(stage_fetch.held, "paged_files", never)
     assert files_at(tmp_path, 5, None) is None
+
+
+FLOW = {
+    "name": "f",
+    "stages": [{"name": "Build", "does": "build"}, {"name": "Read", "does": "review", "only-when": "protected-files"}],
+}
+
+
+def pass_read(repo: Path, **over: Any) -> RepoFacts:
+    read = ledger_read(repo, "docs/ledger", "HEAD")
+    assert read is not None
+    base: dict[str, Any] = {
+        "root": repo,
+        "ref": "HEAD",
+        "read": read,
+        "person": "paul",
+        "team": "t",
+        "now": datetime(2026, 11, 23, tzinfo=UTC),
+        "doc": FLOW,
+    }
+    return RepoFacts(**{**base, **over})
+
+
+def session(sid: str) -> Session:
+    return Session(id=sid, name=sid, dir="/r", kind="agent", adapter="claude-code", state="working")
+
+
+def test_facts_take_the_entrys_own_row_text_and_team_line(repo: Path) -> None:
+    row = {"id": "TD-7", "team": "other"}
+    got = facts_on(pass_read(repo, entries=({"id": "TD-8"}, row), teams=("t", "other")), "TD-7", None)
+    assert got is not None
+    assert got.entry is row and got.named == "other" and got.ledger == EntryLedger("open")
+    assert got.text is not None and got.text.startswith("## TD-7:")
+
+
+def test_an_entry_with_no_team_line_names_none(repo: Path) -> None:
+    got = facts_on(pass_read(repo, entries=({"id": "TD-7", "team": ""},)), "TD-7", None)
+    assert got is not None and got.named is None
+
+
+def test_the_holders_session_and_open_ask_are_read_by_its_address(repo: Path) -> None:
+    s = session("s1")
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@node"}
+    got = facts_on(pass_read(repo, sessions={"s1@node": s}, open_asks={"s1@node"}), "TD-7", record)
+    assert got is not None and got.session is s and got.open_ask
+
+
+def test_a_holder_on_an_unread_node_is_no_reading(repo: Path) -> None:
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1@node"}
+    assert facts_on(pass_read(repo, sessions={}, unread_nodes={"node"}), "TD-7", record) is None
+
+
+def test_a_holder_with_no_session_read_at_all_is_no_reading(repo: Path) -> None:
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1"}
+    assert facts_on(pass_read(repo), "TD-7", record) is None
+
+
+def test_a_holder_read_as_gone_has_no_session(repo: Path) -> None:
+    record = {"tid": "TD-7", "stage": "build", "flow": "f", "holder": "s1"}
+    got = facts_on(pass_read(repo, sessions={}), "TD-7", record)
+    assert got is not None and got.session is None
+
+
+def test_a_closed_records_old_holder_on_an_unread_node_stops_nothing(repo: Path) -> None:
+    record = {"tid": "TD-7", "holder": "s1@node", "closed_at": "2026-11-20T00:00:00Z"}
+    got = facts_on(pass_read(repo, unread_nodes={"node"}), "TD-7", record)
+    assert got is not None and got.session is None
+
+
+def test_the_flow_a_record_was_written_under_is_passed_only_when_it_is_that_flow(repo: Path) -> None:
+    was = {"name": "old", "stages": []}
+    under_old = {"tid": "TD-7", "stage": "build", "flow": "old"}
+    under_other = {**under_old, "flow": "older"}
+    assert facts_on(pass_read(repo, was=was), "TD-7", under_old).was is was
+    assert facts_on(pass_read(repo, was=was), "TD-7", under_other).was is None
+
+
+def test_an_entry_in_flight_to_merge_reads_as_merge_running(repo: Path) -> None:
+    assert facts_on(pass_read(repo, merging={"TD-7"}), "TD-7", None).merge_running
+    assert not facts_on(pass_read(repo, merging={"TD-8"}), "TD-7", None).merge_running
+
+
+def test_files_are_read_at_the_open_head_for_an_only_when_stage(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[tuple[int, str | None]] = []
+    monkeypatch.setattr(stage_fetch, "files_at", lambda _r, pr, head: asked.append((pr, head)) or ["a.py"])
+    record = {"tid": "TD-7", "stage": "read", "flow": "f", "pr": 5}
+    rows = ({"number": 5, "state": "open", "head": "abc"},)
+    got = facts_on(pass_read(repo, rows=rows, protected=["src/**"]), "TD-7", record)
+    assert asked == [(5, "abc")] and got.read_at == "abc" and got.files == ["a.py"]
+
+
+@pytest.mark.parametrize(
+    ("stage", "rows", "protected"),
+    [
+        ("build", ({"number": 5, "state": "open", "head": "abc"},), ["src/**"]),  # not an only-when stage
+        ("read", ({"number": 5, "state": "merged", "head": "abc"},), ["src/**"]),  # no open head
+        ("read", ({"number": 5, "state": "open", "head": "abc"},), None),  # the protected files were not read
+    ],
+)
+def test_no_files_are_asked_of_the_forge_where_they_decide_nothing(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, stage: str, rows: tuple, protected: list[str] | None
+) -> None:
+    monkeypatch.setattr(stage_fetch, "files_at", lambda *_: pytest.fail("asked the forge"))
+    record = {"tid": "TD-7", "stage": stage, "flow": "f", "pr": 5}
+    got = facts_on(pass_read(repo, rows=rows, protected=protected), "TD-7", record)
+    assert got is not None and got.read_at is None and got.files is None
