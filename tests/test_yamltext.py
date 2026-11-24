@@ -31,7 +31,7 @@ def test_every_other_repo_file_reader_reads_a_file_nested_too_deeply_as_no_readi
     assert settle.repo_settle(tmp_path) == {}
     assert ledger.ledger_set(tmp_path) is None
     assert held.repo_key(tmp_path, []) == []
-    assert gitinfo.worktree_setup(tmp_path)[0] in ("defaulted", "absent")
+    assert gitinfo.worktree_setup(tmp_path) == ("absent", None)
     assert workorders.board_path(tmp_path) == ("absent", None)
 
 
