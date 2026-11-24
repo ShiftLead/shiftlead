@@ -1540,6 +1540,36 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: processes left behind** (§4.6 *Told what finished sessions left running*, TD-2137) ──
+   One row per host holding a left-behind spell. **Snooze ▾** by time alone, keyed `left_behind:<host>`; the pids,
+   with each one's start time and the walk's time, are `ao disk`'s. It stops no process. #}
+{% macro left_behind_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="the host whose finished sessions left processes running">{{ e.host }}</span>
+  <span class="badge kindmark k-promote">{% call cap() %}left behind{% endcall %}</span>
+  <span class="grow"></span>
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="left behind since">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{{ e.text }}</div>
+<div class="row gap wrap mfoot">
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
+  <span class="grow"></span>
+  {%- if not drawn_on_queue %}
+  <details class="more"><summary class="btn sm ghost" title="{{ help_title('left-behind-snooze') }}">Snooze ▾</summary>
+    <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="left_behind" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="left_behind" data-when="1d">+1 day</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="left_behind" data-when="1w">+1 week</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="left_behind" data-when="pick">pick a date…</button>
+    </div>
+  </details>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Inbox row: memory low** (§4.6 *Told when memory runs short*, TD-2136) ──
    One row per host and half (`ram`, `swap`) that is low, for the home's spell's life. **Snooze ▾** by time alone,
    keyed `memory_low:<host>:<half>`; the full reading is `ao disk`'s. It frees nothing and signals no process. #}
@@ -1899,6 +1929,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- elif e.row == 'ci_not_run' %}{{ ci_not_run_row(e, section) }}
 {%- elif e.row == 'disk_low' %}{{ disk_low_row(e, section) }}
 {%- elif e.row == 'memory_low' %}{{ memory_low_row(e, section) }}
+{%- elif e.row == 'left_behind' %}{{ left_behind_row(e, section) }}
 {%- elif e.row == 'stuck' %}{{ stuck_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>

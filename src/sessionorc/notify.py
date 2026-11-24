@@ -149,6 +149,28 @@ def memory_low_line(spell: dict[str, Any]) -> str:
     return f"{PREFIX} · {memory_low_text(spell)}"
 
 
+def left_behind_text(spell: dict[str, Any]) -> str:
+    """A left-behind spell's words, the Inbox row's and the message's (§4.5a *Inbox row: processes left behind*):
+    *<host>: <n> processes left behind by finished sessions, holding <size>. Largest: <three, by name and size>*, a
+    walk cut short reading *at least*."""
+    least = "at least " if spell.get("cut") else ""
+    n = spell.get("processes") if isinstance(spell.get("processes"), int) else 0
+    what = "process" if n == 1 else "processes"
+    names = []
+    got = spell.get("largest")
+    for t in got if isinstance(got, list) else []:
+        if isinstance(t, dict) and isinstance(t.get("bytes"), int):
+            names.append(f"{t.get('name')} ({size_text(t['bytes'])})")
+    largest = f". Largest: {', '.join(names)}" if names else ""
+    size = size_text(spell.get("bytes") if isinstance(spell.get("bytes"), int) else 0)
+    return f"{spell.get('host')}: {least}{n} {what} left behind by finished sessions, holding {least}{size}{largest}"
+
+
+def left_behind_line(spell: dict[str, Any]) -> str:
+    """The message for a left-behind spell: *shiftlead · <the row's words>*."""
+    return f"{PREFIX} · {left_behind_text(spell)}"
+
+
 def test_line(home: str) -> str:
     """**Send a test**: *shiftlead · a test from kmaster*."""
     return f"{PREFIX} · a test from {home}"

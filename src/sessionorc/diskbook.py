@@ -354,6 +354,8 @@ def write(
             out["low"] = low
         if isinstance(memory := kept.get("memory"), dict):  # and each memory half's (TD-2136)
             out["memory"] = memory
+        if isinstance(left := kept.get("left_behind"), dict):  # and the left-behind spell (TD-2137)
+            out["left_behind"] = left
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
     return out
 
@@ -388,6 +390,52 @@ def set_memory(home: str | Path, host: str, memory: dict[str, dict[str, Any]]) -
         got.pop("memory", None)
         out = {"host": host, **got, **({"memory": memory} if memory else {})}
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
+
+
+def left_state(home: str | Path) -> dict[str, Any]:
+    """The left-behind spell and the latest `LEFT_EVERY` walk's figures in `disk.json` (§4.6 *Told what finished
+    sessions left running*); an odd entry reads as none."""
+    got = _load(Path(home) / FILE).get("left_behind")
+    return dict(got) if isinstance(got, dict) else {}
+
+
+def set_left(home: str | Path, host: str, left: dict[str, Any]) -> None:
+    """Write the left-behind state into `disk.json`, leaving the rest of the file as it stands."""
+    path = Path(home) / FILE
+    with _WRITE:
+        got = _load(path)
+        got.pop("left_behind", None)
+        out = {"host": host, **got, **({"left_behind": left} if left else {})}
+        _atomic_write(path, json.dumps(out, indent=1) + "\n")
+
+
+def left_spells(old: dict[str, Any], answers: dict[str, Any], now: str) -> dict[str, dict[str, Any]]:
+    """The home's `left_behind` spells after one round of `disk` answers (§4.6 *Told what finished sessions left
+    running*), keyed by host: begun by the first answer whose `left_behind` has `since` set and ended by the first
+    where it is not, holding the latest processes, bytes, `cut`, the walk's time and the three largest trees. A host
+    whose answer is an error or lacks `left_behind` (an older build) keeps its spell as it stands; a host no longer
+    asked has none."""
+    out: dict[str, dict[str, Any]] = {}
+    for host, answer in answers.items():
+        left = answer.get("left_behind") if isinstance(answer, dict) and "error" not in answer else None
+        if not isinstance(left, dict):
+            if isinstance(was := old.get(str(host)), dict):
+                out[str(host)] = was
+            continue
+        if not left.get("since"):
+            continue
+        was = old.get(str(host)) if isinstance(old.get(str(host)), dict) else {}
+        trees = [t for t in left.get("trees") or [] if isinstance(t, dict)]
+        out[str(host)] = {
+            "host": str(host),
+            "since": str(was.get("since") or now),
+            "at": left.get("at"),
+            "processes": int(left.get("processes") or 0),
+            "bytes": int(left.get("bytes") or 0),
+            "cut": bool(left.get("cut")),
+            "largest": [{"name": t.get("name"), "bytes": t.get("bytes")} for t in trees[:3]],
+        }
+    return out
 
 
 def memory_spells(old: dict[str, Any], answers: dict[str, Any], now: str) -> dict[str, dict[str, Any]]:

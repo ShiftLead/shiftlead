@@ -1,6 +1,8 @@
 """How much memory a host has left, and what holds it (design §4.6 *Told when memory runs short*, *The process
 reading*, TD-2127; built by TD-2136): the two halves' share free from `/proc/meminfo` and the cgroup tree, each half's
-state from one reading to the next, and a bounded walk of this user's processes naming the largest holders.
+state from one reading to the next, and a bounded walk of this user's processes naming the largest holders; and
+from the same walk the processes finished sessions left running (*Told what finished sessions left running*, built
+by TD-2137), with the spell they raise.
 
 It only reads: nothing here signals a process, and of a process's environment only `SHIFTLEAD_HOME` and
 `SHIFTLEAD_SESSION` are read."""
@@ -10,11 +12,21 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .scratch import LEFT_SLACK, LEFT_WALK_S, MEMORY_CLEAR, MEMORY_LOW
+from .scratch import (
+    LEFT_AGE,
+    LEFT_CLEAR,
+    LEFT_ENDED_KEEP,
+    LEFT_ENDED_RUNS,
+    LEFT_RAISE,
+    LEFT_SLACK,
+    LEFT_WALK_S,
+    MEMORY_CLEAR,
+    MEMORY_LOW,
+)
 
 PROC = "/proc"
 CGROUP = "/sys/fs/cgroup"
@@ -214,6 +226,7 @@ class Proc:
     swap: int  # `SwapPss`, or `VmSwap`
     home: str | None
     session: str | None
+    cwd_gone: bool = False  # its working directory has been deleted
 
 
 def _stat(path: Path) -> tuple[int, int]:
@@ -251,6 +264,14 @@ def _sizes(path: Path) -> tuple[int, int]:
         return got.get("VmRSS", 0), got.get("VmSwap", 0)
     except OSError:
         return 0, 0
+
+
+def _cwd_gone(path: Path) -> bool:
+    """Whether the process's working directory has been deleted: the kernel's link reads `<path> (deleted)`."""
+    try:
+        return os.readlink(path / "cwd").endswith(" (deleted)")
+    except OSError:
+        return False
 
 
 def _boot(proc: Path) -> tuple[float, float]:
@@ -295,7 +316,7 @@ def walk(
         except (OSError, ValueError, IndexError):  # gone, or not a process's files
             continue
         ram, swap = _sizes(path)
-        out.append(Proc(int(e.name), ppid, name, btime + start / tick, ram, swap, home, session))
+        out.append(Proc(int(e.name), ppid, name, btime + start / tick, ram, swap, home, session, _cwd_gone(path)))
     return out, False
 
 
@@ -317,15 +338,75 @@ def live_runs(records: list[Any]) -> dict[str, tuple[str, float]]:
     return out
 
 
-def holders(
-    procs: list[Proc], live: dict[str, tuple[str, float]], home: str | Path, slack: float = LEFT_SLACK
-) -> dict[str, list[dict[str, Any]]]:
-    """Each half's three largest holders (§4.6 *The process reading*): the processes of a live run, with their
-    descendants, under that record's name, and every other process summed by name; `ram` by `Pss`, `swap` by
-    `SwapPss`. A process is a live run's when its `SHIFTLEAD_HOME` is this host's home or absent, its
-    `SHIFTLEAD_SESSION` names a live record, and it started no earlier than `slack` before that record's `created`."""
-    here = _resolved(home)
-    by_pid = {p.pid: p for p in procs}
+def ended_records(records: list[Any]) -> dict[str, float]:
+    """Rule 5's records, in the same snapshot (§4.6 *Told what finished sessions left running*): each unattended
+    `exited` or `closed` record, by id, with its `created` as a time."""
+    out: dict[str, float] = {}
+    for r in records:
+        created = _epoch(str(getattr(r, "created", "") or ""))
+        if getattr(r, "state", None) in ENDED and getattr(r, "unattended", False) and created is not None:
+            out[str(r.id)] = created
+    return out
+
+
+# -- the runs that ended (`ended_runs`) -----------------------------------------------------------------------------
+
+
+def end_run(ended: dict[str, Any], sid: str, created: str, now: str) -> dict[str, Any]:
+    """`ended_runs` with one more run of `sid`, `{"from": <created>, "to": <now>}`, written when an unattended record
+    is forgotten or a new run replaces it in place under its id; at most `LEFT_ENDED_RUNS` runs an id."""
+    out = {k: {"runs": list(v.get("runs") or [])} for k, v in ended.items() if isinstance(v, dict)}
+    runs = out.setdefault(sid, {"runs": []})["runs"]
+    runs.append({"from": created, "to": now})
+    out[sid]["runs"] = runs[-LEFT_ENDED_RUNS:]
+    return out
+
+
+def trim_runs(ended: dict[str, Any], now: float) -> dict[str, Any]:
+    """`ended_runs` without a run whose `to` is past `LEFT_ENDED_KEEP`, or an odd one, and without an id left with
+    none; at most `LEFT_ENDED_RUNS` runs an id."""
+    out: dict[str, Any] = {}
+    for sid, one in ended.items():
+        runs = [
+            r
+            for r in (one.get("runs") if isinstance(one, dict) else None) or []
+            if isinstance(r, dict)
+            and _epoch(str(r.get("from") or "")) is not None
+            and (to := _epoch(str(r.get("to") or ""))) is not None
+            and now - to <= LEFT_ENDED_KEEP
+        ]
+        if runs:
+            out[str(sid)] = {"runs": runs[-LEFT_ENDED_RUNS:]}
+    return out
+
+
+def spans(ended: dict[str, Any]) -> dict[str, list[tuple[float, float]]]:
+    """`ended_runs` as times, the snapshot a walk reads beside the records."""
+    out: dict[str, list[tuple[float, float]]] = {}
+    for sid, one in ended.items():
+        for r in (one.get("runs") if isinstance(one, dict) else None) or []:
+            a = _epoch(str(r.get("from") or "")) if isinstance(r, dict) else None
+            b = _epoch(str(r.get("to") or "")) if isinstance(r, dict) else None
+            if a is not None and b is not None:
+                out.setdefault(str(sid), []).append((a, b))
+    return out
+
+
+# -- what finished sessions left running ----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Runs:
+    """The snapshot of the records a walk reads (§4.6 *The process reading*): the live runs by id (name, `created`),
+    rule 5's ended unattended records by id (`created`), and `ended_runs`' spans by id."""
+
+    live: dict[str, tuple[str, float]]
+    ended: dict[str, float]
+    spans: dict[str, list[tuple[float, float]]]
+
+
+def _live_of(live: dict[str, tuple[str, float]], here: str, slack: float):
+    """Rule 4's test: the live run a process belongs to, or None."""
 
     def run_of(p: Proc) -> str | None:
         if not p.session or p.session not in live:
@@ -334,9 +415,95 @@ def holders(
             return None
         return p.session if p.start >= live[p.session][1] - slack else None
 
+    return run_of
+
+
+def _stamp(t: float) -> str:
+    return datetime.fromtimestamp(t, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def left_behind(
+    procs: list[Proc], runs: Runs, home: str | Path, now: float, slack: float = LEFT_SLACK, age: float = LEFT_AGE
+) -> tuple[list[dict[str, Any]], set[int]]:
+    """The process trees finished sessions left running (§4.6 *Told what finished sessions left running*), largest
+    first, and every pid they hold. A root is a process whose parent is pid 1 or this user's `systemd` manager, at
+    least `age` old, carrying `SHIFTLEAD_HOME` or `SHIFTLEAD_SESSION`, belonging to no live run, and either of an ended
+    run (an unattended `exited` or `closed` record, or a span of `ended_runs`, under this home or none) or of a scratch
+    home that is gone (or whose working directory was deleted). Its descendants are counted with it, but a live run's,
+    with its own descendants, are left out. It stops no process."""
+    here = _resolved(home)
+    run_of = _live_of(runs.live, here, slack)
+    managers = {p.pid for p in procs if p.name == "systemd" and p.ppid == 1}
+    children: dict[int, list[Proc]] = {}
+    for p in procs:
+        children.setdefault(p.ppid, []).append(p)
+
+    def why(p: Proc) -> dict[str, Any] | None:
+        if p.home is None and p.session is None:
+            return None  # rule 3: a person's own job, a desktop service, an editor server
+        if run_of(p) is not None:
+            return None  # rule 4, before any span
+        ours = p.home is None or _resolved(p.home) == here
+        if ours and p.session:
+            created = runs.ended.get(p.session)
+            if created is not None and p.start >= created - slack:
+                return {"session": p.session}
+            if any(a - slack <= p.start <= b for a, b in runs.spans.get(p.session, ())):
+                return {"session": p.session}
+        if not ours and p.home is not None and (p.cwd_gone or not os.path.isdir(p.home)):
+            return {"home": p.home}
+        return None
+
+    trees: list[dict[str, Any]] = []
+    held: set[int] = set()
+    for p in procs:
+        if p.ppid not in ({1} | managers) or p.pid in managers or p.start > now - age:
+            continue
+        judged = why(p)
+        if judged is None:
+            continue
+        tree, todo = [p], list(children.get(p.pid, ()))
+        while todo and len(tree) < 100_000:
+            q = todo.pop()
+            if q.pid in held or run_of(q) is not None:
+                continue  # a live run beneath a left-behind root is left out, with its descendants
+            tree.append(q)
+            todo.extend(children.get(q.pid, ()))
+        held.update(q.pid for q in tree)
+        size = sum(q.ram + q.swap for q in tree)
+        trees.append(
+            {
+                "pid": p.pid,
+                "name": p.name,
+                "start": _stamp(p.start),
+                "bytes": size,
+                "processes": len(tree),
+                **judged,
+                "cwd_deleted": p.cwd_gone,
+            }
+        )
+    trees.sort(key=lambda t: (-t["bytes"], t["pid"]))
+    return trees, held
+
+
+def holders(
+    procs: list[Proc],
+    live: dict[str, tuple[str, float]],
+    home: str | Path,
+    slack: float = LEFT_SLACK,
+    left: set[int] | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Each half's three largest holders (§4.6 *The process reading*): the processes of a live run, with their
+    descendants, under that record's name, everything left behind as one holder, *left behind*, and every other
+    process summed by name; `ram` by `Pss`, `swap` by `SwapPss`. A process is a live run's when its `SHIFTLEAD_HOME` is
+    this host's home or absent, its `SHIFTLEAD_SESSION` names a live record, and it started no earlier than `slack`
+    before that record's `created`."""
+    run_of = _live_of(live, _resolved(home), slack)
+    by_pid = {p.pid: p for p in procs}
+    left = left or set()
     sums: dict[tuple[str, str], list[int]] = {}
     for p in procs:
-        key: tuple[str, str] = ("name", p.name)
+        key: tuple[str, str] = ("left", "left behind") if p.pid in left else ("name", p.name)
         q: Proc | None = p
         for _ in range(_ANCESTORS):
             if q is None:
@@ -363,8 +530,49 @@ def _resolved(path: str | Path) -> str:
 
 
 def read_holders(
-    live: dict[str, tuple[str, float]], home: str | Path, proc: str | Path | None = None, limit_s: float = LEFT_WALK_S
+    live: dict[str, tuple[str, float]] | Runs,
+    home: str | Path,
+    proc: str | Path | None = None,
+    limit_s: float = LEFT_WALK_S,
+    now: float | None = None,
 ) -> dict[str, Any]:
-    """One walk's answer: each half's holders, and `cut` where the walk stopped at its bound. In a thread."""
+    """One walk's answer: each half's holders, `cut` where the walk stopped at its bound, and `left`, what finished
+    sessions left running (`processes`, `bytes`, `trees`). In a thread."""
+    runs = live if isinstance(live, Runs) else Runs(live, {}, {})
     procs, cut = walk(proc, limit_s)
-    return {**holders(procs, live, home), "cut": cut}
+    trees, held = left_behind(procs, runs, home, time.time() if now is None else now)
+    left = {"processes": sum(t["processes"] for t in trees), "bytes": sum(t["bytes"] for t in trees), "trees": trees}
+    return {**holders(procs, runs.live, home, left=held), "cut": cut, "left": left}
+
+
+class LeftWatch:
+    """The left-behind spell from walk to walk (§4.6 *Told what finished sessions left running*): the run of
+    `LEFT_EVERY` walks at or over `LEFT_RAISE` lives in memory, so a restart starts it again; the spell and the latest
+    figures are the caller's, `disk.json`'s `left_behind`."""
+
+    def __init__(self) -> None:
+        self.run = 0
+
+    def walked(self, state: dict[str, Any], got: dict[str, Any] | None, every: bool, now: str) -> dict[str, Any]:
+        """The state after one walk. Only a `LEFT_EVERY` walk that answered counts: a walk made because a half turned
+        low, or one that raised, changes nothing and breaks no run. Two such walks running at or over `LEFT_RAISE`
+        start the spell; the first complete one under both of `LEFT_CLEAR`'s bounds ends it. A walk cut at its bound
+        counts toward the raise and never ends a spell, and under the raise it breaks no run."""
+        left = (got or {}).get("left")
+        if not every or got is None or not isinstance(left, dict):
+            return dict(state)
+        cut = bool(got.get("cut"))
+        n, size = int(left.get("processes") or 0), int(left.get("bytes") or 0)
+        since = state.get("since")
+        if since:
+            if not cut and size < LEFT_CLEAR[0] and n < LEFT_CLEAR[1]:
+                since = None
+                self.run = 0
+        elif size >= LEFT_RAISE[0] or n >= LEFT_RAISE[1]:
+            self.run += 1
+            if self.run >= 2:
+                since, self.run = now, 0
+        elif not cut:
+            self.run = 0
+        out = {"at": now, "processes": n, "bytes": size, "cut": cut, "trees": list(left.get("trees") or [])}
+        return {"since": since, **out} if since else out

@@ -409,7 +409,7 @@ async def test_the_walk_reads_a_snapshot_of_the_live_records(agent, mem):
     finally:
         agent.sessions.pop("ao-x-w")
         agent.sessions.pop("ao-x-old")
-    assert list(walks[0]) == ["ao-x-w"] and walks[0]["ao-x-w"][0] == "worker"
+    assert list(walks[0].live) == ["ao-x-w"] and walks[0].live["ao-x-w"][0] == "worker"
 
 
 @pytest.mark.integration

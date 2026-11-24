@@ -361,6 +361,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     lanes_rows,  # noqa: F401
     ledger_for_you,  # noqa: F401
     ledger_rows,  # noqa: F401
+    left_behind_rows,
     live_look,  # noqa: F401
     look_pair,  # noqa: F401
     look_review,  # noqa: F401
@@ -1789,6 +1790,8 @@ class Readings:
             + disk_low_rows(home.get("disk_low"))
             # §4.5a *Inbox row: memory low* (TD-2136): the home's spells, a row per host and half
             + memory_low_rows(home.get("memory_low"))
+            # §4.5a *Inbox row: processes left behind* (TD-2137): the home's spells, a row per host
+            + left_behind_rows(home.get("left_behind"))
             # §4.5a *Queue card / Inbox: stuck row* (§6 rule 13, TD-1497): the home's stuck asks, Open where held
             + stuck_rows(home.get("stuck"), records=fleet)
         )
@@ -2407,6 +2410,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += disk_low_rows(None if agent_down else (info or {}).get("disk_low"))
         # …and a host's memory or swap low (§4.5a *Inbox row: memory low*, TD-2136)
         promos += memory_low_rows(None if agent_down else (info or {}).get("memory_low"))
+        # …and a host's processes left behind by finished sessions (§4.5a *Inbox row: processes left behind*, TD-2137)
+        promos += left_behind_rows(None if agent_down else (info or {}).get("left_behind"))
         # …and stuck work the person is asked to see (§4.5a *Queue card / Inbox: stuck row*, TD-1497)
         promos += stuck_rows(None if agent_down else (info or {}).get("stuck"), records=sessions)
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)

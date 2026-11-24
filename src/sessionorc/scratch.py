@@ -619,6 +619,12 @@ MEMORY_CLEAR = 0.20  # the first reading over this ends it
 LEFT_EVERY = 600  # seconds between walks of `/proc` (§4.6 *The process reading*)
 LEFT_WALK_S = 10.0  # one walk's bound; twice this and it is cut with no holders
 LEFT_SLACK = 60  # seconds a process may start before its record's `created` and still be that run's
+# told what finished sessions left running (§4.6, TD-2127, built by TD-2137)
+LEFT_AGE = 3600  # a process younger than this is never named
+LEFT_RAISE = (512 * 1024**2, 25)  # bytes or processes, trees included: two `LEFT_EVERY` walks at or over start a spell
+LEFT_CLEAR = (256 * 1024**2, 10)  # the first complete `LEFT_EVERY` walk under both ends it
+LEFT_ENDED_KEEP = 90 * 86_400  # an `ended_runs` span is kept this long after its `to`
+LEFT_ENDED_RUNS = 20  # and at most this many runs an id
 TEST_RUN_MARK = ".shiftlead-test-run"  # a suite's scratch root, holding its pid (TD-2084)
 RUN_QUIET_S = 600  # rule 1: nothing under a run written for ten minutes
 BUILD_QUIET_S = 86_400  # rule 3: nothing under a build leftover written for a day

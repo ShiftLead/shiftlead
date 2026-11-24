@@ -570,6 +570,15 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "left-behind-snooze",
+        "Snooze ▾",
+        "Inbox row: processes left behind",
+        (
+            "Sets this row aside until the time you pick: +1 day, +1 week or a date. It stops no process, and the "
+            "row is not told on Telegram or push while it is snoozed."
+        ),
+    ),
+    Help(
         "stuck-open",
         "Open",
         "Queue card / Inbox: stuck row",
@@ -1180,6 +1189,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "ci-snooze",
             "disk-low-snooze",
             "memory-low-snooze",
+            "left-behind-snooze",
             "stuck-open",
             "board-answers",
             "board-go-with-it",
