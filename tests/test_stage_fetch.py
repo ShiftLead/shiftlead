@@ -20,10 +20,12 @@ from shiftlead.stage_fetch import (
     files_at,
     held_read,
     ledger_read,
+    over_line,
     protected_at,
     rows_of,
     sessions_read,
     team_flow,
+    teams_on,
 )
 from shiftlead.stage_read import EntryLedger
 
@@ -454,9 +456,9 @@ def test_an_unread_node_with_no_checkout_of_the_repo_changes_nothing(tmp_path: P
 
 def test_unknown_held_is_no_reading_for_an_entry_with_no_live_record(repo: Path) -> None:
     facts = pass_read(repo, held=None, sessions={})
-    assert facts_on(facts, "TD-1", None) is None
-    assert facts_on(facts, "TD-1", {"holder": "", "closed_at": "2026-11-20"}) is None
-    assert facts_on(facts, "TD-1", {"holder": "", "stage": "Build"}) is not None
+    assert facts_on(facts, "TD-7", None) is None
+    assert facts_on(facts, "TD-7", {"holder": "", "closed_at": "2026-11-20"}) is None
+    assert facts_on(facts, "TD-7", {"holder": "", "stage": "Build"}) is not None
 
 
 @pytest.mark.parametrize("key", ["", "home"])
@@ -474,5 +476,33 @@ def test_a_symlink_loop_is_no_session_of_the_repo_and_stops_nothing(tmp_path: Pa
 
 def test_a_live_record_is_read_whether_or_not_held_is_known(repo: Path) -> None:
     record = {"holder": "", "stage": "Build", "flow": "f", "team": "t"}
-    known, unknown = (facts_on(pass_read(repo, held=h, sessions={}), "TD-1", record) for h in ((), None))
+    known, unknown = (facts_on(pass_read(repo, held=h, sessions={}), "TD-7", record) for h in ((), None))
     assert known == unknown is not None
+
+
+def test_the_teams_are_those_the_ledger_declares(repo: Path) -> None:
+    commit(repo, {"docs/ledger/README.md": README + "\nFields: Team = Build | docs\n"})
+    read = ledger_read(repo, "docs/ledger", "HEAD")
+    assert read is not None and teams_on(read) == ("build", "docs")
+
+
+def test_a_ledger_declaring_no_team_has_none(repo: Path) -> None:
+    read = ledger_read(repo, "docs/ledger", "HEAD")
+    assert read is not None and teams_on(read) == ()
+
+
+@pytest.mark.parametrize(
+    ("host", "over"),
+    [
+        ({"t": {"balance": {"crossed": True}}}, True),
+        ({"t": {"balance": {"crossed": False}}}, False),
+        ({"t": {"balance": "crossed"}}, False),
+        ({"t": "not a record"}, False),
+        ({"t": {}}, False),
+        ({"other": {"balance": {"crossed": True}}}, False),
+        ({}, False),
+        (None, False),
+    ],
+)
+def test_a_team_is_over_its_line_only_where_its_own_mark_is_crossed(host: dict | None, over: bool) -> None:
+    assert over_line(host, "t") is over

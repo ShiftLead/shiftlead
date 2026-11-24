@@ -131,6 +131,21 @@ def rows_of(
     return rows_for(([r for r in recent if r.get("state") != "open"], opened, recent), wanted, read_one)
 
 
+def teams_on(read: LedgerRead) -> tuple[str, ...]:
+    """`RepoFacts.teams`: the teams the repo's ledger declares on its `Fields:` line, which is what an entry's `Team:`
+    line is read against (design §4.9d). A repo with one team declares none, so no entry of it can read as moved."""
+    return ledger.declared_teams(read.text)
+
+
+def over_line(host_teams: Mapping[str, Any] | None, team: str) -> bool:
+    """Whether `team` is over its line on open pull requests (design §6 *Balance*), read from the home's `host` record
+    as the claim's refusal reads it. The wiring withholds `may_start` while it holds: an offer's claim would be refused,
+    so each pass would start a session only to end it."""
+    rec = (host_teams or {}).get(team)
+    mark = rec.get("balance") if isinstance(rec, Mapping) else None
+    return isinstance(mark, Mapping) and bool(mark.get("crossed"))
+
+
 class TeamFlow(NamedTuple):
     """The flow a team's records are read against this pass. `doc` is what runs, `was` the copy it replaces where the
     two differ, `put` the text to store as the team's copy once the pass has read its records, and `problems` why the
