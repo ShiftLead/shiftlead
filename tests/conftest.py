@@ -392,10 +392,15 @@ def _mark_run(config: pytest.Config, base: Path) -> None:
             return
         listed = runs / f"{pid}-{time.time_ns()}"
         fd = os.open(listed, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(str(base))
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(str(base))
+        except (OSError, ValueError):  # a partial file names nothing, and no later run would remove it
+            with contextlib.suppress(OSError):
+                listed.unlink()
+            raise
         config._run_list_file = listed
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):  # RuntimeError: `resolve` on a symlink loop, before Python 3.13
         return
 
 

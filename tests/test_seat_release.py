@@ -266,6 +266,38 @@ def test_a_failed_write_never_fails_the_run(tmp_path, monkeypatch):
     conftest._mark_run(_config(str(base)), s / "no-such-directory")  # nor the mark
 
 
+def test_a_list_file_whose_write_fails_is_not_left_behind(tmp_path, monkeypatch):
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    s = tmp_path.resolve()
+    monkeypatch.setenv("SHIFTLEAD_SCRATCH", str(s))
+    base = s / "run"
+    base.mkdir()
+
+    def no_space(fd, *_args):
+        os.close(fd)
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(conftest.os, "fdopen", no_space)
+    config = _config(str(base))
+    conftest._mark_run(config, base)
+    assert not hasattr(config, "_run_list_file") and not list((s / conftest.RUN_LIST).iterdir())
+
+
+def test_a_scratch_path_that_cannot_be_resolved_never_fails_the_run(tmp_path, monkeypatch):
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("SHIFTLEAD_SCRATCH", str(tmp_path))
+    base = tmp_path / "run"
+    base.mkdir()
+
+    def loop(_self, *_args, **_kwargs):
+        raise RuntimeError("symlink loop")
+
+    monkeypatch.setattr(conftest.Path, "resolve", loop)
+    config = _config(str(base))
+    conftest._mark_run(config, base)
+    assert not hasattr(config, "_run_list_file")
+
+
 @pytest.mark.parametrize("body, stays", [("pass", False), ("assert False", True)])
 def test_a_real_suite_leaves_a_list_file_only_when_it_fails(tmp_path, body: str, stays: bool):
     s = tmp_path.resolve() / "seat"
