@@ -400,11 +400,32 @@ def test_an_enter_that_leaves_the_dialog_up_fails_the_step(tmp_path, monkeypatch
     real = fake.__call__
 
     def stuck(method, **p):
+        if method == "tail":
+            return ["", "older line", *[f"line {n}" for n in range(cw.FAILURE_PANE_LINES - 1)], "Allow once?   ", ""]
         return None if method == "keys" else real(method, **p)
 
     walk = cw.Walk("gemini", "conformance", tmp_path, stuck, out=said.append)
     assert not walk.run()
     assert said[-1].startswith("FAIL  a permission: Enter pressed on Bash: touch …, and it still reads state needs-you")
+    # TD-2119: the failure says what the tool showed, so reading it needs no second walk
+    shown = said[-1].split("the pane's last lines:\n")[1].splitlines()
+    assert len(shown) == cw.FAILURE_PANE_LINES and shown[0] == "line 0" and shown[-1] == "Allow once?"
+
+
+def test_a_pane_that_cannot_be_read_leaves_the_enters_failure_standing(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw, "TURN_WAIT", 0.0)
+    fake, said = FakeAgent(tmp_path, channel=False), []
+    real = fake.__call__
+
+    def stuck(method, **p):
+        if method == "tail":
+            raise OSError("no pane")
+        return None if method == "keys" else real(method, **p)
+
+    assert not cw.Walk("gemini", "conformance", tmp_path, stuck, out=said.append).run()
+    assert "it still reads state needs-you" in said[-1]
+    assert "the pane could not be read (OSError: no pane)" in said[-1]
 
 
 def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
