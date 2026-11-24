@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,7 +14,7 @@ import pytest
 
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.models import Session
-from shiftlead import stage_pass, stage_start
+from shiftlead import stage_fetch, stage_pass, stage_start
 from shiftlead.stage_fetch import LedgerRead, RepoFacts, SessionsRead
 from shiftlead.stage_pass import Reach, step
 from shiftlead.stage_read import EntryFacts, EntryLedger
@@ -424,3 +425,181 @@ def test_a_record_that_is_not_an_object_never_stops_the_pass(store, read_as_give
     monkeypatch.setattr(store, "put_entry", lambda *_a: "sha")
     got = stage_pass.team_pass(store, repo_facts(store), no_sessions(), World().reach, local="h")
     assert got == stage_pass.TeamPass()
+
+
+# -- one repo's pass ---------------------------------------------------------------------------------------------
+
+
+def test_a_session_here_is_found_by_the_homes_own_address_too() -> None:
+    here, there = stage_session(), stage_session("build-td-8", ("TD-8",))
+    read = SessionsRead({"a": here, "b@node": there}, frozenset({"node"}), frozenset({"a", "b@node"}))
+    got = stage_pass.addressed(read, "home")
+    assert got.sessions["a"] is here and got.sessions["a@home"] is here and got.sessions["b@node"] is there
+    assert "b@node@home" not in got.sessions and got.read_nodes == {"node", "home"}
+    assert got.open_asks == {"a", "a@home", "b@node"}
+
+
+def flow_of(doc: dict[str, Any] = FLOW) -> stage_fetch.TeamFlow:
+    return stage_fetch.TeamFlow(doc)
+
+
+def made(store: StageStore, **over: Any) -> RepoFacts | None:
+    asked: list[int] = over.pop("asked", [])
+    args: dict[str, Any] = {
+        "person": "paul",
+        "team": "t",
+        "now": NOW,
+        "flow": flow_of(),
+        "entries": [row()],
+        "prs": {"open": [], "recent": []},
+        "read_one": lambda n: (asked.append(n), None)[1],
+        "records": {},
+        "sessions": no_sessions(),
+        "checkouts": {},
+        "local": "home",
+        "host_teams": {},
+        "protected": [],
+        **over,
+    }
+    return stage_pass.repo_facts(
+        store.root, "origin/main", LedgerRead("docs/ledger", TEXT, None, lambda _p: None), **args
+    )
+
+
+def test_no_reading_of_the_pull_requests_is_no_reading_of_the_team(store):
+    assert made(store, prs={"error": "gh failed"}) is None
+    assert made(store, prs=None) is None
+
+
+def test_the_facts_carry_the_flow_that_runs_and_the_one_its_records_were_written_under(store):
+    was = {**FLOW, "name": "old"}
+    got = made(store, flow=stage_fetch.TeamFlow(FLOW, was=was, put="x"))
+    assert got is not None and got.doc == FLOW and got.was == was and got.entries == (row(),)
+
+
+def test_an_open_records_pull_request_the_reading_lacks_is_read_by_its_number(store):
+    asked: list[int] = []
+    records = {"TD-1": {"pr": 5}, "TD-2": {"pr": 6, "closed_at": "2026-11-01"}, "TD-3": {"pr": None}, "TD-4": []}
+    made(store, records=records, asked=asked)
+    assert asked == [5]
+
+
+@pytest.mark.parametrize(
+    ("started", "host_teams", "may"),
+    [
+        (True, {}, True),
+        (True, {"t": {"balance": {"crossed": True}}}, False),
+        (True, {"other": {"balance": {"crossed": True}}}, True),
+        (False, {}, False),
+    ],
+)
+def test_a_team_over_its_line_may_not_start_a_session(store, started, host_teams, may):
+    got = made(store, started=started, host_teams=host_teams, within_size=True)
+    assert got is not None and got.may_start is may and got.within_size
+
+
+def test_a_holder_written_in_the_homes_address_form_is_read_as_the_session_here(store):
+    s = stage_session()
+    repo = made(store, sessions=SessionsRead({"a": s}, frozenset(), frozenset({"a"})))
+    assert repo is not None
+    got = stage_fetch.facts_on(repo, TID, {**new_record(TID, "f", "build", team="t"), "holder": "a@home"})
+    assert got is not None and got.session is s and got.open_ask
+
+
+def test_held_is_unknown_while_a_node_with_a_checkout_of_the_repo_is_unread(store):
+    pr = {"number": 4, "state": "open", "branch": "build-td-7"}
+    unknown = made(store, prs={"open": [pr], "recent": []}, checkouts={"node": ["/r"]})
+    assert unknown is not None and unknown.held is None
+    known = made(store, prs={"open": [pr], "recent": []}, checkouts={"home": ["/r"]})
+    assert known is not None and known.held == frozenset()
+
+
+class Teams:
+    """A `FactsFor` that records the flows it was given, and a `Reach` per team."""
+
+    def __init__(self, store: StageStore, *, none_for: tuple[str, ...] = ()) -> None:
+        self.store, self.none_for = store, none_for
+        self.flows: dict[str, stage_fetch.TeamFlow] = {}
+        self.world = World()
+
+    def facts(self, team: str, flow: stage_fetch.TeamFlow, _records: Any) -> RepoFacts | None:
+        self.flows[team] = flow
+        return None if team in self.none_for else replace(repo_facts(self.store), team=team, doc=flow.doc)
+
+    def reach(self, _team: str) -> Reach:
+        return self.world.reach
+
+
+GOOD = "format: 3\nname: f\nstages:\n- {name: build, does: build, model: m, takes: any}\n"
+
+
+def test_a_failing_flow_runs_its_last_good_copy_and_is_told_once(store, read_as_given):
+    store.put_flow("t", GOOD)
+    state, teams = stage_pass.RepoState(), Teams(store)
+    first = stage_pass.repo_pass(
+        store, state, {"t": ("bad", ["no stages"])}, teams.facts, no_sessions(), teams.reach, local="h"
+    )
+    assert first.tell == {"t": ("no stages",)} and teams.flows["t"].doc["name"] == "f" and "t" in first.teams
+    again = stage_pass.repo_pass(
+        store, state, {"t": ("bad", ["no stages"])}, teams.facts, no_sessions(), teams.reach, local="h"
+    )
+    assert again.tell == {}
+    other = stage_pass.repo_pass(
+        store, state, {"t": ("bad", ["a loop"])}, teams.facts, no_sessions(), teams.reach, local="h"
+    )
+    assert other.tell == {"t": ("a loop",)}
+    stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert state.told == {}
+    back = stage_pass.repo_pass(
+        store, state, {"t": ("bad", ["a loop"])}, teams.facts, no_sessions(), teams.reach, local="h"
+    )
+    assert back.tell == {"t": ("a loop",)}
+
+
+def test_a_flow_that_fails_with_no_good_copy_is_told_and_its_team_unread(store):
+    state, teams = stage_pass.RepoState(), Teams(store)
+    got = stage_pass.repo_pass(store, state, {"t": (None, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert got.unread == ("t",) and got.tell == {"t": ("the flow could not be read",)} and teams.flows == {}
+
+
+def test_a_passing_flow_replaces_the_copy_after_the_pass_reads_the_records(store, read_as_given):
+    state, teams = stage_pass.RepoState(), Teams(store)
+    stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert store.flow("t") == GOOD and teams.flows["t"].put == GOOD
+
+
+def test_a_team_with_no_facts_is_unread_and_the_others_go_on(store, read_as_given):
+    state, teams = stage_pass.RepoState(), Teams(store, none_for=("a",))
+    flows = {"a": (GOOD, []), "b": (GOOD, [])}
+    got = stage_pass.repo_pass(store, state, flows, teams.facts, no_sessions(), teams.reach, local="h")
+    assert got.unread == ("a",) and list(got.teams) == ["b"]
+
+
+def test_each_teams_sightings_are_kept_for_its_next_pass_and_a_gone_team_forgotten(store, read_as_given):
+    read = SessionsRead({"a": stage_session()}, frozenset(), frozenset())
+    state, teams = stage_pass.RepoState(told={"gone": ("x",)}, seen={"gone": ("z",)}), Teams(store)
+    stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, read, teams.reach, local="home")
+    assert state.seen == {"t": ("a",)} and state.told == {} and teams.world.ended == []
+    stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, read, teams.reach, local="home")
+    assert teams.world.ended == ["a"]
+
+
+def test_the_closed_records_are_swept_once_for_the_repo(store, monkeypatch):
+    calls: list[Any] = []
+    monkeypatch.setattr(stage_pass.stage_make, "sweep_closed", lambda s, now: (calls.append(now), ["TD-1"])[1])
+    teams = Teams(store)
+    flows = {"a": (None, []), "b": (None, [])}
+    got = stage_pass.repo_pass(
+        store, stage_pass.RepoState(), flows, teams.facts, no_sessions(), teams.reach, local="h", now=NOW
+    )
+    assert calls == [NOW] and got.swept == ("TD-1",)
+
+
+def test_a_sweep_that_fails_never_fails_the_pass(store, monkeypatch):
+    def refuse(_s: Any, _now: Any) -> list[str]:
+        raise StateError("origin refused")
+
+    monkeypatch.setattr(stage_pass.stage_make, "sweep_closed", refuse)
+    teams = Teams(store)
+    got = stage_pass.repo_pass(store, stage_pass.RepoState(), {}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert got == stage_pass.RepoPass()
