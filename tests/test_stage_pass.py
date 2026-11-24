@@ -597,9 +597,53 @@ def test_the_closed_records_are_swept_once_for_the_repo(store, monkeypatch):
 
 def test_a_sweep_that_fails_never_fails_the_pass(store, monkeypatch):
     def refuse(_s: Any, _now: Any) -> list[str]:
-        raise StateError("origin refused")
+        raise TypeError("a closed date that is not a string")
 
     monkeypatch.setattr(stage_pass.stage_make, "sweep_closed", refuse)
     teams = Teams(store)
     got = stage_pass.repo_pass(store, stage_pass.RepoState(), {}, teams.facts, no_sessions(), teams.reach, local="h")
     assert got == stage_pass.RepoPass()
+
+
+@pytest.mark.parametrize("where", ["facts", "reach"])
+def test_one_teams_failure_never_stops_the_other_teams_or_the_sweep(store, read_as_given, monkeypatch, where):
+    swept: list[Any] = []
+    monkeypatch.setattr(stage_pass.stage_make, "sweep_closed", lambda _s, now: (swept.append(now), [])[1])
+    teams = Teams(store)
+
+    def facts(team: str, flow: stage_fetch.TeamFlow, records: Any) -> RepoFacts | None:
+        if where == "facts" and team == "a":
+            raise RuntimeError("the forge did not answer")
+        return teams.facts(team, flow, records)
+
+    def reach(team: str) -> Reach:
+        if where == "reach" and team == "a":
+            raise KeyError(team)
+        return teams.reach(team)
+
+    state = stage_pass.RepoState()
+    flows = {"a": ("bad", ["no stages"]), "b": (GOOD, [])}
+    store.put_flow("a", GOOD)
+    got = stage_pass.repo_pass(store, state, flows, facts, no_sessions(), reach, local="h")
+    assert got.unread == ("a",) and list(got.teams) == ["b"] and swept == [None]
+    assert got.tell == {"a": ("no stages",)}
+
+
+def test_records_that_cannot_be_read_read_no_pull_request_by_number(store, read_as_given, monkeypatch):
+    def broken() -> dict[str, Any]:
+        raise TypeError("not a mapping")
+
+    given: list[Any] = []
+    teams = Teams(store)
+    monkeypatch.setattr(store, "entries", broken)
+    monkeypatch.setattr(stage_pass.stage_make, "sweep_closed", lambda _s, _n: [])
+    stage_pass.repo_pass(
+        store,
+        stage_pass.RepoState(),
+        {"t": (GOOD, [])},
+        lambda t, f, r: (given.append(r), None)[1],
+        no_sessions(),
+        teams.reach,
+        local="h",
+    )
+    assert given == [{}]

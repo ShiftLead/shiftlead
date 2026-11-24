@@ -326,7 +326,7 @@ def repo_pass(
         del state.told[gone]
     try:
         records = {k: r for k, r in store.entries().items() if isinstance(r, Mapping)}
-    except (StateError, ValueError):
+    except Exception:  # noqa: BLE001 — no records read is only no pull requests read by number
         log.exception("the stage records could not be read for their pull requests")
         records = {}
     done: dict[str, TeamPass] = {}
@@ -334,28 +334,52 @@ def repo_pass(
     tell: dict[str, tuple[str, ...]] = {}
     for team, (current, problems) in flows.items():
         try:
-            kept = store.flow(team)
-        except (StateError, ValueError):
-            log.exception("the flow copy of team %s could not be read", team)
+            got = _repo_team(store, state, team, current, problems, facts, records, read, reach, tell, local=local)
+        except Exception:  # noqa: BLE001 — one team's failure is that team's and never stops the others' passes
+            log.exception("the stage pass of team %s failed", team)
+            got = None
+        if got is None:
             unread.append(team)
-            continue
-        flow = team_flow(current, problems, kept)
-        failing = flow.problems if flow is not None else tuple(problems) or ("the flow could not be read",)
-        if failing:
-            if state.told.get(team) != failing:
-                tell[team] = state.told[team] = failing
         else:
-            state.told.pop(team, None)
-        repo = facts(team, flow, records) if flow is not None else None
-        if repo is None:
-            unread.append(team)
-            continue
-        got = team_pass(store, repo, read, reach(team), local=local, before=state.seen.get(team, ()), put=flow.put)
-        state.seen[team] = got.seen
-        done[team] = got
+            done[team] = got
     try:
         swept = tuple(stage_make.sweep_closed(store, now))
-    except (StateError, ValueError):
+    except Exception:  # noqa: BLE001 — a failed sweep is tried again next pass and never fails this one
         log.exception("the closed stage records could not be swept")
         swept = ()
     return RepoPass(done, tuple(unread), tell, swept)
+
+
+def _repo_team(
+    store: StageStore,
+    state: RepoState,
+    team: str,
+    current: str | None,
+    problems: Collection[str],
+    facts: FactsFor,
+    records: Mapping[str, Any],
+    read: SessionsRead,
+    reach: Callable[[str], Reach],
+    tell: dict[str, tuple[str, ...]],
+    *,
+    local: str,
+) -> TeamPass | None:
+    """One team's turn in `repo_pass`: its flow chosen and told, then its pass. None: no reading of the team."""
+    try:
+        kept = store.flow(team)
+    except (StateError, ValueError):
+        log.exception("the flow copy of team %s could not be read", team)
+        return None
+    flow = team_flow(current, problems, kept)
+    failing = flow.problems if flow is not None else tuple(problems) or ("the flow could not be read",)
+    if failing:
+        if state.told.get(team) != failing:
+            tell[team] = state.told[team] = failing
+    else:
+        state.told.pop(team, None)
+    repo = facts(team, flow, records) if flow is not None else None
+    if flow is None or repo is None:
+        return None
+    got = team_pass(store, repo, read, reach(team), local=local, before=state.seen.get(team, ()), put=flow.put)
+    state.seen[team] = got.seen
+    return got
