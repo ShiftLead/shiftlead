@@ -10,10 +10,11 @@ from typing import Any
 
 import pytest
 
+from shiftlead import stage_merge
 from shiftlead.stage_acts import Act, Reading, choose
 from shiftlead.stage_end import TRY_AGAIN
 from shiftlead.stage_make import make
-from shiftlead.stage_merge import MERGING, NO_READING_FOR, run
+from shiftlead.stage_merge import MERGING, NO_READING_FOR, gate_and_land, run
 from shiftlead.stagerecord import StageStore, new_record
 
 TID = "TD-7"
@@ -176,3 +177,130 @@ def test_another_act_is_not_made(store):
     made, landed = None, []
     made = run(store, TID, Act("offer"), READ, FLOW, "paul", lambda _p, _h: None, lambda p, _h: landed.append(p), NOW)
     assert not made.made and not landed
+
+
+# -- the real gate and merge -------------------------------------------------------------------------------
+
+
+class Forge:
+    """`cadence` and `sync` as `gate_and_land` calls them, recording the merge."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, *, composes: bool | None = True, sha: str = HEAD) -> None:
+        self.verdict: dict[str, Any] | None = {"verdict": "pass", "failed": []}
+        self.trailers: str | None = "Review: x\n"
+        self.signed: list[str] = []
+        self.merges: list[tuple[int, str, str | None, str | None]] = []
+        self.sha = sha
+        self.compose_why: str | None = None
+        monkeypatch.setattr(
+            stage_merge.cadence, "composes", lambda _root: (composes, None if composes is not None else "no tree")
+        )
+        monkeypatch.setattr(stage_merge.cadence, "check", self.check)
+        monkeypatch.setattr(stage_merge.sync, "compose", self.compose)
+        monkeypatch.setattr(stage_merge.sync, "merge", self.merge)
+
+    def check(self, _root: Any, _pr: int, _timeout: float, trailers: Path | None = None) -> dict[str, Any] | None:
+        if trailers is not None and self.trailers is not None:
+            Path(trailers).write_text(self.trailers, encoding="utf-8")
+        return self.verdict
+
+    def compose(self, _root: Any, _pr: int, out: Path, *, merged_by: str) -> str | None:
+        self.signed.append(merged_by)
+        assert (out / "gate").read_text(encoding="utf-8") == self.trailers
+        if self.compose_why:
+            return self.compose_why
+        for name, text in (("sha", self.sha + "\n"), ("subject", "the subject"), ("body", "the body")):
+            (out / name).write_text(text, encoding="utf-8")
+        return None
+
+    def merge(
+        self, _root: Any, pr: int, head: str, subject: str | None = None, body_file: Path | None = None
+    ) -> str | None:
+        body = Path(body_file).read_text(encoding="utf-8") if body_file is not None else None
+        self.merges.append((pr, head, subject, body))
+        return None
+
+
+def test_a_passed_gate_lands_the_composed_squash_signed_by_the_home(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch)
+    gate, land = gate_and_land(tmp_path)
+    assert gate(5, HEAD) == forge.verdict
+    assert land(5, HEAD) is None
+    assert forge.signed == ["shiftlead-home"]
+    assert forge.merges == [(5, HEAD, "the subject", "the body")]
+
+
+def test_a_pin_that_composes_no_squash_merges_bare(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch, composes=False)
+    gate, land = gate_and_land(tmp_path)
+    gate(5, HEAD)
+    assert land(5, HEAD) is None
+    assert forge.signed == [] and forge.merges == [(5, HEAD, None, None)]
+
+
+def test_an_unread_tree_raises_so_the_run_reads_no_reading(monkeypatch, tmp_path):
+    Forge(monkeypatch, composes=None)
+    gate, _ = gate_and_land(tmp_path)
+    with pytest.raises(RuntimeError, match="no tree"):
+        gate(5, HEAD)
+
+
+@pytest.mark.parametrize("verdict", [None, {"verdict": "fail", "failed": ["review"]}])
+def test_nothing_lands_unless_the_gate_passed(monkeypatch, tmp_path, verdict):
+    forge = Forge(monkeypatch)
+    forge.verdict = verdict
+    gate, land = gate_and_land(tmp_path)
+    assert gate(5, HEAD) == verdict
+    assert land(5, HEAD) == "the gate has not passed this head"
+    assert forge.merges == []
+
+
+def test_a_later_failed_gate_takes_back_the_earlier_pass(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch)
+    gate, land = gate_and_land(tmp_path)
+    gate(5, HEAD)
+    forge.verdict = {"verdict": "fail", "failed": ["ci"]}
+    gate(5, HEAD)
+    assert land(5, HEAD) == "the gate has not passed this head"
+    assert forge.merges == []
+
+
+def test_a_pass_is_for_its_own_head_and_lands_once(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch)
+    gate, land = gate_and_land(tmp_path)
+    gate(5, HEAD)
+    assert land(5, "b" * 40) == "the gate has not passed this head"
+    assert land(5, HEAD) == "the gate has not passed this head"  # the mismatch spent the pass
+    assert forge.merges == []
+
+
+def test_a_squash_composed_for_another_head_is_not_merged(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch, sha="b" * 40)
+    gate, land = gate_and_land(tmp_path)
+    gate(5, HEAD)
+    assert "composed for bbbbbbbbbbbb" in (land(5, HEAD) or "")
+    assert forge.merges == []
+
+
+def test_a_refused_compose_is_the_reason_and_merges_nothing(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch)
+    forge.compose_why = "squash-message said no"
+    gate, land = gate_and_land(tmp_path)
+    gate(5, HEAD)
+    assert land(5, HEAD) == "squash-message said no"
+    assert forge.merges == []
+
+
+def test_a_pass_with_no_trailer_file_raises(monkeypatch, tmp_path):
+    forge = Forge(monkeypatch)
+    forge.trailers = None
+    gate, land = gate_and_land(tmp_path)
+    with pytest.raises(OSError):
+        gate(5, HEAD)
+    assert land(5, HEAD) == "the gate has not passed this head"
+
+
+def test_compose_signs_with_the_name_it_is_given():
+    env = {"AGENT_NAME": "x", "AGENT_MODEL": "m", "AGENT_MODEL_FILE": "f", "PATH": "/bin"}
+    assert stage_merge.sync.squash_env(env, "shiftlead-home") == {"AGENT_NAME": "shiftlead-home", "PATH": "/bin"}
+    assert stage_merge.sync.squash_env(env)["AGENT_NAME"] == "shiftlead-sync"
