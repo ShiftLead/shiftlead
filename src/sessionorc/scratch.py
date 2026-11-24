@@ -618,6 +618,12 @@ RUN_QUIET_S = 600  # rule 1: nothing under a run written for ten minutes
 BUILD_QUIET_S = 86_400  # rule 3: nothing under a build leftover written for a day
 BUILD_LEFTOVERS = ("pdm-build-", "pdm-wheel-cache-")
 _PYTEST_RUN = re.compile(r"pytest-\d+")
+TEST_KEEP_S = 7200  # a live seat's ended test run stays readable this long (§4.6 *A live seat's rebuildable copies*)
+RELEASE_WALK_S = 60.0  # the hourly release's bound on one candidate's walk
+WALK_CUT = "walk cut short"
+TEST_RUNS_DIR = ".shiftlead-test-runs"  # in a seat: one file per hand-run suite with its own `--basetemp`
+RUN_LIST_MAX = 4096  # bytes read of a list file or a mark; a longer one is not ours
+_RUN_FILE = re.compile(r"(\d+)-\d+")
 
 
 class Backoff:
@@ -668,12 +674,13 @@ def _run_over(run: Path) -> bool:
         return False
 
 
-def _quiet(path: Path, now: float, quiet_s: float, changed: bool = False) -> bool:
-    """Nothing under `path` written for `quiet_s`, each time read by `_written_at`, by a walk bounded by
-    `diskbook.WALK_S`; cut short, or an entry that cannot be read, it is not quiet. `changed` also reads each
-    entry's change time, which a copy or a move into the tree cannot set back (§4.6 *tool temp*)."""
+def _quiet_reading(path: Path, now: float, quiet_s: float, changed: bool = False, walk_s: float | None = None) -> str:
+    """`quiet` where nothing under `path` was written for `quiet_s`, each time read by `_written_at`; `cut` where the
+    walk passed its bound (`walk_s`, else `diskbook.WALK_S`); `written` otherwise, an entry that cannot be read
+    included. `changed` also reads each entry's change time, which a copy or a move into the tree cannot set back
+    (§4.6 *tool temp*)."""
     cut = now - quiet_s
-    limit = diskbook.deadline()
+    limit = diskbook.deadline() if walk_s is None else time.monotonic() + walk_s
 
     def at(st: os.stat_result) -> float:
         written = _written_at(st.st_mtime, now)
@@ -681,22 +688,27 @@ def _quiet(path: Path, now: float, quiet_s: float, changed: bool = False) -> boo
 
     try:
         if at(path.lstat()) > cut:
-            return False
+            return "written"
         todo = [path]
         while todo:
             if time.monotonic() > limit:
-                return False
+                return "cut"
             for e in list(os.scandir(todo.pop())):
                 try:
                     if at(e.stat(follow_symlinks=False)) > cut:
-                        return False
+                        return "written"
                     if e.is_dir(follow_symlinks=False):
                         todo.append(Path(e.path))
                 except FileNotFoundError:
                     continue
     except OSError:
-        return False
-    return True
+        return "written"
+    return "quiet"
+
+
+def _quiet(path: Path, now: float, quiet_s: float, changed: bool = False, walk_s: float | None = None) -> bool:
+    """Whether `_quiet_reading` reads `path` as quiet; a walk cut short is not."""
+    return _quiet_reading(path, now, quiet_s, changed, walk_s) == "quiet"
 
 
 def _seats(root: str | Path, home: str | Path) -> list[Path]:
@@ -737,17 +749,18 @@ def _dirs(path: Path) -> list[os.DirEntry[str]]:
         return []
 
 
-def _test_runs(seat: Path) -> list[Path]:
+def _test_runs(seat: Path, current: bool = False) -> list[Path]:
     """Rule 1's candidates directly under a seat: each `pytest-of-*/pytest-<N>/` that is over and not `pytest-current`'s
-    target, and each directory whose `.shiftlead-test-run` names a pid not running."""
+    target (`current`, the hourly release's: its target too, by the same test), and each directory whose
+    `.shiftlead-test-run` names a pid not running."""
     out: list[Path] = []
     for e in _dirs(seat):
         if e.name.startswith("pytest-of-"):
-            current = os.path.realpath(os.path.join(e.path, "pytest-current"))
+            target = None if current else os.path.realpath(os.path.join(e.path, "pytest-current"))
             out += [
                 Path(r.path)
                 for r in _dirs(Path(e.path))
-                if _PYTEST_RUN.fullmatch(r.name) and os.path.realpath(r.path) != current and _run_over(Path(r.path))
+                if _PYTEST_RUN.fullmatch(r.name) and os.path.realpath(r.path) != target and _run_over(Path(r.path))
             ]
             continue
         try:
@@ -756,6 +769,142 @@ def _test_runs(seat: Path) -> list[Path]:
         except (OSError, ValueError):
             continue
     return out
+
+
+def _read_small(path: Path) -> str | None:
+    """A regular file of this uid, up to `RUN_LIST_MAX` bytes, never through a symlink; None for anything else."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid():
+            return None
+        data = os.read(fd, RUN_LIST_MAX + 1)
+        return None if len(data) > RUN_LIST_MAX else data.decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    finally:
+        os.close(fd)
+
+
+def _listed_base(seat: Path, text: str) -> tuple[Path | None, bool]:
+    """The base temp a list file names, with whether it is gone. None, not gone, where it is not a real directory of
+    this uid strictly under the seat with no symlink on the way (§4.6 *A hand-run suite is marked*)."""
+    real = Path(os.path.realpath(seat))
+    if not os.path.isabs(text) or os.path.normpath(text) != text:
+        return None, False
+    try:
+        parts = Path(text).relative_to(real).parts
+    except ValueError:
+        return None, False
+    if not parts:
+        return None, False
+    at = real
+    try:
+        for part in parts:
+            at = at / part
+            st = at.lstat()
+            if stat.S_ISLNK(st.st_mode):
+                return None, False
+    except FileNotFoundError:
+        return None, True
+    except OSError:
+        return None, False
+    return (at, False) if stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid() else (None, False)
+
+
+def _listed_runs(seat: Path, dry: bool = False) -> list[Path]:
+    """The hand-run suites a seat's run list names whose process has ended. A file whose path is gone, or whose mark
+    names another pid (a later run reused the `--basetemp`), is removed, except by a dry run."""
+    d = seat / TEST_RUNS_DIR
+    try:
+        st = d.lstat()
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return []
+        entries = list(os.scandir(d))
+    except OSError:
+        return []
+    out: list[Path] = []
+    for e in entries:
+        got = _RUN_FILE.fullmatch(e.name)
+        text = _read_small(Path(e.path)) if got else None
+        if text is None:
+            continue
+        base, gone = _listed_base(seat, text.rstrip("\n"))
+        mark = None if base is None else _read_small(base / TEST_RUN_MARK)
+        pid = None if mark is None else mark.strip()
+        if gone or (pid is not None and pid.isdecimal() and pid != got[1]):
+            if not dry:
+                with contextlib.suppress(OSError):
+                    os.unlink(e.path)
+        elif pid is not None and _pid_gone(pid):
+            out.append(base)
+    return out
+
+
+def _candidates(seat: Path, current: bool = False, dry: bool = False) -> list[Path]:
+    """A seat's ended test runs, each once: rule 1's and the listed ones."""
+    runs: dict[str, Path] = {}
+    for run in [*_test_runs(seat, current), *_listed_runs(seat, dry)]:
+        runs.setdefault(os.path.realpath(run), run)
+    return list(runs.values())
+
+
+def release(
+    root: str | Path,
+    home: str | Path,
+    transcript_roots: list[Path],
+    now_s: float,
+    tally: Any = None,
+    dry: bool = False,
+    deadline: float | None = None,
+) -> list[tuple[str, str]]:
+    """The hourly release of ended test runs from every directory `_seats` returns (§4.6 *A live seat's rebuildable
+    copies*, part 3): each goes once nothing under it was written for `TEST_KEEP_S`, `pytest-current` unlinked while it
+    still names it. A path overlapping a transcript store is skipped, and past `deadline` (monotonic) the pass stops,
+    its tally *partial*. A dry run counts what would go and removes nothing. Returns the runs kept, with why."""
+    import logging
+
+    log = logging.getLogger(__name__)
+    kept: list[tuple[str, str]] = []
+    for seat in _seats(root, home):
+        for run in _candidates(seat, current=True, dry=dry):
+            left = None if deadline is None else deadline - time.monotonic()
+            if left is not None and left <= 0:
+                if tally is not None:
+                    tally.unlisted = True
+                return kept
+            if any(overlaps(run, t) for t in transcript_roots):
+                continue
+            walk_s = RELEASE_WALK_S if left is None else min(RELEASE_WALK_S, left)
+            reading = _quiet_reading(run, now_s, TEST_KEEP_S, walk_s=walk_s)
+            if reading == "cut":
+                kept.append((str(run), WALK_CUT))
+                if tally is not None:
+                    tally.keep(run, WALK_CUT)
+            if reading != "quiet":
+                continue
+            size = diskbook.size_of(run, diskbook.deadline()) if tally is not None else None
+            if dry:
+                if tally is not None:
+                    tally.gone(run, size)
+                continue
+            link = run.parent / "pytest-current"
+            target = os.path.realpath(run)
+            try:
+                _remove(run)
+            except OSError as err:
+                log.warning("could not release %s: %s", run, err)
+                continue
+            if tally is not None:
+                tally.gone(run, size)
+            log.info("released test run %s", run)
+            with contextlib.suppress(OSError):
+                if link.is_symlink() and os.path.realpath(link) == target:
+                    link.unlink()
+    return kept
 
 
 def reclaim(
@@ -787,7 +936,12 @@ def reclaim(
 
     def take(path: Path, quiet_s: float) -> None:
         nonlocal removed
-        if any(overlaps(path, t) for t in transcript_roots) or not _quiet(path, now_s, quiet_s):
+        if any(overlaps(path, t) for t in transcript_roots):
+            return
+        reading = _quiet_reading(path, now_s, quiet_s)
+        if reading == "cut":
+            log.warning("reclaim kept %s: %s", path, WALK_CUT)
+        if reading != "quiet":
             return
         try:
             size = diskbook.size_of(path, diskbook.deadline()) or 0
@@ -799,7 +953,7 @@ def reclaim(
         log.info("reclaimed %s", path)
 
     for seat in _seats(root, home):
-        for run in _test_runs(seat):
+        for run in _candidates(seat):
             if done():
                 return {"removed": removed, "skipped": False}
             take(run, RUN_QUIET_S)

@@ -137,6 +137,7 @@ OWNERS = Path("/tmp") / f"ao-test-owners-{os.getuid()}"
 # Inside each of a run's scratch roots, its pid: what says whose a root in a seat's directory is (design §4.6 *The
 # pressure pass*, rule 1). The `OWNERS` files stay for the roots at the top of `/tmp`.
 TEST_RUN_MARK = ".shiftlead-test-run"
+RUN_LIST = ".shiftlead-test-runs"  # in a seat's scratch: a hand-run suite's `--basetemp`, one file each
 
 
 def private_socket_name() -> str:
@@ -369,6 +370,35 @@ def make_git_template(base: Path) -> Path:
     return template
 
 
+def _mark_run(config: pytest.Config, base: Path) -> None:
+    """Say whose this base temp is (design §4.6 *A live seat's rebuildable copies*, part 2): its pid in `TEST_RUN_MARK`
+    and, for a caller's `--basetemp` strictly under `SHIFTLEAD_SCRATCH`, one file in the seat's run list naming it, so
+    the sweep finds it at any depth with no walk. Never for a suite run inside a test, and a failed write never fails
+    the run. The caller is the controller alone."""
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    pid = os.getpid()
+    try:
+        (base / TEST_RUN_MARK).write_text(str(pid))
+        seat = os.environ.get("SHIFTLEAD_SCRATCH")
+        if not seat or not config.option.basetemp:
+            return
+        root = Path(seat).resolve()
+        if root not in base.parents:
+            return
+        runs = root / RUN_LIST
+        runs.mkdir(mode=0o700, exist_ok=True)
+        if runs.is_symlink():
+            return
+        listed = runs / f"{pid}-{time.time_ns()}"
+        fd = os.open(listed, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(str(base))
+        config._run_list_file = listed
+    except (OSError, ValueError):
+        return
+
+
 @pytest.hookimpl(tryfirst=True)  # before xdist starts its workers, which inherit the template's variable
 def pytest_sessionstart(session: pytest.Session) -> None:
     """The dead runs' sweep (TD-2028), in the xdist controller alone (a worker's base temp is inside the
@@ -382,6 +412,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         return
     with contextlib.suppress(OSError, ValueError, OverflowError):  # a sweep never stops the run
         sweep_dead_pytest_runs(factory.getbasetemp())
+    _mark_run(session.config, factory.getbasetemp())
     with contextlib.suppress(OSError):  # without it git copies its default template, which only costs inodes
         os.environ["GIT_TEMPLATE_DIR"] = str(make_git_template(factory.getbasetemp()))
 
@@ -409,6 +440,10 @@ def pytest_unconfigure(config: pytest.Config) -> None:
             current.unlink()
     with contextlib.suppress(OSError):
         _rmtree_writable(str(base))
+    listed = getattr(config, "_run_list_file", None)
+    if listed is not None and not base.exists():  # a tree that would not go stays listed, for the sweep
+        with contextlib.suppress(OSError):
+            listed.unlink()
 
 
 @pytest.fixture(scope="session", autouse=True)
