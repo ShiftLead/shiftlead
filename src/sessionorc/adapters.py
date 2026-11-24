@@ -11,7 +11,7 @@ import hmac
 import logging
 import shutil
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib.metadata import entry_points
@@ -84,6 +84,12 @@ class Adapter(Protocol):
         ...
 
     # Optional, looked up with getattr:
+    #   temp_roots() -> list[Path]                        the directories the tool writes temp files under when
+    #                                                      it runs outside a run's scratch (§4.3, §4.6 *tool
+    #                                                      temp*, TD-2106); absent, none
+    #   temp_entry(cwd: Path) -> str | None               the name directly under a temp root holding the files
+    #                                                      of a session working in `cwd`; optional, with
+    #                                                      `temp_roots`; None where it has none
     #   implements: frozenset[str]                        which of `OPTIONAL_METHODS` an agent adapter
     #                                                      implements: the conformance suite tests each one
     #                                                      declared and asserts each other one absent (design
@@ -619,6 +625,28 @@ class ExternalSession:
     name: str
     tool_id: str | None
     status: str | None
+    started: float | None = None  # epoch seconds, from the tool's registry; None where it carries none (§4.6)
+
+
+def temp_tools() -> list[tuple[str, Path]]:
+    """(adapter, directory) for each `temp_roots()` an adapter names (§4.3, §4.6 *tool temp*). An adapter that raises
+    names none, so nothing of its root is read."""
+    out: list[tuple[str, Path]] = []
+    for name in names():
+        fn = getattr(get(name), "temp_roots", None)
+        if fn is None:
+            continue
+        try:
+            out.extend((name, Path(p)) for p in fn())
+        except Exception:  # noqa: BLE001 — a broken adapter never stops the sweep
+            log.exception("adapter %s could not name its temp roots", name)
+    return out
+
+
+def temp_namers() -> list[Callable[[Path], str | None]]:
+    """Each adapter's `temp_entry` (§4.3): the name under a temp root that holds a session's files for its cwd."""
+    found = (getattr(get(name), "temp_entry", None) for name in names())
+    return [fn for fn in found if fn is not None]
 
 
 def external_sessions() -> dict[str, Any]:

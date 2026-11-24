@@ -3109,6 +3109,17 @@ class HostAgent(
             s.branch_kept,
         )
 
+    def _tool_ids(self) -> set[str]:
+        """The tool's own ids of every session ShiftLead holds: each record's `adapter_id`, closed ones included, and
+        in home mode those of each container node whose link is up, so an outside session is told from ours (§4.1,
+        §4.6 *tool temp*). Reads copies of the maps."""
+        ours = {r.adapter_id for r in list(self.sessions.values()) if r.adapter_id}
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                if (self.links.get(host) or {}).get("up"):
+                    ours |= {r.adapter_id for r in list(self.remote.get(host, {}).values()) if r.adapter_id}
+        return ours
+
     def _reap_idle(self, s: Session | None, wt: Path) -> str | None:
         """The reaper's *idle*, through ShiftLead's own seams (§4.1): no live record of any adapter, a shell's
         included, has its `dir` inside `wt` — this host's, and while their link is up those of the container
@@ -3118,7 +3129,7 @@ class HostAgent(
         maps."""
         wt = wt.resolve()
         mine = list(self.sessions.values())
-        ours = {r.adapter_id for r in mine if r.adapter_id}
+        ours = self._tool_ids()
         for r in mine:
             if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                 return f"in use by {r.id}"
@@ -3127,7 +3138,6 @@ class HostAgent(
                 if not (self.links.get(host) or {}).get("up"):
                     return f"{host} unreachable"
                 for r in list(self.remote.get(host, {}).values()):
-                    ours.add(r.adapter_id or "")
                     if r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                         return f"in use by {r.id}@{host}"
         seen = adapters.external_sessions()

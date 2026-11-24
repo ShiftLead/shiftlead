@@ -38,6 +38,7 @@ from sessionorc import (
     paths,
     reports,
     teamstore,
+    tempsweep,
     witness,
     workorders,
     worktreesweep,
@@ -6110,6 +6111,8 @@ class TickMixin:
                 log.exception("scratch removal failed")
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
+        if named is not None and not late("scratch"):
+            self._sweep_tool_temp(tallies["scratch"], dry=dry, deadline=deadline)
         if not late("caches"):
             self._sweep_caches(now, tallies["caches"], dry=dry, deadline=deadline)
         if not late("worktrees"):
@@ -6210,6 +6213,40 @@ class TickMixin:
                     log.warning("could not prune attachment %s: %s", f, e)
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
                 rm.rmdir(folder)
+
+    def _sweep_tool_temp(self, tally: Any, dry: bool = False, deadline: float | None = None) -> None:
+        """§4.6 *tool temp* (TD-2106): what runs outside a run's scratch leave in shared temp space, swept only by the
+        default home's agent, so a scratch home never reads the real `/tmp`. Runs in the sweep's thread."""
+        if not cachesweep.default_home():
+            return
+        try:
+            troots, blind = adapters.transcript_roots()
+            if blind:  # a store could lie inside any candidate: none goes
+                tally.unlisted = True
+                log.warning("tool temp skipped: %s named no transcript roots", ", ".join(blind))
+                return
+
+            def live_cwds() -> list[str]:
+                ended = ("exited", "closed")
+                return [s.dir for s in list(self.sessions.values()) if s.host == self.host and s.state not in ended]
+
+            tempsweep.sweep(
+                Path("/tmp"),
+                adapters.temp_tools(),
+                troots,
+                tally,
+                now=time.time(),
+                idle=lambda entry: self._reap_idle(None, entry),
+                externals=adapters.external_sessions,
+                tool_ids=self._tool_ids,
+                live_cwds=live_cwds,
+                namers=adapters.temp_namers(),
+                dry=dry,
+                deadline=deadline,
+            )
+        except Exception:  # noqa: BLE001 — the rule never stops the rest of the sweep
+            tally.unlisted = True
+            log.exception("tool temp sweep failed")
 
     def _sweep_caches(
         self, now: datetime, tally: diskbook.Tally | None = None, dry: bool = False, deadline: float | None = None

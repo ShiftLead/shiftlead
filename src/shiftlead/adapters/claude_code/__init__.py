@@ -157,6 +157,13 @@ def munge(path: Path | str) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "-", str(path))
 
 
+def _started_s(value: Any) -> float | None:
+    """The registry's `startedAt`, epoch milliseconds, in seconds; None where it is absent or not a number."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return value / 1000
+
+
 def config_dir(profile: Profile) -> Path:
     """The profile's config dir, else what Claude Code itself would use: `CLAUDE_CONFIG_DIR` if
     set in this process's environment, else `~/.claude`."""
@@ -1000,9 +1007,18 @@ class ClaudeCodeAdapter:
                         name=str(e.get("name") or e.get("sessionId") or pid),
                         tool_id=e.get("sessionId"),
                         status=e.get("status"),
+                        started=_started_s(e.get("startedAt")),
                     )
                 )
         return out
+
+    def temp_roots(self) -> list[Path]:
+        """Where Claude Code writes temp files when it runs outside a run's scratch (§4.3, §4.6 *tool temp*)."""
+        return [Path(f"/tmp/claude-{os.getuid()}")]
+
+    def temp_entry(self, cwd: Path) -> str | None:
+        """The project directory under the temp root for a session working in `cwd`."""
+        return munge(cwd)
 
     # -- account ---------------------------------------------------------------------------------
 
