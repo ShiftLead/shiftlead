@@ -945,10 +945,8 @@ def _proc_paths(base: str) -> set[str]:
     got: set[str] = set()
 
     def link(p: str) -> None:
-        try:
+        with contextlib.suppress(FileNotFoundError):  # a zombie's, or an fd closed while it was read
             got.add(os.readlink(p).removesuffix(" (deleted)"))
-        except FileNotFoundError:  # a zombie's, or an fd closed while it was read
-            pass
 
     for name in ("cwd", "root", "exe"):
         link(f"{base}/{name}")
@@ -1003,13 +1001,14 @@ def _copy_reading(
     real = os.path.realpath(path)
     if any(p == real or p.startswith(real + os.sep) for p in got):
         return IN_USE
-    if git_work(path):
-        return GIT_WORK
+    if git_work(path, limit=time.monotonic() + (RELEASE_WALK_S if walk_s is None else walk_s)):
+        return GIT_WORK  # past its bound too: a read cut short holds the copy
     return "take"
 
 
 def _gone_to(copies: Path, name: str) -> Path:
-    """A free `.gone-<name>`, with a suffix `-<n>` where that name exists."""
+    """A free `.gone-<name>`, with a suffix `-<n>` where that name exists, the name cut to fit a file name's bound."""
+    name = name.encode()[:200].decode(errors="ignore")
     at, n = copies / f"{GONE}{name}", 0
     while os.path.lexists(at):
         n += 1
@@ -1024,11 +1023,13 @@ def _drop_copy(path: Path, copies: Path) -> None:
     mains = _worktree_mains(path)
     gone = _gone_to(copies, path.name)
     os.rename(path, gone)
-    _remove(gone)
-    for m in mains:
-        git = shutil.which("git") or "git"
-        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-            subprocess.run([git, "-C", str(m), "worktree", "prune"], capture_output=True, timeout=GIT_STEP)
+    try:
+        _remove(gone)
+    finally:  # a removal that failed leaves a .gone-* the next pass finishes, and the worktrees pruned now
+        for m in mains:
+            git = shutil.which("git") or "git"
+            with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+                subprocess.run([git, "-C", str(m), "worktree", "prune"], capture_output=True, timeout=GIT_STEP)
 
 
 def _finish_gone(copies: Path, transcript_roots: list[Path], log: Any) -> None:
@@ -1042,7 +1043,7 @@ def _finish_gone(copies: Path, transcript_roots: list[Path], log: Any) -> None:
             log.warning("could not finish %s: %s", g, err)
 
 
-def _held_once() -> Callable[[], set[str] | None]:
+def held_once() -> Callable[[], set[str] | None]:
     """`held_paths`, read at the first call and kept for the pass."""
     got: list[set[str] | None] = []
 
@@ -1062,21 +1063,27 @@ def release_copies(
     tally: Any = None,
     dry: bool = False,
     deadline: float | None = None,
+    held: Callable[[], set[str] | None] | None = None,
 ) -> list[tuple[str, str]]:
     """The hourly release of a seat's `copies/` (§4.6 *A live seat's rebuildable copies*, part 4), over the directories
     `_seats` returns: the `.gone-*` left behind are finished first, then each copy goes once nothing under it was
     written for `COPY_KEEP_S`, unless a process of this uid holds a path under it, it holds git work, or `/proc` cannot
     be read. A path overlapping a transcript store is skipped; past `deadline` the pass stops, its tally *partial*. A
-    dry run counts what would go and removes nothing. Returns the copies kept, with why."""
+    dry run counts what would go and removes nothing. `held` is the pass's one `/proc` reading (`held_once`), shared
+    by every root. Returns the copies kept, with why."""
     import logging
 
     log = logging.getLogger(__name__)
     kept: list[tuple[str, str]] = []
-    held = _held_once()
+    held = held or held_once()
     for seat in _seats(root, home):
         copies = _copies(seat)
         if copies is None:
             continue
+        if deadline is not None and time.monotonic() >= deadline:
+            if tally is not None:
+                tally.unlisted = True
+            return kept
         if not dry:
             _finish_gone(copies, transcript_roots, log)
         for copy in _copy_dirs(copies, gone=False):
@@ -1177,7 +1184,7 @@ def reclaim(
                 if done():
                     return {"removed": removed, "skipped": skipped}
                 take(Path(e.path), BUILD_QUIET_S)
-    held = _held_once()
+    held = held_once()
     for seat in _seats(root, home):  # rule 4: copies, after two quiet hours
         copies = _copies(seat)
         if copies is None:

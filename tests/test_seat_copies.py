@@ -223,3 +223,21 @@ def test_a_process_the_kernel_refuses_to_show_is_not_seen_and_any_other_failure_
         assert scratch.held_paths(str(proc)) == set()
     finally:
         (refused / "maps").chmod(0o600)
+
+
+@pytest.mark.unit
+def test_a_long_copy_name_still_has_a_gone_name_that_fits(seat):
+    _, _, s = seat
+    copies = s / scratch.COPIES_DIR
+    got = scratch._gone_to(copies, "x" * 255)
+    assert len(got.name.encode()) <= 255
+
+
+@pytest.mark.unit
+def test_a_future_dated_file_does_not_keep_a_copy(seat, no_holds):
+    root, home, s = seat
+    c = _copy(s, "review")
+    ahead = time.time() + 40 * 365 * DAY
+    os.utime(c / "pkg" / "a.py", (ahead, ahead))
+    _release(root, home, time.time() + DAY + 60)
+    assert not c.exists()
