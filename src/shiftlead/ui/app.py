@@ -365,6 +365,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     look_pair,  # noqa: F401
     look_review,  # noqa: F401
     look_shots,  # noqa: F401
+    memory_low_rows,
     needs_person,  # noqa: F401
     not_clear_on,  # noqa: F401
     origin_case,  # noqa: F401
@@ -1786,6 +1787,8 @@ class Readings:
             + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
             # §4.5a *Inbox row: temporary space low* (TD-2083): the home's spells, a row per host and pool
             + disk_low_rows(home.get("disk_low"))
+            # §4.5a *Inbox row: memory low* (TD-2136): the home's spells, a row per host and half
+            + memory_low_rows(home.get("memory_low"))
             # §4.5a *Queue card / Inbox: stuck row* (§6 rule 13, TD-1497): the home's stuck asks, Open where held
             + stuck_rows(home.get("stuck"), records=fleet)
         )
@@ -2402,6 +2405,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += ci_not_run_rows(None if agent_down else (info or {}).get("ci_spells"))
         # …and a host's temporary space low (§4.5a *Inbox row: temporary space low*, TD-2083)
         promos += disk_low_rows(None if agent_down else (info or {}).get("disk_low"))
+        # …and a host's memory or swap low (§4.5a *Inbox row: memory low*, TD-2136)
+        promos += memory_low_rows(None if agent_down else (info or {}).get("memory_low"))
         # …and stuck work the person is asked to see (§4.5a *Queue card / Inbox: stuck row*, TD-1497)
         promos += stuck_rows(None if agent_down else (info or {}).get("stuck"), records=sessions)
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)

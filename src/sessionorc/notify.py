@@ -117,6 +117,38 @@ def disk_low_line(spell: dict[str, Any]) -> str:
     return f"{PREFIX} · {disk_low_text(spell)}"
 
 
+def size_text(n: Any) -> str:
+    """`n` bytes as a person reads them: B, KB, MB, GB or TB, powers of 1024, one decimal past KB."""
+    size = float(n or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024:
+            return f"{size:.0f} {unit}" if unit in ("B", "KB") else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+def memory_low_text(spell: dict[str, Any]) -> str:
+    """A low half's words, the Inbox row's and the message's (§4.5a *Inbox row: memory low*): *<host> memory low:
+    <n>% free* or *<host> swap low: <n>% free*, then *Your largest: <three holders>*, sizes from a walk cut at its
+    bound reading *at least*; a walk that found no holder omits *Your largest*."""
+    share = spell.get("share_free")
+    free = f": {int(share * 100)}% free" if isinstance(share, int | float) else ""
+    least = "at least " if spell.get("cut") else ""
+    names = []
+    got = spell.get("holders")
+    for h in got if isinstance(got, list) else []:  # a record a hand or another build left odd costs the name alone
+        if isinstance(h, dict) and isinstance(h.get("bytes"), int):
+            names.append(f"{h.get('name')} ({least}{size_text(h['bytes'])})")
+    largest = f". Your largest: {', '.join(names)}" if names else ""
+    what = "swap" if spell.get("half") == "swap" else "memory"
+    return f"{spell.get('host')} {what} low{free}{largest}"
+
+
+def memory_low_line(spell: dict[str, Any]) -> str:
+    """The message for a low half: *shiftlead · <the row's words>*."""
+    return f"{PREFIX} · {memory_low_text(spell)}"
+
+
 def test_line(home: str) -> str:
     """**Send a test**: *shiftlead · a test from kmaster*."""
     return f"{PREFIX} · a test from {home}"

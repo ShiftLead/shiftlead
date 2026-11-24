@@ -1004,6 +1004,40 @@ def disk_low_rows(spells: Mapping[str, Any] | None, now: datetime | None = None)
     return out
 
 
+def memory_low_rows(spells: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: memory low** (§4.6 *Told when memory runs short*, TD-2136): one row per spell the home
+    keeps (`memory_low` on `host`), under *Needs you*, counted, keyed `memory_low:<host>:<half>`, which is the attention
+    store's snooze key and the message's `?row=`. It ends by itself once that half is back over 20% free."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    if not isinstance(spells, Mapping):  # a host record a hand or another build left odd costs the rows, not the page
+        return out
+    for key, spell in sorted(spells.items()):
+        if not isinstance(spell, Mapping):
+            continue
+        text = notify_mod.memory_low_text(dict(spell))
+        since = str(spell.get("since") or "")
+        sid = f"memory_low:{key}"
+        host = str(spell.get("host") or "")
+        out.append(
+            {
+                "row": "memory_low",
+                "sid": sid,
+                "id": sid,
+                "name": host,
+                "host": host,
+                "half": str(spell.get("half") or ""),
+                "subject": kind_subject("Memory"),
+                "team": "",
+                "at": since,
+                "age": _age(since, at),
+                "text": text,
+                "find": f"Memory {text}",
+            }
+        )
+    return out
+
+
 def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Inbox row: CI not starting** (§4.4 *CI that never started is the person's*, TD-687):
     one row per spell the home keeps (`ci_spells` on `host`), under *Needs you*, counted: *GitHub

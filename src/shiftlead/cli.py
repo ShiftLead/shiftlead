@@ -3930,6 +3930,20 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
         for pool, one in (e.get("pressure") or {}).items():  # §4.6 *Told before the pool is full*, TD-2083
             words = notify_mod.disk_low_text({**one, "host": host, "pool": pool})
             out.append(f"  ⚠ {words} (since {one.get('since')})")
+        if e.get("no_memory"):  # §4.6 *Told when memory runs short*, TD-2136
+            out.append("  no memory reading")
+        memory = e.get("memory") if isinstance(e.get("memory"), dict) else {}
+        shares = [
+            f"{half} {int(one['share_free'] * 100)}% free"
+            for half, one in memory.items()
+            if isinstance(one, dict) and isinstance(one.get("share_free"), int | float)
+        ]
+        if shares:
+            out.append(f"  memory: {', '.join(shares)}")
+        for half, one in memory.items():
+            if isinstance(one, dict) and one.get("low"):
+                words = notify_mod.memory_low_text({**one, "host": host, "half": half})
+                out.append(f"  ⚠ {words} (since {one.get('since')})")
     return out
 
 

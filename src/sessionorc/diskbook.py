@@ -349,8 +349,11 @@ def write(
         }
         if seat_free is not None:
             out["seat_free"] = seat_free
-        if isinstance(low := _load(path).get("low"), dict):  # each pool's *low* state outlives a pass (TD-2083)
+        kept = _load(path)
+        if isinstance(low := kept.get("low"), dict):  # each pool's *low* state outlives a pass (TD-2083)
             out["low"] = low
+        if isinstance(memory := kept.get("memory"), dict):  # and each memory half's (TD-2136)
+            out["memory"] = memory
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
     return out
 
@@ -369,6 +372,51 @@ def set_low(home: str | Path, host: str, low: dict[str, dict[str, Any]]) -> None
         got.pop("low", None)
         out = {"host": host, **got, **({"low": low} if low else {})}
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
+
+
+def memory_state(home: str | Path) -> dict[str, dict[str, Any]]:
+    """Each memory half's *low* state in `disk.json` (§4.6 *Told when memory runs short*), an odd entry dropped."""
+    got = _load(Path(home) / FILE).get("memory")
+    return {str(k): v for k, v in got.items() if isinstance(v, dict)} if isinstance(got, dict) else {}
+
+
+def set_memory(home: str | Path, host: str, memory: dict[str, dict[str, Any]]) -> None:
+    """Write the memory halves' *low* state into `disk.json`, leaving the rest of the file as it stands."""
+    path = Path(home) / FILE
+    with _WRITE:
+        got = _load(path)
+        got.pop("memory", None)
+        out = {"host": host, **got, **({"memory": memory} if memory else {})}
+        _atomic_write(path, json.dumps(out, indent=1) + "\n")
+
+
+def memory_spells(old: dict[str, Any], answers: dict[str, Any], now: str) -> dict[str, dict[str, Any]]:
+    """The home's `memory_low` spells after one round of `disk` answers (§4.6 *Told what finished sessions left
+    running*), keyed `<host>:<half>`: begun by the first answer whose half has `low` true and ended by the first where
+    it is false or the half is absent, holding the latest share free, holders and `cut`. A host whose answer is an
+    error or lacks `memory` (an older build, no memory reading) keeps its spells as they stand; a host no longer asked
+    has none."""
+    out: dict[str, dict[str, Any]] = {}
+    for host, answer in answers.items():
+        memory = answer.get("memory") if isinstance(answer, dict) and "error" not in answer else None
+        if not isinstance(memory, dict):
+            out.update({k: v for k, v in old.items() if isinstance(v, dict) and v.get("host") == host})
+            continue
+        for half, one in memory.items():
+            if not isinstance(one, dict) or not one.get("low"):
+                continue
+            key = f"{host}:{half}"
+            was = old.get(key) if isinstance(old.get(key), dict) else {}
+            share = one.get("share_free")
+            out[key] = {
+                "host": str(host),
+                "half": str(half),
+                "since": str(was.get("since") or now),
+                "share_free": share if isinstance(share, int | float) else was.get("share_free"),
+                "holders": [h for h in one.get("holders") or [] if isinstance(h, dict)],
+                "cut": bool(one.get("cut")),
+            }
+    return out
 
 
 def low_spells(old: dict[str, Any], answers: dict[str, Any], now: str) -> dict[str, dict[str, Any]]:
