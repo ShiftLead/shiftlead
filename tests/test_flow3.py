@@ -283,3 +283,11 @@ def test_ao_flow_list_marks_the_format3_builtins_not_yet_in_use(tmp_path, monkey
     wise = [ln for ln in lines if ln.startswith("flow design-wise")]
     assert len(wise) == 1 and "usable  format 3, not yet in use" in wise[0]
     assert any(ln.startswith("flow td") and "format 3" not in ln for ln in lines), "the first shape's stay in use"
+
+
+def test_a_flow_nested_past_the_parsers_depth_is_one_problem():
+    """TD-2135: a file nested past the YAML parser's depth reads as text that is no YAML, never a RecursionError."""
+    deep = "format: 3\nstages: " + "[" * 5000
+    got = flow3.check_text(deep)
+    assert len(got.problems) == 1 and got.problems[0].startswith("the file is not valid YAML")
+    assert flow3.is_format3(deep) is False

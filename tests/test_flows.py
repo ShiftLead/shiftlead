@@ -1774,3 +1774,9 @@ def test_start_after_a_rename_is_a_persons_and_never_beside_a_live_orphan(
     assert cli.main(["team", "start", "ao-grind", "--anyway"]) == 1
     assert "grind-1 still running: a live team takes a rename or a removal by Apply" in capsys.readouterr().err
     assert not [m for m, _ in state["calls"] if m in ("create", "relaunch", "close")]
+
+
+def test_a_teams_load_of_a_flow_nested_past_the_parsers_depth_names_a_problem(tmp_path):
+    """TD-2135: a team's load of such a flow reads it as not usable, saying why, and raises nothing."""
+    flow = flowdefs.parse("deep", "repo", tmp_path, "stages: " + "[" * 5000, tmp_path)
+    assert len(flow.problems) == 1 and "not valid YAML (nested too deeply to read)" in flow.problems[0]
