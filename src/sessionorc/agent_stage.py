@@ -7,18 +7,54 @@ session holds, a thread for the blocking work, and the claim released once the m
 from __future__ import annotations
 
 import asyncio
+import copy
 import time
+from collections.abc import Callable, Mapping
 from importlib.metadata import entry_points
+from pathlib import PurePath
 from typing import Any
 
+from sessionorc import hosts, naming, teamstore
+from sessionorc import settings as settings_mod
 from sessionorc.agent_common import ACT_TIMEOUT, RpcError, log
 from sessionorc.agent_ids import origin_key
-from sessionorc.models import lane_refs
+from sessionorc.client import AgentError, AgentUnavailable
+from sessionorc.mail import PERSON
+from sessionorc.models import Session, lane_refs
 
 GROUP = "shiftlead.home_calls"
 NAME = "stage"
 FLOW = "flow"
 TEAM = "team"
+TICK = "stage_tick"
+STAGE_EVERY = 60.0  # seconds between two stage passes at the home (§4.9c *The home acts only where no session will*)
+STAGE_CALL_WAIT = ACT_TIMEOUT * 4  # a pass's call on the home's loop: a create waits on its pane
+
+
+def stage_teams(doc: Mapping[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+    """The switched teams of `settings.yml` by the registered checkout's name their `repo` holds (§4.9d *Before and
+    after the cut-over*): `{repo: {team: its entry}}`, each entry a copy for the pass's thread."""
+    teams = doc.get("teams")
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for team, entry in teams.items() if isinstance(teams, Mapping) else ():
+        if isinstance(team, str) and teamstore.switched(doc, team):
+            out.setdefault(str(entry["repo"]).strip(), {})[team] = copy.deepcopy(dict(entry))
+    return out
+
+
+def _named(path: Any, name: str) -> bool:
+    """Whether a checkout's path is the registered repo `name`, by its last component as the readings name a repo
+    (`queue.record_repo`); a node's path is never resolved here."""
+    return bool(path) and PurePath(str(path)).name == name
+
+
+def told(team: str, problems: Any) -> str:
+    """The note to the person once a team's flow stops passing its check (§4.9c *A flow that stops passing its check
+    keeps its last good version in use*)."""
+    lines = [str(p) for p in problems or ()] or ["its check gave no reason"]
+    return f"Team {team}'s flow stopped passing its check, so the team keeps running its last good copy.\n" + "\n".join(
+        f"- {p}" for p in lines
+    )
 
 
 def home_call(name: str) -> Any:
@@ -117,3 +153,114 @@ class StageMixin:
         if "refused" in got:
             raise RpcError(str(got["refused"]))
         return got
+
+    # the stage pass (§4.9c *The home acts only where no session will*, TD-2051): one detached pass at the home after
+    # the cut-over, at most once a minute, a thread for each repo with switched teams, and never two passes at once
+    _stage_task: asyncio.Task[None] | None = None
+    _stage_at = float("-inf")
+
+    def _stage_due(self) -> None:
+        """The tick's start of the stage pass: the home's, after the cut-over, once `STAGE_EVERY` has passed since the
+        last began and that one has ended, so no repo is ever in two passes at once."""
+        if self.mode != "home" or not self._first_shape_off:  # type: ignore[attr-defined]
+            return
+        if self._stage_task is not None and not self._stage_task.done():
+            return
+        if time.monotonic() - self._stage_at < STAGE_EVERY:
+            return
+        self._stage_at = time.monotonic()
+        self._stage_task = asyncio.create_task(self._stage_pass())
+
+    async def _stage_pass(self) -> None:
+        """One pass over every repo with switched teams, each in a thread of its own (`shiftlead.stage_tick.run`, whose
+        gate can take as long as the cadence check). What only the home holds is read here, on the loop, and handed
+        over as copies: the repo facts of `_refresh_repos`' last reading (a repo not read yet waits for it), the graph,
+        the nodes whose snapshot has arrived, every node's checkouts of the repo and the `host` record's teams."""
+        try:
+            doc = await asyncio.to_thread(settings_mod.read)
+            by_repo = stage_teams(doc) if doc is not None else {}
+            if not by_repo:
+                return
+            calls = home_call(TICK)
+            roots = await asyncio.to_thread(lambda: hosts.local_host().repos())
+            graph = copy.deepcopy(self._graph())  # type: ignore[attr-defined]
+            snapshotted = frozenset(self._intent_sent)  # type: ignore[attr-defined]
+            host_teams = copy.deepcopy(self._host_rec.get("teams") or {})  # type: ignore[attr-defined]
+            kept: dict[str, Any] = self.__dict__.setdefault("_stage_kept", {})
+            call = self._stage_call(asyncio.get_running_loop())
+            jobs = []
+            for name, teams in sorted(by_repo.items()):
+                local = [r for r in roots if _named(r, name)]
+                if not local:
+                    log.warning("the stage pass: no registered checkout is %s, named by %s", name, ", ".join(teams))
+                    continue
+                root = local[0]
+                reading = self._repos.get(root)  # type: ignore[attr-defined]
+                if not reading:
+                    continue
+                checkouts = {self.host: local, **await self._stage_nodes(name, graph)}  # type: ignore[attr-defined]
+                args = {
+                    "root": root,
+                    "teams": teams,
+                    "entries": copy.deepcopy((reading.get("ledger") or {}).get("entries") or []),
+                    "prs": copy.deepcopy(reading.get("prs")),
+                    "graph": graph,
+                    "snapshotted": snapshotted,
+                    "checkouts": checkouts,
+                    "host_teams": host_teams,
+                    "local": self.host,  # type: ignore[attr-defined]
+                    "call": call,
+                    "kept": kept.setdefault(root, calls.Kept()),
+                }
+                jobs.append(self._stage_repo(calls, root, args))
+            await asyncio.gather(*jobs)
+        except Exception:  # noqa: BLE001 — a pass that fails is a log line and the next minute's retry
+            log.exception("the stage pass failed")
+
+    async def _stage_nodes(self, name: str, graph: Mapping[str, Session]) -> dict[str, list[str]]:
+        """Each node's checkouts of the repo `name`: its roster's, and the repos its sessions work in, so a roster
+        that did not answer still names where they are. A node with none of either is left out, but for one whose
+        roster gave nothing at all, which is named with what its sessions show, so its holders read as unknown while
+        its snapshot has not arrived."""
+        nodes = set(hosts.nodes()) | set(self.remote)  # type: ignore[attr-defined]
+        nodes.discard(self.host)  # type: ignore[attr-defined]
+        out: dict[str, list[str]] = {}
+        for node in sorted(nodes):
+            roster = await self._host_roster(node)  # type: ignore[attr-defined]
+            paths = [str(r) for r in roster if _named(r, name)]
+            for address, s in graph.items():
+                at = naming.split_address(address)[1]
+                if at == node and _named(s.repo, name) and str(s.repo) not in paths:
+                    paths.append(str(s.repo))
+            if paths or not roster:
+                out[node] = paths
+        return out
+
+    async def _stage_repo(self, calls: Any, root: str, args: dict[str, Any]) -> None:
+        """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check."""
+        try:
+            got = await asyncio.to_thread(calls.call, **args)
+        except Exception:  # noqa: BLE001 — one repo's failure never stops another's pass
+            log.exception("the stage pass of %s failed", root)
+            return
+        for team, problems in sorted((getattr(got, "tell", None) or {}).items()):
+            self._system_note(PERSON, told(team, problems), team=team)  # type: ignore[attr-defined]
+
+    def _stage_call(self, loop: asyncio.AbstractEventLoop) -> Callable[..., Any]:
+        """The host agent's call as the pass's thread makes it: the RPC dispatched on the loop with no session caller,
+        so a close keeps the tick as its closer (slice 31). A refusal raises `AgentError` as the client's does, and a
+        loop that does not answer in `STAGE_CALL_WAIT` raises `AgentUnavailable`."""
+
+        def call(method: str, **params: Any) -> Any:
+            req = {"id": f"stage-{method}", "method": method, "params": params}
+            fut = asyncio.run_coroutine_threadsafe(self._dispatch_inner(req), loop)  # type: ignore[attr-defined]
+            try:
+                resp = fut.result(timeout=STAGE_CALL_WAIT)
+            except TimeoutError:
+                fut.cancel()
+                raise AgentUnavailable(f"the home did not answer {method} within {STAGE_CALL_WAIT:.0f}s") from None
+            if "error" in resp:
+                raise AgentError(str(resp["error"]), resp.get("error_data"))
+            return resp.get("result")
+
+        return call
