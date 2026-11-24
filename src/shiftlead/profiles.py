@@ -27,7 +27,7 @@ from pathlib import Path
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, yamltext
 
 DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member with no profile (teams.create_params)
 SHELL_ADAPTER = "shell"  # no agent: a profile may name it, a team session may not (teams.plan, TD-329)
@@ -159,7 +159,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
     path = path or profiles_file()
     if not path.is_file():
         return {"default": Profile(name="default")}, "default"
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = yamltext.load(path.read_text(encoding="utf-8")) or {}
     out: dict[str, Profile] = {}
     for name, raw in (data.get("profiles") or {}).items():
         raw = dict(raw or {})

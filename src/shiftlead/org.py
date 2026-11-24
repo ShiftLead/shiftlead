@@ -49,7 +49,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths
+from sessionorc import hosts, paths, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc.models import GRANTS
 from sessionorc.seats import INTERACTIVE, OUTSIDE
@@ -477,7 +477,7 @@ def load(path: Path | None = None) -> Org:
     path = path or org_file()
     if not path.is_file():
         return Org(path=path)
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = yamltext.load(path.read_text(encoding="utf-8")) or {}
     label = path.name
     if not isinstance(data, dict):
         raise ValueError(f"{label}: the top level must be a mapping with `projects:`, `teams:`, `roles:`")

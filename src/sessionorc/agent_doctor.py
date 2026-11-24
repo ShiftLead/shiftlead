@@ -18,7 +18,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, agent_common, containers, hosts, identity, paths
+from sessionorc import adapters, agent_common, containers, hosts, identity, paths, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc.adapters import CommandAdapter, ShellAdapter
 from sessionorc.agent_common import _parse
@@ -55,7 +55,7 @@ def _parse_error(path: Path) -> str | None:
     """Why a YAML file does not parse, in the reader's own words; None when it parses to a mapping,
     is empty, or is absent (an absent file is a home with no such settings)."""
     try:
-        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        doc = yamltext.load(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
     except OSError as e:

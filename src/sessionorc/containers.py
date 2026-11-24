@@ -49,7 +49,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, cadence, hosts, identity, paths
+from sessionorc import adapters, cadence, hosts, identity, paths, yamltext
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 INSIDE = "/shiftlead"  # the node's volume, inside
@@ -724,7 +724,7 @@ def write_node_config(n: ContainerNode) -> None:
     )
     src = paths.home() / "profiles.yml"
     try:
-        doc = yaml.safe_load(src.read_text(encoding="utf-8")) or {}
+        doc = yamltext.load(src.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         doc = {}
     profiles = doc.get("profiles") if isinstance(doc, dict) and isinstance(doc.get("profiles"), dict) else {}
@@ -944,7 +944,10 @@ def remove_node_entry(path: Path, name: str) -> bool:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return False
-    before = yaml.safe_load(text) if text.strip() else {}
+    try:
+        before = yamltext.load(text) if text.strip() else {}
+    except yaml.YAMLError:
+        return False  # a file that does not parse is not a shape this understands
     if not isinstance(before, dict) or name not in (before.get("nodes") or {}):
         return False
     lines = text.splitlines(keepends=True)
@@ -970,7 +973,10 @@ def remove_node_entry(path: Path, name: str) -> bool:
         out.append(line)
         i += 1
     new_text = "".join(out)
-    after = yaml.safe_load(new_text) if new_text.strip() else {}
+    try:
+        after = yamltext.load(new_text) if new_text.strip() else {}
+    except yaml.YAMLError:
+        return False
     if isinstance(after, dict) and after.get("nodes") is None and "nodes" in after:
         after["nodes"] = {} if isinstance(before.get("nodes"), dict) else []  # the last entry went: `nodes:` alone
     expected = dict(before)

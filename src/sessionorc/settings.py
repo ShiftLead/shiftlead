@@ -37,7 +37,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, yamltext
 from sessionorc.store import _atomic_write
 
 DAY = timedelta(days=1)
@@ -51,7 +51,7 @@ def load(path: Path | None = None) -> dict[str, Any]:
     """The whole file, `{}` when it is missing or unreadable: a broken file gates nothing, which is
     the side a person would pick — a gate that pauses on a typo stops a team for no reason."""
     try:
-        doc = yaml.safe_load((path or settings_file()).read_text(encoding="utf-8"))
+        doc = yamltext.load((path or settings_file()).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return {}
     return doc if isinstance(doc, dict) else {}
@@ -63,7 +63,7 @@ def read(path: Path | None = None) -> dict[str, Any] | None:
     What the home sends its nodes (§4.4a *Settings, replicated*, TD-147): a broken file is not
     settings, and a node keeps the replica it has rather than take nothing over it."""
     try:
-        doc = yaml.safe_load((path or settings_file()).read_text(encoding="utf-8"))
+        doc = yamltext.load((path or settings_file()).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return None
     if doc is None:

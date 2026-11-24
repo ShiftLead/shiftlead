@@ -25,7 +25,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import defs, naming, paths
+from sessionorc import defs, naming, paths, yamltext
 
 LOGINS_FILE = "logins.yml"
 
@@ -88,7 +88,7 @@ def load(home: Path | None = None) -> dict[str, Any] | None:
     if not p.is_file():
         return None
     try:
-        raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        raw = yamltext.load(p.read_text(encoding="utf-8")) or {}
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
         raise LoginError(f"{p} could not be read: {type(e).__name__}") from None
     if not isinstance(raw, dict):
