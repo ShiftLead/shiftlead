@@ -4,8 +4,8 @@ TD-2051).
 `step` reads the entry, chooses its one act and makes it, by the module that makes that act, then ends the session the
 act took the record from. What it is given to reach the world (`gate`, `land`, `start`, `claim`, `end`) is the tick's
 wiring, so one entry's failure is that entry's: it is returned as a `Step` and the pass goes on to the next.
-`team_pass` is one team's whole pass: it ends the sessions a crash stranded, stores the team's flow copy once the records
-are read, and takes a step on each open record and each entry the team's lane may take. Nothing calls this yet.
+`team_pass` is one team's whole pass: it ends the sessions a crash stranded, stores the team's flow copy once the
+records are read, and takes a step on each open record and each entry the team's lane may take. Nothing calls this yet.
 """
 
 from __future__ import annotations
