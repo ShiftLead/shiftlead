@@ -6110,6 +6110,10 @@ class TickMixin:
                         kept += scratch_mod.release(
                             root, paths.home(), troots, time.time(), tallies["scratch"], dry=dry, deadline=deadline
                         )
+                    for root in roots:  # part 4: a seat's copies/
+                        kept += scratch_mod.release_copies(
+                            root, paths.home(), troots, time.time(), tallies["scratch"], dry=dry, deadline=deadline
+                        )
             except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
                 tallies["scratch"].unlisted = True
                 log.exception("scratch removal failed")

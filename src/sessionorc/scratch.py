@@ -907,6 +907,208 @@ def release(
     return kept
 
 
+COPIES_DIR = "copies"  # in a seat: the one place for a review copy or an exported tree (TD-2132)
+COPY_KEEP_S = 86_400  # the hourly pass takes a copy after a quiet day
+COPY_PRESSURE_S = 7200  # the pressure pass's rule 4 after two quiet hours
+GONE = ".gone-"  # a copy renamed on its way out, so a reader gets *no such file* rather than a partial tree
+IN_USE = "in use"
+PROC_UNREAD = "processes unreadable"
+
+
+def _copies(seat: Path) -> Path | None:
+    """A seat's `copies/`, where it is a real directory of this uid; None for anything else."""
+    d = seat / COPIES_DIR
+    try:
+        st = d.lstat()
+    except OSError:
+        return None
+    return d if stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid() else None
+
+
+def _copy_dirs(copies: Path, gone: bool) -> list[Path]:
+    """The real directories straight under `copies` that resolved lie under it: the `.gone-*` ones (`gone`), or the
+    candidates. A plain file there is never aged."""
+    real = os.path.realpath(copies)
+    out: list[Path] = []
+    for e in sorted(_dirs(copies), key=lambda e: e.name):
+        if e.name.startswith(GONE) != gone:
+            continue
+        if os.path.dirname(os.path.realpath(e.path)) != real:
+            continue
+        out.append(Path(e.path))
+    return out
+
+
+def _proc_paths(base: str) -> set[str]:
+    """The paths the process at `base` (`/proc/<pid>`) holds: its working directory, root, executable, mapped files
+    and open files."""
+    got: set[str] = set()
+
+    def link(p: str) -> None:
+        try:
+            got.add(os.readlink(p).removesuffix(" (deleted)"))
+        except FileNotFoundError:  # a zombie's, or an fd closed while it was read
+            pass
+
+    for name in ("cwd", "root", "exe"):
+        link(f"{base}/{name}")
+    with open(f"{base}/maps", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            parts = line.rstrip("\n").split(None, 5)
+            if len(parts) == 6 and parts[5].startswith("/"):
+                got.add(parts[5].removesuffix(" (deleted)"))
+    for fd in os.listdir(f"{base}/fd"):
+        link(f"{base}/fd/{fd}")
+    return got
+
+
+def held_paths(proc: str = "/proc") -> set[str] | None:
+    """Every path a process of this uid holds (§4.6 *A live seat's rebuildable copies*, part 4), read once a pass. A
+    process that has gone is skipped, and so is one the kernel refuses to show (it holds capabilities this process
+    lacks, or is marked not dumpable: `systemd --user`, `gpg-agent`, a container's), which is not seen, as one in
+    another pid namespace is not; None where `proc` cannot be listed or a process of this uid cannot be read for any
+    other reason, so every copy is kept."""
+    uid = os.getuid()
+    try:
+        pids = [e.name for e in os.scandir(proc) if e.name.isdecimal()]
+    except OSError:
+        return None
+    held: set[str] = set()
+    for pid in pids:
+        try:
+            if os.stat(f"{proc}/{pid}").st_uid != uid:
+                continue
+            held |= _proc_paths(f"{proc}/{pid}")
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+        except OSError:
+            return None
+    return held
+
+
+def _copy_reading(
+    path: Path, now_s: float, quiet_s: float, walk_s: float | None, held: Callable[[], set[str] | None]
+) -> str:
+    """`take` where a copy may go; `written` where something under it was written within `quiet_s`, by modification
+    and directory change times; else why it is kept: the walk cut short, a process in it, `/proc` unreadable, git
+    work."""
+    reading = _quiet_reading(path, now_s, quiet_s, changed=True, walk_s=walk_s)
+    if reading == "cut":
+        return WALK_CUT
+    if reading != "quiet":
+        return "written"
+    got = held()
+    if got is None:
+        return PROC_UNREAD
+    real = os.path.realpath(path)
+    if any(p == real or p.startswith(real + os.sep) for p in got):
+        return IN_USE
+    if git_work(path):
+        return GIT_WORK
+    return "take"
+
+
+def _gone_to(copies: Path, name: str) -> Path:
+    """A free `.gone-<name>`, with a suffix `-<n>` where that name exists."""
+    at, n = copies / f"{GONE}{name}", 0
+    while os.path.lexists(at):
+        n += 1
+        at = copies / f"{GONE}{name}-{n}"
+    return at
+
+
+def _drop_copy(path: Path, copies: Path) -> None:
+    """Rename a copy to a free `.gone-*`, remove it, then `git worktree prune` where it carried a worktree."""
+    import shutil
+
+    mains = _worktree_mains(path)
+    gone = _gone_to(copies, path.name)
+    os.rename(path, gone)
+    _remove(gone)
+    for m in mains:
+        git = shutil.which("git") or "git"
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            subprocess.run([git, "-C", str(m), "worktree", "prune"], capture_output=True, timeout=GIT_STEP)
+
+
+def _finish_gone(copies: Path, transcript_roots: list[Path], log: Any) -> None:
+    """Remove the `.gone-*` a pass left behind, with no age test."""
+    for g in _copy_dirs(copies, gone=True):
+        if any(overlaps(g, t) for t in transcript_roots):
+            continue
+        try:
+            _remove(g)
+        except OSError as err:
+            log.warning("could not finish %s: %s", g, err)
+
+
+def _held_once() -> Callable[[], set[str] | None]:
+    """`held_paths`, read at the first call and kept for the pass."""
+    got: list[set[str] | None] = []
+
+    def held() -> set[str] | None:
+        if not got:
+            got.append(held_paths())
+        return got[0]
+
+    return held
+
+
+def release_copies(
+    root: str | Path,
+    home: str | Path,
+    transcript_roots: list[Path],
+    now_s: float,
+    tally: Any = None,
+    dry: bool = False,
+    deadline: float | None = None,
+) -> list[tuple[str, str]]:
+    """The hourly release of a seat's `copies/` (§4.6 *A live seat's rebuildable copies*, part 4), over the directories
+    `_seats` returns: the `.gone-*` left behind are finished first, then each copy goes once nothing under it was
+    written for `COPY_KEEP_S`, unless a process of this uid holds a path under it, it holds git work, or `/proc` cannot
+    be read. A path overlapping a transcript store is skipped; past `deadline` the pass stops, its tally *partial*. A
+    dry run counts what would go and removes nothing. Returns the copies kept, with why."""
+    import logging
+
+    log = logging.getLogger(__name__)
+    kept: list[tuple[str, str]] = []
+    held = _held_once()
+    for seat in _seats(root, home):
+        copies = _copies(seat)
+        if copies is None:
+            continue
+        if not dry:
+            _finish_gone(copies, transcript_roots, log)
+        for copy in _copy_dirs(copies, gone=False):
+            left = None if deadline is None else deadline - time.monotonic()
+            if left is not None and left <= 0:
+                if tally is not None:
+                    tally.unlisted = True
+                return kept
+            if any(overlaps(copy, t) for t in transcript_roots):
+                continue
+            walk_s = RELEASE_WALK_S if left is None else min(RELEASE_WALK_S, left)
+            reading = _copy_reading(copy, now_s, COPY_KEEP_S, walk_s, held)
+            if reading == "written":
+                continue
+            if reading != "take":
+                kept.append((str(copy), reading))
+                if tally is not None:
+                    tally.keep(copy, reading)
+                continue
+            size = diskbook.size_of(copy, diskbook.deadline()) if tally is not None else None
+            if not dry:
+                try:
+                    _drop_copy(copy, copies)
+                except OSError as err:
+                    log.warning("could not release %s: %s", copy, err)
+                    continue
+                log.info("released copy %s", copy)
+            if tally is not None:
+                tally.gone(copy, size)
+    return kept
+
+
 def reclaim(
     root: str | Path,
     home: str | Path,
@@ -918,7 +1120,8 @@ def reclaim(
     sweep_lock: Any,
 ) -> dict[str, Any]:
     """One reclaim of the pool at `root` (§4.6 *The pressure pass*): test runs, then ended runs' directories under
-    `PRESSURE_KEEP_HOURS`, then build leftovers, stopping once `share()` is back over `PRESSURE_CLEAR`. Rule 2 takes
+    `PRESSURE_KEEP_HOURS`, then build leftovers, then copies after `COPY_PRESSURE_S`, stopping once `share()` is back
+    over `PRESSURE_CLEAR`. Rule 2 takes
     `sweep_lock` without waiting and is `skipped` if it is held. No rule removes a path that overlaps a transcript
     store (§9 invariant 16), and with `transcript_roots` None (an adapter that cannot name its stores, so one could
     lie inside any candidate) nothing is removed. Returns the bytes `removed` and `skipped`."""
@@ -974,6 +1177,30 @@ def reclaim(
                 if done():
                     return {"removed": removed, "skipped": skipped}
                 take(Path(e.path), BUILD_QUIET_S)
+    held = _held_once()
+    for seat in _seats(root, home):  # rule 4: copies, after two quiet hours
+        copies = _copies(seat)
+        if copies is None:
+            continue
+        _finish_gone(copies, transcript_roots, log)
+        for copy in _copy_dirs(copies, gone=False):
+            if done():
+                return {"removed": removed, "skipped": skipped}
+            if any(overlaps(copy, t) for t in transcript_roots):
+                continue
+            reading = _copy_reading(copy, now_s, COPY_PRESSURE_S, None, held)
+            if reading == WALK_CUT:
+                log.warning("reclaim kept %s: %s", copy, WALK_CUT)
+            if reading != "take":
+                continue
+            try:
+                size = diskbook.size_of(copy, diskbook.deadline()) or 0
+                _drop_copy(copy, copies)
+            except OSError as err:
+                log.warning("could not reclaim %s: %s", copy, err)
+                continue
+            removed += size
+            log.info("reclaimed copy %s", copy)
     return {"removed": removed, "skipped": skipped}
 
 
