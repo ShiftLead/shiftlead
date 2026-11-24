@@ -50,6 +50,7 @@ from sessionorc import conventions as conventions_mod
 from sessionorc import gatesweep as gatesweep_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import memory as memory_mod
 from sessionorc import no_lane as no_lane_mod
 from sessionorc import queue as queue_mod
 from sessionorc import scratch as scratch_mod
@@ -525,6 +526,10 @@ class TickMixin:
         if snapshot_at - self._pressure_at >= timedelta(seconds=scratch_mod.PRESSURE_EVERY) and not pressing:
             self._pressure_at = snapshot_at
             self._pressure_task = asyncio.create_task(self._pressure_pass(snapshot_at))
+        reading_memory = self._memory_task is not None and not self._memory_task.done()
+        if snapshot_at - self._memory_at >= timedelta(seconds=scratch_mod.PRESSURE_EVERY) and not reading_memory:
+            self._memory_at = snapshot_at  # §4.6 *Told when memory runs short*, TD-2136
+            self._memory_task = asyncio.create_task(self._memory_pass())
         if self.mode == "home":
             reading = self._disk_low_task is not None and not self._disk_low_task.done()
             if snapshot_at - self._disk_low_at >= timedelta(seconds=scratch_mod.PRESSURE_EVERY) and not reading:
@@ -5820,20 +5825,89 @@ class TickMixin:
             }
         return out
 
+    def _walk_state(self) -> str:
+        """The `/proc` walk's state (§4.6 *The process reading*): `idle` once its thread has returned, `stuck` past
+        twice `LEFT_WALK_S` (its result then read as `cut`, never applied), else `running`."""
+        if self._walk_task is None or self._walk_task.done():
+            return "idle"
+        if self._walk_stuck or time.monotonic() - self._walk_started > 2 * scratch_mod.LEFT_WALK_S:
+            self._walk_stuck = True
+            return "stuck"
+        return "running"
+
+    async def _memory_pass(self) -> None:
+        """One reading of the memory halves, off the loop, and each half's state after it (§4.6 *Told when memory
+        runs short*, TD-2136): two readings under `MEMORY_LOW` start a walk, whose result writes the half *low*; a walk
+        is also due every `LEFT_EVERY`. A detached task: a failure is logged."""
+        try:
+            halves = await asyncio.to_thread(memory_mod.read_halves)
+            async with self._memory_lock:
+                walk = self._walk_state()
+                old = await asyncio.to_thread(diskbook.memory_state, paths.home())
+                new, start = self._memory_watch.step(old, halves, now_iso(), walk)
+                if new != old:
+                    await asyncio.to_thread(diskbook.set_memory, paths.home(), self.host, new)
+            due = time.monotonic() - self._walk_at >= scratch_mod.LEFT_EVERY
+            if self._walk_state() == "idle" and (start or due):
+                self._start_walk()
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
+            log.exception("the memory reading failed")
+
+    def _start_walk(self) -> None:
+        """Start one walk of `/proc`, the records' snapshot taken here, on the loop (§4.6 *The process reading*)."""
+        live = memory_mod.live_runs(list(self.sessions.values()))
+        self._walk_for = set(self._memory_watch.turning)
+        self._walk_started = self._walk_at = time.monotonic()
+        self._walk_stuck = False
+        self._walk_task = asyncio.create_task(self._walk(live))
+
+    async def _walk(self, live: dict[str, tuple[str, float]]) -> None:
+        """One walk and its result (§4.6 *The process reading*): a walk that raised is `cut` with no holders; one
+        read as stuck meanwhile is not applied. A half that turned during it is walked for as it returns."""
+        try:
+            try:
+                got: dict[str, Any] | None = await asyncio.to_thread(memory_mod.read_holders, live, paths.home())
+            except Exception:  # noqa: BLE001 — a walk that raises is cut, with no holders
+                log.exception("the process walk failed")
+                got = None
+            async with self._memory_lock:
+                if time.monotonic() - self._walk_started > 2 * scratch_mod.LEFT_WALK_S:
+                    self._walk_stuck = True  # past its bound, whether or not a reading saw it stuck: never applied
+                if not self._walk_stuck:
+                    old = await asyncio.to_thread(diskbook.memory_state, paths.home())
+                    new = self._memory_watch.walked(old, got, self._walk_for, now_iso())
+                    if new != old:
+                        await asyncio.to_thread(diskbook.set_memory, paths.home(), self.host, new)
+            if self._memory_watch.turning:
+                self._start_walk()
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
+            log.exception("the process walk's result failed")
+
+    def _memory_view(self) -> dict[str, Any] | None:
+        """The `memory` of this host's `disk` reading, each half read live; None with no reading. Off the loop."""
+        halves = memory_mod.read_halves()
+        return None if halves is None else memory_mod.view(diskbook.memory_state(paths.home()), halves)
+
     async def _disk_low_pass(self) -> None:
         """The home's read of every host's `pressure` (§4.6 *Told before the pool is full*), one `disk` call per host
         at once: a detached task, so a node that is down holds up only its own answer. A change is saved to the `host`
         record, which the page and the notify pass read."""
         try:
             got = await self._disk_everywhere("disk", self._disk_here)
-            old = self._host_rec.get("disk_low") or {}
-            new = diskbook.low_spells(old, got, now_iso())
-            if new == old:
+            changed = False
+            # the pools' spells (TD-2083) and the memory halves' (§4.6 *Told when memory runs short*, TD-2136)
+            for name, spells in (("disk_low", diskbook.low_spells), ("memory_low", diskbook.memory_spells)):
+                old = self._host_rec.get(name) or {}
+                new = spells(old, got, now_iso())
+                if new == old:
+                    continue
+                changed = True
+                if new:
+                    self._host_rec[name] = new
+                else:
+                    self._host_rec.pop(name, None)
+            if not changed:
                 return
-            if new:
-                self._host_rec["disk_low"] = new
-            else:
-                self._host_rec.pop("disk_low", None)
             self.host_store.save(self._host_rec)
             await self._push_changes()
         except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
@@ -5958,6 +6032,11 @@ class TickMixin:
             out["no_pressure"] = pool
         if pressure := self._pressure_view():  # §4.6 *Told before the pool is full*, TD-2083
             out["pressure"] = pressure
+        memory = self._memory_view()  # §4.6 *Told when memory runs short*, TD-2136: always carried with a reading
+        if memory is None:
+            out["no_memory"] = True
+        else:
+            out["memory"] = memory
         return out
 
     async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:

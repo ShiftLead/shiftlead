@@ -201,6 +201,13 @@ class NotifyMixin:
                 continue
             k = f"disk_low:{key}"
             rows[k] = _Row(str(spell["since"]), notify.disk_low_line(spell), k, f"{k}|disk_low", snooze_is_seen=True)
+        # *memory low* for a host's half (§4.6 *Told when memory runs short*, TD-2136), likewise
+        for key, spell in (self._host_rec.get("memory_low") or {}).items():
+            if not isinstance(spell, dict) or not spell.get("since"):
+                continue
+            k = f"memory_low:{key}"
+            line = notify.memory_low_line(spell)
+            rows[k] = _Row(str(spell["since"]), line, k, f"{k}|memory_low", snooze_is_seen=True)
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:

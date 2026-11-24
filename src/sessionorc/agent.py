@@ -60,6 +60,7 @@ from sessionorc import briefs as briefs_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import digest as digest_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import memory as memory_mod
 from sessionorc import scratch as scratch_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
@@ -891,6 +892,17 @@ class HostAgent(
         # the home's read of each host's low pools (§4.6 *Told before the pool is full*, TD-2083)
         self._disk_low_task: asyncio.Task[None] | None = None
         self._disk_low_at = datetime.now(UTC)
+        # told when memory runs short (§4.6, TD-2136): a reading every `PRESSURE_EVERY`, its own task; one walk of
+        # `/proc` at a time, every `LEFT_EVERY` and as a half turns, its thread watched for twice `LEFT_WALK_S`
+        self._memory_task: asyncio.Task[None] | None = None
+        self._memory_at = datetime.now(UTC)
+        self._memory_lock = asyncio.Lock()  # the reading and a walk's result each rewrite `disk.json`'s `memory`
+        self._memory_watch = memory_mod.Watch()
+        self._walk_task: asyncio.Task[None] | None = None
+        self._walk_started = 0.0  # monotonic
+        self._walk_at = time.monotonic()  # the last walk's start: the first `LEFT_EVERY` walk is one after start
+        self._walk_for: set[str] = set()
+        self._walk_stuck = False
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
@@ -1565,6 +1577,8 @@ class HostAgent(
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
             # the *temporary space low* rows' spells (§4.6 *Told before the pool is full*, TD-2083)
             out["disk_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("disk_low") or {}).items())}
+            # the *memory low* rows' spells (§4.6 *Told when memory runs short*, TD-2136)
+            out["memory_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("memory_low") or {}).items())}
             # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
             # with its `waiting_until` where this tick read one (never stored)
             out["stuck"] = {

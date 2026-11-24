@@ -613,6 +613,12 @@ PRESSURE_KEEP_HOURS = 1.0  # rule 2's keep in place of `scratch_keep_hours`
 PRESSURE_TELL = 0.15  # under this share free, once reclaimed from, a pool is *low* (TD-2083)
 PRESSURE_WALK_S = 30.0  # the one walk that names a low pool's largest holders
 PRESSURE_HOLDERS = 3
+# told when memory runs short (§4.6, TD-2127, built by TD-2136): read every `PRESSURE_EVERY` too (`sessionorc.memory`)
+MEMORY_LOW = 0.10  # two readings running under this share free make a half *turning*
+MEMORY_CLEAR = 0.20  # the first reading over this ends it
+LEFT_EVERY = 600  # seconds between walks of `/proc` (§4.6 *The process reading*)
+LEFT_WALK_S = 10.0  # one walk's bound; twice this and it is cut with no holders
+LEFT_SLACK = 60  # seconds a process may start before its record's `created` and still be that run's
 TEST_RUN_MARK = ".shiftlead-test-run"  # a suite's scratch root, holding its pid (TD-2084)
 RUN_QUIET_S = 600  # rule 1: nothing under a run written for ten minutes
 BUILD_QUIET_S = 86_400  # rule 3: nothing under a build leftover written for a day
