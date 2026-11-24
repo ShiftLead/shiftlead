@@ -5960,12 +5960,46 @@ class TickMixin:
                     self._host_rec[name] = new
                 else:
                     self._host_rec.pop(name, None)
+            changed = self._tell_seats(got) or changed
             if not changed:
                 return
             self.host_store.save(self._host_rec)
             await self._push_changes()
         except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
             log.exception("reading the hosts' temporary space failed")
+
+    def _tell_seats(self, answers: dict[str, Any]) -> bool:
+        """Each seat over its budget told once (§4.6 *A seat is told instead*, TD-2133): every host's `seats_over`
+        in this round of `disk` answers, against the spells told, kept in the host record as `seats_told` (by the
+        seat's address, with its host and `since`), so a restart or a link down neither repeats nor loses a note.
+        A spell not told yet gets one `system` note to its seat, wherever it runs; a host whose answer is an error
+        keeps its told spells, and one the reading no longer carries is forgotten. True where `seats_told` changed."""
+        old = self._host_rec.get("seats_told") or {}
+        new: dict[str, dict[str, Any]] = {}
+        for host, answer in answers.items():
+            if not isinstance(answer, dict) or "error" in answer:
+                new.update({k: v for k, v in old.items() if isinstance(v, dict) and v.get("host") == host})
+                continue
+            spells = answer.get("seats_over")
+            for spell in spells if isinstance(spells, list) else []:
+                if not isinstance(spell, dict) or not spell.get("record") or not isinstance(spell.get("since"), str):
+                    continue
+                addr = str(spell["record"]) if host == self.host else f"{spell['record']}@{host}"
+                was = old.get(addr) if isinstance(old.get(addr), dict) else {}
+                if was.get("since") != spell["since"]:
+                    try:
+                        self._system_note(addr, scratch_mod.seat_note(spell))
+                    except Exception:  # noqa: BLE001 — one seat's note never loses the others' told state
+                        log.exception("telling %s of its scratch failed", addr)
+                        continue
+                new[addr] = {"host": str(host), "since": spell["since"]}
+        if new == old:
+            return False
+        if new:
+            self._host_rec["seats_told"] = new
+        else:
+            self._host_rec.pop("seats_told", None)
+        return True
 
     def _reclaim(self, pool: str, start: float, named: dict[str, tuple[str, float | None]]) -> bool:
         """One reclaim, in a thread, under its own lock; its line in `disk.json`, weak passes folded. False where
@@ -6037,6 +6071,10 @@ class TickMixin:
                     runs.measure(path, size)
             self._disk_result = self._disk_book.close(tallies)
             try:
+                seats = tallies["scratch"].seat  # §4.6 *A seat is told instead* (TD-2133): the hourly pass alone
+                spells = None
+                if seats is not None:
+                    spells = scratch_mod.seat_step(diskbook.seat_state(paths.home()), seats, now_iso())
                 free = diskbook.free_space(self._scratch_root())
                 diskbook.write(
                     paths.home(),
@@ -6047,6 +6085,8 @@ class TickMixin:
                     datetime.now(UTC),
                     seat_free=self._seat_free(),
                     branches=diskbook.branch_rows(int(branches["deleted"]), self._branch_kept or {}),
+                    seats=seats,
+                    seat_spells=spells,
                 )
             except Exception:  # noqa: BLE001 — the reading never stops a pass
                 log.exception("writing the sweep's reading failed")
@@ -6086,6 +6126,8 @@ class TickMixin:
             out["no_pressure"] = pool
         if pressure := self._pressure_view():  # §4.6 *Told before the pool is full*, TD-2083
             out["pressure"] = pressure
+        if over := scratch_mod.seats_over(diskbook.seat_state(paths.home())):  # §4.6 *A seat is told instead*
+            out["seats_over"] = over
         memory = self._memory_view()  # §4.6 *Told when memory runs short*, TD-2136: always carried with a reading
         if memory is None:
             out["no_memory"] = True
@@ -6204,6 +6246,8 @@ class TickMixin:
                 return True
             return False
 
+        if scratch is not None and not dry:  # each live seat's inodes (§4.6 *A seat is told instead*, TD-2133):
+            tallies["scratch"].seat = {}  # with none live, every spell ends
         if scratch and not dry:
             large: list[str] = []
             for root in roots:
@@ -6211,6 +6255,7 @@ class TickMixin:
                     large += scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
                 except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
                     log.exception("scratch sweep failed")
+                    tallies["scratch"].seat = None  # a pass that missed a seat moves no spell
             for rid in large:
                 tallies["scratch"].keep(scratch[rid], "large scratch")
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)

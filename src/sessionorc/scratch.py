@@ -185,29 +185,37 @@ SWEEP_TOUCH_FILES = 200_000  # files a record a pass the sweep touches at most; 
 TOUCH_AFTER_S = 86_400  # a file not accessed for a day is touched (§4.6)
 
 
-def _touch(path: Path, now_ns: int, cap: int, size: list[int] | None = None) -> bool:
+def _touch(
+    path: Path, now_ns: int, cap: int, size: list[int] | None = None, inodes: dict[str, int] | None = None
+) -> bool:
     """Move the access time of every file under `path` not accessed for a day to `now_ns`, its modification
     time left true (§4.6): `systemd-tmpfiles` ages a file by its own times, so a seat that runs past its age
     keeps what it wrote. A symlink is skipped, never touched through; a `.git` is descended into as any
     directory. True where more than `cap` files wanted touching: the rest wait for the next pass. A walk that
-    reaches the end appends the bytes it saw to `size` (each entry's own size, the sweep's reading)."""
+    reaches the end appends the bytes it saw to `size` (each entry's own size, the sweep's reading). `inodes`
+    gains, per entry directly under `path`, the entries the walk saw under it, itself included (§4.6 *A seat is
+    told instead*, TD-2133): a walk cut at `cap` leaves a lower bound."""
     stale = now_ns - TOUCH_AFTER_S * 1_000_000_000
     touched = 0
     total = 0
-    todo = [path]
+    todo: list[tuple[Path, str | None]] = [(path, None)]
     while todo:
+        where, top = todo.pop()
         try:
-            entries = list(os.scandir(todo.pop()))
+            entries = list(os.scandir(where))
         except OSError:  # gone meanwhile, or unreadable
             continue
         for e in entries:
+            under = top if top is not None else e.name
+            if inodes is not None:
+                inodes[under] = inodes.get(under, 0) + 1
             try:
                 st = e.stat(follow_symlinks=False)
                 total += st.st_size
                 if e.is_symlink():
                     continue
                 if e.is_dir(follow_symlinks=False):
-                    todo.append(Path(e.path))
+                    todo.append((Path(e.path), under))
                     continue
                 if not e.is_file(follow_symlinks=False):
                     continue
@@ -232,10 +240,13 @@ def keep_alive(
     `owner.json`, empty), one missing its `owner.json` gains it, and its stale files are touched (`_touch`).
     One elsewhere, not this uid's, or whose `owner.json` names another record or home is left alone. Returns
     the ids past `SWEEP_TOUCH_FILES`, each logged *large scratch* by the caller. `tally` (a `diskbook.Tally`)
-    lists each directory touched and takes its size where the walk reached the end."""
+    lists each directory touched and takes its size where the walk reached the end, and, where its `seat` is a
+    dict, each record's count of inodes (`seat_count`), which the seat budget reads (TD-2133)."""
     try:
         p = ensure_parent(root)
     except (ScratchError, OSError):
+        if tally is not None:
+            tally.seat = None  # no seat walked under this root: the pass moves no spell (TD-2133)
         return []
     large: list[str] = []
     for record, given in records.items():
@@ -248,25 +259,138 @@ def keep_alive(
             except FileNotFoundError:
                 path.mkdir(mode=0o700)
                 write_owner(path, record, home)
+                if tally is not None and tally.seat is not None:
+                    tally.seat[record] = {"inodes": 0, "largest": [], "cut": False}
                 continue
             if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                _skipped(tally, record)
                 continue
             got = owner(path)
             if got is None and not (path / OWNER).exists():
                 write_owner(path, record, home)
             elif not got or got.get("id") != record or got.get("home") != str(home):
+                _skipped(tally, record)
                 continue
         except OSError:
+            _skipped(tally, record)
             continue
         size: list[int] = []
-        if _touch(path, now_ns, SWEEP_TOUCH_FILES, size):
+        inodes: dict[str, int] = {}
+        cut = _touch(path, now_ns, SWEEP_TOUCH_FILES, size, inodes)
+        if cut:
             large.append(record)
+        if tally is not None and tally.seat is not None:  # §4.6 *A seat is told instead* (TD-2133)
+            tally.seat[record] = seat_count(inodes, cut)
         if tally is not None:
             if size:
                 tally.measure(path, size[0] + st.st_size)  # the directory's own entry too, as `size_of` counts
             else:  # a large scratch's touch walk stopped short: sized by a bounded walk of its own, else as last
                 tally.measure(path, deadline=diskbook.deadline())
     return large
+
+
+def _skipped(tally: Any, record: str) -> None:
+    """A live record whose scratch this pass left unwalked: marked in `tally.seat` so its spell stands, since only
+    a record missing from it has ended (`seat_step`, TD-2133)."""
+    if tally is not None and tally.seat is not None:
+        tally.seat.setdefault(record, {"skipped": True})
+
+
+# -- the seat budget (design §4.6 *A live seat's rebuildable copies*, *A seat is told instead*, TD-2133) -----------
+
+SEAT_BUDGET = 250_000  # inodes a live seat's scratch may hold; over it on two hourly passes running, a spell starts
+SEAT_BUDGET_CLEAR = 200_000  # under it (a walk not cut short) the spell ends
+SEAT_LARGEST = 3  # the largest entries a spell, and its note, names
+
+
+def _count(v: Any) -> int:
+    """A count read from `disk.json` or a node's answer: 0 for anything that is not a whole number."""
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def seat_count(inodes: dict[str, int], cut: bool) -> dict[str, Any]:
+    """One seat's reading for `tally.seat`: its total inodes, its `SEAT_LARGEST` largest entries directly under the
+    scratch (`{"name", "inodes"}`, largest first, then by name) and whether the walk was cut short."""
+    top = sorted(inodes.items(), key=lambda kv: (-kv[1], kv[0]))[:SEAT_LARGEST]
+    return {
+        "inodes": sum(inodes.values()),
+        "largest": [{"name": n, "inodes": c} for n, c in top],
+        "cut": bool(cut),
+    }
+
+
+def seat_step(old: dict[str, Any], seats: dict[str, dict[str, Any]], now: str) -> dict[str, dict[str, Any]]:
+    """The seats' spells after one hourly pass (§4.6 *A seat is told instead*), keyed by record. `seats` is the
+    pass's `tally.seat`, every live seat; a record not in it has ended, and its spell with it, while one marked
+    `skipped` (live, its scratch not walked this pass) keeps what it had, run and spell alike. A count over
+    `SEAT_BUDGET` adds one to the record's run of passes over, and the second running opens the spell (`since`); an
+    open spell ends under `SEAT_BUDGET_CLEAR` from a walk that reached the end. A cut walk counts what it saw, a
+    lower bound: over the budget it counts, and otherwise it changes nothing, so it can start a spell and never end
+    one. A reading under the budget with no spell open ends the run."""
+    out: dict[str, dict[str, Any]] = {}
+    for record, got in seats.items():
+        was = old.get(record) if isinstance(old.get(record), dict) else {}
+        if not isinstance(got, dict):
+            continue
+        if got.get("skipped"):
+            if was:
+                out[record] = dict(was)
+            continue
+        count = _count(got.get("inodes"))
+        cut = bool(got.get("cut"))
+        since = was.get("since") if isinstance(was.get("since"), str) else None
+        if count > SEAT_BUDGET:
+            passes = _count(was.get("passes")) + 1
+            since = since or (now if passes >= 2 else None)
+        elif since:
+            if count < SEAT_BUDGET_CLEAR and not cut:
+                continue
+            passes = _count(was.get("passes"))
+        elif cut and was:
+            out[record] = dict(was)  # a lower bound under the line neither counts nor breaks the run
+            continue
+        else:
+            continue
+        one: dict[str, Any] = {"passes": passes, "inodes": count, "largest": list(got.get("largest") or [])}
+        if since:
+            one["since"] = since
+        out[record] = one
+    return out
+
+
+def seats_over(spells: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every open spell for the `disk` reading's `seats_over` (§4.6 *A seat is told instead*): record, `since`,
+    its count and largest entries, by record. Reading it changes nothing."""
+    out = []
+    for record, one in sorted(spells.items()):
+        if isinstance(one, dict) and isinstance(one.get("since"), str):
+            out.append(
+                {
+                    "record": record,
+                    "since": one["since"],
+                    "inodes": _count(one.get("inodes")),
+                    "largest": [x for x in one.get("largest") or [] if isinstance(x, dict)],
+                }
+            )
+    return out
+
+
+def seat_note(spell: dict[str, Any]) -> str:
+    """The one `system` note a seat over its budget gets (§4.6 *A seat is told instead*): what it holds, its
+    largest entries, and what to do."""
+    largest = ", ".join(
+        f"{x.get('name')} ({_count(x.get('inodes')):,})" for x in spell.get("largest") or [] if isinstance(x, dict)
+    )
+    return (
+        f"Your scratch holds {_count(spell.get('inodes')):,} files, over the {SEAT_BUDGET:,} a seat may keep "
+        "(design §4.6 *A live seat's rebuildable copies*)."
+        + (f" The largest entries in it: {largest}." if largest else "")
+        + " Move a copy you still need under $SHIFTLEAD_SCRATCH/copies/, and remove what you no longer need;"
+        " test runs go by themselves within two hours."
+    )
 
 
 # -- the disk sweep's scratch rule (design §4.6 *The disk sweep*, TD-1945) ----------------------------------------
