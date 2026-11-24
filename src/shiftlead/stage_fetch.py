@@ -11,6 +11,7 @@ Nothing calls this yet, and none of it writes anything.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
@@ -20,10 +21,18 @@ from typing import Any, NamedTuple
 
 import yaml
 
-from sessionorc import held, ledger, ledgerboard, reports
+from sessionorc import held, ledger, ledgerboard, naming, reports
 from sessionorc.models import Session
 from shiftlead import repoconfig
-from shiftlead.stage_read import EntryFacts, EntryLedger, ledger_on, only_when_protected, renumbered_on, rows_for
+from shiftlead.stage_read import (
+    EntryFacts,
+    EntryLedger,
+    held_on,
+    ledger_on,
+    only_when_protected,
+    renumbered_on,
+    rows_for,
+)
 
 TD_ID = re.compile(r"TD-[0-9]+")
 
@@ -173,6 +182,38 @@ def sessions_read(graph: Mapping[str, Session], snapshotted: Collection[str]) ->
     return SessionsRead(graph, frozenset(snapshotted), waits)
 
 
+def _in_checkout(s: Session, node: str, paths: Collection[str]) -> bool:
+    """Whether `s` works in one of `paths`. A node's path means nothing here, so only the home's is resolved."""
+    if not s.repo:
+        return False
+    if node:
+        return os.path.normpath(s.repo) in {os.path.normpath(p) for p in paths}
+    try:
+        return Path(s.repo).resolve() in {Path(p).resolve() for p in paths}
+    except (OSError, ValueError, RuntimeError):  # a symlink loop raises RuntimeError on 3.12
+        return False
+
+
+def held_read(
+    rows: Iterable[Mapping[str, Any]], read: SessionsRead, checkouts: Mapping[str, Collection[str]], *, local: str
+) -> frozenset[int] | None:
+    """`RepoFacts.held`: the open pull requests a live session of this repo holds. `checkouts` are the repo's paths by
+    node, the home's under `""` or its name `local`, since one path can be another repo on another machine. None: a
+    node with a checkout of the repo was not read, so a session there may hold any of them and none can be offered as
+    nobody's."""
+    where: dict[str, list[str]] = {}
+    for node, paths in checkouts.items():
+        where.setdefault("" if node == local else node, []).extend(paths)
+    if any(node and node not in read.read_nodes for node in where):
+        return None
+    records = [
+        s
+        for address, s in read.sessions.items()
+        if _in_checkout(s, node := naming.qualify(address, local=local).partition("@")[2], where.get(node, ()))
+    ]
+    return held_on([dict(r) for r in rows], records)
+
+
 @dataclass(frozen=True)
 class RepoFacts:
     """What the tick's pass read once for a team of a repo, for `facts_on` to take each entry's part of.
@@ -180,7 +221,8 @@ class RepoFacts:
     `sessions` are the records by the address a stage record's holder is written in, and `read_nodes` the nodes whose
     sessions were read this pass, so a node nobody reached is never read as its session gone. `open_asks` are the
     addresses with an open ask of their own, `merging` the entries whose merge is in flight, and `was` the flow the
-    team's records were written under, read before its copy is replaced. `may_start` and `within_size` are TD-2065's.
+    team's records were written under, read before its copy is replaced. `held` is `held_read`'s, None where it could
+    not be known. `may_start` and `within_size` are TD-2065's.
     """
 
     root: Path | str
@@ -193,7 +235,7 @@ class RepoFacts:
     entries: tuple[dict[str, Any], ...] = ()
     teams: Collection[str] = ()
     rows: tuple[Mapping[str, Any], ...] = ()
-    held: Collection[int] = ()
+    held: Collection[int] | None = ()
     branches: Collection[str] = ()
     protected: Collection[str] | None = None
     sessions: Mapping[str, Session] | None = None
@@ -225,11 +267,14 @@ def _row_of(entries: Iterable[dict[str, Any]], tid: str) -> dict[str, Any] | Non
 
 def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> EntryFacts | None:
     """`tid`'s `EntryFacts` from the pass's reads. None: its holder's sessions could not be read (`sessions` None, or
-    its node unread), so its absence says nothing, and reading it as gone would offer a live session's entry again."""
+    its node unread), so its absence says nothing, and reading it as gone would offer a live session's entry again. Also
+    None for an entry with no live record while `held` is unknown, since its pull request may be a live session's."""
     live = record if record is not None and not record.get("closed_at") else None
     holder = str(live.get("holder") or "") if live else ""
     _, at, node = holder.partition("@")
     if holder and (repo.sessions is None or (at and node not in repo.read_nodes)):
+        return None
+    if live is None and repo.held is None:
         return None
     on = entry_on(repo.root, repo.ref, repo.read, tid)
     row = _row_of(repo.entries, tid)
@@ -248,7 +293,7 @@ def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> Ent
         named=str(row.get("team") or "") or None if row else None,
         teams=repo.teams,
         rows=repo.rows,
-        held=repo.held,
+        held=repo.held or (),
         branches=repo.branches,
         was=repo.was if repo.was is not None and repo.was.get("name") == written_under else None,
         session=repo.sessions.get(holder) if holder and repo.sessions is not None else None,

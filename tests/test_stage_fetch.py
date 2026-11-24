@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from sessionorc.models import MailEntry, Session
+from sessionorc.models import MailEntry, ProgressEntry, Session
 from shiftlead import stage_fetch, stage_work
 from shiftlead.stage_fetch import (
     EntryOn,
@@ -18,6 +18,7 @@ from shiftlead.stage_fetch import (
     entry_text,
     facts_on,
     files_at,
+    held_read,
     ledger_read,
     protected_at,
     rows_of,
@@ -412,3 +413,66 @@ def test_a_passing_flow_over_an_unreadable_copy_replaces_it() -> None:
 @pytest.mark.parametrize("kept", [None, "", "a: ["])
 def test_no_passing_flow_and_no_good_copy_is_no_reading(kept: str | None) -> None:
     assert team_flow(NEW_FLOW, ["broken"], kept) is None
+
+
+def holder(sid: str, repo: str, pr: int | None = None, branch: str | None = None) -> Session:
+    s = session(sid)
+    s.repo = repo
+    s.git = {"branch": branch} if branch else None
+    if pr is not None:
+        s.progress = [ProgressEntry(ref=f"pr:{pr}", status="claimed", at="2026-11-23T00:00:00Z")]
+    return s
+
+
+OPEN_ROWS = ({"number": 7, "state": "open", "branch": "td7-x"}, {"number": 8, "state": "open", "branch": "td8-x"})
+
+
+def test_a_live_session_of_the_repo_holds_its_pull_request_by_claim_or_branch(tmp_path: Path) -> None:
+    root = str(tmp_path)
+    graph = {"a": holder("a", root, pr=7), "b": holder("b", root, branch="td8-x")}
+    assert held_read(OPEN_ROWS, sessions_read(graph, ()), {"": [root]}, local="home") == {7, 8}
+
+
+def test_a_session_of_another_repo_holds_nothing_here(tmp_path: Path) -> None:
+    graph = {"a": holder("a", str(tmp_path / "other"), pr=7)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, ()), {"": [str(tmp_path)]}, local="home") == frozenset()
+
+
+def test_the_same_path_on_another_node_is_another_repo() -> None:
+    graph = {"a@n2": holder("a", "/r", pr=7), "b@n1": holder("b", "/r", pr=8)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, {"n1", "n2"}), {"n1": ["/r"]}, local="home") == {8}
+
+
+def test_a_node_with_a_checkout_that_was_not_read_leaves_held_unknown() -> None:
+    assert held_read(OPEN_ROWS, sessions_read({}, ()), {"n1": ["/r"]}, local="home") is None
+
+
+def test_an_unread_node_with_no_checkout_of_the_repo_changes_nothing(tmp_path: Path) -> None:
+    graph = {"a": holder("a", str(tmp_path), pr=7)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, ()), {"": [str(tmp_path)]}, local="home") == {7}
+
+
+def test_unknown_held_is_no_reading_for_an_entry_with_no_live_record(repo: Path) -> None:
+    facts = pass_read(repo, held=None, sessions={})
+    assert facts_on(facts, "TD-1", None) is None
+    assert facts_on(facts, "TD-1", {"holder": "", "closed_at": "2026-11-20"}) is None
+    assert facts_on(facts, "TD-1", {"holder": "", "stage": "Build"}) is not None
+
+
+@pytest.mark.parametrize("key", ["", "home"])
+def test_a_key_naming_the_homes_own_host_is_the_homes_session(tmp_path: Path, key: str) -> None:
+    graph = {"a@home": holder("a", str(tmp_path), pr=7)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, ()), {key: [str(tmp_path)]}, local="home") == {7}
+
+
+def test_a_symlink_loop_is_no_session_of_the_repo_and_stops_nothing(tmp_path: Path) -> None:
+    loop = tmp_path / "loop"
+    loop.symlink_to(loop)
+    graph = {"a": holder("a", str(loop), pr=7), "b": holder("b", str(tmp_path), pr=8)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, ()), {"": [str(tmp_path)]}, local="home") == {8}
+
+
+def test_a_live_record_is_read_whether_or_not_held_is_known(repo: Path) -> None:
+    record = {"holder": "", "stage": "Build", "flow": "f", "team": "t"}
+    known, unknown = (facts_on(pass_read(repo, held=h, sessions={}), "TD-1", record) for h in ((), None))
+    assert known == unknown is not None
