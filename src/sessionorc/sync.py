@@ -25,7 +25,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import cadence, paths, promote
+from sessionorc import cadence, paths, promote, yamltext
 from sessionorc import held as held_mod
 from sessionorc.workorders import _git as _git_bytes
 from sessionorc.workorders import default_branch
@@ -395,7 +395,7 @@ def held_globs(root: Path | str) -> list[str] | None:
     if not f.exists():
         return []
     try:
-        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        doc = yamltext.load(f.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return None
     got = doc.get("held", []) if isinstance(doc, dict) else [] if doc is None else None

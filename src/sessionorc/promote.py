@@ -33,7 +33,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import build, cadence, gitinfo, ledgerboard, paths, reports
+from sessionorc import build, cadence, gitinfo, ledgerboard, paths, reports, yamltext
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def block(root: str | Path) -> dict[str, str] | None:
     and skips the repo; it is never fatal to the tick. The rest of the file is the clients'."""
     f = paths.repo_file(root)
     try:
-        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        doc = yamltext.load(f.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
     except (OSError, yaml.YAMLError) as e:

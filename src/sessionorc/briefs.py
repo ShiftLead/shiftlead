@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, yamltext
 
 KINDS = ("design", "build", "review", "audit")
 # the standard briefs (§4.9c *What a stage's session is told*), each with its kind
@@ -112,7 +112,7 @@ def flows_naming(name: str) -> list[str]:
         if (d / "briefs" / f"{name}.md").is_file():
             continue
         try:
-            doc = yaml.safe_load((d / FLOW_FILE).read_text(encoding="utf-8"))
+            doc = yamltext.load((d / FLOW_FILE).read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, yaml.YAMLError):
             out.append(f"{d.name} (unreadable)")
             continue

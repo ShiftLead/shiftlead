@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import cadence, paths
+from sessionorc import cadence, paths, yamltext
 
 # a `git status` the host agent polls skips git's optional index refresh, so it never takes `index.lock`
 # beside a session's own `git add` in the same checkout, as an editor's polling status does (TD-1181)
@@ -136,7 +136,7 @@ def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`) refuse such a
     file by name."""
     try:
-        doc = yaml.safe_load(paths.repo_file(repo).read_text(encoding="utf-8"))
+        doc = yamltext.load(paths.repo_file(repo).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         doc = None
     got = doc.get("worktree_setup") if isinstance(doc, dict) else None

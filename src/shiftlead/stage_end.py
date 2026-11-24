@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+import yaml
+
 from sessionorc import board, ledgerboard, reports, workorders
 from shiftlead import flow3, repoconfig, stage_work
 from shiftlead.stagerecord import StageStore, StateError, _now, ask_words
@@ -401,13 +403,17 @@ def call(
         text = store.flow(team) if team else None
         if text is None:
             return {"refused": f"team {team} has no flow on the state branch"}
+        try:
+            doc = repoconfig.parse_yaml(text)
+        except yaml.YAMLError:  # a stored flow edited by hand into bad YAML is a refusal, not a failed call (TD-2150)
+            return {"refused": f"team {team}'s flow on the state branch cannot be read"}
         return end(
             store,
             tid,
             caller,
             outcome,
             reason,
-            repoconfig.parse_yaml(text),
+            doc,
             ForgeFacts(directory) if seen is None else NodeFacts(root, seen),
             _person_of(Path(root)),
         )
