@@ -63,6 +63,7 @@ import look_home  # noqa: E402 — the scratch home's helpers: the refusal of th
 WALK_NAME = "conformance-walk"
 FIRST_HOOK_WAIT = 120.0  # the tool's start, its first hook, the record `idle` by hook
 TURN_WAIT = 300.0  # one short turn
+FAILURE_PANE_LINES = 20  # of the tool's screen, in a failed Enter's message: a dialog and what is under it
 SESSION_END_WAIT = 15.0  # a killed tool's own end hook
 PERMISSION_PROMPT = "Use your shell tool to run exactly this command, then stop: touch conformance-permission.txt"
 # a tool that runs a bare `touch` unasked in every mode takes a command it asks for (Grok Build, §4.3, TD-1637)
@@ -379,6 +380,17 @@ class Walk:
         self.shot(name)
         return ok
 
+    def screen(self) -> str:
+        """What the tool shows now, for a failure to name (TD-2119); a pane that cannot be read is said, and
+        never replaces the failure it was read for."""
+        try:
+            lines = [line.rstrip() for line in self.tail(FAILURE_PANE_LINES * 3) if line.strip()]
+        except Exception as e:  # noqa: BLE001 — the step has already failed: this only adds to what it says
+            return f"the pane could not be read ({type(e).__name__}: {e})"
+        if not lines:
+            return "the pane read empty"
+        return "the pane's last lines:\n" + "\n".join(lines[-FAILURE_PANE_LINES:])
+
     def allow(self, rec: dict[str, Any]) -> str:
         """Allow the permission `rec` waits on, as its person: through the hook channel, or — for a tool
         with none (§4.3 `permission_channel`, TD-871) — an Enter on the dialog's first choice, the tool's
@@ -390,7 +402,9 @@ class Walk:
             self.call("keys", id=self.id, keys=["Enter"])
             left = poll(self.get, lambda r: r.get("state") != "needs-you", TURN_WAIT)
             if left.get("state") == "needs-you":
-                raise StepFailed(f"Enter pressed on {pending.get('text')}, and it still reads {describe(left)}")
+                raise StepFailed(
+                    f"Enter pressed on {pending.get('text')}, and it still reads {describe(left)}; {self.screen()}"
+                )
             return "allowed in the terminal (Enter: Allow once)"
         if pending.get("tool_use_id"):
             self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
