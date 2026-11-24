@@ -6,6 +6,7 @@ import json
 import os
 import stat
 import subprocess
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -2007,6 +2008,64 @@ async def test_a_create_whose_owner_write_fails_leaves_no_pane_to_adopt(agent, t
     async with LocalClient() as person:
         with pytest.raises(Exception, match="no space left for the owner file"):
             await person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+    assert seen["sid"] not in agent.sessions and not agent._starting
+    assert not await asyncio.to_thread(agent.tmux.has_session, seen["sid"])
+    panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+    agent._reconcile(panes, {}, datetime.now(UTC))
+    assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+
+
+async def test_a_create_whose_later_tmux_step_fails_leaves_no_pane_to_adopt(agent, tmp_path, monkeypatch):
+    """TD-2144: `new-session` chains `set-option` and `pipe-pane`, and a later step that failed left the pane up with
+    no record, so the next tick adopted it as a nameless shell."""
+    run, seen = agent.tmux.run, {}
+
+    def failing(*args, **kw):
+        if args and args[0] == "new-session":
+            seen["sid"] = args[args.index("-s") + 1]
+            args = (*args, ";", "set-option", "-t", "=ao-nobody:", "status", "off")
+        return run(*args, **kw)
+
+    monkeypatch.setattr(agent.tmux, "run", failing)
+    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
+    async with LocalClient() as person:
+        with pytest.raises(Exception, match="ao-nobody"):
+            await person.call("create", name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+    assert seen["sid"] not in agent.sessions and not agent._starting
+    assert not await asyncio.to_thread(agent.tmux.has_session, seen["sid"])
+    panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+    agent._reconcile(panes, {}, datetime.now(UTC))
+    assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+
+
+async def test_a_create_cancelled_while_its_pane_comes_up_leaves_no_pane_to_adopt(agent, tmp_path, monkeypatch):
+    """TD-2144: a create cancelled while it awaited its start left the start's thread running, and the pane came up
+    after the create had gone, with no record, for the next tick to adopt."""
+    start, seen = agent._start, {}
+    called, release = threading.Event(), threading.Event()
+
+    def slow_start(sid, *a):
+        seen["sid"] = sid
+        called.set()
+        release.wait(10)  # the cancel lands here, before the pane is up
+        start(sid, *a)
+        seen["up"] = agent.tmux.has_session(sid)
+
+    monkeypatch.setattr(agent, "_start", slow_start)
+    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
+    making = asyncio.ensure_future(
+        agent.rpc_create(name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+    )
+    try:
+        assert await asyncio.to_thread(called.wait, 10)
+        making.cancel()
+        await asyncio.sleep(0.2)
+        assert not making.done() and seen["sid"] in agent._starting  # waiting for the start, the tick held off
+    finally:
+        release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await making
+    assert seen["up"]  # the pane did come up after the cancel
     assert seen["sid"] not in agent.sessions and not agent._starting
     assert not await asyncio.to_thread(agent.tmux.has_session, seen["sid"])
     panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)

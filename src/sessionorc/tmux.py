@@ -151,9 +151,27 @@ class Tmux:
 
         The window is pinned at `grid`, `(columns, rows)` (design §4.6 *Attach behaviour with another client
         present*, TD-1919): `-x`/`-y` start the tool at it, so it is never resized while it starts, and
-        `window-size manual` in the same invocation keeps every client from sizing it after."""
+        `window-size manual` in the same invocation keeps every client from sizing it after.
+
+        A later step of the chain that fails leaves the session up: `-P` prints the id (`$N`) of the session this
+        call made, so that one is killed before the error is raised, and a duplicate session, which made nothing
+        and printed nothing, is never touched (design §4.1, TD-2144)."""
         cols, rows = grid
-        args = ["new-session", "-d", "-s", name, "-c", str(cwd), "-x", str(int(cols)), "-y", str(int(rows))]
+        args = [
+            "new-session",
+            "-d",
+            "-P",
+            "-F",
+            "#{session_id}",
+            "-s",
+            name,
+            "-c",
+            str(cwd),
+            "-x",
+            str(int(cols)),
+            "-y",
+            str(int(rows)),
+        ]
         for k, v in env.items():
             args += ["-e", f"{k}={v}"]
         if argv:
@@ -169,6 +187,9 @@ class Tmux:
             err = cp.stderr.strip() or cp.stdout.strip()
             if "duplicate session" in err:
                 raise DuplicateSession(err)
+            made = [w for w in cp.stdout.split() if re.fullmatch(r"\$\d+", w)]
+            if made:
+                self.run("kill-session", "-t", made[0], check=False)
             raise TmuxError(f"tmux new-session {name}: {err}")
 
     @staticmethod

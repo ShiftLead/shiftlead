@@ -10,7 +10,7 @@ import pytest
 from conftest import kill_private_server, private_socket_name
 from conftest import wait_for_sync as wait_for
 
-from sessionorc.tmux import Tmux
+from sessionorc.tmux import DuplicateSession, Tmux, TmuxError
 
 pytestmark = pytest.mark.integration
 
@@ -276,3 +276,33 @@ def test_the_pins_default_grid_is_the_settings():
     from sessionorc import tmux as tmux_module
 
     assert tmux_module.GRID_DEFAULT == settings.TERMINAL_GRID_DEFAULT
+
+
+def _a_later_step_fails(tmux, monkeypatch):
+    """`new_session`'s chain with one more step that fails after `new-session` has made the session."""
+    run = tmux.run
+
+    def failing(*args, **kw):
+        if args and args[0] == "new-session":
+            args = (*args, ";", "set-option", "-t", "=ao-t-nobody:", "status", "off")
+        return run(*args, **kw)
+
+    monkeypatch.setattr(tmux, "run", failing)
+
+
+def test_a_later_step_that_fails_takes_the_session_it_made_with_it(tmux, monkeypatch):
+    """TD-2144: a chained step that failed after `new-session` left the session up with no record."""
+    _a_later_step_fails(tmux, monkeypatch)
+    with pytest.raises(TmuxError, match="ao-t-nobody") as e:
+        tmux.new_session("ao-t-late", "/", ["sleep", "30"], {})
+    assert not isinstance(e.value, DuplicateSession)
+    assert not tmux.has_session("ao-t-late")
+
+
+def test_a_duplicate_session_is_never_killed(tmux, monkeypatch):
+    """TD-2144: `new-session` refused the name, so it made nothing, and the session of that name is another's."""
+    tmux.new_session("ao-t-other", "/", ["sleep", "30"], {})
+    _a_later_step_fails(tmux, monkeypatch)
+    with pytest.raises(DuplicateSession):
+        tmux.new_session("ao-t-other", "/", ["sleep", "30"], {})
+    assert tmux.has_session("ao-t-other")
