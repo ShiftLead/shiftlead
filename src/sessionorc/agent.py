@@ -2070,69 +2070,76 @@ class HostAgent(
                     self._starting.discard(sid)  # taken again below, before the next await
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
-            if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
-                self._starting.add(sid)  # the pane is up and has no record yet: a tick must not adopt it (TD-2096)
-                try:
+            # the pane is up and has no record yet: a tick must not adopt it (TD-2096), and a step that fails before
+            # the record stands takes the pane with it, so nothing is left to adopt (§4.1, TD-2125)
+            self._starting.add(sid)
+            try:
+                if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
                     await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
-                finally:
-                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
-            s = Session(
-                id=sid,
-                name=shown,
-                kind=kind,  # type: ignore[arg-type]
-                adapter=adapter,
-                dir=str(directory),
-                profile=profile,
-                repo=repo,
-                worktree=worktree,
-                unattended=unattended,
-                confidence=ad.state_source,
-                run_log=str(run_log),
-                adapter_id=spec.adapter_id,
-                context_id=spec.adapter_id if getattr(ad, "start_context", False) else None,
-                capabilities=grants,
-                controllers=members,
-                lane=references,
-                role=str(role or ""),
-                ledger=(str(ledger).strip() or None) if ledger else None,
-                team=str(team or ""),  # badges (§4.9): stored as given, never validated here
-                project=str(project or ""),
-                run_until=self._team_stamp(str(team or ""), bool(unattended), _stop_time(run_until)),
-                wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
-                pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
-                resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
-                previous_run=previous_run,
-                host=self.host,
-                # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
-                supervised=bool(supervised)
-                or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
-                or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
-                run_only=bool(run_only),
-                seat=dict(seat) if seat else None,
-                builtin=builtin,
-                scale=extra,
-                review=reading,
-                context_bound=bound,
-                start_context=start_context,
-                first_prompt=first_prompt,
-                model_file=model_env.get("AGENT_MODEL_FILE"),
-                scratch=run_scratch,
-                tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
-            )
-            if self.mode != "node":
-                # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
-                # never passed — `supervised` and `seat` as the record is written, the caller as every
-                # caller is read. A node's is the home's, set on its copy from this create's reply.
-                s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
-                _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
-            dropped: str | None = None  # the replaced run's address, when this create does not carry its mail
-            if isinstance(holder, Session):
-                # the record of this name it replaced, for the home, which holds the mail (§4.4a)
-                kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
-                s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
-                dropped = None if kept else self._address(holder)
-            s.worktree_made = made or _inherits_made(s, holder)
-            self.sessions[sid] = s
+                s = Session(
+                    id=sid,
+                    name=shown,
+                    kind=kind,  # type: ignore[arg-type]
+                    adapter=adapter,
+                    dir=str(directory),
+                    profile=profile,
+                    repo=repo,
+                    worktree=worktree,
+                    unattended=unattended,
+                    confidence=ad.state_source,
+                    run_log=str(run_log),
+                    adapter_id=spec.adapter_id,
+                    context_id=spec.adapter_id if getattr(ad, "start_context", False) else None,
+                    capabilities=grants,
+                    controllers=members,
+                    lane=references,
+                    role=str(role or ""),
+                    ledger=(str(ledger).strip() or None) if ledger else None,
+                    team=str(team or ""),  # badges (§4.9): stored as given, never validated here
+                    project=str(project or ""),
+                    run_until=self._team_stamp(str(team or ""), bool(unattended), _stop_time(run_until)),
+                    wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
+                    pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
+                    resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
+                    previous_run=previous_run,
+                    host=self.host,
+                    # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
+                    supervised=bool(supervised)
+                    or bool(
+                        resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised
+                    )
+                    or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
+                    run_only=bool(run_only),
+                    seat=dict(seat) if seat else None,
+                    builtin=builtin,
+                    scale=extra,
+                    review=reading,
+                    context_bound=bound,
+                    start_context=start_context,
+                    first_prompt=first_prompt,
+                    model_file=model_env.get("AGENT_MODEL_FILE"),
+                    scratch=run_scratch,
+                    tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
+                )
+                if self.mode != "node":
+                    # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
+                    # never passed — `supervised` and `seat` as the record is written, the caller as every
+                    # caller is read. A node's is the home's, set on its copy from this create's reply.
+                    s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
+                    _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
+                dropped: str | None = None  # the replaced run's address, when this create does not carry its mail
+                if isinstance(holder, Session):
+                    # the record of this name it replaced, for the home, which holds the mail (§4.4a)
+                    kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
+                    s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
+                    dropped = None if kept else self._address(holder)
+                s.worktree_made = made or _inherits_made(s, holder)
+                self.sessions[sid] = s
+            except BaseException:  # a cancelled create too: its pane has no record either
+                await asyncio.to_thread(self._kill_unrecorded_pane, sid)
+                raise
+            finally:
+                self._starting.discard(sid)
             self._cwd_raw.pop(sid, None)  # a new run starts in `dir`: its first report resolves afresh (TD-1988)
             self._cwd_asking.pop(sid, None)
             room.clear()  # counted live now, as a record
@@ -2826,6 +2833,14 @@ class HostAgent(
         grid = settings_mod.terminal_grid(settings_mod.load())  # read at each start (§5, TD-1919)
         self.tmux.new_session(sid, cwd, argv, env, logfile=run_log, grid=grid)  # log from the first byte (invariant 3)
         self._pane_cgroup(sid)
+
+    def _kill_unrecorded_pane(self, sid: str) -> None:
+        """A create that failed after its pane started leaves no pane for the tick to adopt (§4.1, TD-2125). A kill
+        that fails is logged and never replaces the create's own error."""
+        try:
+            self.tmux.kill_session(sid)
+        except Exception:  # noqa: BLE001 — the create's error is the one the caller must see
+            log.exception("%s: killing the pane of a failed create failed", sid)
 
     def _pane_cgroup(self, sid: str) -> None:
         """Under the installed home's tmux system unit (§4.1, `Delegate=yes`) tmux reaches no user bus

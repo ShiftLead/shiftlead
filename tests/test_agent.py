@@ -1989,6 +1989,31 @@ async def test_a_tick_while_a_create_writes_its_scratch_owner_does_not_adopt_the
         assert not agent._starting
 
 
+async def test_a_create_whose_owner_write_fails_leaves_no_pane_to_adopt(agent, tmp_path, monkeypatch):
+    """TD-2125: a create that raised after its pane started left the pane up with no record, and the next tick
+    adopted it as a nameless shell."""
+    from sessionorc import scratch as scratch_mod
+
+    seen, write = {}, scratch_mod.write_owner
+
+    def failing_write(path, sid, home):
+        if not sid:  # the directory's first write, before the pane has an id
+            return write(path, sid, home)
+        seen["sid"] = sid
+        assert agent.tmux.has_session(sid)  # the pane was up when the step failed
+        raise OSError("no space left for the owner file")
+
+    monkeypatch.setattr(scratch_mod, "write_owner", failing_write)
+    async with LocalClient() as person:
+        with pytest.raises(Exception, match="no space left for the owner file"):
+            await person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+    assert seen["sid"] not in agent.sessions and not agent._starting
+    assert not await asyncio.to_thread(agent.tmux.has_session, seen["sid"])
+    panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+    agent._reconcile(panes, {}, datetime.now(UTC))
+    assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+
+
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):
     """Found in the review of PR #147, which put a button in front of this.
 
