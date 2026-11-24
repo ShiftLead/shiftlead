@@ -542,3 +542,21 @@ def test_the_inbox_draws_the_row_and_its_snooze(tmp_path: Path, monkeypatch):
     assert 'data-sid="memory_low:kmaster:ram" data-row="memory_low" data-when="1w"' in html
     assert 'data-msg="memory_low:kmaster:ram"' in html
     assert c.get("/api/person/inbox").json()["needs"] == 1
+
+
+@pytest.mark.integration
+async def test_a_walk_returning_past_its_bound_is_not_applied(agent, monkeypatch):
+    level = {"halves": {"ram": 0.05}}
+
+    def late(*_a, **_k):
+        agent._walk_started = time.monotonic() - 3 * scratch.LEFT_WALK_S  # returned past twice its bound
+        return {"ram": HOLDERS, "swap": [], "cut": False}
+
+    monkeypatch.setattr(memory, "read_halves", lambda *a, **k: level["halves"])
+    monkeypatch.setattr(memory, "read_holders", late)
+    await agent._memory_pass()
+    await agent._memory_pass()
+    await agent._walk_task
+    assert "ram" not in diskbook.memory_state(os.environ["SHIFTLEAD_HOME"]), "no low written from a late result"
+    await agent._memory_pass()  # the next reading sees the half still turning and the walk done: a fresh walk
+    await agent._walk_task

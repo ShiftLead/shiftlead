@@ -5871,6 +5871,8 @@ class TickMixin:
                 log.exception("the process walk failed")
                 got = None
             async with self._memory_lock:
+                if time.monotonic() - self._walk_started > 2 * scratch_mod.LEFT_WALK_S:
+                    self._walk_stuck = True  # past its bound, whether or not a reading saw it stuck: never applied
                 if not self._walk_stuck:
                     old = await asyncio.to_thread(diskbook.memory_state, paths.home())
                     new = self._memory_watch.walked(old, got, self._walk_for, now_iso())
