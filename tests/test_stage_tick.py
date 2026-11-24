@@ -144,3 +144,35 @@ def test_an_unreadable_ledger_or_person_reads_no_record(
 
     monkeypatch.setattr(stage_end, "_person_of", refuse)
     assert a_pass(root, Kept()) is None
+
+
+@pytest.mark.integration
+def test_origins_branches_are_read_once_a_pass_and_only_for_a_carried_branch(
+    root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A moved entry's carried branch counts as still pushed only by origin's reading (TD-2051): read once a pass,
+    only where a closed record carries a branch, and a pass that cannot read it has no reading of the team."""
+    reads: list[Path] = []
+    given: list[Any] = []
+
+    def pushed(at: Path) -> frozenset[str] | None:
+        reads.append(at)
+        return answer
+
+    def facts(*_a: Any, **kw: Any) -> None:
+        given.append(kw["branches"])
+        return None
+
+    monkeypatch.setattr(stage_tick, "pushed_branches", pushed)
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_facts", facts)
+    two = {"t": TEAM, "u": {**TEAM, "flow": "build"}}
+    answer: frozenset[str] | None = frozenset({"td7-x"})
+    a_pass(root, Kept(), teams=two)
+    assert reads == [] and given == [frozenset(), frozenset()], "no record carries a branch: origin is not asked"
+    monkeypatch.setattr(stage_tick, "carries_branch", lambda _records: True)
+    given.clear()
+    a_pass(root, Kept(), teams=two)
+    assert reads == [root] and given == [answer, answer], "asked once for the two teams"
+    answer, given[:] = None, []
+    got = a_pass(root, Kept(), teams=two)
+    assert given == [] and got is not None and set(got.unread) == {"t", "u"}

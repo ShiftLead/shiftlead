@@ -105,6 +105,27 @@ def protected_at(root: Path | str, ref: str) -> list[str] | None:
         return None
 
 
+def pushed_branches(root: Path | str) -> frozenset[str] | None:
+    """The branches pushed to the repo's origin now, by one `git ls-remote --heads` (never the remote-tracking refs,
+    which keep a branch deleted since the last pruning fetch). None: origin could not be read."""
+    out = ledger._git(root, "ls-remote", "--heads", "origin", timeout=20.0)
+    if out is None:
+        return None
+    names = (ln.split("\t", 1)[1] for ln in out.splitlines() if "\t" in ln)
+    return frozenset(n.removeprefix("refs/heads/") for n in names if n.startswith("refs/heads/"))
+
+
+def carries_branch(records: Mapping[str, Any]) -> bool:
+    """Whether a closed record carries a branch, so `carried_on` may read the pushed branches this pass."""
+    return any(
+        isinstance(r, Mapping)
+        and r.get("closed_at")
+        and isinstance(r.get("carried"), Mapping)
+        and r["carried"].get("branch")
+        for r in records.values()
+    )
+
+
 def files_at(root: Path | str, pr: int, head: str | None) -> list[str] | None:
     """Pull request `pr`'s changed files, where its head is still `head` after they were read, so the list is that
     commit's. None: no head, a failed read, or a push or a close meanwhile."""
