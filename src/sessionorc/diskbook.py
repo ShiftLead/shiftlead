@@ -341,7 +341,9 @@ def write(
             "branches_deleted": int(branches.get("deleted") or 0),
         }
         if seats is not None:  # what the week's check reads (TD-2134)
-            line["seats"] = {r: int(one.get("inodes") or 0) for r, one in sorted(seats.items())}
+            line["seats"] = {
+                r: int(one.get("inodes") or 0) for r, one in sorted(seats.items()) if not one.get("skipped")
+            }
         lines.append(line)
         branches = {**branches, "deleted_30d": _branches_30d(lines, cutoff)}
         out = {

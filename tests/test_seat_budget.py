@@ -104,6 +104,16 @@ def test_a_cut_walk_can_start_a_spell_and_never_end_one():
 
 
 @pytest.mark.unit
+def test_a_live_seat_left_unwalked_keeps_its_run_and_its_spell():
+    over = scratch.SEAT_BUDGET + 1
+    one = scratch.seat_step({}, {"ao-w": _seat(over)}, "T1")
+    assert scratch.seat_step(one, {"ao-w": {"skipped": True}}, "T2") == one
+    spell = scratch.seat_step(one, {"ao-w": _seat(over)}, "T2")
+    assert scratch.seat_step(spell, {"ao-w": {"skipped": True}}, "T3") == spell
+    assert scratch.seat_step({}, {"ao-w": {"skipped": True}}, "T1") == {}
+
+
+@pytest.mark.unit
 def test_a_record_that_ends_ends_its_spell():
     over = scratch.SEAT_BUDGET + 1
     spell = scratch.seat_step(scratch.seat_step({}, {"ao-w": _seat(over)}, "T1"), {"ao-w": _seat(over)}, "T2")
@@ -165,6 +175,16 @@ async def test_a_seat_over_its_budget_on_two_passes_is_told_once(agent, small):
         agent._prune_runs(datetime.now(UTC), set(), set(), scratch_of, {})
         await agent._disk_low_pass()
         assert len(_notes(r)) == 1, "nothing repeats within the spell"
+
+        scratch.write_owner(big, "ao-other", home)  # a pass that skips the live seat: its spell stands
+        agent._prune_runs(datetime.now(UTC), set(), set(), scratch_of, {})
+        assert "ao-x-w" not in json.loads((Path(home) / diskbook.FILE).read_text())["passes"][-1]["seats"]
+        assert [o["since"] for o in agent._disk_here()["seats_over"]] == [over[0]["since"]]
+        scratch.write_owner(big, "ao-x-w", home)
+        agent._prune_runs(datetime.now(UTC), set(), set(), scratch_of, {})
+        assert [o["since"] for o in agent._disk_here()["seats_over"]] == [over[0]["since"]]
+        await agent._disk_low_pass()
+        assert len(_notes(r)) == 1, "a skipped pass neither ends the spell nor tells it again"
 
         scratch._remove(big / "pytest-of-k")
         scratch._remove(big / "review")  # one file left, under the clear line

@@ -263,13 +263,16 @@ def keep_alive(
                     tally.seat[record] = {"inodes": 0, "largest": [], "cut": False}
                 continue
             if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                _skipped(tally, record)
                 continue
             got = owner(path)
             if got is None and not (path / OWNER).exists():
                 write_owner(path, record, home)
             elif not got or got.get("id") != record or got.get("home") != str(home):
+                _skipped(tally, record)
                 continue
         except OSError:
+            _skipped(tally, record)
             continue
         size: list[int] = []
         inodes: dict[str, int] = {}
@@ -284,6 +287,13 @@ def keep_alive(
             else:  # a large scratch's touch walk stopped short: sized by a bounded walk of its own, else as last
                 tally.measure(path, deadline=diskbook.deadline())
     return large
+
+
+def _skipped(tally: Any, record: str) -> None:
+    """A live record whose scratch this pass left unwalked: marked in `tally.seat` so its spell stands, since only
+    a record missing from it has ended (`seat_step`, TD-2133)."""
+    if tally is not None and tally.seat is not None:
+        tally.seat.setdefault(record, {"skipped": True})
 
 
 # -- the seat budget (design §4.6 *A live seat's rebuildable copies*, *A seat is told instead*, TD-2133) -----------
@@ -314,15 +324,20 @@ def seat_count(inodes: dict[str, int], cut: bool) -> dict[str, Any]:
 
 def seat_step(old: dict[str, Any], seats: dict[str, dict[str, Any]], now: str) -> dict[str, dict[str, Any]]:
     """The seats' spells after one hourly pass (§4.6 *A seat is told instead*), keyed by record. `seats` is the
-    pass's `tally.seat`, every live seat whose scratch was walked; a record not in it has ended, and its spell
-    with it. A count over `SEAT_BUDGET` adds one to the record's run of passes over, and the second running opens
-    the spell (`since`); an open spell ends under `SEAT_BUDGET_CLEAR` from a walk that reached the end. A cut walk
-    counts what it saw, a lower bound: over the budget it counts, and otherwise it changes nothing, so it can start
-    a spell and never end one. A reading under the budget with no spell open ends the run."""
+    pass's `tally.seat`, every live seat; a record not in it has ended, and its spell with it, while one marked
+    `skipped` (live, its scratch not walked this pass) keeps what it had, run and spell alike. A count over
+    `SEAT_BUDGET` adds one to the record's run of passes over, and the second running opens the spell (`since`); an
+    open spell ends under `SEAT_BUDGET_CLEAR` from a walk that reached the end. A cut walk counts what it saw, a
+    lower bound: over the budget it counts, and otherwise it changes nothing, so it can start a spell and never end
+    one. A reading under the budget with no spell open ends the run."""
     out: dict[str, dict[str, Any]] = {}
     for record, got in seats.items():
         was = old.get(record) if isinstance(old.get(record), dict) else {}
         if not isinstance(got, dict):
+            continue
+        if got.get("skipped"):
+            if was:
+                out[record] = dict(was)
             continue
         count = _count(got.get("inodes"))
         cut = bool(got.get("cut"))
