@@ -332,6 +332,16 @@ def _split_filled_for(prompt: str) -> tuple[str, str]:
     return told, (FILLED_FOR + rest) if sep else ""
 
 
+async def _uncancelled(fut: asyncio.Future[Any]) -> None:
+    """Wait for `fut` to finish however often the waiter is cancelled meanwhile, so what it does in a thread is over
+    before the caller goes on; its result or error stays on it, unread (§4.1, TD-2144)."""
+    while not fut.done():
+        with contextlib.suppress(
+            BaseException
+        ):  # a cancel of the waiter, or the future's own error, read by the caller
+            await asyncio.shield(fut)
+
+
 def _stamp_start(s: Session) -> None:
     """A record's start stamps its mode (design §4.5 *A taken-over member*, TD-1439): `mode_at` its
     `created`, `mode_via` `start`, and no `mode_by` — a person's create and a policy's both arrive with
@@ -2078,11 +2088,20 @@ class HostAgent(
                     )
                     first_prompt = start_hooks.with_hooks(first_prompt or "", told)
                 self._starting.add(sid)
+                started = asyncio.ensure_future(asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log))
                 try:
-                    await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
+                    await asyncio.shield(started)
                     break
                 except DuplicateSession:
                     taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
+                except asyncio.CancelledError:
+                    # the start's thread runs on after a cancel: its pane would come up with no record, so wait
+                    # for it and take a pane it brought up with it, `_starting` held until the kill has landed;
+                    # a start that failed left none, and a duplicate's pane is another session's (§4.1, TD-2144)
+                    await _uncancelled(started)
+                    if not started.exception():
+                        await _uncancelled(asyncio.ensure_future(asyncio.to_thread(self._kill_unrecorded_pane, sid)))
+                    raise
                 finally:
                     self._starting.discard(sid)  # taken again below, before the next await
             else:
