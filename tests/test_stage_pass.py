@@ -6,12 +6,16 @@ from __future__ import annotations
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from sessionorc.client import AgentError, AgentUnavailable
+from shiftlead import stage_pass, stage_start
 from shiftlead.stage_pass import Reach, step
 from shiftlead.stage_read import EntryFacts, EntryLedger
+from shiftlead.stage_start import Work
 from shiftlead.stagerecord import StageStore, new_record
 
 TID = "TD-7"
@@ -191,3 +195,88 @@ def test_a_record_that_moved_since_its_reading_ends_no_session(store):
     got = step(store, stale, facts(ledger=EntryLedger("archived")), world.reach)
     assert got.act.case == "close" and not got.made.made
     assert world.ended == []
+
+
+class Calls:
+    def __init__(self, fail: Exception | None = None, verdict: str = "free") -> None:
+        self.fail, self.verdict, self.seen = fail, verdict, []
+
+    def __call__(self, method: str, **kw: Any) -> dict[str, Any]:
+        self.seen.append((method, kw))
+        if self.fail is not None:
+            raise self.fail
+        return {"verdict": self.verdict} if method == "name_check" else {"id": "build-td-7"}
+
+
+def launched(host: str = "") -> stage_start.StageLaunch:
+    x = SimpleNamespace(host=host, dir="/r", name="build-td-7")
+    got = SimpleNamespace(launch=x, create_params=lambda controllers: {"name": x.name, "controllers": controllers})
+    return got  # type: ignore[return-value]
+
+
+def reach(monkeypatch: pytest.MonkeyPatch, call: Calls, *, started: bool = True, host: str = "") -> stage_pass.Reach:
+    monkeypatch.setattr(stage_start, "launch", lambda *a, **k: launched(host))
+    monkeypatch.setattr(stage_start, "team_started", lambda *a: started)
+    return stage_pass.reach_for(call, object(), object(), {}, lambda *a: None, lambda *a: None, host="", here="h")
+
+
+def test_a_start_creates_the_session_and_names_its_holder(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls()
+    assert reach(monkeypatch, call).start("build", Work("TD-7")) == "build-td-7"
+    assert [m for m, _ in call.seen] == ["name_check", "create"]
+
+
+def test_a_start_on_a_node_names_the_holder_by_its_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert reach(monkeypatch, Calls(), host="n1").start("build", Work("TD-7")) == "build-td-7@n1"
+
+
+def test_a_team_not_started_starts_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls()
+    assert reach(monkeypatch, call, started=False).start("build", Work("TD-7")) is None
+    assert call.seen == []
+
+
+def test_a_live_name_starts_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls(verdict="live")
+    assert reach(monkeypatch, call).start("build", Work("TD-7")) is None
+    assert [m for m, _ in call.seen] == ["name_check"]
+
+
+def test_a_claim_is_written_on_the_holder_and_a_refusal_is_returned(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls()
+    assert reach(monkeypatch, call).claim("a", "TD-7") is None
+    assert call.seen == [("progress", {"id": "a", "ref": "TD-7", "status": "claimed"})]
+    assert reach(monkeypatch, Calls(AgentError("over its line"))).claim("a", "TD-7") == "over its line"
+
+
+def test_an_end_closes_the_session_as_the_tick() -> None:
+    call = Calls()
+    stage_start.end(call, "a@n1", "why")
+    assert call.seen == [("close", {"id": "a@n1", "closer": {"by": "tick", "why": "why"}})]
+
+
+def test_an_end_of_a_session_already_gone_is_no_failure() -> None:
+    stage_start.end(Calls(AgentError("no session a")), "a")
+
+
+@pytest.mark.parametrize(
+    "error", [AgentError("a runs on n1: this call does not cross the link"), AgentUnavailable("down")]
+)
+def test_an_end_that_could_not_reach_the_session_is_a_failure(error: AgentError) -> None:
+    with pytest.raises(AgentError):
+        stage_start.end(Calls(error), "a")
+
+
+@pytest.mark.parametrize(
+    ("holder", "words"),
+    [("a@n1", "no session a@n1"), ("a@n1", "n1: no session a"), ("a@home", "no session a@home")],
+)
+def test_a_no_session_for_a_node_address_does_not_prove_it_gone(holder: str, words: str) -> None:
+    with pytest.raises(AgentError):
+        stage_start.end(Calls(AgentError(words)), holder)
+
+
+def test_the_reach_ends_a_session_through_the_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls()
+    reach(monkeypatch, call).end("a")
+    assert [m for m, _ in call.seen] == ["close"]

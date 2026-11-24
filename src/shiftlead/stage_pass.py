@@ -14,7 +14,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from shiftlead import stage_make, stage_merge
+from shiftlead import org as orgmod
+from shiftlead import stage_make, stage_merge, stage_start
 from shiftlead.stage_acts import Act, Reading, choose
 from shiftlead.stage_make import Made
 from shiftlead.stage_read import EntryFacts, reading_on
@@ -33,6 +34,32 @@ class Reach:
     start: Callable[[str, Work], str | None]
     claim: Callable[[str, str], str | None]
     end: Callable[[str], None]
+
+
+def reach_for(
+    call: Callable[..., Any],
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    doc: dict[str, Any],
+    gate: stage_merge.Gate,
+    land: stage_merge.Land,
+    **where: Any,
+) -> Reach:
+    """A `Reach` through the host agent's `call`. `where` is `stage_start.launch`'s placing of the session (`host`,
+    `here`, `place`, `flow_dir`, `files`). The team's started mark is read at each start."""
+
+    def start(key: str, work: Work) -> str | None:
+        got = stage_start.launch(org, team, doc, key, work, **where)
+        made = stage_start.start(call, org, team, got)
+        return stage_start.holder_of(got, made) if made else None
+
+    return Reach(
+        gate=gate,
+        land=land,
+        start=start,
+        claim=lambda holder, tid: stage_start.claim(call, holder, tid),
+        end=lambda holder: stage_start.end(call, holder),
+    )
 
 
 @dataclass(frozen=True)
