@@ -446,6 +446,12 @@ def test_the_same_path_on_another_node_is_another_repo() -> None:
     assert held_read(OPEN_ROWS, sessions_read(graph, {"n1", "n2"}), {"n1": ["/r"]}, local="home") == {8}
 
 
+@pytest.mark.parametrize(("session_path", "checkout"), [("/r/./x", "/r/x"), ("/r/x/", "/r/x"), ("/r/x", "/r//x/")])
+def test_a_node_path_differing_only_in_form_is_the_same_checkout(session_path: str, checkout: str) -> None:
+    graph = {"a@n1": holder("a", session_path, pr=7)}
+    assert held_read(OPEN_ROWS, sessions_read(graph, {"n1"}), {"n1": [checkout]}, local="home") == {7}
+
+
 def test_a_node_with_a_checkout_that_was_not_read_leaves_held_unknown() -> None:
     assert held_read(OPEN_ROWS, sessions_read({}, ()), {"n1": ["/r"]}, local="home") is None
 
@@ -468,9 +474,19 @@ def test_a_key_naming_the_homes_own_host_is_the_homes_session(tmp_path: Path, ke
     assert held_read(OPEN_ROWS, sessions_read(graph, ()), {key: [str(tmp_path)]}, local="home") == {7}
 
 
-def test_a_symlink_loop_is_no_session_of_the_repo_and_stops_nothing(tmp_path: Path) -> None:
+def test_a_symlink_loop_is_no_session_of_the_repo_and_stops_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     loop = tmp_path / "loop"
     loop.symlink_to(loop)
+    resolve = Path.resolve
+
+    def resolving(self: Path, strict: bool = False) -> Path:
+        if self == loop:  # as 3.12 does; 3.13 resolves a self-loop to itself, so the guard is pinned on both
+            raise RuntimeError(f"Symlink loop from {self!r}")
+        return resolve(self, strict)
+
+    monkeypatch.setattr(Path, "resolve", resolving)
     graph = {"a": holder("a", str(loop), pr=7), "b": holder("b", str(tmp_path), pr=8)}
     assert held_read(OPEN_ROWS, sessions_read(graph, ()), {"": [str(tmp_path)]}, local="home") == {8}
 
