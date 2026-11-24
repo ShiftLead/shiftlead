@@ -272,6 +272,7 @@ def keep_alive(
 # -- the disk sweep's scratch rule (design §4.6 *The disk sweep*, TD-1945) ----------------------------------------
 
 UNNAMED_AFTER_S = 3600  # a directory no record names (or naming a gone home) goes an hour after its newest write
+FUTURE_AFTER_S = 86_400  # a modification time further than this past now says nothing of a write (§4.6, TD-2126)
 GIT_WORK = "git work"
 GIT_STEP = 20.0  # each git read's own timeout
 
@@ -414,10 +415,17 @@ def _worktree_mains(path: Path) -> list[Path]:
     return mains
 
 
-def _newest_write(path: Path) -> float:
-    """The newest modification time of anything under `path`, itself included, not following a symlink; an entry
-    that cannot be read counts as written now, so it never ages a directory past its hour."""
-    newest = path.lstat().st_mtime
+def _written_at(mtime: float, now: float) -> float:
+    """A modification time as a write's time: 0 where it lies more than `FUTURE_AFTER_S` past `now`, which says
+    nothing about when the entry was written (§4.6 *A live seat's rebuildable copies*, part 1)."""
+    return mtime if mtime <= now + FUTURE_AFTER_S else 0.0
+
+
+def _newest_write(path: Path, now: float) -> float:
+    """The newest write under `path`, itself included, by `_written_at` against `now`, not following a symlink and
+    still walking a directory dated far ahead; an entry that cannot be read counts as written now, so it never ages
+    a directory past its hour."""
+    newest = _written_at(path.lstat().st_mtime, now)
     todo = [path]
     while todo:
         try:
@@ -426,7 +434,7 @@ def _newest_write(path: Path) -> float:
             return time.time()
         for e in entries:
             try:
-                newest = max(newest, e.stat(follow_symlinks=False).st_mtime)
+                newest = max(newest, _written_at(e.stat(follow_symlinks=False).st_mtime, now))
                 if e.is_dir(follow_symlinks=False):
                     todo.append(Path(e.path))
             except FileNotFoundError:
@@ -546,7 +554,7 @@ def sweep(
                 if ended is None or now_s - ended < keep_hours * 3600:
                     _measure_once(weigh, path, ended is None)
                     continue
-            elif now_s - _newest_write(path) < UNNAMED_AFTER_S:
+            elif now_s - _newest_write(path, now_s) < UNNAMED_AFTER_S:
                 _measure_once(weigh, path, False)
                 continue
             if live_now(str(path)):
@@ -650,12 +658,12 @@ def _run_over(run: Path) -> bool:
 
 
 def _quiet(path: Path, now: float, quiet_s: float) -> bool:
-    """Nothing under `path` written for `quiet_s`, by a walk bounded by `diskbook.WALK_S`; cut short, or an entry
-    that cannot be read, it is not quiet."""
+    """Nothing under `path` written for `quiet_s`, each time read by `_written_at`, by a walk bounded by
+    `diskbook.WALK_S`; cut short, or an entry that cannot be read, it is not quiet."""
     cut = now - quiet_s
     limit = diskbook.deadline()
     try:
-        if path.lstat().st_mtime > cut:
+        if _written_at(path.lstat().st_mtime, now) > cut:
             return False
         todo = [path]
         while todo:
@@ -663,7 +671,7 @@ def _quiet(path: Path, now: float, quiet_s: float) -> bool:
                 return False
             for e in list(os.scandir(todo.pop())):
                 try:
-                    if e.stat(follow_symlinks=False).st_mtime > cut:
+                    if _written_at(e.stat(follow_symlinks=False).st_mtime, now) > cut:
                         return False
                     if e.is_dir(follow_symlinks=False):
                         todo.append(Path(e.path))
