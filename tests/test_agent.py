@@ -2027,6 +2027,7 @@ async def test_a_create_whose_later_tmux_step_fails_leaves_no_pane_to_adopt(agen
         return run(*args, **kw)
 
     monkeypatch.setattr(agent.tmux, "run", failing)
+    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
     async with LocalClient() as person:
         with pytest.raises(Exception, match="ao-nobody"):
             await person.call("create", name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
@@ -2051,6 +2052,7 @@ async def test_a_create_cancelled_while_its_pane_comes_up_leaves_no_pane_to_adop
         seen["up"] = agent.tmux.has_session(sid)
 
     monkeypatch.setattr(agent, "_start", slow_start)
+    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
     making = asyncio.ensure_future(
         agent.rpc_create(name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
     )
