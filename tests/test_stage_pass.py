@@ -15,8 +15,10 @@ import pytest
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.models import Session
 from shiftlead import stage_fetch, stage_pass, stage_start
+from shiftlead.stage_acts import Act
 from shiftlead.stage_fetch import LedgerRead, RepoFacts, SessionsRead
-from shiftlead.stage_pass import Reach, step
+from shiftlead.stage_make import Made
+from shiftlead.stage_pass import Reach, Step, step
 from shiftlead.stage_read import EntryFacts, EntryLedger
 from shiftlead.stage_start import Work
 from shiftlead.stagerecord import StageStore, StateError, new_record
@@ -392,7 +394,7 @@ def test_unreadable_records_take_no_act_and_keep_the_last_passs_sightings(store,
     monkeypatch.setattr(store, "entries", broken)
     world = World()
     got = stage_pass.team_pass(store, repo_facts(store, row()), no_sessions(), world.reach, local="h", before=("a",))
-    assert got == stage_pass.TeamPass(seen=("a",)) and world.ended == []
+    assert got == stage_pass.TeamPass(seen=("a",), read=False) and world.ended == []
 
 
 def test_the_flow_copy_is_stored_once_the_records_are_read(store, read_as_given):
@@ -656,3 +658,65 @@ def test_records_that_cannot_be_read_read_no_pull_request_by_number(store, read_
         local="h",
     )
     assert given == [{}]
+
+
+def test_a_refusal_stands_after_three_passes_over_ten_minutes_and_is_told_once() -> None:
+    """TD-2051 (§4.9c *A refusal that stands*): the same act refused for the same reason on three passes running, the
+    first at least ten minutes before the last, is told once; a pass with no reading neither counts nor ends it."""
+    from datetime import timedelta
+
+    state = stage_pass.RepoState()
+    no = Step("TD-7", act=Act("reconcile", "merged"), made=Made(False, "the ledger refused"))
+    at = [NOW + timedelta(minutes=m) for m in (0, 4, 8, 12, 13)]
+    got = [stage_pass.note_refusals(state, "t", [no], a) for a in at[:3]]
+    assert got == [[], [], []], "three passes, but only eight minutes"
+    assert stage_pass.note_refusals(state, "t", [Step("TD-7", read=False)], at[3]) == []
+    [told] = stage_pass.note_refusals(state, "t", [no], at[3])
+    assert (told.tid, told.team, told.act, told.why, told.since) == (
+        "TD-7",
+        "t",
+        "reconcile (merged)",
+        "the ledger refused",
+        NOW,
+    )
+    assert stage_pass.note_refusals(state, "t", [no], at[4]) == [], "told once"
+
+
+def test_a_made_act_another_reason_or_an_entry_not_turned_to_ends_the_spell() -> None:
+    from datetime import timedelta
+
+    state = stage_pass.RepoState()
+    no = Step("TD-7", act=Act("answer"), made=Made(False, "x"))
+    later = [NOW + timedelta(minutes=10 * i) for i in range(12)]
+    for a in later[:2]:
+        stage_pass.note_refusals(state, "t", [no], a)
+    stage_pass.note_refusals(state, "t", [Step("TD-7", act=Act("answer"), made=Made(True))], later[2])
+    assert ("t", "TD-7") not in state.spells
+    for a in later[3:5]:
+        stage_pass.note_refusals(state, "t", [no], a)
+    stage_pass.note_refusals(state, "t", [Step("TD-7", act=Act("answer"), made=Made(False, "y"))], later[5])
+    assert state.spells[("t", "TD-7")].why == "y" and state.spells[("t", "TD-7")].passes == 1, (
+        "another reason starts a spell anew"
+    )
+    stage_pass.note_refusals(state, "t", [], later[6])
+    assert state.spells == {}, "an entry the pass did not turn to"
+    stage_pass.note_refusals(state, "t", [no], later[7])
+    stage_pass.note_refusals(state, "u", [], later[7])
+    assert ("t", "TD-7") in state.spells, "another team's pass leaves this team's spells alone"
+
+
+def test_a_team_pass_with_no_reading_keeps_its_refusal_runs(store, read_as_given, monkeypatch):
+    """A team whose records could not be read this pass has no reading of any entry, so its runs stand."""
+    from datetime import timedelta
+
+    state, teams = stage_pass.RepoState(), Teams(store)
+    no = Step("TD-7", act=Act("answer"), made=Made(False, "x"))
+    stage_pass.note_refusals(state, "t", [no], NOW)
+    monkeypatch.setattr(stage_pass, "team_pass", lambda *a, **k: stage_pass.TeamPass(read=False))
+    got = stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert got.refused == () and state.spells[("t", "TD-7")].passes == 1
+    for m in (5, 11):
+        stage_pass.note_refusals(state, "t", [no], NOW + timedelta(minutes=m))
+    assert state.spells[("t", "TD-7")].told
+    gone = stage_pass.repo_pass(store, state, {"u": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert gone.refused == () and state.spells == {}, "a team gone from the repo's flows takes its runs with it"

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from sessionorc import agent_stage, hosts
-from sessionorc.agent_stage import STAGE_EVERY, StageMixin, stage_teams, told
+from sessionorc.agent_stage import STAGE_EVERY, StageMixin, refused_words, stage_teams, told
 from sessionorc.client import AgentError
 
 pytestmark = pytest.mark.unit
@@ -233,3 +233,26 @@ def test_a_call_that_times_out_is_left_to_finish_and_never_cancelled(monkeypatch
         assert finished == ["create"], "the create ran to its end on the loop"
 
     asyncio.run(go())
+
+
+def test_an_entry_whose_refusal_stands_is_told_to_the_person_once_by_its_team(
+    monkeypatch: pytest.MonkeyPatch, body: list[dict[str, Any]]
+) -> None:
+    """TD-2051: each refusal the pass names as newly standing is one system note to the person, under its team."""
+    from datetime import UTC, datetime
+
+    r = SimpleNamespace(
+        tid="TD-7",
+        team="build-r",
+        act="reconcile (merged)",
+        why="the ledger refused the archive",
+        since=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
+    )
+    module = SimpleNamespace(call=lambda **kw: SimpleNamespace(tell={}, refused=(r,)), Kept=lambda: None)
+    monkeypatch.setattr(agent_stage, "home_call", lambda name: module)
+    agent = _Agent()
+    asyncio.run(agent._stage_pass())
+    assert agent.notes == [("person", refused_words(r), "build-r")]
+    text = refused_words(r)
+    assert text.startswith("The home cannot move TD-7 (team build-r): its reconcile (merged) step was refused")
+    assert "since 2026-11-24 23:00 UTC" in text and "- the ledger refused the archive" in text

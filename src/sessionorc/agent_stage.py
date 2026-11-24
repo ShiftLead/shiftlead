@@ -59,6 +59,18 @@ def told(team: str, problems: Any) -> str:
     )
 
 
+def refused_words(r: Any) -> str:
+    """The note to the person once an entry's act has been refused the same way pass after pass (§4.9c *A refusal that
+    stands*)."""
+    since = r.since.strftime("%Y-%m-%d %H:%M UTC") if hasattr(r.since, "strftime") else str(r.since)
+    return (
+        f"The home cannot move {r.tid} (team {r.team}): its {r.act} step was refused on every pass since {since}.\n"
+        f"- {r.why}\n"
+        "The home keeps trying each pass, and tells you again only if the refusal changes, or comes back after the "
+        "step goes through."
+    )
+
+
 def home_call(name: str) -> Any:
     """The module the group names `name`, or a refusal naming the install that lacks it."""
     for ep in entry_points(group=GROUP):
@@ -239,7 +251,8 @@ class StageMixin:
         return out
 
     async def _stage_repo(self, calls: Any, root: str, args: dict[str, Any]) -> None:
-        """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check."""
+        """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check, and of
+        each entry whose act's refusal has newly come to stand."""
         try:
             pool = self.__dict__.get("_stage_pool")
             if pool is None:
@@ -253,6 +266,11 @@ class StageMixin:
                 self._system_note(PERSON, told(team, problems), team=team)  # type: ignore[attr-defined]
             except Exception:  # noqa: BLE001 — a note that cannot be written is a log line, never the pass
                 log.exception("the stage pass could not tell the person of %s's flow", team)
+        for r in getattr(got, "refused", None) or ():
+            try:
+                self._system_note(PERSON, refused_words(r), team=r.team)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 — as above
+                log.exception("the stage pass could not tell the person of %s's refusal", r.tid)
 
     def _stage_call(self, loop: asyncio.AbstractEventLoop) -> Callable[..., Any]:
         """The host agent's call as the pass's thread makes it: the RPC dispatched on the loop with no session caller,
