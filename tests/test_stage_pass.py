@@ -526,13 +526,15 @@ class Teams:
     def __init__(self, store: StageStore, *, none_for: tuple[str, ...] = ()) -> None:
         self.store, self.none_for = store, none_for
         self.flows: dict[str, stage_fetch.TeamFlow] = {}
+        self.reached: dict[str, Any] = {}
         self.world = World()
 
     def facts(self, team: str, flow: stage_fetch.TeamFlow, _records: Any) -> RepoFacts | None:
         self.flows[team] = flow
         return None if team in self.none_for else replace(repo_facts(self.store), team=team, doc=flow.doc)
 
-    def reach(self, _team: str) -> Reach:
+    def reach(self, team: str, doc: Any) -> Reach:
+        self.reached[team] = doc
         return self.world.reach
 
 
@@ -546,6 +548,7 @@ def test_a_failing_flow_runs_its_last_good_copy_and_is_told_once(store, read_as_
         store, state, {"t": ("bad", ["no stages"])}, teams.facts, no_sessions(), teams.reach, local="h"
     )
     assert first.tell == {"t": ("no stages",)} and teams.flows["t"].doc["name"] == "f" and "t" in first.teams
+    assert teams.reached["t"]["name"] == "f", "a session starts from the last good copy, never the failing flow"
     again = stage_pass.repo_pass(
         store, state, {"t": ("bad", ["no stages"])}, teams.facts, no_sessions(), teams.reach, local="h"
     )
@@ -622,10 +625,10 @@ def test_one_teams_failure_never_stops_the_other_teams_or_the_sweep(store, read_
             raise RuntimeError("the forge did not answer")
         return teams.facts(team, flow, records)
 
-    def reach(team: str) -> Reach:
+    def reach(team: str, _doc: Any) -> Reach:
         if where == "reach" and team == "a":
             raise KeyError(team)
-        return teams.reach(team)
+        return teams.reach(team, _doc)
 
     state = stage_pass.RepoState()
     flows = {"a": ("bad", ["no stages"]), "b": (GOOD, [])}

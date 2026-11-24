@@ -20,11 +20,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from sessionorc import gitinfo, ledger, paths, reports
 from sessionorc.models import Session
-from shiftlead import flow3, repoconfig, stage_end, stage_merge, stage_pass, stage_start
+from shiftlead import flow3, stage_end, stage_merge, stage_pass, stage_start
 from shiftlead import org as orgmod
 from shiftlead.stage_fetch import (
     TeamFlow,
@@ -95,24 +93,20 @@ def _reach(
     kept: Kept,
     team: str,
     org: Callable[[], orgmod.Org | None],
+    doc: Mapping[str, Any],
 ) -> Reach:
     """`team`'s `Reach`: the repo's one gate and land, kept between passes, and the session half through the host
-    agent's `call`. A team the org does not define can start nothing (the launch on a login is TD-2068's); its holders
-    are still claimed and ended through the home. `org` reads the org once per pass, at the first team that asks."""
+    agent's `call`, launching from `doc`, the flow the pass runs — the last good copy while the team's flow fails its
+    check (§4.9c). A stage's own brief is read from the flow's directory as found now; with no flow file found, only
+    a standard brief can be read, so a stage naming its own fails its start. A team the org does not define can start
+    nothing (the launch on a login is TD-2068's); its holders are still claimed and ended through the home. `org`
+    reads the org once per pass, at the first team that asks."""
     if kept.gate_land is None:
         kept.gate_land = stage_merge.gate_and_land(root)
     gate, land = kept.gate_land
     read = org()
     teamdef = read.teams.get(team) if read is not None else None
-    at = flow_file(root, str(entry.get("flow") or ""))
-    doc = None
-    if teamdef is not None and at is not None:
-        try:
-            got = repoconfig.parse_yaml(at[0].read_text(encoding="utf-8"))
-            doc = dict(got) if isinstance(got, Mapping) else None
-        except (OSError, UnicodeDecodeError, ValueError, yaml.YAMLError):
-            doc = None
-    if teamdef is None or at is None or doc is None:
+    if teamdef is None:
         return Reach(
             gate=gate,
             land=land,
@@ -121,8 +115,10 @@ def _reach(
             end=lambda holder: stage_start.end(call, holder),
         )
     host = str(entry.get("host") or local)
+    at = flow_file(root, str(entry.get("flow") or ""))
+    place, flow_dir = (at[1], at[0].parent) if at is not None else ("package", None)
     return stage_pass.reach_for(
-        call, read, teamdef, doc, gate, land, host=host, here=local, place=at[1], flow_dir=at[0].parent
+        call, read, teamdef, dict(doc), gate, land, host=host, here=local, place=place, flow_dir=flow_dir
     )
 
 
@@ -206,8 +202,8 @@ def run(
                 held.append(None)
         return held[0]
 
-    def reach(team: str) -> Reach:
-        return _reach(call, root, teams.get(team) or {}, local, kept, team, org)
+    def reach(team: str, doc: Mapping[str, Any]) -> Reach:
+        return _reach(call, root, teams.get(team) or {}, local, kept, team, org, doc)
 
     return stage_pass.repo_pass(StageStore(root), kept.state, flows, facts, sessions, reach, local=local, now=now)
 

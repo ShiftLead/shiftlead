@@ -176,3 +176,25 @@ def test_origins_branches_are_read_once_a_pass_and_only_for_a_carried_branch(
     answer, given[:] = None, []
     got = a_pass(root, Kept(), teams=two)
     assert given == [] and got is not None and set(got.unread) == {"t", "u"}
+
+
+@pytest.mark.unit
+def test_a_team_launches_from_the_flow_the_pass_runs(
+    root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TD-2051: the reach launches from the doc it is given (the last good copy while the flow fails its check), its
+    briefs from the flow's directory as found now, and only from the standard briefs where no flow file is found."""
+    given: list[Any] = []
+    monkeypatch.setattr(stage_tick.stage_pass, "reach_for", lambda *a, **k: given.append((a[3], k)) or "reach")
+    org = type("Org", (), {"teams": {"t": object()}})()
+    copy = {"format": 3, "name": "kept", "stages": []}
+    got = stage_tick._reach(never, root, {**TEAM, "flow": "nowhere"}, "h", Kept(), "t", lambda: org, copy)
+    assert got == "reach" and given[0][0] == copy and given[0][1]["place"] == "package"
+    assert given[0][1]["flow_dir"] is None
+    d = root / flow3.REPO_DIR / "failing"
+    d.mkdir(parents=True)
+    (d / flow3.FILE).write_text("not: a flow\n", encoding="utf-8")
+    stage_tick._reach(never, root, {**TEAM, "flow": "failing"}, "h", Kept(), "t", lambda: org, copy)
+    assert given[1][0] == copy and given[1][1]["place"] == "repo" and given[1][1]["flow_dir"] == d
+    alone = stage_tick._reach(never, root, TEAM, "h", Kept(), "u", lambda: org, copy)
+    assert len(given) == 2 and alone.start("build", object()) is None, "a team the org lacks starts nothing"

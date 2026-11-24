@@ -310,16 +310,17 @@ def repo_pass(
     flows: Mapping[str, tuple[str | None, Collection[str]]],
     facts: FactsFor,
     read: SessionsRead,
-    reach: Callable[[str], Reach],
+    reach: Callable[[str, Mapping[str, Any]], Reach],
     *,
     local: str,
     now: datetime | None = None,
 ) -> RepoPass:
     """One pass over a repo's teams. `flows` holds each team's flow as read now (None: unreadable) and its check's
     problems; `facts` makes a team's `RepoFacts` from the flow it runs and the records (`repo_facts`, its reads bound);
-    `reach` gives a team its `Reach`. A team's flow copy is read before its pass, so the flow its records were written
-    under is known before the copy is replaced. The person is told of a failing flow once, until it passes again, and
-    the closed records are swept once for the repo, after its teams."""
+    `reach` gives a team its `Reach` from the flow it runs, the last good copy while its flow fails. A team's flow copy
+    is read before its pass, so the flow its records were written under is known before the copy is replaced. The
+    person is told of a failing flow once, until it passes again, and the closed records are swept once for the repo,
+    after its teams."""
     for gone in set(state.seen) - set(flows):
         del state.seen[gone]
     for gone in set(state.told) - set(flows):
@@ -359,7 +360,7 @@ def _repo_team(
     facts: FactsFor,
     records: Mapping[str, Any],
     read: SessionsRead,
-    reach: Callable[[str], Reach],
+    reach: Callable[[str, Mapping[str, Any]], Reach],
     tell: dict[str, tuple[str, ...]],
     *,
     local: str,
@@ -380,6 +381,8 @@ def _repo_team(
     repo = facts(team, flow, records) if flow is not None else None
     if flow is None or repo is None:
         return None
-    got = team_pass(store, repo, read, reach(team), local=local, before=state.seen.get(team, ()), put=flow.put)
+    got = team_pass(
+        store, repo, read, reach(team, flow.doc), local=local, before=state.seen.get(team, ()), put=flow.put
+    )
     state.seen[team] = got.seen
     return got
