@@ -5980,13 +5980,18 @@ class TickMixin:
             if not isinstance(answer, dict) or "error" in answer:
                 new.update({k: v for k, v in old.items() if isinstance(v, dict) and v.get("host") == host})
                 continue
-            for spell in answer.get("seats_over") or []:
+            spells = answer.get("seats_over")
+            for spell in spells if isinstance(spells, list) else []:
                 if not isinstance(spell, dict) or not spell.get("record") or not isinstance(spell.get("since"), str):
                     continue
                 addr = str(spell["record"]) if host == self.host else f"{spell['record']}@{host}"
                 was = old.get(addr) if isinstance(old.get(addr), dict) else {}
                 if was.get("since") != spell["since"]:
-                    self._system_note(addr, scratch_mod.seat_note(spell))
+                    try:
+                        self._system_note(addr, scratch_mod.seat_note(spell))
+                    except Exception:  # noqa: BLE001 — one seat's note never loses the others' told state
+                        log.exception("telling %s of its scratch failed", addr)
+                        continue
                 new[addr] = {"host": str(host), "since": spell["since"]}
         if new == old:
             return False
@@ -6241,9 +6246,10 @@ class TickMixin:
                 return True
             return False
 
+        if scratch is not None and not dry:  # each live seat's inodes (§4.6 *A seat is told instead*, TD-2133):
+            tallies["scratch"].seat = {}  # with none live, every spell ends
         if scratch and not dry:
             large: list[str] = []
-            tallies["scratch"].seat = {}  # each live seat's inodes (§4.6 *A seat is told instead*, TD-2133)
             for root in roots:
                 try:
                     large += scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])

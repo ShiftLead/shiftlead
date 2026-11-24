@@ -208,3 +208,54 @@ async def test_a_node_seat_is_told_and_a_node_down_neither_repeats_nor_forgets(a
         assert len(_notes(r)) == 2, "a new spell is told again"
     finally:
         agent.remote.pop("laptop", None)
+
+
+@pytest.mark.unit
+def test_a_root_that_cannot_be_made_moves_no_spell(tmp_path, monkeypatch):
+    t = diskbook.Tally()
+    t.seat = {}
+
+    def refuse(_root):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(scratch, "ensure_parent", refuse)
+    assert scratch.keep_alive(tmp_path, {"ao-w": str(tmp_path / "x")}, tmp_path, time.time_ns(), t) == []
+    assert t.seat is None
+
+
+@pytest.mark.unit
+def test_odd_counts_read_as_nothing_and_never_raise():
+    old = {"ao-w": {"passes": "x", "since": "T", "inodes": "y", "largest": "z"}}
+    assert scratch.seats_over(old) == [{"record": "ao-w", "since": "T", "inodes": 0, "largest": []}]
+    got = scratch.seat_step(old, {"ao-w": {"inodes": "many"}, "ao-q": "bad"}, "T2")
+    assert got == {}, "an odd count reads as 0, under the clear line, and a seat's odd reading is skipped"
+    assert "files" in scratch.seat_note({"inodes": "x", "largest": [{"name": "a", "inodes": None}]})
+
+
+@pytest.mark.integration
+async def test_a_spell_outlives_other_writers_and_ends_when_no_seat_is_live(agent, small):
+    await park_ticks(agent)
+    home = os.environ["SHIFTLEAD_HOME"]
+    spell = {"ao-x-w": {"passes": 2, "since": "T", "inodes": 9, "largest": []}}
+    diskbook.write(home, agent.host, {}, {}, "s", datetime.now(UTC), seats={}, seat_spells=spell)
+    diskbook.set_low(home, agent.host, {"seats": {"low": True}})
+    diskbook.set_memory(home, agent.host, {})
+    diskbook.write(home, agent.host, {}, {}, "s", datetime.now(UTC))  # a pass that walked no seat
+    assert diskbook.seat_state(home) == spell
+    agent._disk_dry_here(agent._sweep_snapshot(datetime.now(UTC)))  # a dry run writes no spell
+    assert diskbook.seat_state(home) == spell
+    agent._prune_runs(datetime.now(UTC), set(), set(), {}, {})  # the hourly pass, no seat live
+    assert diskbook.seat_state(home) == {}
+
+
+@pytest.mark.integration
+async def test_odd_node_answers_tell_nothing(agent, monkeypatch):
+    await park_ticks(agent)
+    answers = {"laptop": {"seats_over": "x"}, "pi": {"seats_over": [{"record": "w", "since": 5}, "y", {}]}}
+
+    async def everywhere(_method, _here):
+        return {agent.host: {}, **answers}
+
+    monkeypatch.setattr(agent, "_disk_everywhere", everywhere)
+    await agent._disk_low_pass()
+    assert "seats_told" not in agent._host_rec

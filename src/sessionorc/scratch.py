@@ -245,6 +245,8 @@ def keep_alive(
     try:
         p = ensure_parent(root)
     except (ScratchError, OSError):
+        if tally is not None:
+            tally.seat = None  # no seat walked under this root: the pass moves no spell (TD-2133)
         return []
     large: list[str] = []
     for record, given in records.items():
@@ -291,6 +293,14 @@ SEAT_BUDGET_CLEAR = 200_000  # under it (a walk not cut short) the spell ends
 SEAT_LARGEST = 3  # the largest entries a spell, and its note, names
 
 
+def _count(v: Any) -> int:
+    """A count read from `disk.json` or a node's answer: 0 for anything that is not a whole number."""
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def seat_count(inodes: dict[str, int], cut: bool) -> dict[str, Any]:
     """One seat's reading for `tally.seat`: its total inodes, its `SEAT_LARGEST` largest entries directly under the
     scratch (`{"name", "inodes"}`, largest first, then by name) and whether the walk was cut short."""
@@ -312,19 +322,18 @@ def seat_step(old: dict[str, Any], seats: dict[str, dict[str, Any]], now: str) -
     out: dict[str, dict[str, Any]] = {}
     for record, got in seats.items():
         was = old.get(record) if isinstance(old.get(record), dict) else {}
-        try:
-            count = int(got.get("inodes") or 0)
-        except (TypeError, ValueError):
+        if not isinstance(got, dict):
             continue
+        count = _count(got.get("inodes"))
         cut = bool(got.get("cut"))
         since = was.get("since") if isinstance(was.get("since"), str) else None
         if count > SEAT_BUDGET:
-            passes = int(was.get("passes") or 0) + 1
+            passes = _count(was.get("passes")) + 1
             since = since or (now if passes >= 2 else None)
         elif since:
             if count < SEAT_BUDGET_CLEAR and not cut:
                 continue
-            passes = int(was.get("passes") or 0)
+            passes = _count(was.get("passes"))
         elif cut and was:
             out[record] = dict(was)  # a lower bound under the line neither counts nor breaks the run
             continue
@@ -347,7 +356,7 @@ def seats_over(spells: dict[str, Any]) -> list[dict[str, Any]]:
                 {
                     "record": record,
                     "since": one["since"],
-                    "inodes": int(one.get("inodes") or 0),
+                    "inodes": _count(one.get("inodes")),
                     "largest": [x for x in one.get("largest") or [] if isinstance(x, dict)],
                 }
             )
@@ -358,10 +367,10 @@ def seat_note(spell: dict[str, Any]) -> str:
     """The one `system` note a seat over its budget gets (§4.6 *A seat is told instead*): what it holds, its
     largest entries, and what to do."""
     largest = ", ".join(
-        f"{x.get('name')} ({int(x.get('inodes') or 0):,})" for x in spell.get("largest") or [] if isinstance(x, dict)
+        f"{x.get('name')} ({_count(x.get('inodes')):,})" for x in spell.get("largest") or [] if isinstance(x, dict)
     )
     return (
-        f"Your scratch holds {int(spell.get('inodes') or 0):,} files, over the {SEAT_BUDGET:,} a seat may keep "
+        f"Your scratch holds {_count(spell.get('inodes')):,} files, over the {SEAT_BUDGET:,} a seat may keep "
         "(design §4.6 *A live seat's rebuildable copies*)."
         + (f" The largest entries in it: {largest}." if largest else "")
         + " Move a copy you still need under $SHIFTLEAD_SCRATCH/copies/, and remove what you no longer need;"
