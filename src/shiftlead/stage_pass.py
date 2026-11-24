@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -288,17 +288,77 @@ class RepoState:
 
     seen: dict[str, tuple[str, ...]] = field(default_factory=dict)
     told: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    spells: dict[str, Spell] = field(default_factory=dict)  # by entry: its act refused the same way, pass after pass
+
+
+STANDING_PASSES = 3  # a refusal the same on this many passes running, over at least STANDING_SPAN, is standing
+STANDING_SPAN = timedelta(minutes=10)
+
+
+@dataclass
+class Spell:
+    """One entry's run of passes whose act was refused with the same reason: since when, how many, and whether the
+    person has been told of it."""
+
+    team: str
+    act: str
+    why: str
+    since: datetime
+    passes: int = 1
+    told: bool = False
+
+
+@dataclass(frozen=True)
+class Refusal:
+    """A refusal newly standing, for the person to be told once (§4.9c *A refusal that stands*)."""
+
+    tid: str
+    team: str
+    act: str
+    why: str
+    since: datetime
+
+
+def note_refusals(state: RepoState, team: str, steps: Iterable[Step], now: datetime) -> list[Refusal]:
+    """Each refused act among `team`'s `steps` counted into its entry's spell, and the spells newly standing. A made
+    act, no act, or a refusal for another act or reason ends the spell (the last starting one of its own); a step with
+    no reading leaves it as it was; an entry the pass did not turn to has its spell dropped."""
+    out: list[Refusal] = []
+    stepped: set[str] = set()
+    for s in steps:
+        stepped.add(s.tid)
+        if not s.read:
+            continue
+        refused = s.act is not None and s.made is not None and not s.made.made
+        if not refused:
+            state.spells.pop(s.tid, None)
+            continue
+        act = f"{s.act.name} ({s.act.case})" if s.act.case else str(s.act.name)  # type: ignore[union-attr]
+        why = s.made.why or "no reason given"  # type: ignore[union-attr]
+        spell = state.spells.get(s.tid)
+        if spell is None or (spell.team, spell.act, spell.why) != (team, act, why):
+            state.spells[s.tid] = Spell(team, act, why, now)
+            continue
+        spell.passes += 1
+        if not spell.told and spell.passes >= STANDING_PASSES and now - spell.since >= STANDING_SPAN:
+            spell.told = True
+            out.append(Refusal(s.tid, team, act, why, spell.since))
+    for tid in [t for t, sp in state.spells.items() if sp.team == team and t not in stepped]:
+        del state.spells[tid]
+    return out
 
 
 @dataclass(frozen=True)
 class RepoPass:
     """What one repo's pass did. `unread`: the teams with no reading this pass. `tell`: the teams whose flow has newly
-    stopped passing its check, with its problems, for the person to be told once. `swept`: closed records removed."""
+    stopped passing its check, with its problems, for the person to be told once. `swept`: closed records removed.
+    `refused`: the entries whose act's refusal has newly come to stand, for the person to be told once each."""
 
     teams: Mapping[str, TeamPass] = field(default_factory=dict)
     unread: tuple[str, ...] = ()
     tell: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     swept: tuple[str, ...] = ()
+    refused: tuple[Refusal, ...] = ()
 
 
 FactsFor = Callable[[str, TeamFlow, Mapping[str, Any]], RepoFacts | None]
@@ -325,6 +385,10 @@ def repo_pass(
         del state.seen[gone]
     for gone in set(state.told) - set(flows):
         del state.told[gone]
+    for tid in [t for t, sp in state.spells.items() if sp.team not in flows]:
+        del state.spells[tid]
+    at = now or datetime.now(UTC)
+    refused: list[Refusal] = []
     try:
         records = {k: r for k, r in store.entries().items() if isinstance(r, Mapping)}
     except Exception:  # noqa: BLE001 — no records read is only no pull requests read by number
@@ -343,12 +407,13 @@ def repo_pass(
             unread.append(team)
         else:
             done[team] = got
+            refused += note_refusals(state, team, got.steps, at)
     try:
         swept = tuple(stage_make.sweep_closed(store, now))
     except Exception:  # noqa: BLE001 — a failed sweep is tried again next pass and never fails this one
         log.exception("the closed stage records could not be swept")
         swept = ()
-    return RepoPass(done, tuple(unread), tell, swept)
+    return RepoPass(done, tuple(unread), tell, swept, tuple(refused))
 
 
 def _repo_team(
