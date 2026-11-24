@@ -9,15 +9,19 @@ shows the merge and the ledger reads the entry archived. A cause a session can c
 A row only a person can cure sends the entry to the person with *Try the merge again*, spending no limit. No reading
 leaves the record `merging`, tried again on later passes for an hour, and then goes to the person, spending no limit.
 
-`gate` and `land` are given by the caller; nothing calls this yet.
+`gate_and_land` makes the two for a repo: the gate's own script on the pull request, then cadence step 5's merge, signed
+`Merged-by: shiftlead-home`. Nothing calls this yet.
 """
 
 from __future__ import annotations
 
+import tempfile
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
+from sessionorc import cadence, sync
 from shiftlead.stage_acts import Act, Reading, choose
 from shiftlead.stage_end import TRY_AGAIN, _answers, _apply, _stage_or_none, destination
 from shiftlead.stage_make import Made, _ask, _back
@@ -26,10 +30,59 @@ from shiftlead.stagerecord import StageStore
 NO_READING_FOR = timedelta(hours=1)
 PERSON_ROWS = frozenset({"reach", "person"})  # the gate's rows only a person can cure
 MERGING = Act("reconcile", "merging")
+MERGED_BY = "shiftlead-home"  # the squash's `Merged-by:` on a flow's merge, with no model since the home runs none
 _STAMP = "%Y-%m-%dT%H:%M:%SZ"
 
 Gate = Callable[[int, str], Mapping[str, Any] | None]  # `cadence.check`'s `{verdict, failed}`, or None for no reading
 Land = Callable[[int, str], str | None]  # merges that pull request at that head: None, or why it did not
+
+
+def gate_and_land(root: Path | str) -> tuple[Gate, Land]:
+    """The repo's real `Gate` and `Land`. The gate's script runs on the pull request then and there, and what it passed
+    is kept for the merge: the head, and the trailers where the pinned tree composes the squash. `land` merges only a
+    head the gate passed, at that head, and a composed squash only where it was composed for that head. A pin that
+    composes none merges bare, as the sync pass does. A gate that cannot say whether the tree composes raises, which
+    `run` reads as no reading."""
+    passed: dict[int, tuple[str, str | None]] = {}
+
+    def gate(pr: int, head: str) -> Mapping[str, Any] | None:
+        passed.pop(pr, None)
+        composes, why = cadence.composes(root)
+        if composes is None:
+            raise RuntimeError(why or "whether the tree composes the squash could not be read")
+        if not composes:
+            got = cadence.check(root, pr, sync.GATE_TIMEOUT)
+            if got is not None and got.get("verdict") == "pass":
+                passed[pr] = (head, None)
+            return got
+        with tempfile.TemporaryDirectory(prefix="stage-merge-") as d:
+            file = Path(d) / "gate"
+            got = cadence.check(root, pr, sync.GATE_TIMEOUT, trailers=file)
+            if got is not None and got.get("verdict") == "pass":
+                passed[pr] = (head, file.read_text(encoding="utf-8"))  # a pass with no trailers raises: no reading
+            return got
+
+    def land(pr: int, head: str) -> str | None:
+        got = passed.pop(pr, None)
+        if got is None or got[0] != head:
+            return "the gate has not passed this head"
+        if got[1] is None:
+            return sync.merge(root, pr, head)
+        with tempfile.TemporaryDirectory(prefix="stage-merge-") as d:
+            out = Path(d)
+            (out / "gate").write_text(got[1], encoding="utf-8")
+            if why := sync.compose(root, pr, out, merged_by=MERGED_BY):
+                return why
+            try:
+                sha = (out / "sha").read_text(encoding="utf-8").strip()
+                subject = (out / "subject").read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as e:
+                return f"the composed squash could not be read: {e}"
+            if sha != head:
+                return f"the squash was composed for {sha[:12]}, not the head the gate passed"
+            return sync.merge(root, pr, head, subject=subject, body_file=out / "body")
+
+    return gate, land
 
 
 def _current(store: StageStore, tid: str, head: str | None) -> dict[str, Any] | None:

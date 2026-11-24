@@ -357,14 +357,14 @@ def merge(
     return _gh(root, args, GATE_TIMEOUT)[0]
 
 
-def squash_env(env: dict[str, str]) -> dict[str, str]:
+def squash_env(env: dict[str, str], merged_by: str = MERGED_BY) -> dict[str, str]:
     """`squash-message`'s environment from the resolver's (§6 *Sync* step 5): the merge is signed `Merged-by:
-    shiftlead-sync`, and never with a model, since the home runs none — `AGENT_MODEL` and `AGENT_MODEL_FILE`
-    are removed."""
-    return {**{k: v for k, v in env.items() if k not in ("AGENT_MODEL", "AGENT_MODEL_FILE")}, "AGENT_NAME": MERGED_BY}
+    <merged_by>`, by default `shiftlead-sync`, and never with a model, since the home runs none — `AGENT_MODEL` and
+    `AGENT_MODEL_FILE` are removed."""
+    return {**{k: v for k, v in env.items() if k not in ("AGENT_MODEL", "AGENT_MODEL_FILE")}, "AGENT_NAME": merged_by}
 
 
-def compose(root: Path | str, number: int, gate_dir: Path | str) -> str | None:
+def compose(root: Path | str, number: int, gate_dir: Path | str, *, merged_by: str = MERGED_BY) -> str | None:
     """`forge.py squash-message <n> --gate <dir>/gate --out <dir>` through the resolver, in the registry
     checkout, under `GATE_TIMEOUT` (it makes paginated `gh api` reads): None when `<dir>` holds `subject`,
     `body` and `sha`, else why not, in one line."""
@@ -374,7 +374,7 @@ def compose(root: Path | str, number: int, gate_dir: Path | str) -> str | None:
     )
     try:
         cp = subprocess.run(
-            argv, capture_output=True, text=True, timeout=GATE_TIMEOUT, cwd=str(root), env=squash_env(env),
+            argv, capture_output=True, text=True, timeout=GATE_TIMEOUT, cwd=str(root), env=squash_env(env, merged_by),
             stdin=subprocess.DEVNULL,
         )  # fmt: skip
     except subprocess.TimeoutExpired:
