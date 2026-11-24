@@ -395,3 +395,32 @@ def test_the_flow_copy_is_stored_once_the_records_are_read(store, read_as_given)
     store.put_flow = lambda team, text: (order.append("put"), put_flow(team, text))[1]  # type: ignore[method-assign]
     stage_pass.team_pass(store, repo_facts(store), no_sessions(), World().reach, local="h", put="name: f\n")
     assert order == ["read", "put"] and store.flow("t") == "name: f\n"
+
+
+def test_a_stranded_session_never_holds_back_the_acts_on_an_open_record(store, read_as_given, monkeypatch):
+    put(store, holder=None, waits="parts")
+    monkeypatch.setattr(stage_pass, "facts_on", lambda _r, tid, _rec: facts(tid=tid, ledger=EntryLedger("archived")))
+    world = World(end_fails=True)
+    read = SessionsRead({"a": stage_session()}, frozenset(), frozenset())
+    got = stage_pass.team_pass(store, repo_facts(store), read, world.reach, local="home", before=("a",))
+    assert got.unended == ("a",) and [s.tid for s in got.steps] == [TID]
+    assert store.entry(TID)["closed_at"]
+
+
+@pytest.mark.parametrize("error", [StateError("refused"), ValueError("not a team name")])
+def test_a_flow_copy_that_cannot_be_stored_steps_no_entry(store, read_as_given, monkeypatch, error):
+    def refuse(_team: str, _text: str) -> str:
+        raise error
+
+    monkeypatch.setattr(store, "put_flow", refuse)
+    got = stage_pass.team_pass(
+        store, repo_facts(store, row()), no_sessions(), World().reach, local="h", put="name: f\n"
+    )
+    assert got.flow_unstored and got.steps == () and store.entry(TID) is None
+
+
+def test_a_record_that_is_not_an_object_never_stops_the_pass(store, read_as_given, monkeypatch):
+    monkeypatch.setattr(store, "entries", lambda: {"TD-9": ["not", "a", "record"]})
+    monkeypatch.setattr(store, "put_entry", lambda *_a: "sha")
+    got = stage_pass.team_pass(store, repo_facts(store), no_sessions(), World().reach, local="h")
+    assert got == stage_pass.TeamPass()

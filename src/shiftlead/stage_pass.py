@@ -112,11 +112,13 @@ def step(store: StageStore, record: Mapping[str, Any] | None, f: EntryFacts, rea
 @dataclass(frozen=True)
 class TeamPass:
     """What one team's pass did. `seen` is the next pass's `before`; `unended` the stranded sessions that could not be
-    ended, which stay in `seen` so the next pass tries again."""
+    ended, which stay in `seen` so the next pass tries again. `flow_unstored`: the team's flow copy could not be stored,
+    so no entry was stepped, since a session's `ao stage end` reads that copy."""
 
     steps: tuple[Step, ...] = ()
     seen: tuple[str, ...] = ()
     unended: tuple[str, ...] = ()
+    flow_unstored: bool = False
 
 
 def targets(records: Mapping[str, Mapping[str, Any]], entries: Iterable[Mapping[str, Any]], team: str) -> list[str]:
@@ -147,20 +149,16 @@ def team_pass(
 ) -> TeamPass:
     """One pass over `repo.team`'s entries. `read` was taken before this call, so a session an offer starts after it
     cannot read as stranded; the records are read under the store's lock. `put` is the flow text to store as the team's
-    copy, written only now that the records written under the old copy have been read. A stranded session's entry is
-    left for a later pass, since its session still holds the stage's name."""
+    copy, written only now that the records written under the old copy have been read. An entry a stranded session
+    names with no open record is left for a later pass, since that session still holds the stage's name; an open
+    record's acts go on beside it."""
     try:
         with store.locked():
-            records = store.entries()
+            records = {k: r for k, r in store.entries().items() if isinstance(r, dict)}
             found = stranded(read, records, repo.team, repo.doc, local=local, before=before)
     except (StateError, ValueError):
         log.exception("the stage records of team %s could not be read", repo.team)
         return TeamPass(seen=tuple(before))
-    if put is not None:
-        try:
-            store.put_flow(repo.team, put)
-        except StateError:
-            log.exception("the flow copy of team %s could not be stored", repo.team)
     unended = []
     for address in found.end:
         try:
@@ -168,12 +166,18 @@ def team_pass(
         except Exception:  # noqa: BLE001 — a session left running is reported and tried again next pass
             log.exception("ending the stranded session %s failed", address)
             unended.append(address)
+    if put is not None:
+        try:
+            store.put_flow(repo.team, put)
+        except (StateError, ValueError):
+            log.exception("the flow copy of team %s could not be stored", repo.team)
+            return TeamPass(seen=found.seen, unended=tuple(unended), flow_unstored=True)
     waiting = {ledgerboard._num(str(read.sessions[a].lane[0])) for a in found.seen}
     steps = []
     for tid in targets(records, repo.entries, repo.team):
-        if ledgerboard._num(tid) in waiting:
-            continue
         record = records.get(tid)
+        if ledgerboard._num(tid) in waiting and (record is None or record.get("closed_at")):
+            continue
         try:
             f = facts_on(repo, tid, record)
             steps.append(step(store, record, f, reach) if f is not None else Step(tid, read=False))
