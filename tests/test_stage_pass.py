@@ -263,7 +263,13 @@ def test_an_end_of_a_session_already_gone_is_no_failure() -> None:
 
 
 @pytest.mark.parametrize(
-    "error", [AgentError("a runs on n1: this call does not cross the link"), AgentUnavailable("down")]
+    "error",
+    [
+        AgentError("a runs on n1: this call does not cross the link"),
+        AgentUnavailable("down"),
+        # an unreachable agent is a failure even worded as a local session already gone (TD-2138)
+        AgentUnavailable("no session a"),
+    ],
 )
 def test_an_end_that_could_not_reach_the_session_is_a_failure(error: AgentError) -> None:
     with pytest.raises(AgentError):
