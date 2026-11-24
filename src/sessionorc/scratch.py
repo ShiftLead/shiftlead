@@ -277,15 +277,18 @@ GIT_WORK = "git work"
 GIT_STEP = 20.0  # each git read's own timeout
 
 
-def _git_dirs(path: Path, weigh_tests: bool = True) -> list[tuple[str, Path]]:
+def _git_dirs(path: Path, weigh_tests: bool = True, limit: float | None = None) -> list[tuple[str, Path]]:
     """Every git store under `path`, not following a symlink: (`clone`, its directory) for a `.git` directory or a
     bare repo (a directory holding `HEAD`, `objects` and `refs`), (`worktree`, its directory) for a `.git` file. A
     store's own insides are not walked. Raises OSError where a directory cannot be read: kept as *git work*. With
     `weigh_tests` false, a `pytest-of-*/` or a marked test root directly under `path` is not walked (§4.6 *The
-    pressure pass*, rule 2): its fixture repos are no one's work."""
+    pressure pass*, rule 2): its fixture repos are no one's work. Past `limit` (monotonic) it raises `TimeoutError`,
+    an OSError, so a walk cut short reads as held."""
     found: list[tuple[str, Path]] = []
     todo = [path]
     while todo:
+        if limit is not None and time.monotonic() > limit:
+            raise TimeoutError(f"git walk of {path} cut short")
         d = todo.pop()
         names = {e.name: e for e in os.scandir(d)}
         if "HEAD" in names and "objects" in names and "refs" in names:
@@ -382,14 +385,20 @@ def _store_holds(kind: str, d: Path) -> bool:
     return False
 
 
-def git_work(path: str | Path, weigh_tests: bool = True) -> bool:
+def git_work(path: str | Path, weigh_tests: bool = True, limit: float | None = None) -> bool:
     """Whether a scratch directory holds git work and is kept (*git work*, §4.6): any store under it that holds
-    some, or a tree or store that cannot be read. `weigh_tests` false is the pressure pass's rule 2 alone."""
+    some, or a tree or store that cannot be read. `weigh_tests` false is the pressure pass's rule 2 alone. Past
+    `limit` (monotonic), read in the walk and between stores, it is held (§4.6 *tool temp*)."""
     try:
-        stores = _git_dirs(Path(path), weigh_tests)
+        stores = _git_dirs(Path(path), weigh_tests, limit)
     except OSError:
         return True
-    return any(_store_holds(kind, d) for kind, d in stores)
+    for kind, d in stores:
+        if limit is not None and time.monotonic() > limit:
+            return True
+        if _store_holds(kind, d):
+            return True
+    return False
 
 
 def _worktree_mains(path: Path) -> list[Path]:
@@ -444,15 +453,17 @@ def _newest_write(path: Path, now: float) -> float:
     return newest
 
 
-def _remove(path: Path) -> None:
-    """Remove a scratch directory whole, a symlink inside it as a link, read-only directories made writable."""
+def _remove(path: Path, floor: Path | None = None) -> None:
+    """Remove a scratch directory whole, a symlink inside it as a link, read-only directories made writable. With
+    `floor`, the retry never makes `floor`'s parent writable, which for *tool temp* is `/tmp` or the tool's root."""
     import shutil
 
     def again(fn, p, exc):
         if isinstance(exc, FileNotFoundError):  # the other remover took it (§4.6 *The pressure pass*)
             return
         with contextlib.suppress(OSError):
-            os.chmod(os.path.dirname(p), 0o700)
+            if floor is None or os.path.abspath(p) != os.path.abspath(floor):
+                os.chmod(os.path.dirname(p), 0o700)
             if not os.path.islink(p) and os.path.isdir(p):
                 os.chmod(p, 0o700)
         fn(p)
@@ -657,13 +668,19 @@ def _run_over(run: Path) -> bool:
         return False
 
 
-def _quiet(path: Path, now: float, quiet_s: float) -> bool:
+def _quiet(path: Path, now: float, quiet_s: float, changed: bool = False) -> bool:
     """Nothing under `path` written for `quiet_s`, each time read by `_written_at`, by a walk bounded by
-    `diskbook.WALK_S`; cut short, or an entry that cannot be read, it is not quiet."""
+    `diskbook.WALK_S`; cut short, or an entry that cannot be read, it is not quiet. `changed` also reads each
+    entry's change time, which a copy or a move into the tree cannot set back (§4.6 *tool temp*)."""
     cut = now - quiet_s
     limit = diskbook.deadline()
+
+    def at(st: os.stat_result) -> float:
+        written = _written_at(st.st_mtime, now)
+        return max(written, st.st_ctime) if changed else written
+
     try:
-        if _written_at(path.lstat().st_mtime, now) > cut:
+        if at(path.lstat()) > cut:
             return False
         todo = [path]
         while todo:
@@ -671,7 +688,7 @@ def _quiet(path: Path, now: float, quiet_s: float) -> bool:
                 return False
             for e in list(os.scandir(todo.pop())):
                 try:
-                    if _written_at(e.stat(follow_symlinks=False).st_mtime, now) > cut:
+                    if at(e.stat(follow_symlinks=False)) > cut:
                         return False
                     if e.is_dir(follow_symlinks=False):
                         todo.append(Path(e.path))
