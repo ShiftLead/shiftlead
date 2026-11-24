@@ -1306,7 +1306,7 @@ def _members_block(lines: list[str], team: str) -> tuple[int, list[tuple[int, di
                 continue
             raise ValueError(f"team {team}'s members: block is not a list of - items")
         try:
-            body = yaml.safe_load(it["body"])
+            body = yamltext.load(it["body"])
         except yaml.YAMLError:
             body = None
         items.append((i, body if isinstance(body, dict) else {}, isinstance(body, dict)))

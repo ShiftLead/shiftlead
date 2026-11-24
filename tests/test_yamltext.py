@@ -82,3 +82,12 @@ def test_every_home_file_reader_reads_a_file_nested_too_deeply_as_a_bad_file(tmp
         profiles.load(tmp_path / "profiles.yml")
     with pytest.raises(yaml.YAMLError):
         org.load(tmp_path / "org.yml")
+
+
+def test_an_org_member_item_nested_too_deeply_is_an_item_the_edit_cannot_read():
+    """TD-2154: the members edit parses each `- {…}` item of org.yml alone, and one nested too deeply crashed it."""
+    from shiftlead import org
+
+    lines = ["teams:\n", "  t:\n", "    members:\n", "      - {role: worker}\n", "      - " + "[" * 5000 + "\n"]
+    _, items = org._members_block(lines, "t")
+    assert items[0][1] == {"role": "worker"} and items[1][1:] == ({}, False)
