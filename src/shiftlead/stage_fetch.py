@@ -248,11 +248,11 @@ def stranded(
 ) -> Stranded:
     """The live sessions of `team`'s stages that no open record names and that have not reported their stage over: left
     by a crash between a start and its record, or by an end that failed (design §4.9c act 5). Each holds its stage's
-    name, so the entry could be offered to nobody until it is ended. `read` must be taken before `records`, and `records`
-    under the store's lock, or a session an offer has just started reads as stranded. `ao stage end` clears the holder
-    before it marks the claim done, so one reading proves nothing: only a session also in `before`, the last pass's
-    `seen`, is to be ended. A session on a node not read is left alone, as is one whose claim is done or dropped, which
-    is on its way out."""
+    name, so the entry could be offered to nobody until it is ended. `read` must be taken before `records`, and
+    `records` under the store's lock, or a session an offer has just started reads as stranded. `ao stage end` clears
+    the holder before it marks the claim done, so one reading proves nothing: only a session also in `before`, the
+    last pass's `seen`, is to be ended. A session on a node not read is left alone, as is one whose claim is done or
+    dropped, which is on its way out."""
     keys = {flow3.key_of(st.get("name")) for st in doc.get("stages") or [] if isinstance(st, Mapping)}
     holders = {
         naming.qualify(str(r["holder"]), local=local)
