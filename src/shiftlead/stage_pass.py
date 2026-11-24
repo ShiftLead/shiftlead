@@ -14,8 +14,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from shiftlead import stage_make, stage_merge, stage_start
 from shiftlead import org as orgmod
+from shiftlead import stage_make, stage_merge, stage_start
 from shiftlead.stage_acts import Act, Reading, choose
 from shiftlead.stage_make import Made
 from shiftlead.stage_read import EntryFacts, reading_on
