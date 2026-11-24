@@ -2177,8 +2177,8 @@ class HostAgent(
                 s.worktree_made = made or _inherits_made(s, holder)
                 self.sessions[sid] = s
             except BaseException:  # a cancelled create too: its pane has no record either
+                self._guard_killed_pane(sid)  # first: a second cancel in the kill's await still leaves it guarded
                 await asyncio.to_thread(self._kill_unrecorded_pane, sid)
-                self._guard_killed_pane(sid)
                 raise
             finally:
                 self._starting.discard(sid)
