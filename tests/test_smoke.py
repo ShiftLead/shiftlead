@@ -35,11 +35,28 @@ def _load():
 sm = _load()
 
 
+@pytest.fixture(autouse=True)
+def first_byte(monkeypatch):
+    """Every load's first byte reads 0.01 s, or the next of `first_byte[route]`: what the budget judges is then
+    the test's figure and never this machine's load (TD-2109). A load that got no answer keeps its None."""
+    planned: dict[str, list[float]] = {}
+    real = sm.fetch
+
+    def fetch(*a, **kw):
+        got = real(*a, **kw)
+        if got["first"] is None:
+            return got
+        return got | {"first": planned[got["route"]].pop(0) if planned.get(got["route"]) else 0.01}
+
+    monkeypatch.setattr(sm, "fetch", fetch)
+    return planned
+
+
 @pytest.fixture
 def stub():
     """A UI that answers every page with `TIMING` as its `Server-Timing`, and `behave[route]` to break one: an
     int is its status, `cut` a body with no `</html>`, `short` a body cut short of its Content-Length, a float
-    seconds of delay, `coldslow` 0.25 s of delay on the route's first load alone, `big` a page past the budget's
+    seconds of delay, `big` a page past the budget's
     150 KB sent plain, `gzip` the same page gzipped to a request that takes it, `badgzip` that gzip with its
     deflate stream broken. `seen` is every route asked."""
     behave: dict[str, object] = {}
@@ -51,8 +68,6 @@ def stub():
             b = behave.get(self.path)
             if isinstance(b, float):
                 time.sleep(b)
-            if b == "coldslow" and seen.count(self.path) == 1:
-                time.sleep(0.25)
             body = PAGE[:20] if b == "cut" else BIG if b in ("big", "gzip") else PAGE
             zipped = b in ("gzip", "badgzip") and "gzip" in (self.headers.get("Accept-Encoding") or "")
             body = gzip.compress(body) if zipped else body
@@ -161,18 +176,17 @@ def test_each_page_failure_is_the_last_line(tmp_path, stub, capsys, behave, why)
     assert code == 1 and lines[-1].startswith(why)
 
 
-def test_a_page_over_its_budget_is_told_with_its_longest_step_and_fails_nothing(tmp_path, stub, capsys):
+def test_a_page_over_its_budget_is_told_with_its_longest_step_and_fails_nothing(tmp_path, stub, first_byte, capsys):
     """§4.5 *Page loads*' budget, told on the last line — the promote's note (§6 *This repo's smoke*, TD-881):
     first byte by page, the HTML on the wire, and the judged load alone."""
     port, b, _ = stub
-    b.update({"/settings": 0.25, "/inbox": "big", "/queue": "gzip"})
+    b.update({"/inbox": "big", "/queue": "gzip"})
+    first_byte["/settings"] = [0.25, 0.25]
     code, lines = _run(tmp_path, port, capsys)
     assert code == 0 and lines[-1].startswith("smoke passed; Inbox over budget: 195 KB of HTML over 150 KB")
     told = lines[-1].split("; ")
     assert told[1] == "Inbox over budget: 195 KB of HTML over 150 KB — longest step render 250 ms"
-    assert told[2].startswith("Settings over budget: first byte 0.2") and told[2].endswith(
-        " s over 0.2 s — longest step render 250 ms"
-    )
+    assert told[2] == "Settings over budget: first byte 0.25 s over 0.2 s — longest step render 250 ms"
     assert told[3:] == [sm.SKIPPED]  # the Queue, gzipped on the wire, is under; so is every other page
     queue = [ln for ln in lines if ln.startswith("Queue /queue · ")]
     assert all(f"· {len(gzip.compress(BIG))} bytes ·" in ln for ln in queue)  # what the wire carried
@@ -181,15 +195,14 @@ def test_a_page_over_its_budget_is_told_with_its_longest_step_and_fails_nothing(
     assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"  # every page under: nothing told
 
 
-def test_the_budget_judges_the_second_load_not_the_cold_one(tmp_path, stub, capsys):
+def test_the_budget_judges_the_second_load_not_the_cold_one(tmp_path, stub, first_byte, capsys):
     """Each page is loaded twice and the second judged (§6 *This repo's smoke*, TD-886): a slow cold load tells
     nothing."""
-    port, b, _ = stub
-    b["/settings"] = "coldslow"
+    port, _, _ = stub
+    first_byte["/settings"] = [0.25, 0.01]
     code, lines = _run(tmp_path, port, capsys)
     settings = [ln for ln in lines if ln.startswith("Settings /settings · ")]
-    assert settings[0].startswith("Settings /settings · cold · 200 · first byte ")
-    assert float(settings[0].split("first byte ")[1].split(" s")[0]) >= 0.2  # the cold load was over its budget
+    assert settings[0].startswith("Settings /settings · cold · 200 · first byte 0.25 s")  # over its budget
     assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"
 
 
