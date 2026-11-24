@@ -74,6 +74,7 @@ class Tally:
         self.kept: list[tuple[str, str]] = []
         self.held_gone = 0  # the removed bytes that were among those held (a dry run reads them back as held)
         self.unlisted = False  # the rule could not list its items this pass: the last reading stands, *partial*
+        self.seat: dict[str, dict[str, Any]] | None = None  # scratch's: each live seat's inodes (TD-2133)
 
     def list(self, path: str | Path) -> None:
         self.listed.add(str(path))
@@ -312,12 +313,16 @@ def write(
     now: datetime,
     seat_free: dict[str, Any] | None = None,
     branches: dict[str, Any] | None = None,
+    seats: dict[str, dict[str, Any]] | None = None,
+    seat_spells: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Write one pass's `result` (`Book.close`'s) to `disk.json` in `home`: the pass's kinds, `free`, `seat_free`
     where the host sets a `seat_root` (TD-2082), the host agent's `started` (a reading by a later run says *partial*,
     its memory being empty), the branch rule's `branches` (`branch_rows`; None: no delete, the file's rows stand), and
-    the dated lines of the passes in the last `KEEP_DAYS`, this one's appended. Through a temporary file and one
-    rename; returns what it wrote."""
+    the dated lines of the passes in the last `KEEP_DAYS`, this one's appended. `seats` (`tally.seat`, None where the
+    pass walked no seat) puts each live seat's inodes on this pass's line, and `seat_spells` (`scratch.seat_step`'s;
+    None: as the file holds them) the seats' spells (§4.6 *A seat is told instead*, TD-2133). Through a temporary
+    file and one rename; returns what it wrote."""
     path = Path(home) / FILE
     cutoff = now - timedelta(days=KEEP_DAYS)
     with _WRITE:
@@ -330,13 +335,14 @@ def write(
             old = _load(path).get("branches")
             old = old if isinstance(old, dict) else {}
             branches = {"deleted": 0, "kept": old.get("kept") or [], "kept_more": int(old.get("kept_more") or 0)}
-        lines.append(
-            {
-                "at": _stamp(now),
-                "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS},
-                "branches_deleted": int(branches.get("deleted") or 0),
-            }
-        )
+        line: dict[str, Any] = {
+            "at": _stamp(now),
+            "removed": {k: int((result.get(k) or {}).get("removed") or 0) for k in KINDS},
+            "branches_deleted": int(branches.get("deleted") or 0),
+        }
+        if seats is not None:  # what the week's check reads (TD-2134)
+            line["seats"] = {r: int(one.get("inodes") or 0) for r, one in sorted(seats.items())}
+        lines.append(line)
         branches = {**branches, "deleted_30d": _branches_30d(lines, cutoff)}
         out = {
             "host": host,
@@ -356,8 +362,18 @@ def write(
             out["memory"] = memory
         if isinstance(left := kept.get("left_behind"), dict):  # and the left-behind spell (TD-2137)
             out["left_behind"] = left
+        if seat_spells is None and isinstance(kept.get("seats_over"), dict):
+            seat_spells = kept["seats_over"]  # and each seat's spell (TD-2133), written by the hourly pass alone
+        if seat_spells:
+            out["seats_over"] = seat_spells
         _atomic_write(path, json.dumps(out, indent=1) + "\n")
     return out
+
+
+def seat_state(home: str | Path) -> dict[str, dict[str, Any]]:
+    """Each seat's spell in `disk.json` (§4.6 *A seat is told instead*, TD-2133), by record, an odd entry dropped."""
+    got = _load(Path(home) / FILE).get("seats_over")
+    return {str(k): v for k, v in got.items() if isinstance(v, dict)} if isinstance(got, dict) else {}
 
 
 def low_state(home: str | Path) -> dict[str, dict[str, Any]]:

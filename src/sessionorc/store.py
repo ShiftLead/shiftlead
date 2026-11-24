@@ -190,14 +190,14 @@ class RepoStore:
 
 class HostStore:
     """The home's own `host` record (design §6 *Balance*, TD-239), `{teams: {<team>: {...}},
-    last_tick?, first_shape_off?, ci_spells?, disk_low?, memory_low?, left_behind?, ended_runs?, stuck?, stuck_open?}`
-    — `last_tick` the
+    last_tick?, first_shape_off?, ci_spells?, disk_low?, memory_low?, left_behind?, ended_runs?, seats_told?, stuck?,
+    stuck_open?}` — `last_tick` the
     agent's newest tick (§4.5 row 5 (b), TD-490), `first_shape_off` the last readable reading of the cut-over's
     marker (§4.9e, TD-2076), `ci_spells` the *CI not starting* rows' spells by owner (§4.4, TD-687), `disk_low`
     the *temporary space low* rows' spells by `<host>:<pool>` (§4.6, TD-2083), `memory_low` the *memory low* rows'
     by `<host>:<half>` (§4.6, TD-2136), `left_behind` the *processes left behind* rows' by host and `ended_runs`
-    this host's unattended runs that ended, `{<id>: {"runs": [{"from", "to"}]}}` (§4.6, TD-2137), `stuck` and
-    `stuck_open` rule 13's stuck work
+    this host's unattended runs that ended, `{<id>: {"runs": [{"from", "to"}]}}` (§4.6, TD-2137), `seats_told` the
+    seat budget's notes sent, by the seat's address (§4.6, TD-2133), `stuck` and `stuck_open` rule 13's stuck work
     and its board lines' clocks (§6 *Stuck work*, TD-1496), each shape-checked — written whole each
     time it changes. A missing or unreadable file is an empty record, never a crash: the
     next tick writes what stands."""
@@ -223,7 +223,8 @@ class HostStore:
                 rec["first_shape_cut"] = raw["first_shape_cut"]  # the marker's date, which rule 13's ask reading reads
         # `disk_low`: §4.6 *Told before the pool is full*, TD-2083; `memory_low`: *Told when memory runs short*, TD-2136
         # `left_behind`, `ended_runs`: *Told what finished sessions left running*, TD-2137
-        for name in ("ci_spells", "disk_low", "memory_low", "left_behind", "ended_runs"):
+        # `seats_told`: §4.6 *A seat is told instead*, TD-2133
+        for name in ("ci_spells", "disk_low", "memory_low", "left_behind", "ended_runs", "seats_told"):
             spells = raw.get(name) if isinstance(raw, dict) else None
             if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
                 rec[name] = kept
