@@ -24,6 +24,7 @@ from shiftlead.stage_fetch import (
     protected_at,
     rows_of,
     sessions_read,
+    stranded,
     team_flow,
     teams_on,
 )
@@ -506,3 +507,65 @@ def test_a_ledger_declaring_no_team_has_none(repo: Path) -> None:
 )
 def test_a_team_is_over_its_line_only_where_its_own_mark_is_crossed(host: dict | None, over: bool) -> None:
     assert over_line(host, "t") is over
+
+
+STAGED = {"stages": [{"name": "Build"}, {"name": "Read Twice"}]}
+
+
+def staged(name: str = "build-td-7", lane: tuple[str, ...] = ("TD-7",), **over: Any) -> Session:
+    s = session("a")
+    s.name, s.team, s.lane, s.unattended = name, "t", list(lane), True
+    for k, v in over.items():
+        setattr(s, k, v)
+    return s
+
+
+def strand(graph: dict[str, Session], records: dict | None = None, nodes: tuple[str, ...] = ()) -> tuple[str, ...]:
+    return stranded(sessions_read(graph, nodes), records or {}, "t", STAGED, local="home")
+
+
+def test_a_live_stage_session_no_record_names_is_stranded() -> None:
+    assert strand({"a": staged()}) == ("a",)
+    assert strand({"a": staged("read-twice-td-7")}) == ("a",)
+
+
+def test_a_claimed_session_no_record_names_is_stranded() -> None:
+    assert strand({"a": staged(progress=[ProgressEntry(ref="TD-7", status="claimed")])}) == ("a",)
+
+
+@pytest.mark.parametrize("holder", ["a", "a@home"])
+def test_the_records_holder_is_not_stranded_in_either_address_form(holder: str) -> None:
+    assert strand({"a": staged()}, {"TD-7": {"holder": holder}}) == ()
+
+
+def test_a_closed_records_old_holder_is_stranded() -> None:
+    assert strand({"a": staged()}, {"TD-7": {"holder": "a", "closed_at": "2026-11-20"}}) == ("a",)
+
+
+@pytest.mark.parametrize("status", ["done", "dropped"])
+def test_a_session_that_reported_its_stage_over_is_left_to_exit(status: str) -> None:
+    assert strand({"a": staged(progress=[ProgressEntry(ref="TD-7", status=status)])}) == ()
+
+
+def test_a_session_on_a_node_not_read_is_left_alone() -> None:
+    assert strand({"a@n1": staged()}) == ()
+    assert strand({"a@n1": staged()}, nodes=("n1",)) == ("a@n1",)
+
+
+@pytest.mark.parametrize(
+    "s",
+    [
+        staged(team="other"),
+        staged(state="exited"),
+        staged(state="closed"),
+        staged(unattended=False),
+        staged(seat="techlead"),
+        staged(superseded_by="b"),
+        staged(lane=("free-pick",)),
+        staged(lane=("TD-7", "TD-8")),
+        staged("grinder-td-7"),
+        staged("build-td-8"),
+    ],
+)
+def test_anything_else_is_not_a_stranded_stage_session(s: Session) -> None:
+    assert strand({"a": s}) == ()
