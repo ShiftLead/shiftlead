@@ -521,7 +521,7 @@ def staged(name: str = "build-td-7", lane: tuple[str, ...] = ("TD-7",), **over: 
 
 
 def strand(graph: dict[str, Session], records: dict | None = None, nodes: tuple[str, ...] = ()) -> tuple[str, ...]:
-    return stranded(sessions_read(graph, nodes), records or {}, "t", STAGED, local="home")
+    return stranded(sessions_read(graph, nodes), records or {}, "t", STAGED, local="home").seen
 
 
 def test_a_live_stage_session_no_record_names_is_stranded() -> None:
@@ -569,3 +569,21 @@ def test_a_session_on_a_node_not_read_is_left_alone() -> None:
 )
 def test_anything_else_is_not_a_stranded_stage_session(s: Session) -> None:
     assert strand({"a": s}) == ()
+
+
+def test_only_a_session_stranded_on_two_passes_running_is_to_be_ended() -> None:
+    read = sessions_read({"a": staged()}, ())
+    first = stranded(read, {}, "t", STAGED, local="home")
+    assert first.seen == ("a",) and first.end == ()
+    assert stranded(read, {}, "t", STAGED, local="home", before=first.seen).end == ("a",)
+
+
+def test_a_session_that_reported_between_the_passes_is_not_ended() -> None:
+    done = staged(progress=[ProgressEntry(ref="TD-7", status="done")])
+    assert stranded(sessions_read({"a": done}, ()), {}, "t", STAGED, local="home", before=("a",)).end == ()
+
+
+def test_a_padded_id_matches_its_session_name_and_its_done_row() -> None:
+    assert strand({"a": staged("build-td-007", lane=("TD-007",))}) == ("a",)
+    done = [ProgressEntry(ref="TD-007", status="done")]
+    assert strand({"a": staged("build-td-007", lane=("TD-007",), progress=done)}) == ()

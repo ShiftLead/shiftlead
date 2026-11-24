@@ -229,6 +229,14 @@ def held_read(
     return held_on([dict(r) for r in rows], records)
 
 
+class Stranded(NamedTuple):
+    """`seen`: the sessions that read as stranded this pass, kept for the next pass's `before`. `end`: those that also
+    did on the pass before, which are the ones to end."""
+
+    seen: tuple[str, ...] = ()
+    end: tuple[str, ...] = ()
+
+
 def stranded(
     read: SessionsRead,
     records: Mapping[str, Mapping[str, Any]],
@@ -236,12 +244,15 @@ def stranded(
     doc: Mapping[str, Any],
     *,
     local: str,
-) -> tuple[str, ...]:
+    before: Collection[str] = (),
+) -> Stranded:
     """The live sessions of `team`'s stages that no open record names and that have not reported their stage over: left
     by a crash between a start and its record, or by an end that failed (design §4.9c act 5). Each holds its stage's
-    name, so the entry could be offered to nobody until it is ended. `records` must be read under the store's lock, or
-    an offer in flight reads as stranded. A session on a node not read is left alone, as is one whose claim is done or
-    dropped, which is on its way out."""
+    name, so the entry could be offered to nobody until it is ended. `read` must be taken before `records`, and `records`
+    under the store's lock, or a session an offer has just started reads as stranded. `ao stage end` clears the holder
+    before it marks the claim done, so one reading proves nothing: only a session also in `before`, the last pass's
+    `seen`, is to be ended. A session on a node not read is left alone, as is one whose claim is done or dropped, which
+    is on its way out."""
     keys = {flow3.key_of(st.get("name")) for st in doc.get("stages") or [] if isinstance(st, Mapping)}
     holders = {
         naming.qualify(str(r["holder"]), local=local)
@@ -262,12 +273,12 @@ def stranded(
             or s.state in ("exited", "closed")
         ):
             continue
-        tid = s.lane[0] if len(s.lane) == 1 else ""
+        tid = str(s.lane[0]) if len(s.lane) == 1 else ""
         if not TD_ID.fullmatch(tid) or s.name not in {f"{k}-{tid.lower()}" for k in keys}:
             continue
         if not any(p.ref == tid and p.status != "claimed" for p in s.progress):
             out.append(address)
-    return tuple(out)
+    return Stranded(tuple(out), tuple(a for a in out if a in before))
 
 
 @dataclass(frozen=True)
