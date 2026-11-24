@@ -5,6 +5,7 @@ live, its folder removed once empty; a live session's is kept whole; `runs_keep_
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -12,6 +13,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import paths
+from sessionorc.client import LocalClient
 
 
 def _files(tmp_path, ages: dict[str, int]):
@@ -44,6 +46,36 @@ async def test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_liv
     assert f["ao-live-3/old.png"].exists()  # a live session's, whatever its age
     await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set())  # no live reading: nothing swept
     assert f["ao-ended-2/young.png"].exists()
+
+
+@pytest.mark.integration
+async def test_a_session_created_after_the_sweeps_reading_keeps_its_old_attachments(agent, tmp_path):
+    """TD-2124: the pass reads the records again just before an age removal, for a session's folder and for a draft
+    it claimed, so a stale reading loses neither; an ended session's files still go on that same reading."""
+    await park_ticks(agent)
+    (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
+    reading: set[str] = set()  # the sweep's reading, taken before the create
+    async with LocalClient() as person:
+        sid = (
+            await person.call(
+                "create", name="m", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+            )
+        )["id"]
+    f = _files(
+        tmp_path,
+        {
+            f"{sid}/old.png": 30,
+            "ao-gone-1/old.png": 30,
+            "draft-0000000a/old.png": 30,
+            "draft-0000000b/old.png": 30,
+        },
+    )
+    at = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    for token, by in (("draft-0000000a", sid), ("draft-0000000b", "ao-gone-1")):
+        (paths.attachments_dir() / token / paths.DRAFT_CLAIM).write_text(json.dumps({"by": by, "at": at}))
+    await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set(), reading)
+    assert f[f"{sid}/old.png"].exists() and f["draft-0000000a/old.png"].exists()
+    assert not f["ao-gone-1/old.png"].exists() and not f["draft-0000000b/old.png"].exists()
 
 
 @pytest.mark.integration

@@ -6158,16 +6158,13 @@ class TickMixin:
                 continue
         local = hosts.local_host()
         keep = local.runs_keep_days
-        _prune_drafts(now, keep, live_ids, rm)
         ended = ("exited", "closed")
-        _prune_runs_by_size(
-            local.runs_keep_mb,
-            live,
-            live_ids,
-            now,
-            lambda rid: any(s.id == rid and s.state not in ended for s in list(self.sessions.values())),
-            rm,
-        )
+
+        def id_live_now(rid: str) -> bool:  # a record created since the snapshot (TD-2124): read just before removal
+            return any(s.id == rid and s.state not in ended for s in list(self.sessions.values()))
+
+        _prune_drafts(now, keep, live_ids, rm, id_live_now)
+        _prune_runs_by_size(local.runs_keep_mb, live, live_ids, now, id_live_now, rm)
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
@@ -6210,6 +6207,8 @@ class TickMixin:
             for f in files:
                 try:
                     if f.stat().st_mtime < cutoff:
+                        if id_live_now(folder.name):
+                            break  # the file left behind keeps the folder through the rmdir below
                         if rm.unlink(f):
                             continue
                         log.info("pruned attachment %s (older than %d days)", f, keep)
@@ -8275,14 +8274,21 @@ def sweep_roots(repos: Mapping[Any, Any] | None) -> list[str]:
     return sorted({str(r.get("root") or k) for k, r in (repos or {}).items() if isinstance(r, Mapping)})
 
 
-def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None, rm: _Removal | None = None) -> None:
+def _prune_drafts(
+    now: datetime,
+    keep: int,
+    live_ids: set[str] | None,
+    rm: _Removal | None = None,
+    still_live: Callable[[str], bool] | None = None,
+) -> None:
     """The Add entry form's draft folders (design §4.6 *Run-log retention*, §4.4 *The Add entry form's
     draft*, TD-630), by their `claimed.json`: one with none is removed once nothing in it was written
     for `ATTACH_PART_IDLE_S`, whatever `keep`; one claimed by a hand (`by: hand:<ask id>`) is removed
     `keep` days after its `at`, and kept under `0`; one claimed by a session lives as that session's
     own folder does — kept while its id is in `live_ids` (`None`: nothing is known, so kept), its
     files then going by age and the folder, claim and all, once nothing else is left. A claim that
-    cannot be read is kept: the person's files are the safe direction. `rm` (a dry run's) records instead."""
+    cannot be read is kept: the person's files are the safe direction. `rm` (a dry run's) records instead.
+    `still_live` reads the records again just before a session's draft loses a file (TD-2124)."""
     rm = rm or _Removal()
     idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
     cutoff = (now - timedelta(days=keep)).timestamp()
@@ -8306,6 +8312,8 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None, rm: _Remo
                     log.info("pruned draft %s (handed as %s, older than %d days)", folder.name, by[5:], keep)
                 continue
             if not by or live_ids is None or by in live_ids or keep <= 0:
+                continue
+            if still_live is not None and still_live(by):
                 continue
             files = [f for f in folder.iterdir() if f.name != paths.DRAFT_CLAIM]
             for f in files:
