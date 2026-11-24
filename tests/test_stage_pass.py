@@ -394,7 +394,7 @@ def test_unreadable_records_take_no_act_and_keep_the_last_passs_sightings(store,
     monkeypatch.setattr(store, "entries", broken)
     world = World()
     got = stage_pass.team_pass(store, repo_facts(store, row()), no_sessions(), world.reach, local="h", before=("a",))
-    assert got == stage_pass.TeamPass(seen=("a",)) and world.ended == []
+    assert got == stage_pass.TeamPass(seen=("a",), read=False) and world.ended == []
 
 
 def test_the_flow_copy_is_stored_once_the_records_are_read(store, read_as_given):
@@ -691,13 +691,32 @@ def test_a_made_act_another_reason_or_an_entry_not_turned_to_ends_the_spell() ->
     for a in later[:2]:
         stage_pass.note_refusals(state, "t", [no], a)
     stage_pass.note_refusals(state, "t", [Step("TD-7", act=Act("answer"), made=Made(True))], later[2])
-    assert "TD-7" not in state.spells
+    assert ("t", "TD-7") not in state.spells
     for a in later[3:5]:
         stage_pass.note_refusals(state, "t", [no], a)
     stage_pass.note_refusals(state, "t", [Step("TD-7", act=Act("answer"), made=Made(False, "y"))], later[5])
-    assert state.spells["TD-7"].why == "y" and state.spells["TD-7"].passes == 1, "another reason starts a spell anew"
+    assert state.spells[("t", "TD-7")].why == "y" and state.spells[("t", "TD-7")].passes == 1, (
+        "another reason starts a spell anew"
+    )
     stage_pass.note_refusals(state, "t", [], later[6])
     assert state.spells == {}, "an entry the pass did not turn to"
     stage_pass.note_refusals(state, "t", [no], later[7])
     stage_pass.note_refusals(state, "u", [], later[7])
-    assert "TD-7" in state.spells, "another team's pass leaves this team's spells alone"
+    assert ("t", "TD-7") in state.spells, "another team's pass leaves this team's spells alone"
+
+
+def test_a_team_pass_with_no_reading_keeps_its_refusal_runs(store, read_as_given, monkeypatch):
+    """A team whose records could not be read this pass has no reading of any entry, so its runs stand."""
+    from datetime import timedelta
+
+    state, teams = stage_pass.RepoState(), Teams(store)
+    no = Step("TD-7", act=Act("answer"), made=Made(False, "x"))
+    stage_pass.note_refusals(state, "t", [no], NOW)
+    monkeypatch.setattr(stage_pass, "team_pass", lambda *a, **k: stage_pass.TeamPass(read=False))
+    got = stage_pass.repo_pass(store, state, {"t": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert got.refused == () and state.spells[("t", "TD-7")].passes == 1
+    for m in (5, 11):
+        stage_pass.note_refusals(state, "t", [no], NOW + timedelta(minutes=m))
+    assert state.spells[("t", "TD-7")].told
+    gone = stage_pass.repo_pass(store, state, {"u": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
+    assert gone.refused == () and state.spells == {}, "a team gone from the repo's flows takes its runs with it"

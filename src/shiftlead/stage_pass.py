@@ -130,12 +130,14 @@ def step(store: StageStore, record: Mapping[str, Any] | None, f: EntryFacts, rea
 class TeamPass:
     """What one team's pass did. `seen` is the next pass's `before`; `unended` the stranded sessions that could not be
     ended, which stay in `seen` so the next pass tries again. `flow_unstored`: the team's flow copy could not be stored,
-    so no entry was stepped, since a session's `ao stage end` reads that copy."""
+    so no entry was stepped, since a session's `ao stage end` reads that copy. `read` False: the records could not be
+    read or the copy stored, so no entry had a reading this pass."""
 
     steps: tuple[Step, ...] = ()
     seen: tuple[str, ...] = ()
     unended: tuple[str, ...] = ()
     flow_unstored: bool = False
+    read: bool = True
 
 
 def targets(records: Mapping[str, Mapping[str, Any]], entries: Iterable[Mapping[str, Any]], team: str) -> list[str]:
@@ -175,7 +177,7 @@ def team_pass(
             found = stranded(read, records, repo.team, repo.doc, local=local, before=before)
     except (StateError, ValueError):
         log.exception("the stage records of team %s could not be read", repo.team)
-        return TeamPass(seen=tuple(before))
+        return TeamPass(seen=tuple(before), read=False)
     unended = []
     for address in found.end:
         try:
@@ -188,7 +190,7 @@ def team_pass(
             store.put_flow(repo.team, put)
         except (StateError, ValueError):
             log.exception("the flow copy of team %s could not be stored", repo.team)
-            return TeamPass(seen=found.seen, unended=tuple(unended), flow_unstored=True)
+            return TeamPass(seen=found.seen, unended=tuple(unended), flow_unstored=True, read=False)
     waiting = {ledgerboard._num(str(read.sessions[a].lane[0])) for a in found.seen}
     steps = []
     for tid in targets(records, repo.entries, repo.team):
@@ -288,7 +290,7 @@ class RepoState:
 
     seen: dict[str, tuple[str, ...]] = field(default_factory=dict)
     told: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    spells: dict[str, Spell] = field(default_factory=dict)  # by entry: its act refused the same way, pass after pass
+    spells: dict[tuple[str, str], Spell] = field(default_factory=dict)  # by (team, entry): an act refused alike
 
 
 STANDING_PASSES = 3  # a refusal the same on this many passes running, over at least STANDING_SPAN, is standing
@@ -331,20 +333,20 @@ def note_refusals(state: RepoState, team: str, steps: Iterable[Step], now: datet
             continue
         refused = s.act is not None and s.made is not None and not s.made.made
         if not refused:
-            state.spells.pop(s.tid, None)
+            state.spells.pop((team, s.tid), None)
             continue
         act = f"{s.act.name} ({s.act.case})" if s.act.case else str(s.act.name)  # type: ignore[union-attr]
         why = s.made.why or "no reason given"  # type: ignore[union-attr]
-        spell = state.spells.get(s.tid)
-        if spell is None or (spell.team, spell.act, spell.why) != (team, act, why):
-            state.spells[s.tid] = Spell(team, act, why, now)
+        spell = state.spells.get((team, s.tid))
+        if spell is None or (spell.act, spell.why) != (act, why):
+            state.spells[(team, s.tid)] = Spell(team, act, why, now)
             continue
         spell.passes += 1
         if not spell.told and spell.passes >= STANDING_PASSES and now - spell.since >= STANDING_SPAN:
             spell.told = True
             out.append(Refusal(s.tid, team, act, why, spell.since))
-    for tid in [t for t, sp in state.spells.items() if sp.team == team and t not in stepped]:
-        del state.spells[tid]
+    for key in [k for k in state.spells if k[0] == team and k[1] not in stepped]:
+        del state.spells[key]
     return out
 
 
@@ -385,8 +387,8 @@ def repo_pass(
         del state.seen[gone]
     for gone in set(state.told) - set(flows):
         del state.told[gone]
-    for tid in [t for t, sp in state.spells.items() if sp.team not in flows]:
-        del state.spells[tid]
+    for key in [k for k in state.spells if k[0] not in flows]:
+        del state.spells[key]
     at = now or datetime.now(UTC)
     refused: list[Refusal] = []
     try:
@@ -407,7 +409,8 @@ def repo_pass(
             unread.append(team)
         else:
             done[team] = got
-            refused += note_refusals(state, team, got.steps, at)
+            if got.read:  # a team pass with no reading neither counts nor ends a run
+                refused += note_refusals(state, team, got.steps, at)
     try:
         swept = tuple(stage_make.sweep_closed(store, now))
     except Exception:  # noqa: BLE001 — a failed sweep is tried again next pass and never fails this one
