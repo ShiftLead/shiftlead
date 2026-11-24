@@ -223,12 +223,13 @@ def claim(call: Any, holder: str, tid: str) -> str | None:
 
 
 def end(call: Any, holder: str, why: str = "its stage record no longer names it") -> None:
-    """Close a session an act took its record from, as the tick closes one. A session already gone is no failure; an
-    agent that could not be reached is, so the caller reports the session as left running."""
+    """Close a session an act took its record from, as the tick closes one. A session of this host already gone is no
+    failure. Anything else is, so the caller reports the session as left running: above all a node's `no session`,
+    which the home answers from its copy of that node's records, and that copy can lag a session still running."""
     try:
         call("close", id=holder, closer={"by": "tick", "why": why})
     except AgentUnavailable:
         raise
     except AgentError as e:
-        if not str(e).startswith("no session "):
+        if "@" in holder or str(e) != f"no session {holder}":
             raise

@@ -265,3 +265,18 @@ def test_an_end_of_a_session_already_gone_is_no_failure() -> None:
 def test_an_end_that_could_not_reach_the_session_is_a_failure(error: AgentError) -> None:
     with pytest.raises(AgentError):
         stage_start.end(Calls(error), "a")
+
+
+@pytest.mark.parametrize(
+    ("holder", "words"),
+    [("a@n1", "no session a@n1"), ("a@n1", "n1: no session a"), ("a@home", "no session a@home")],
+)
+def test_a_no_session_for_a_node_address_does_not_prove_it_gone(holder: str, words: str) -> None:
+    with pytest.raises(AgentError):
+        stage_start.end(Calls(AgentError(words)), holder)
+
+
+def test_the_reach_ends_a_session_through_the_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = Calls()
+    reach(monkeypatch, call).end("a")
+    assert [m for m, _ in call.seen] == ["close"]
