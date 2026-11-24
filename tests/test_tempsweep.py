@@ -275,6 +275,34 @@ def test_a_session_going_live_between_the_reads_keeps_the_entry(roots):
     assert d.exists() and calls == 2
 
 
+def test_an_outside_session_of_no_start_time_appearing_between_the_reads_keeps_the_entry(roots):
+    """TD-2149: the second read, just before a removal, finds an outside session with no start time, so the age
+    bound is unknown and the entry stays, as the first read would have kept it."""
+    tmp, root = roots
+    d = entry(root)
+    reads = 0
+
+    def externals():
+        nonlocal reads
+        reads += 1
+        return {"items": [ext(started=None)] if reads > 1 else [], "blind": []}
+
+    tally = diskbook.Tally()
+    tempsweep.sweep(
+        tmp,
+        [(TOOL, root)],
+        [],
+        tally,
+        now=NOW,
+        idle=lambda _p: None,
+        externals=externals,
+        tool_ids=set,
+        live_cwds=list,
+        namers=[munge],
+    )
+    assert d.exists() and reads == 2 and tally.removed == 0
+
+
 def test_an_absent_root_removes_nothing_and_leaves_the_reading_whole(tmp_path):
     tally = run(tmp_path / "no-tmp", tmp_path / "no-root")
     assert not tally.unlisted and tally.removed == 0
