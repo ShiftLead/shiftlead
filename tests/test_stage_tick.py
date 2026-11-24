@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from sessionorc import paths
 from shiftlead import flow3, stage_end, stage_merge, stage_tick
 from shiftlead.stage_tick import Kept, flow_now, run
 from shiftlead.stagerecord import StageStore
@@ -82,15 +83,30 @@ def test_a_builtin_flow_is_found_in_the_package_and_passes_its_check(root: Path)
 
 
 @pytest.mark.unit
-def test_a_repo_flow_is_its_own_only_where_it_is_format_3(root: Path) -> None:
+def test_a_repo_flow_runs_only_where_it_is_format_3(root: Path) -> None:
     d = root / flow3.REPO_DIR / "mine"
     d.mkdir(parents=True)
     (d / flow3.FILE).write_text("stages: []\n", encoding="utf-8")
-    assert flow_now(root, "mine") == (None, ("flow mine is not found",))
+    assert flow_now(root, "mine") == (None, (f"flow mine ({d}) is not a format-3 flow",))
     built = (flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8")
     (d / flow3.FILE).write_text(built, encoding="utf-8")
     assert flow_now(root, "mine")[0] == built
     assert flow_now(root, "") == (None, ("the team names no flow",))
+    assert flow_now(root, "nowhere") == (None, ("flow nowhere is not found",))
+
+
+@pytest.mark.unit
+def test_the_orgs_flow_shadows_the_repos_and_a_name_never_leaves_the_flows(root: Path) -> None:
+    built = (flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8")
+    mine, org = root / flow3.REPO_DIR / "mine", paths.home() / "flows" / "mine"
+    for d in (mine, org):
+        d.mkdir(parents=True)
+        (d / flow3.FILE).write_text(built, encoding="utf-8")
+    assert stage_tick.flow_file(root, "mine") == (org / flow3.FILE, "org", None)
+    (root / "x").mkdir()
+    (root / "x" / flow3.FILE).write_text(built, encoding="utf-8")
+    for name in ("../../x", "/abs", ".hidden"):
+        assert stage_tick.flow_file(root, name) is None
 
 
 @pytest.mark.integration
