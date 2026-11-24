@@ -563,6 +563,11 @@ def test_a_session_that_reported_its_stage_over_is_left_to_exit(status: str) -> 
     assert strand({"a": staged(progress=[ProgressEntry(ref="TD-7", status=status)])}) == ()
 
 
+@pytest.mark.parametrize("status", ["done", "dropped"])
+def test_another_entrys_finished_progress_line_does_not_spare_a_session(status: str) -> None:
+    assert strand({"a": staged(progress=[ProgressEntry(ref="TD-8", status=status)])}) == ("a",)
+
+
 def test_a_session_on_a_node_not_read_is_left_alone() -> None:
     assert strand({"a@n1": staged()}) == ()
     assert strand({"a@n1": staged()}, nodes=("n1",)) == ("a@n1",)
