@@ -243,3 +243,13 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
     assert rows["nobody"]["credentials"] is None and rows["nobody"]["layers"] == []
     (home / "profiles.yml").write_text("profiles:\n  x: {billing: nonsense}\n", encoding="utf-8")
     assert [set(r) for r in ClaudeCodeAdapter().doctor_profiles()] == [{"error"}]
+
+
+async def test_a_settings_file_nested_too_deeply_is_reported_invalid(agent):
+    """TD-2154: a settings.yml nested past the YAML parser's depth raised RecursionError out of `ao doctor`."""
+    settings_mod.settings_file().write_text("teams: " + "[" * 5000 + "\n", encoding="utf-8")
+    try:
+        got = await agent.rpc_doctor()
+        assert got["files"]["settings.yml"]["error"] == "nested too deeply to read"
+    finally:
+        settings_mod.settings_file().unlink(missing_ok=True)

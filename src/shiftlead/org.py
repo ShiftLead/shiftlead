@@ -49,7 +49,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths
+from sessionorc import hosts, paths, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc.models import GRANTS
 from sessionorc.seats import INTERACTIVE, OUTSIDE
@@ -477,7 +477,7 @@ def load(path: Path | None = None) -> Org:
     path = path or org_file()
     if not path.is_file():
         return Org(path=path)
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = yamltext.load(path.read_text(encoding="utf-8")) or {}
     label = path.name
     if not isinstance(data, dict):
         raise ValueError(f"{label}: the top level must be a mapping with `projects:`, `teams:`, `roles:`")
@@ -1306,7 +1306,7 @@ def _members_block(lines: list[str], team: str) -> tuple[int, list[tuple[int, di
                 continue
             raise ValueError(f"team {team}'s members: block is not a list of - items")
         try:
-            body = yaml.safe_load(it["body"])
+            body = yamltext.load(it["body"])
         except yaml.YAMLError:
             body = None
         items.append((i, body if isinstance(body, dict) else {}, isinstance(body, dict)))

@@ -53,7 +53,7 @@ from pathlib import Path
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, yamltext
 
 AGENT_CADENCE_ROSTER = "~/.config/agent-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
@@ -127,7 +127,7 @@ def hosts_file() -> Path:
 def _read_local_cached(path: str, mtime_ns: int) -> dict:
     """Parsed `local:` mapping, cached per (path, mtime) so a render loop does not re-parse YAML."""
     try:
-        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        doc = yamltext.load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return {}
     local = doc.get("local") if isinstance(doc, dict) else None
@@ -137,7 +137,7 @@ def _read_local_cached(path: str, mtime_ns: int) -> dict:
 @functools.lru_cache(maxsize=8)
 def _read_home_cached(path: str, mtime_ns: int) -> str:
     try:
-        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        doc = yamltext.load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return ""
     v = doc.get("home") if isinstance(doc, dict) else None
@@ -159,7 +159,7 @@ def home_name() -> str:
 @functools.lru_cache(maxsize=8)
 def _read_top_cached(path: str, mtime_ns: int) -> dict:
     try:
-        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        doc = yamltext.load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return {}
     return doc if isinstance(doc, dict) else {}

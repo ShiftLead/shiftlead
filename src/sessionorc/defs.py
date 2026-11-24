@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, yamltext
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def _let_in(home: Path) -> bool:
 
 def _parses(p: Path) -> bool:
     try:
-        yaml.safe_load(p.read_text(encoding="utf-8"))
+        yamltext.load(p.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return False
     return True

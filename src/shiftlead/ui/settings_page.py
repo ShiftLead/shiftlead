@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths, work
+from sessionorc import hosts, paths, work, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
@@ -1041,7 +1041,7 @@ def local_entry(path: Path) -> dict[str, Any]:
     """`hosts.yml`'s `local:` mapping as written — only to tell a value the file sets from one it
     leaves to its default; the values themselves are `sessionorc.hosts`'s reading."""
     try:
-        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        doc = yamltext.load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return {}
     local = doc.get("local") if isinstance(doc, dict) else None
