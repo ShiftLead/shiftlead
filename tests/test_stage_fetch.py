@@ -608,3 +608,28 @@ def test_a_padded_id_matches_its_session_name_and_its_done_row() -> None:
     assert strand({"a": staged("build-td-007", lane=("TD-007",))}) == ("a",)
     done = [ProgressEntry(ref="TD-007", status="done")]
     assert strand({"a": staged("build-td-007", lane=("TD-007",), progress=done)}) == ()
+
+
+@pytest.mark.integration
+def test_pushed_branches_reads_origin_now_and_a_closed_record_asks_for_them(tmp_path: Path) -> None:
+    """TD-2051: origin's branches as pushed now, a deleted one gone though its remote-tracking ref stays."""
+    origin, root = tmp_path / "o.git", tmp_path / "r"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    for args in (("config", "user.email", "t@example.com"), ("config", "user.name", "t")):
+        subprocess.run(["git", "-C", str(root), *args], check=True)
+    subprocess.run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    for ref in ("main", "main:td7-x", "main:feature/td8"):
+        subprocess.run(["git", "-C", str(root), "push", "-q", "origin", ref], check=True)
+    subprocess.run(["git", "-C", str(root), "fetch", "-q", "origin"], check=True)
+    assert stage_fetch.pushed_branches(root) == {"main", "td7-x", "feature/td8"}
+    subprocess.run(["git", "-C", str(origin), "branch", "-D", "td7-x"], check=True, capture_output=True)
+    assert stage_fetch.pushed_branches(root) == {"main", "feature/td8"}, "the stale remote-tracking ref is not read"
+    subprocess.run(["git", "-C", str(root), "remote", "set-url", "origin", str(tmp_path / "gone")], check=True)
+    assert stage_fetch.pushed_branches(root) is None
+    closed = {"id": "TD-7", "closed_at": "2026-11-24T00:00:00Z", "carried": {"branch": "td7-x", "pr": 3}}
+    assert stage_fetch.carries_branch({"TD-7": closed})
+    assert not stage_fetch.carries_branch({"TD-7": {**closed, "closed_at": None}})
+    assert not stage_fetch.carries_branch({"TD-7": {**closed, "carried": {"pr": 3}}})
+    assert not stage_fetch.carries_branch({})

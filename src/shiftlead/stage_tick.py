@@ -26,7 +26,14 @@ from sessionorc import gitinfo, ledger, paths, reports
 from sessionorc.models import Session
 from shiftlead import flow3, repoconfig, stage_end, stage_merge, stage_pass, stage_start
 from shiftlead import org as orgmod
-from shiftlead.stage_fetch import TeamFlow, ledger_read, protected_at, sessions_read
+from shiftlead.stage_fetch import (
+    TeamFlow,
+    carries_branch,
+    ledger_read,
+    protected_at,
+    pushed_branches,
+    sessions_read,
+)
 from shiftlead.stage_pass import Reach, RepoPass, RepoState
 from shiftlead.stagerecord import StageStore
 
@@ -156,7 +163,17 @@ def run(
     sessions = sessions_read(graph, snapshotted)
     flows = {team: flow_now(root, entry.get("flow")) for team, entry in teams.items()}
 
+    pushed: list[frozenset[str] | None] = []  # origin's branches, read once a pass and only when a record needs them
+
     def facts(team: str, flow: TeamFlow, records: Mapping[str, Any]) -> Any:
+        branches: frozenset[str] | None = frozenset()
+        if carries_branch(records):
+            if not pushed:
+                pushed.append(pushed_branches(root))
+            branches = pushed[0]
+            if branches is None:  # a moved entry whose branch cannot be seen is not offered afresh in its place
+                log.warning("the stage pass of %s: origin's branches could not be read", root)
+                return None
         return stage_pass.repo_facts(
             root,
             ref,
@@ -174,6 +191,7 @@ def run(
             local=local,
             host_teams=host_teams,
             protected=protected,
+            branches=branches,
             started=False,  # stage_start.team_started, false until TD-2065 writes the started mark
         )
 
