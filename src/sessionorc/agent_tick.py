@@ -5849,24 +5849,34 @@ class TickMixin:
                     await asyncio.to_thread(diskbook.set_memory, paths.home(), self.host, new)
             due = time.monotonic() - self._walk_at >= scratch_mod.LEFT_EVERY
             if self._walk_state() == "idle" and (start or due):
-                self._start_walk()
+                self._start_walk(every=due)
         except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
             log.exception("the memory reading failed")
 
-    def _start_walk(self) -> None:
-        """Start one walk of `/proc`, the records' snapshot taken here, on the loop (§4.6 *The process reading*)."""
-        live = memory_mod.live_runs(list(self.sessions.values()))
+    def _start_walk(self, every: bool = False) -> None:
+        """Start one walk of `/proc`, the records' snapshot and `ended_runs`' taken here, on the loop (§4.6 *The
+        process reading*). `every`: a `LEFT_EVERY` walk, the only kind that counts toward the left-behind spell."""
+        records = list(self.sessions.values())
+        runs = memory_mod.Runs(
+            memory_mod.live_runs(records),
+            memory_mod.ended_records(records),
+            memory_mod.spans(self._host_rec.get("ended_runs") or {}),
+        )
         self._walk_for = set(self._memory_watch.turning)
-        self._walk_started = self._walk_at = time.monotonic()
+        self._walk_started = time.monotonic()
+        if every:
+            self._walk_at = self._walk_started  # a walk for a turning half moves no `LEFT_EVERY` clock
         self._walk_stuck = False
-        self._walk_task = asyncio.create_task(self._walk(live))
+        self._walk_task = asyncio.create_task(self._walk(runs, every))
 
-    async def _walk(self, live: dict[str, tuple[str, float]]) -> None:
-        """One walk and its result (§4.6 *The process reading*): a walk that raised is `cut` with no holders; one
-        read as stuck meanwhile is not applied. A half that turned during it is walked for as it returns."""
+    async def _walk(self, runs: memory_mod.Runs, every: bool = False) -> None:
+        """One walk and its result (§4.6 *The process reading*, *Told what finished sessions left running*): a walk
+        that raised is `cut` with no holders and counts toward neither left-behind line; one read as stuck meanwhile is
+        not applied. `ended_runs` is trimmed as the result is taken. A half that turned during it is walked for as it
+        returns."""
         try:
             try:
-                got: dict[str, Any] | None = await asyncio.to_thread(memory_mod.read_holders, live, paths.home())
+                got: dict[str, Any] | None = await asyncio.to_thread(memory_mod.read_holders, runs, paths.home())
             except Exception:  # noqa: BLE001 — a walk that raises is cut, with no holders
                 log.exception("the process walk failed")
                 got = None
@@ -5878,10 +5888,49 @@ class TickMixin:
                     new = self._memory_watch.walked(old, got, self._walk_for, now_iso())
                     if new != old:
                         await asyncio.to_thread(diskbook.set_memory, paths.home(), self.host, new)
+                    was = await asyncio.to_thread(diskbook.left_state, paths.home())
+                    left = self._left_watch.walked(was, got, every, now_iso())
+                    if left != was:
+                        await asyncio.to_thread(diskbook.set_left, paths.home(), self.host, left)
+            self._trim_ended_runs()
             if self._memory_watch.turning:
                 self._start_walk()
         except Exception:  # noqa: BLE001 — a detached task: log, and the next reading tries again
             log.exception("the process walk's result failed")
+
+    def _end_run(self, rec: Any) -> None:
+        """Write an unattended run that ended to `ended_runs` in this host's record (§4.6 *Told what finished sessions
+        left running*): at its forget, however it came to be, or as a new run replaces it in place under its id."""
+        if not getattr(rec, "unattended", False) or not getattr(rec, "created", None):
+            return
+        ended = memory_mod.end_run(self._host_rec.get("ended_runs") or {}, rec.id, str(rec.created), now_iso())
+        self._host_rec["ended_runs"] = ended
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("saving ended_runs failed")
+
+    def _trim_ended_runs(self) -> None:
+        """`ended_runs` without what is past `LEFT_ENDED_KEEP` or `LEFT_ENDED_RUNS`, on the loop as a walk's result is
+        taken."""
+        old = self._host_rec.get("ended_runs") or {}
+        new = memory_mod.trim_runs(old, time.time())
+        if new == old:
+            return
+        if new:
+            self._host_rec["ended_runs"] = new
+        else:
+            self._host_rec.pop("ended_runs", None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("saving ended_runs failed")
+
+    def _left_view(self) -> dict[str, Any]:
+        """The `left_behind` of this host's `disk` reading, always carried: `since` (None with no spell), the latest
+        `LEFT_EVERY` walk's time, processes, bytes, `cut` and trees. Off the loop."""
+        got = diskbook.left_state(paths.home())
+        return {"since": got.get("since"), **{k: v for k, v in got.items() if k != "since"}}
 
     def _memory_view(self) -> dict[str, Any] | None:
         """The `memory` of this host's `disk` reading, each half read live; None with no reading. Off the loop."""
@@ -5896,7 +5945,12 @@ class TickMixin:
             got = await self._disk_everywhere("disk", self._disk_here)
             changed = False
             # the pools' spells (TD-2083) and the memory halves' (§4.6 *Told when memory runs short*, TD-2136)
-            for name, spells in (("disk_low", diskbook.low_spells), ("memory_low", diskbook.memory_spells)):
+            # and the left-behind spells by host (*Told what finished sessions left running*, TD-2137)
+            for name, spells in (
+                ("disk_low", diskbook.low_spells),
+                ("memory_low", diskbook.memory_spells),
+                ("left_behind", diskbook.left_spells),
+            ):
                 old = self._host_rec.get(name) or {}
                 new = spells(old, got, now_iso())
                 if new == old:
@@ -6037,6 +6091,7 @@ class TickMixin:
             out["no_memory"] = True
         else:
             out["memory"] = memory
+        out["left_behind"] = self._left_view()  # §4.6 *Told what finished sessions left running*, TD-2137
         return out
 
     async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:
@@ -8143,6 +8198,7 @@ class TickMixin:
             self._close_entry(e.id, "expired", now_iso())
         self._asker_gone(gone, self._address(gone), how="forgotten")
         self._attention_gone(gone, "forgotten")
+        self._end_run(gone)  # §4.6 *Told what finished sessions left running*: its run's span (TD-2137)
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever

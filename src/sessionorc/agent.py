@@ -903,6 +903,7 @@ class HostAgent(
         self._walk_at = time.monotonic()  # the last walk's start: the first `LEFT_EVERY` walk is one after start
         self._walk_for: set[str] = set()
         self._walk_stuck = False
+        self._left_watch = memory_mod.LeftWatch()  # the left-behind spell's run of walks (§4.6, TD-2137)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
@@ -1579,6 +1580,8 @@ class HostAgent(
             out["disk_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("disk_low") or {}).items())}
             # the *memory low* rows' spells (§4.6 *Told when memory runs short*, TD-2136)
             out["memory_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("memory_low") or {}).items())}
+            # the *processes left behind* rows' spells (§4.6 *Told what finished sessions left running*, TD-2137)
+            out["left_behind"] = {k: dict(v) for k, v in sorted((self._host_rec.get("left_behind") or {}).items())}
             # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
             # with its `waiting_until` where this tick read one (never stored)
             out["stuck"] = {
@@ -2610,6 +2613,7 @@ class HostAgent(
         # The replaced record's rows end here, with the record: it is gone from the graph, and the
         # new session under its id must not inherit what it was showing (review of PR #269).
         self._attention_gone(holder, "forgotten")
+        self._end_run(holder)  # §4.6 *Told what finished sessions left running*: the replaced run's span (TD-2137)
         self._scrub(holder.id)  # the side tables are about the old session, not the new one
         log.info("%s superseded the %s session of the same name", holder.name, holder.state)
         return holder.run_log, holder.id

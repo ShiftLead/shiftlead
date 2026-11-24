@@ -208,6 +208,13 @@ class NotifyMixin:
             k = f"memory_low:{key}"
             line = notify.memory_low_line(spell)
             rows[k] = _Row(str(spell["since"]), line, k, f"{k}|memory_low", snooze_is_seen=True)
+        # *processes left behind* for a host (§4.6 *Told what finished sessions left running*, TD-2137), likewise
+        for key, spell in (self._host_rec.get("left_behind") or {}).items():
+            if not isinstance(spell, dict) or not spell.get("since"):
+                continue
+            k = f"left_behind:{key}"
+            line = notify.left_behind_line(spell)
+            rows[k] = _Row(str(spell["since"]), line, k, f"{k}|left_behind", snooze_is_seen=True)
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:

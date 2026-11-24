@@ -3944,6 +3944,24 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             if isinstance(one, dict) and one.get("low"):
                 words = notify_mod.memory_low_text({**one, "host": host, "half": half})
                 out.append(f"  ⚠ {words} (since {one.get('since')})")
+        # §4.6 *Told what finished sessions left running*, TD-2137: each tree with its pid, so a pid is checked
+        # against its start time before anyone acts on it; nothing here stops a process
+        left = e.get("left_behind") if isinstance(e.get("left_behind"), dict) else {}
+        trees = [t for t in left.get("trees") or [] if isinstance(t, dict)]
+        if left.get("since"):
+            spell = {**left, "host": host, "largest": trees[:3]}
+            out.append(f"  ⚠ {notify_mod.left_behind_text(spell)} (since {left.get('since')})")
+        if trees:
+            least = "at least " if left.get("cut") else ""
+            out.append(f"  left behind by finished sessions, read {left.get('at')} ({least}{len(trees)} trees):")
+        for t in trees:
+            why = f"session {t['session']}" if t.get("session") else f"home {t.get('home')}"
+            gone = ", working directory deleted" if t.get("cwd_deleted") else ""
+            n = t.get("processes") or 1
+            out.append(
+                f"    pid {t.get('pid')} {t.get('name')} started {t.get('start')}: "
+                f"{notify_mod.size_text(t.get('bytes'))} in {n} process{'es' if n != 1 else ''} ({why}{gone})"
+            )
     return out
 
 
