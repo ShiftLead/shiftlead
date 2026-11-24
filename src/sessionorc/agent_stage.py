@@ -10,6 +10,7 @@ import asyncio
 import copy
 import time
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import entry_points
 from pathlib import PurePath
 from typing import Any
@@ -29,6 +30,7 @@ TEAM = "team"
 TICK = "stage_tick"
 STAGE_EVERY = 60.0  # seconds between two stage passes at the home (§4.9c *The home acts only where no session will*)
 STAGE_CALL_WAIT = ACT_TIMEOUT * 4  # a pass's call on the home's loop: a create waits on its pane
+STAGE_POOL = 4  # the pass's own threads, apart from `to_thread`'s pool, which the RPCs it waits on use
 
 
 def stage_teams(doc: Mapping[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
@@ -239,26 +241,41 @@ class StageMixin:
     async def _stage_repo(self, calls: Any, root: str, args: dict[str, Any]) -> None:
         """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check."""
         try:
-            got = await asyncio.to_thread(calls.call, **args)
+            pool = self.__dict__.get("_stage_pool")
+            if pool is None:
+                pool = self.__dict__["_stage_pool"] = ThreadPoolExecutor(STAGE_POOL, thread_name_prefix="stage-pass")
+            got = await asyncio.get_running_loop().run_in_executor(pool, lambda: calls.call(**args))
         except Exception:  # noqa: BLE001 — one repo's failure never stops another's pass
             log.exception("the stage pass of %s failed", root)
             return
         for team, problems in sorted((getattr(got, "tell", None) or {}).items()):
-            self._system_note(PERSON, told(team, problems), team=team)  # type: ignore[attr-defined]
+            try:
+                self._system_note(PERSON, told(team, problems), team=team)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 — a note that cannot be written is a log line, never the pass
+                log.exception("the stage pass could not tell the person of %s's flow", team)
 
     def _stage_call(self, loop: asyncio.AbstractEventLoop) -> Callable[..., Any]:
         """The host agent's call as the pass's thread makes it: the RPC dispatched on the loop with no session caller,
         so a close keeps the tick as its closer (slice 31). A refusal raises `AgentError` as the client's does, and a
-        loop that does not answer in `STAGE_CALL_WAIT` raises `AgentUnavailable`."""
+        loop that does not answer in `STAGE_CALL_WAIT`, or stops, raises `AgentUnavailable`. A call that times out is
+        never cancelled, since a create cancelled after its pane came up would leave a session no record names; it
+        finishes on the loop and the next pass reads what it made."""
 
         def call(method: str, **params: Any) -> Any:
             req = {"id": f"stage-{method}", "method": method, "params": params}
             fut = asyncio.run_coroutine_threadsafe(self._dispatch_inner(req), loop)  # type: ignore[attr-defined]
-            try:
-                resp = fut.result(timeout=STAGE_CALL_WAIT)
-            except TimeoutError:
-                fut.cancel()
-                raise AgentUnavailable(f"the home did not answer {method} within {STAGE_CALL_WAIT:.0f}s") from None
+            end = time.monotonic() + STAGE_CALL_WAIT
+            while True:
+                try:
+                    resp = fut.result(timeout=1.0)
+                    break
+                except TimeoutError:
+                    if not loop.is_running():
+                        raise AgentUnavailable(f"the home stopped while {method} was asked") from None
+                    if time.monotonic() >= end:
+                        raise AgentUnavailable(
+                            f"the home did not answer {method} within {STAGE_CALL_WAIT:.0f}s"
+                        ) from None
             if "error" in resp:
                 raise AgentError(str(resp["error"]), resp.get("error_data"))
             return resp.get("result")

@@ -202,3 +202,34 @@ def test_the_threads_call_is_dispatched_on_the_loop_with_no_session_caller() -> 
         assert e.value.data == {"id": "x"}
 
     asyncio.run(go())
+
+
+def test_the_arguments_handed_over_are_the_ones_stage_tick_run_takes(body: list[dict[str, Any]]) -> None:
+    import inspect
+
+    from shiftlead import stage_tick
+
+    asyncio.run(_Agent(roster=["/n/r"])._stage_pass())
+    inspect.signature(stage_tick.run).bind(**body[0])
+
+
+def test_a_call_that_times_out_is_left_to_finish_and_never_cancelled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(agent_stage, "STAGE_CALL_WAIT", 0.2)
+
+    async def go() -> None:
+        agent = _Agent()
+        finished: list[str] = []
+
+        async def slow(req: dict[str, Any]) -> dict[str, Any]:
+            await asyncio.sleep(1.5)
+            finished.append(req["method"])
+            return {"id": req["id"], "result": None}
+
+        agent._dispatch_inner = slow  # type: ignore[method-assign]
+        call = agent._stage_call(asyncio.get_running_loop())
+        with pytest.raises(agent_stage.AgentUnavailable, match="did not answer create"):
+            await asyncio.to_thread(call, "create")
+        await asyncio.sleep(1.5)
+        assert finished == ["create"], "the create ran to its end on the loop"
+
+    asyncio.run(go())
