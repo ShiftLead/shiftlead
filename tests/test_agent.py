@@ -2002,6 +2002,7 @@ async def test_a_create_whose_owner_write_fails_leaves_no_pane_to_adopt(agent, t
             return write(path, sid, home)
         seen["sid"] = sid
         assert agent.tmux.has_session(sid)  # the pane was up when the step failed
+        seen["panes"] = agent.tmux.main_panes(naming.PREFIX)  # a tick's reading, taken before the kill
         raise OSError("no space left for the owner file")
 
     monkeypatch.setattr(scratch_mod, "write_owner", failing_write)
@@ -2013,6 +2014,20 @@ async def test_a_create_whose_owner_write_fails_leaves_no_pane_to_adopt(agent, t
     panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
     agent._reconcile(panes, {}, datetime.now(UTC))
     assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+    _a_stale_reading_adopts_nothing(agent, seen)
+
+
+def _a_stale_reading_adopts_nothing(agent, seen) -> None:
+    """TD-2153: a tick whose pane reading was taken while the create's pane was up reconciles after the create
+    has killed it and released its id, and adopts nothing; a pane born later under that name is adopted."""
+    stale = seen["panes"]
+    assert seen["sid"] in stale
+    agent._reconcile(stale, {}, datetime.now(UTC))
+    assert seen["sid"] not in agent.sessions
+    born_after = {seen["sid"]: dataclasses.replace(stale[seen["sid"]], created=agent._removed[seen["sid"]][0] + 1)}
+    agent._reconcile(born_after, {}, datetime.now(UTC))
+    assert agent.sessions[seen["sid"]].adapter == "shell"  # a stranger's pane, adopted as ever
+    del agent.sessions[seen["sid"]]
 
 
 async def test_a_create_whose_later_tmux_step_fails_leaves_no_pane_to_adopt(agent, tmp_path, monkeypatch):
@@ -2024,10 +2039,11 @@ async def test_a_create_whose_later_tmux_step_fails_leaves_no_pane_to_adopt(agen
         if args and args[0] == "new-session":
             seen["sid"] = args[args.index("-s") + 1]
             args = (*args, ";", "set-option", "-t", "=ao-nobody:", "status", "off")
+        if args and args[0] == "kill-session" and "sid" in seen and "panes" not in seen:
+            seen["panes"] = agent.tmux.main_panes(naming.PREFIX)  # a tick's reading, taken before the kill
         return run(*args, **kw)
 
     monkeypatch.setattr(agent.tmux, "run", failing)
-    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
     async with LocalClient() as person:
         with pytest.raises(Exception, match="ao-nobody"):
             await person.call("create", name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
@@ -2036,6 +2052,7 @@ async def test_a_create_whose_later_tmux_step_fails_leaves_no_pane_to_adopt(agen
     panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
     agent._reconcile(panes, {}, datetime.now(UTC))
     assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+    _a_stale_reading_adopts_nothing(agent, seen)
 
 
 async def test_a_create_cancelled_while_its_pane_comes_up_leaves_no_pane_to_adopt(agent, tmp_path, monkeypatch):
@@ -2050,9 +2067,9 @@ async def test_a_create_cancelled_while_its_pane_comes_up_leaves_no_pane_to_adop
         release.wait(10)  # the cancel lands here, before the pane is up
         start(sid, *a)
         seen["up"] = agent.tmux.has_session(sid)
+        seen["panes"] = agent.tmux.main_panes(naming.PREFIX)  # a tick's reading, taken before the kill
 
     monkeypatch.setattr(agent, "_start", slow_start)
-    await park_ticks(agent)  # a tick whose pane reading predates the kill is TD-2153's
     making = asyncio.ensure_future(
         agent.rpc_create(name="late", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
     )
@@ -2071,6 +2088,7 @@ async def test_a_create_cancelled_while_its_pane_comes_up_leaves_no_pane_to_adop
     panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
     agent._reconcile(panes, {}, datetime.now(UTC))
     assert seen["sid"] not in agent.sessions  # nothing for a following tick to adopt
+    _a_stale_reading_adopts_nothing(agent, seen)
 
 
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):

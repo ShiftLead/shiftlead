@@ -2101,6 +2101,11 @@ class HostAgent(
                     await _uncancelled(started)
                     if not started.exception():
                         await _uncancelled(asyncio.ensure_future(asyncio.to_thread(self._kill_unrecorded_pane, sid)))
+                    if not isinstance(started.exception(), DuplicateSession):
+                        self._guard_killed_pane(sid)
+                    raise
+                except BaseException:
+                    self._guard_killed_pane(sid)  # a failed start killed the pane it made (TD-2144)
                     raise
                 finally:
                     self._starting.discard(sid)  # taken again below, before the next await
@@ -2173,6 +2178,7 @@ class HostAgent(
                 self.sessions[sid] = s
             except BaseException:  # a cancelled create too: its pane has no record either
                 await asyncio.to_thread(self._kill_unrecorded_pane, sid)
+                self._guard_killed_pane(sid)
                 raise
             finally:
                 self._starting.discard(sid)
@@ -2878,6 +2884,13 @@ class HostAgent(
             self.tmux.kill_session(sid)
         except Exception:  # noqa: BLE001 — the create's error is the one the caller must see
             log.exception("%s: killing the pane of a failed create failed", sid)
+
+    def _guard_killed_pane(self, sid: str) -> None:
+        """A tick whose pane reading was taken while a failed or cancelled create's pane was still up must not adopt it
+        once the create releases the id (§4.1, TD-2153): the id is guarded as a removed one is (TD-021), against
+        any pane born up to now, so a pane started after it under the same name is adopted as usual. Called on the
+        loop, before the id leaves `_starting`."""
+        self._removed[sid] = (int(time.time()), time.monotonic())
 
     def _pane_cgroup(self, sid: str) -> None:
         """Under the installed home's tmux system unit (§4.1, `Delegate=yes`) tmux reaches no user bus

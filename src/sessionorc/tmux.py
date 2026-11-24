@@ -5,6 +5,7 @@ Every call takes the socket into account so tests can run against a private serv
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import os
 import re
@@ -182,15 +183,27 @@ class Tmux:
         if logfile is not None:
             logfile.parent.mkdir(parents=True, exist_ok=True)
             args += [";", "pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'"]
-        cp = self.run(*args, check=False)
+        try:
+            cp = self.run(*args, check=False)
+        except subprocess.TimeoutExpired as e:
+            # a chain that timed out may have made its session: one `-P` printed before the timeout is this call's
+            # and is killed, and with no id printed nothing is, since a session of that name may be another's (TD-2153)
+            out = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
+            self._kill_made(out)
+            raise TmuxError(f"tmux new-session {name}: timed out after {e.timeout:g}s") from None
         if cp.returncode != 0:
             err = cp.stderr.strip() or cp.stdout.strip()
             if "duplicate session" in err:
                 raise DuplicateSession(err)
-            made = [w for w in cp.stdout.split() if re.fullmatch(r"\$\d+", w)]
-            if made:
-                self.run("kill-session", "-t", made[0], check=False)
+            self._kill_made(cp.stdout)
             raise TmuxError(f"tmux new-session {name}: {err}")
+
+    def _kill_made(self, out: str) -> None:
+        """Kill the session whose id (`$N`) `new-session -P` printed in `out`, if it printed one (§4.1, TD-2144)."""
+        made = [w for w in out.split() if re.fullmatch(r"\$\d+", w)]
+        if made:
+            with contextlib.suppress(subprocess.TimeoutExpired):  # the start's own error is the one raised
+                self.run("kill-session", "-t", made[0], check=False)
 
     @staticmethod
     def _fit(name: str, argv: list[str], around: int = 0) -> list[str]:

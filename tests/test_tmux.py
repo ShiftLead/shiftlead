@@ -306,3 +306,34 @@ def test_a_duplicate_session_is_never_killed(tmux, monkeypatch):
     with pytest.raises(DuplicateSession):
         tmux.new_session("ao-t-other", "/", ["sleep", "30"], {})
     assert tmux.has_session("ao-t-other")
+
+
+def _a_chain_that_times_out(tmux, monkeypatch, *, printed: bool) -> None:
+    """`new-session` runs, and its client then times out: with the `-P` id it printed so far, or with nothing."""
+    run = tmux.run
+
+    def timing_out(*args, **kw):
+        cp = run(*args, **kw)
+        if args and args[0] == "new-session":
+            raise subprocess.TimeoutExpired(args, 15, output=cp.stdout.encode() if printed else None)
+        return cp
+
+    monkeypatch.setattr(tmux, "run", timing_out)
+
+
+def test_a_new_session_that_times_out_takes_the_session_it_made_with_it(tmux, monkeypatch):
+    """TD-2153: `Tmux.run`'s timeout raised `TimeoutExpired`, not `TmuxError`, so a `new-session` that made its
+    session and then timed out killed nothing."""
+    _a_chain_that_times_out(tmux, monkeypatch, printed=True)
+    with pytest.raises(TmuxError, match="timed out") as e:
+        tmux.new_session("ao-t-slow", "/", ["sleep", "30"], {})
+    assert not isinstance(e.value, DuplicateSession)
+    assert not tmux.has_session("ao-t-slow")
+
+
+def test_a_new_session_that_times_out_with_no_id_kills_nothing(tmux, monkeypatch):
+    """TD-2153: with no `-P` id printed, this call cannot be shown to have made the session of that name."""
+    _a_chain_that_times_out(tmux, monkeypatch, printed=False)
+    with pytest.raises(TmuxError, match="timed out"):
+        tmux.new_session("ao-t-slow", "/", ["sleep", "30"], {})
+    assert tmux.has_session("ao-t-slow")
