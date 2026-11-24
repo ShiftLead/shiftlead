@@ -492,6 +492,7 @@ def test_two_checkouts_of_one_remote_read_at_the_first_key_then_the_union(tmp_pa
 
     class Home:
         _repos = first
+        _first_shape_off = False
         _graph = staticmethod(
             lambda: {
                 "ao-a": _rec("ao-a", repo=a, review={"reader": "t", "held": ["src/a/**"]}),

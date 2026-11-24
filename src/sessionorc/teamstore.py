@@ -2,8 +2,9 @@
 TD-2060): the keys under `settings.yml` `teams.<team>` that only the team page writes, the `cut_over` marker that gates
 those writes, and the one function that picks a login for a model.
 
-Pure: each function takes the settings document, or the rows a caller read, and neither reads nor writes a file. The
-host agent's `team_set` makes the write. No launch calls `pick` yet: that is the launch path's (§4.9e, TD-1976).
+Pure, but for `first_shape_off`: each function takes the settings document, or the rows a caller read, and neither
+reads nor writes a file. The host agent's `team_set` makes the write. No launch calls `pick` yet: that is the launch
+path's (§4.9e, TD-1976).
 """
 
 from __future__ import annotations
@@ -16,12 +17,16 @@ from typing import Any
 
 from sessionorc import logins
 from sessionorc import settings as settings_mod
+from sessionorc.store import HostStore
 
 STORE_KEYS = ("label", "repo", "host", "logins", "at_once", "most")
 SET_KEYS = ("label", "logins", "at_once", "most")  # what `team_set` writes; `repo` and `host` never change
 LABEL_MAX = 60
 BEFORE = "after the switch-over"
 STALE = "changed since this page read it — reload"
+GONE = "this went at the switch-over: use the team page"  # a first-shape verb or control, §4.9e
+NO_PR_HELD = "no pull request is held after the switch-over"  # `ao pr held`'s answer, §4.9e
+FIRST_SHAPE_KEYS = ("on_work", "flow", "size", "max")  # `settings.yml` team keys only the first shape's verbs write
 
 
 class TeamError(ValueError):
@@ -33,6 +38,13 @@ def cut_over(doc: Mapping[str, Any]) -> str | None:
     None before the window has written it."""
     value = doc.get("cut_over")
     return str(value) if value else None
+
+
+def first_shape_off() -> bool:
+    """Whether the first shape is off, for a reader outside the tick (§4.9e *What decides which shape runs*): the
+    marker in `settings.yml`, and where that file does not read, the home's last reading in `host.json`."""
+    doc = settings_mod.read()
+    return cut_over(doc) is not None if doc is not None else HostStore().load().get("first_shape_off") is True
 
 
 def _entry(doc: Mapping[str, Any], team: str) -> Mapping[str, Any]:

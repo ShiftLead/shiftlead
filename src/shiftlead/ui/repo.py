@@ -89,6 +89,7 @@ def entry_line(role: str, host: str = "") -> str:
 
 
 # the teams that service a checkout: `shiftlead.teams`' since TD-218 slice 4, where `ao td add` reads it too
+entry_servicing = teams.entry_servicing
 entry_teams = teams.entry_teams
 
 

@@ -450,6 +450,16 @@ def lane_records(
     return [addr for *_, addr in sorted(out)]
 
 
+def first_shape_record(r: Session | None, cut: str | None) -> bool:
+    """Whether a record is a member or seat of the first shape (§4.9e *What decides which shape runs*, rule 13): a
+    `team` on it, no `seat_model` (TD-2068 adds the field) and no `builtin`, not the person's own, and made before
+    the cut-over's day `cut`. A record of the cut-over's own day, or a marker whose date is not known, is not read
+    as one, so an ask that may be live is still reported."""
+    if r is None or not cut or not r.team or r.builtin or getattr(r, "seat_model", None) or not r.unattended:
+        return False
+    return str(r.created)[:10] < cut[:10]
+
+
 def no_lane(open_at: datetime, now: datetime, wait: timedelta) -> dict[str, Any] | None:
     """A line no lane takes (§6 rule 13): `{since, reason: {state: no_lane}}` once past the wait, else None."""
     return {"since": iso(open_at), "reason": {"state": "no_lane"}} if now - open_at > wait else None

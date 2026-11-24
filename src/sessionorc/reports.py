@@ -1083,6 +1083,53 @@ def _gitlab_reading(directory: Path | str, where: str, now: datetime, timeout: f
     return {"open": open_, "forge": "gitlab", "unread": GITLAB_UNREAD, "at": now.isoformat()}
 
 
+PR_STATE_FIELDS = "number,title,state,headRefOid,headRefName,isCrossRepository,createdAt"
+
+
+def pr_state_row(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, Any] | None:
+    """One pull request's row by its number, whatever its state, on GitHub or GitLab (design §4.9c, TD-2051): `number`,
+    `title`, `state` (`open`, `merged` or `closed`), and an open one's `head`, `branch`, `fork` and `created`, which
+    `stage_work.entry_work` reads. The repo's rows hold only a window of the closed ones, and GitLab's only the open
+    ones. None: it could not be read, or is in a state with no such word (a
+    GitLab merge request `locked` while it merges)."""
+    forge, where = forge_of(git_origin(directory))
+    if forge == "github":
+        try:
+            cp = subprocess.run(
+                ["gh", "pr", "view", str(pr), "--json", PR_STATE_FIELDS],
+                capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+            )  # fmt: skip
+            got = json.loads(cp.stdout or "null") if cp.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            return None
+        number, head, branch, created = "number", "headRefOid", "headRefName", "createdAt"
+        fork = isinstance(got, dict) and bool(got.get("isCrossRepository"))
+    elif forge == "gitlab":
+        host, _, path = where.partition("/")
+        got, why = _glab_api(directory, host, f"projects/{quote(path, safe='')}/merge_requests/{int(pr)}", timeout)
+        if why is not None:
+            return None
+        number, head, branch, created = "iid", "sha", "source_branch", "created_at"
+        fork = isinstance(got, dict) and got.get("source_project_id") not in (None, got.get("target_project_id"))
+    else:
+        return None
+    if not isinstance(got, dict) or got.get(number) != pr:
+        return None
+    state = {"opened": "open"}.get(str(got.get("state")).lower(), str(got.get("state")).lower())
+    if state not in ("open", "merged", "closed"):
+        return None
+    row = {"number": pr, "title": str(got.get("title") or ""), "state": state}
+    if state != "open":
+        return row
+    return {
+        **row,
+        "head": str(got.get(head) or ""),
+        "branch": str(got.get(branch) or ""),
+        "fork": fork,
+        "created": got.get(created) or None,
+    }
+
+
 def pr_reading(
     directory: Path | str,
     now: datetime,

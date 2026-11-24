@@ -892,8 +892,12 @@ def parse_yaml(text: str) -> Any:
     """`yaml.safe_load(text)`, parsed once per text (TD-896): a team's plan reads its repo's
     `.shiftlead.yml` once per member and every flow's files again, and the pure-Python parse was
     ~11 ms a read — some 100 ms of every Org and Repo page load. Each caller gets its own copy, so
-    nothing it changes reaches the next; a text that does not parse raises `yaml.YAMLError` every time."""
-    return copy.deepcopy(_parsed(text))
+    nothing it changes reaches the next; a text that does not parse raises `yaml.YAMLError` every time, one nested past
+    the parser's depth among them (TD-2135), so every caller that reads a bad file as a problem reads that one too."""
+    try:
+        return copy.deepcopy(_parsed(text))
+    except RecursionError:
+        raise yaml.YAMLError("nested too deeply to read") from None
 
 
 def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:

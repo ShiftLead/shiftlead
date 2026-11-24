@@ -47,7 +47,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -64,6 +63,7 @@ import look_home  # noqa: E402 — the scratch home's helpers: the refusal of th
 WALK_NAME = "conformance-walk"
 FIRST_HOOK_WAIT = 120.0  # the tool's start, its first hook, the record `idle` by hook
 TURN_WAIT = 300.0  # one short turn
+FAILURE_PANE_LINES = 20  # of the tool's screen, in a failed Enter's message: a dialog and what is under it
 SESSION_END_WAIT = 15.0  # a killed tool's own end hook
 PERMISSION_PROMPT = "Use your shell tool to run exactly this command, then stop: touch conformance-permission.txt"
 # a tool that runs a bare `touch` unasked in every mode takes a command it asks for (Grok Build, §4.3, TD-1637)
@@ -380,6 +380,17 @@ class Walk:
         self.shot(name)
         return ok
 
+    def screen(self) -> str:
+        """What the tool shows now, for a failure to name (TD-2119); a pane that cannot be read is said, and
+        never replaces the failure it was read for."""
+        try:
+            lines = [line.rstrip() for line in self.tail(FAILURE_PANE_LINES * 3) if line.strip()]
+        except Exception as e:  # noqa: BLE001 — the step has already failed: this only adds to what it says
+            return f"the pane could not be read ({type(e).__name__}: {e})"
+        if not lines:
+            return "the pane read empty"
+        return "the pane's last lines:\n" + "\n".join(lines[-FAILURE_PANE_LINES:])
+
     def allow(self, rec: dict[str, Any]) -> str:
         """Allow the permission `rec` waits on, as its person: through the hook channel, or — for a tool
         with none (§4.3 `permission_channel`, TD-871) — an Enter on the dialog's first choice, the tool's
@@ -391,7 +402,9 @@ class Walk:
             self.call("keys", id=self.id, keys=["Enter"])
             left = poll(self.get, lambda r: r.get("state") != "needs-you", TURN_WAIT)
             if left.get("state") == "needs-you":
-                raise StepFailed(f"Enter pressed on {pending.get('text')}, and it still reads {describe(left)}")
+                raise StepFailed(
+                    f"Enter pressed on {pending.get('text')}, and it still reads {describe(left)}; {self.screen()}"
+                )
             return "allowed in the terminal (Enter: Allow once)"
         if pending.get("tool_use_id"):
             self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
@@ -580,7 +593,7 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
     from sessionorc import adapters
 
     version = smoke_version(adapters.get(args.adapter))
-    home = Path(tempfile.mkdtemp(prefix="aos-", dir="/tmp"))
+    home = look_home.scratch_home("aos-")
     sock = f"ao-smoke-{uuid.uuid4().hex[:8]}"
     agent: subprocess.Popen | None = None
     sid = ""
@@ -648,18 +661,36 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
     except KeyboardInterrupt:
         return failed("stopped", "interrupted")
     finally:
+        hold_signals()
         if sid and call is not None:
             with contextlib.suppress(Exception):
                 call("kill", id=sid)
         look_home.stop(agent)
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        look_home.end_server(sock)
         if args.keep:
             print(f"kept: {home} (the scratch home, the clone under it)")
         else:
             look_home.remove_home(home)
+
+
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+
+
+def hold_signals() -> None:
+    """From here the teardown runs to its end: a second signal must not cut it short and leave a tool running."""
+    for sig in STOP_SIGNALS:
+        signal.signal(sig, signal.SIG_IGN)
+
+
+def interrupt_on_signals() -> None:
+    """A stop signal ends the run through its `finally`, the walk's and the seat smoke's alike (TD-2102)."""
+
+    def on_signal(_signum, _frame):
+        hold_signals()
+        raise KeyboardInterrupt
+
+    for sig in STOP_SIGNALS:
+        signal.signal(sig, on_signal)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -704,20 +735,16 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as e:
         print(f"conformance: refused — {e}", file=sys.stderr)
         return 2
+    interrupt_on_signals()
     if args.smoke:
         return run_smoke(args, entry, start_env)
 
-    home = Path(tempfile.mkdtemp(prefix="aoc-", dir="/tmp"))
+    home = look_home.scratch_home("aoc-")
     sock = f"ao-conf-{uuid.uuid4().hex[:8]}"
     capture = home / "captured" if args.capture else None
     env = agent_env(home, sock, capture)
     agent: subprocess.Popen | None = None
 
-    def on_signal(signum, _frame):
-        raise KeyboardInterrupt
-
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, on_signal)
     try:
         work = write_home(home, args.profile, entry)
         if capture is not None:
@@ -761,11 +788,9 @@ def main(argv: list[str] | None = None) -> int:
         print("conformance: stopped", file=sys.stderr)
         return 1
     finally:
+        hold_signals()
         look_home.stop(agent)
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        look_home.end_server(sock)
         look_home.remove_home(home)
 
 

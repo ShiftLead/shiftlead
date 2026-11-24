@@ -194,6 +194,13 @@ class NotifyMixin:
             n = len((spell.get("row") or {}).get("items") or [])
             line = notify.ci_line(str(spell.get("owner") or key), n)
             rows[k] = _Row(str(spell["since"]), line, k, f"{k}|ci_not_run", snooze_is_seen=True)
+        # *temporary space low* for a host's pool (§4.6 *Told before the pool is full*, TD-2083): one row a spell, so
+        # told once per spell, and a snoozed row is seen and never told
+        for key, spell in (self._host_rec.get("disk_low") or {}).items():
+            if not isinstance(spell, dict) or not spell.get("since"):
+                continue
+            k = f"disk_low:{key}"
+            rows[k] = _Row(str(spell["since"]), notify.disk_low_line(spell), k, f"{k}|disk_low", snooze_is_seen=True)
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:

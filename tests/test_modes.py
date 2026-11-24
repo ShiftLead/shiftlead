@@ -232,3 +232,9 @@ async def test_the_home_never_consults_the_table(agent):
     async with LocalClient() as c:
         assert (await c.call("host"))["mode"] == "home"
         assert (await c.call("inbox"))["unread"] == 0  # the person inbox answers, as in phase 1
+
+
+def test_a_node_with_no_link_refuses_the_built_in_seats_read():
+    """Its replica of the settings, its own logins and its own repos would draw a false reading (§4.9d, TD-2066)."""
+    assert "kmaster (home) is unreachable" in refusal("builtins_show")
+    assert "kmaster (home) is unreachable" in refusal("builtins_show", caller="ao-w", set="default")

@@ -15,6 +15,7 @@
         <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
         <span class="mono note toolfolder">{{ lg.shown }}</span>
         {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}
+        {%- if lg.lists %}<span class="note toollists">{% if lg.lists.teams or lg.lists.sets %}in {% for x in lg.lists.teams %}<a href="/teams/{{ x.name | urlencode }}">{{ x.label or x.name }}</a>{% if not loop.last or lg.lists.sets %}, {% endif %}{% endfor %}{% for x in lg.lists.sets %}built-in set <a href="/builtins/{{ x.name | urlencode }}">{{ x.label or x.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}in no team's list{% endif %}</span>{% endif %}
         <span class="grow"></span><span class="toolstate state-{{ lg.state }}">{{ lg.said }}</span>
         {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
         {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}

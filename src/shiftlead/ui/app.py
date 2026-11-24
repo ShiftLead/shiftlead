@@ -17,7 +17,7 @@ import mimetypes
 import os
 import re
 import time
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from markupsafe import Markup
 
 from sessionorc import board as board_mod
-from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
+from sessionorc import gitinfo, hosts, mail, naming, paths, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import settings as settings_mod
@@ -216,6 +216,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
     role_prompts,  # noqa: F401
+    role_review,
     routed_around,  # noqa: F401
     rpc,  # noqa: F401
     settled_by_work,  # noqa: F401
@@ -344,6 +345,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     ci_not_run_kinds,
     ci_not_run_rows,
     delegated_for,  # noqa: F401
+    disk_low_rows,
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     fork_pr_rows,
@@ -536,6 +538,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_hand,
     entry_line,
     entry_role,
+    entry_servicing,
     entry_teams,
     flow_head,  # noqa: F401
     fork_title,  # noqa: F401
@@ -591,7 +594,10 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
     **Have a session do it** on an `act` line of that checkout's board (§4.5 screen 12 *Three verbs: Have a
     session do it*, TD-1624): the same read with `free-pick`, so nobody would take the work — one function for
     the button's draw and its stale press's 409, so they never disagree. A team that has never run reads as
-    any other. The home reads no `org.yml`, so the page says it."""
+    any other. The home reads no `org.yml`, so the page says it. After the cut-over no team or lane is read, so no
+    road is refused for lack of one: a decided line is a job's, and rule 13 reports one nobody holds (§4.9e)."""
+    if teamstore.first_shape_off():
+        return ""
     want = Path(root).expanduser().resolve()
     serving = [
         t for t in org.teams.values() if (p := org.checkout(t.repo, host)) and Path(p).expanduser().resolve() == want
@@ -614,21 +620,44 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
 
 
 def doer_target(
-    org: orgmod.Org, board_root: str, doer: str, host: str, declared: Mapping[str, Collection[str]] | None = None
+    org: orgmod.Org,
+    board_root: str,
+    doer: str,
+    host: str,
+    declared: Mapping[str, Collection[str]] | None = None,
+    records: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any] | None:
     """Where an `act` line's `Doer:` hands its step (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660),
     read synchronously from `org.yml` — one function for the press and the draw. None where it does not resolve:
     a value that does not read, a repo with no registered root, no team servicing it, a named team that does not
     service its `repo:`, or no techlead seat. `{own: True}` where it names the board's own repo (compared by
     resolved root) or a team whose `repo:` it is: TD-1624's press. Else `{root, repo, team, teams}`, `teams` the
-    servicing teams (`entry_teams`, the ledger's declared order) with the named team first, `team` it or ''."""
+    servicing teams (`entry_teams`, the ledger's declared order) with the named team first, `team` it or ''.
+    After the cut-over a team and its seat are read from `records`' built-in tech leads alone (§4.9d, §4.9e)."""
     parsed = lb.doer_value(str(doer or ""))
     if parsed is None:
         return None
     kind, name = parsed
+    records = list(records)
+    off = teamstore.first_shape_off()
     roots = {str(Path(r).expanduser().resolve()): Path(r).name for r in hosts.local_host().repos()}
     team = ""
-    if kind == "team":
+    if kind == "team" and off:
+        seat = next(
+            (
+                r
+                for r in records
+                if r.get("builtin") == "techlead"
+                and not r.get("superseded_by")
+                and r.get("repo")
+                and str(r.get("team") or "").casefold() == name.casefold()
+            ),
+            None,
+        )
+        if seat is None:
+            return None
+        team, root = str(seat["team"]), str(Path(str(seat["repo"])).expanduser().resolve())
+    elif kind == "team":
         t = next((t for n, t in org.teams.items() if n.casefold() == name.casefold()), None)
         if t is None:
             return None
@@ -644,7 +673,8 @@ def doer_target(
         return None
     if root == str(Path(board_root).expanduser().resolve()):
         return {"own": True}
-    servicing = entry_teams(org, root, host, (declared or {}).get(root, ()))
+    said = (declared or {}).get(root, ())
+    servicing = teams.builtin_servicing(records, root, said) if off else entry_teams(org, root, host, said)
     if team:
         named = next((t for t in servicing if t["team"] == team), None)
         if named is None or not named["seat"]:
@@ -652,11 +682,27 @@ def doer_target(
         servicing = [named, *(t for t in servicing if t is not named)]
     elif not servicing or not servicing[0]["seat"]:
         return None
-    return {"root": root, "repo": roots[root], "team": team, "teams": servicing}
+    # after the cut-over the host agent resolves by `team` alone, so a repo with two tech leads is sent the first
+    return {
+        "root": root,
+        "repo": roots[root],
+        "team": team or (servicing[0]["team"] if off else ""),
+        "teams": servicing,
+    }
+
+
+def hand_team(plan: Mapping[str, Any], off: bool) -> str:
+    """The team the Add entry form sends: its pick, and after the cut-over, where the host agent resolves by `team`
+    alone, the first it shows, so a repo with two built-in tech leads is not refused for a blank pick (§4.9e)."""
+    shown = plan.get("teams") or []
+    return str(plan.get("picked") or (shown[0]["team"] if off and shown else ""))
 
 
 def doer_hands(
-    org: orgmod.Org, host: str, declared: Mapping[str, Collection[str]] | None = None
+    org: orgmod.Org,
+    host: str,
+    declared: Mapping[str, Collection[str]] | None = None,
+    records: Iterable[Mapping[str, Any]] = (),
 ) -> Callable[[str, str], dict[str, Any] | None]:
     """`doer_target` bound to one read of the org, for the board's draw (§4.5 screen 12 *Three verbs: Have a session
     do it*, TD-1660): `(board root, doer) → target`, each pair resolved once per read — the press's own function, so
@@ -665,7 +711,7 @@ def doer_hands(
 
     def hands(root: str, doer: str) -> dict[str, Any] | None:
         if (root, doer) not in seen:
-            seen[(root, doer)] = doer_target(org, root, doer, host, declared)
+            seen[(root, doer)] = doer_target(org, root, doer, host, declared, records)
         return seen[(root, doer)]
 
     return hands
@@ -1358,7 +1404,8 @@ async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str
         # 2. the doer resolved, by the function the draw reads
         org, _notes = await asyncio.to_thread(org_here)
         declared = await declared_teams(facts)
-        target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared)
+        records = await call("list") if await asyncio.to_thread(teamstore.first_shape_off) else []
+        target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared, records)
         if target is None:
             return await fallback(f"{doer} does not resolve to a techlead seat")
         if target.get("own"):
@@ -1665,8 +1712,12 @@ class Readings:
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
         org, host = await self.defs(), host_name()
-        boards_of = repo_boards(org, host)
-        hands = doer_hands(org, host, declared_of(repos))
+        boards_of = await asyncio.to_thread(repo_boards, org, host)  # reads the marker per checkout (§4.9e)
+        fleet: list[dict[str, Any]] = []
+        if await asyncio.to_thread(teamstore.first_shape_off):  # a Doer then resolves to a built-in tech lead (§4.9e)
+            with contextlib.suppress(Exception):  # no list: a doer reads as unresolved, drawn by the lane test
+                fleet = await self.call("list")
+        hands = doer_hands(org, host, declared_of(repos), fleet)
         # off the loop (TD-670): every repo's board rows and their standings run to ~40 ms on the live
         # home, on every recount of the Inbox's counts as on the page's read
         return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, boards_of, hands)
@@ -1733,6 +1784,8 @@ class Readings:
             + fork_pr_rows(repos, fleet, str(home.get("home") or hosts.home_name()))
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
             + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
+            # §4.5a *Inbox row: temporary space low* (TD-2083): the home's spells, a row per host and pool
+            + disk_low_rows(home.get("disk_low"))
             # §4.5a *Queue card / Inbox: stuck row* (§6 rule 13, TD-1497): the home's stuck asks, Open where held
             + stuck_rows(home.get("stuck"), records=fleet)
         )
@@ -2347,6 +2400,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += fork_pr_rows(repos, sessions, str((info or {}).get("home") or hosts.home_name()))
         # …and an account whose CI never starts (§4.5a *Inbox row: CI not starting*, TD-687)
         promos += ci_not_run_rows(None if agent_down else (info or {}).get("ci_spells"))
+        # …and a host's temporary space low (§4.5a *Inbox row: temporary space low*, TD-2083)
+        promos += disk_low_rows(None if agent_down else (info or {}).get("disk_low"))
         # …and stuck work the person is asked to see (§4.5a *Queue card / Inbox: stuck row*, TD-1497)
         promos += stuck_rows(None if agent_down else (info or {}).get("stuck"), records=sessions)
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)
@@ -2655,7 +2710,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
                 ],
                 # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
-                "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
+                # after the cut-over the teams it compares are the built-in tech leads' (§4.9e)
+                "team_notes": team_notes(
+                    r, [t["team"] for t in entry_servicing(org, here_root, host_name(), (), sessions)], sessions
+                ),
                 "boards": boards,
                 "horizon": hz,
                 "doing": drows[0],
@@ -3366,7 +3424,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # picker was ticked with the team's live manager when the team was picked.
         profile = profile or (preset.profile if preset else None) or ""
         adapter = adapter or profile_adapter(profile)
-        review = preset.review if preset else None
+        review = await asyncio.to_thread(role_review, preset)
         if team.strip() and adapter != "shell":
             got = await asyncio.to_thread(
                 team_reader, team.strip(), dir.strip(), cfg if away else None, preset.name if preset else None
@@ -3701,7 +3759,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
         root = str(Path(root).expanduser().resolve())
         org, _notes = await asyncio.to_thread(org_here)
-        team = repo_teams(org, host_name()).get(root, "")
+        # no team definition is read after the cut-over (§4.9e)
+        off = await asyncio.to_thread(teamstore.first_shape_off)
+        team = "" if off else repo_teams(org, host_name()).get(root, "")
         try:
             place, node_cfg = await entry_place(org, team, type_, repo, root, name)
         except ValueError as e:
@@ -3725,7 +3785,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ),
             {},
         )
-        servicing = entry_teams(org, root, host_name(), led.get("declared_teams") or ())
+        said = led.get("declared_teams") or ()
+        servicing = await asyncio.to_thread(teams.entry_servicing, org, root, host_name(), said, list(records.values()))
         picked = next((t for t in servicing if t["team"] == pick), None)
         servicing = [picked, *(t for t in servicing if t is not picked)] if picked else servicing
         return {
@@ -3793,7 +3854,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             type=plan["type"],
             text=str(body.get("words") or ""),
             teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
-            team=plan["picked"],  # `entry.team`: the pick, empty when blank (§4.10, TD-764)
+            # `entry.team`: the pick, empty when blank (§4.10, TD-764)
+            team=hand_team(plan, await asyncio.to_thread(teamstore.first_shape_off)),
             priority=str(body.get("priority") or ""),  # `entry.priority`, `medium` when absent (TD-851)
             **_draft_of(body),
         )
@@ -3840,7 +3902,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             roles = (await asyncio.to_thread(org_here))[0].roles
             # a machine node's config reads across the link, blocking on this loop: a worker thread's
             preset = await asyncio.to_thread(repoconfig.resolve_role, cfg, plan["role"], roles)
-            review = preset.review
+            review = await asyncio.to_thread(role_review, preset)
             if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
                 got = await asyncio.to_thread(team_reader, team, root, node_cfg, preset.name)
                 if got.get("flow") or review is None:
@@ -4154,7 +4216,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             profs, _default = profiles_mod.load()
             if preset.profile and preset.profile not in profs:
                 return form(f"the role {preset.name} names the profile {preset.profile}, which is not defined")
-            review = preset.review
+            review = await asyncio.to_thread(role_review, preset)
             got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
             if got.get("flow") or review is None:  # as **Open a session** takes it
                 review = got["review"]
@@ -4522,6 +4584,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
 
 
+def _first_shape_gone() -> None:
+    """Refuse a first-shape team control after the cut-over (§4.9e *What decides which shape runs*)."""
+    if teamstore.first_shape_off():
+        raise HTTPException(409, teamstore.GONE)
+
+
 def _team_http(e: Exception) -> HTTPException:
     """One mapping for every way a start or a stop can fail, so the strip reports the agent's
     own message the way every other control does — a toast (design §4.5 "Errors"); New session's member
@@ -4624,6 +4692,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `ao team flow <team> --apply` does — the sit-outs, the starts and the relaunches — a person's
         own, and not on a node, as Start is not. The flows are read again after it, so the next
         delta draws what it left."""
+        _first_shape_gone()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
@@ -4641,6 +4710,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
     # is the clients'). A repo-defined team is read here and edited by PR.
     @app.get("/api/teams/{name}/members")
     async def api_team_members(name: str):
+        _first_shape_gone()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
@@ -4659,6 +4729,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/teams/{name}/members")
     async def api_team_members_edit(name: str, request: Request):
+        _first_shape_gone()
         body = await request.json()
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
@@ -5446,6 +5517,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             version=body.get("version") or None,
         )
 
+    def _or_none(got: Any) -> Any:
+        return None if isinstance(got, HTTPException) else got
+
     @app.get("/teams")
     async def teams_first():
         """`/teams` opens the first team of the tabs' order (§4.9d *The page*, TD-2059)."""
@@ -5475,6 +5549,72 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """§4.5a *Team page: Delete* (TD-2063): the person's own act, at the version the page was drawn at."""
         body = await body_of(request)
         return await call("team_delete", team=name, version=body.get("version"))
+
+    @app.post("/api/builtins/new")
+    async def builtins_new(request: Request):
+        """§4.5a *Built-in seats page: + New set* (TD-2066): `{name, label?}`, the person's own act."""
+        body = await body_of(request)
+        return await call("builtins_new", **{k: body[k] for k in ("name", "label") if k in body})
+
+    @app.post("/api/builtins/repo")
+    async def repo_builtins(request: Request):
+        """§4.5a *Built-in seats page: repos* (TD-2066): `{repo, set, version}`, the person's own act."""
+        body = await body_of(request)
+        return await call("repo_builtins", **{k: body[k] for k in ("repo", "set", "version") if k in body})
+
+    @app.post("/api/builtins/{name}/set")
+    async def builtins_set(name: str, request: Request):
+        """§4.5a *Built-in seats page* (TD-2066): a set's label, models or logins, at the page's version."""
+        body = await body_of(request)
+        return await call(
+            "builtins_set", set=name, **{k: body[k] for k in ("label", "models", "logins", "version") if k in body}
+        )
+
+    @app.post("/api/builtins/{name}/delete")
+    async def builtins_delete(name: str, request: Request):
+        """§4.5a *Built-in seats page: Delete* (TD-2066): the person's own act, at the page's version."""
+        body = await body_of(request)
+        return await call("builtins_delete", set=name, version=body.get("version"))
+
+    @app.get("/builtins")
+    async def builtins_first():
+        """`/builtins` opens `default` (§4.9d *The page*)."""
+        return RedirectResponse("/builtins/default", status_code=303)
+
+    @app.get("/builtins/{name}", response_class=HTMLResponse)
+    async def builtins_page(request: Request, name: str):
+        """A built-in set's page (§4.9d *The built-in seats and their page*, TD-2066): a person's own page, drawn from
+        the one read `ao builtins show` prints; before the cut-over it says so in place of its bands."""
+
+        async def read(method: str, **params: Any) -> Any:
+            try:
+                return await call(method, **params)
+            except HTTPException as e:
+                return e
+
+        show, info = await asyncio.gather(read("builtins_show", set=name), read("host"))
+        down = any(isinstance(r, HTTPException) and r.status_code == 503 for r in (show, info))
+        notes: list[str] = []
+        if isinstance(show, HTTPException) and not down:
+            if str(show.detail).startswith("no built-in set"):
+                raise HTTPException(404, str(show.detail))
+            notes.append(str(show.detail))
+        b = None if isinstance(show, HTTPException) else setmod.builtins_page(show)
+        info = {} if isinstance(info, HTTPException) else info
+        return templates.TemplateResponse(
+            request,
+            "builtins.html",
+            {
+                "b": b,
+                "notes": notes,
+                "agent_down": down,
+                "host": host_name(),
+                "active": "Settings",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if down else await chip_usage(call),
+                "build_chip": None if down else await chip_build(call, info or None),
+            },
+        )
 
     @app.get("/teams/{team}", response_class=HTMLResponse)
     async def team_page(request: Request, team: str):

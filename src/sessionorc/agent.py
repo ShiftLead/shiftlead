@@ -419,6 +419,15 @@ def _resolve_in(runs: list[str], cwd: str | None, dir: Path) -> dict[str, str | 
     return {**got, **_resolve_paths(rest, dir)} if rest else got
 
 
+def _dir_inside(d: str | None, wt: Path) -> bool:
+    """Whether directory `d` is the resolved worktree `wt` or inside it, by whole path components (so `w-1` never
+    holds `w-10`); no `d`, or an empty one, is inside nothing and is never resolved (§4.6 *The disk sweep*)."""
+    if not d:
+        return False
+    p = Path(d).resolve()
+    return p == wt or wt in p.parents
+
+
 def _registered_checkout(repo: Any) -> Path | None:
     """`rpc_paths`' `repo`: its real path (`~` expanded) when that is one of `hosts.local_host().repos()`'
     real paths, by equality — a directory inside a checkout is none — else `None`, an empty, non-string
@@ -569,6 +578,16 @@ async def _in_daemon_thread(fn: Callable[..., Any], *args: Any) -> Any:
 TOOLS_POLL_SECONDS = 5.0
 # how long a tools shell's poll waits after a full read that failed (§4.2b): it runs every tool's `--version`
 TOOLS_FULL_RETRY_SECONDS = 60.0
+
+
+def _keep_file(path: Path) -> bool:
+    """Whether a Resume can keep this context file: its modification time set to now first, so a disk sweep reading it
+    next sees it young (§4.6 *home files*, TD-2115), and a failed `utime` read as gone."""
+    try:
+        os.utime(path)
+    except OSError:
+        return False
+    return path.is_file()
 
 
 class HostAgent(
@@ -749,6 +768,9 @@ class HostAgent(
         self.person_inbox: list[MailEntry] = self.person_store.load()
         self.person_store.on_save = self._inbox_changed
         for s in self.sessions.values():
+            # a record from before `context_id` (§4.6 *home files*, TD-2115): idempotent, unsaved until its next save
+            if s.adapter_id and not s.context_id and adapters.takes_start_context(s.adapter):
+                s.context_id = s.adapter_id
             # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
             # written before that would otherwise show needs-you until the next hook event.
             if s.pending and s.pending.kind == "prompt":
@@ -851,11 +873,24 @@ class HostAgent(
         # held in memory only, so a restart starts at the first; and its scope, None reading `default_home()` (a test
         # gives True to run the rule on a scratch home)
         self._worktree_cursor = ""
+        # the branch rule's memory (§4.6 *branches*, TD-2104): the pair a budget stopped at, when a run last reached the
+        # end (monotonic), the kept rows by (repo, branch), seeded from `disk.json` at the first pass
+        self._branch_cursor: tuple[str, str] | None = None
+        self._branch_ended: float | None = None
+        self._branch_kept: dict[tuple[str, str], str] | None = None
         self._disk_book = diskbook.Book()  # the sweep's sizes, in memory: a restart reads *partial* (TD-1945)
         self._disk_result: dict[str, Any] | None = None  # the last pass's result (§4.6 *The sweep's reading*)
         self._worktree_scope: bool | None = None
         self._sweep_loop: asyncio.AbstractEventLoop | None = None
         self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)
+        # the pressure pass (§4.6, TD-2081): its own lock and task; the first reading a `PRESSURE_EVERY` after start
+        self._pressure_lock = threading.Lock()
+        self._pressure_task: asyncio.Task[None] | None = None
+        self._pressure_at = datetime.now(UTC)
+        self._pressure_backoff = scratch_mod.Backoff()
+        # the home's read of each host's low pools (§4.6 *Told before the pool is full*, TD-2083)
+        self._disk_low_task: asyncio.Task[None] | None = None
+        self._disk_low_at = datetime.now(UTC)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
@@ -1023,6 +1058,10 @@ class HostAgent(
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
+        # the cut-over's marker, read before the first RPC or tick; a file that does not read keeps the record's (§4.9e)
+        self._first_shape_off = self._host_rec.get("first_shape_off") is True
+        self._first_shape_cut = self._host_rec.get("first_shape_cut")
+        self._read_cut_over()
         # the previous run's last tick, read before this run's first tick overwrites it: a pane found
         # gone on that first tick ended while nobody was looking (§4.5 row 5 (b), TD-490)
         self._prev_last_tick: str | None = self._host_rec.get("last_tick")
@@ -1128,7 +1167,7 @@ class HostAgent(
         # §4.6 *A session's scratch* (TD-1944): a `scratch_root` past 48 bytes, or a `shiftlead-<uid>/` that is a
         # symlink or another uid's, stops the start, as nothing a session puts there could be trusted; so does one
         # inside or holding a tool's transcript store (§9 invariant 16, TD-1945), which the disk sweep must never weigh
-        await asyncio.to_thread(_check_scratch_root, _scratch_root())
+        await asyncio.to_thread(_check_scratch_root, _scratch_root(), _seat_root())
         sock.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
@@ -1524,6 +1563,8 @@ class HostAgent(
             out["notify"] = self._notify_view()
             out["push"] = self._push_view()  # the Push card's devices and key (§4.10, TD-1302); absent on a node
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
+            # the *temporary space low* rows' spells (§4.6 *Told before the pool is full*, TD-2083)
+            out["disk_low"] = {k: dict(v) for k, v in sorted((self._host_rec.get("disk_low") or {}).items())}
             # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
             # with its `waiting_until` where this tick read one (never stored)
             out["stuck"] = {
@@ -1554,12 +1595,13 @@ class HostAgent(
     async def rpc_get(self, id: str) -> dict[str, Any]:
         s = self._find(id)
         v = self._view(s, bookkeeping=True)  # one record: its tallies and wakes ride along
-        if not v.get("start_context") and s.adapter_id and adapters.start_context_system(s.adapter):
+        conversation = s.context_id or s.adapter_id  # after a `/clear`, the file the launch named (§4.6, TD-2115)
+        if not v.get("start_context") and conversation and adapters.start_context_system(s.adapter):
             # a moved brief is in the conversation's context file, never on the record: Focus shows it from
             # there, in this reply's copy alone (§4.3 *The shared text goes in the system prompt*, TD-1669)
             told = None
             with contextlib.suppress(OSError, ValueError):
-                text = await asyncio.to_thread(paths.context_file(s.adapter_id).read_text, encoding="utf-8")
+                text = await asyncio.to_thread(paths.context_file(conversation).read_text, encoding="utf-8")
                 told = text.partition("\n\n")[2].strip() or None  # the preface holds no blank line
             if told:
                 v["start_context"] = told
@@ -1670,6 +1712,7 @@ class HostAgent(
         supervised: bool = False,
         run_only: bool | None = None,  # None, not False: a launch record keeps it only where it was set
         seat: dict[str, Any] | None = None,
+        builtin: str | None = None,
         scale: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
         context_bound: int | None = None,
@@ -1895,6 +1938,8 @@ class HostAgent(
                 # conversation, never a record of another name that held it — so the record and the launch
                 # record below carry it, as `supervised` is carried; a `seat` the call gives wins
                 seat = dict(holder.seat)
+            if builtin is None and resume and isinstance(holder, Session) and holder.adapter_id == resume:
+                builtin = holder.builtin  # a built-in seat stays one when it is resumed, as its `seat` does (§4.9d)
             if (
                 scale is None
                 and resume
@@ -1970,7 +2015,7 @@ class HostAgent(
             # handed one, or a Resume's of the name's own conversation, kept where it may be; else a new one
             if scratch is None and isinstance(holder, Session) and resume and holder.adapter_id == resume:
                 scratch = holder.scratch
-            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder)
+            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder, bool(unattended))
             previous_run, freed = await self._take_name(holder)
             model_env = await asyncio.to_thread(agent_common.model_env, adapter, spec.model, directory)
             # read after the supersede, so the id it freed is not `taken` and gets reused
@@ -2022,66 +2067,79 @@ class HostAgent(
                 except DuplicateSession:
                     taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
                 finally:
-                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
+                    self._starting.discard(sid)  # taken again below, before the next await
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
-            if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
-                await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
-            s = Session(
-                id=sid,
-                name=shown,
-                kind=kind,  # type: ignore[arg-type]
-                adapter=adapter,
-                dir=str(directory),
-                profile=profile,
-                repo=repo,
-                worktree=worktree,
-                unattended=unattended,
-                confidence=ad.state_source,
-                run_log=str(run_log),
-                adapter_id=spec.adapter_id,
-                capabilities=grants,
-                controllers=members,
-                lane=references,
-                role=str(role or ""),
-                ledger=(str(ledger).strip() or None) if ledger else None,
-                team=str(team or ""),  # badges (§4.9): stored as given, never validated here
-                project=str(project or ""),
-                run_until=self._team_stamp(str(team or ""), bool(unattended), _stop_time(run_until)),
-                wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
-                pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
-                resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
-                previous_run=previous_run,
-                host=self.host,
-                # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
-                supervised=bool(supervised)
-                or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
-                or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
-                run_only=bool(run_only),
-                seat=dict(seat) if seat else None,
-                scale=extra,
-                review=reading,
-                context_bound=bound,
-                start_context=start_context,
-                first_prompt=first_prompt,
-                model_file=model_env.get("AGENT_MODEL_FILE"),
-                scratch=run_scratch,
-                tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
-            )
-            if self.mode != "node":
-                # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
-                # never passed — `supervised` and `seat` as the record is written, the caller as every
-                # caller is read. A node's is the home's, set on its copy from this create's reply.
-                s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
-                _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
-            dropped: str | None = None  # the replaced run's address, when this create does not carry its mail
-            if isinstance(holder, Session):
-                # the record of this name it replaced, for the home, which holds the mail (§4.4a)
-                kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
-                s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
-                dropped = None if kept else self._address(holder)
-            s.worktree_made = made or _inherits_made(s, holder)
-            self.sessions[sid] = s
+            # the pane is up and has no record yet: a tick must not adopt it (TD-2096), and a step that fails before
+            # the record stands takes the pane with it, so nothing is left to adopt (§4.1, TD-2125)
+            self._starting.add(sid)
+            try:
+                if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
+                    await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
+                s = Session(
+                    id=sid,
+                    name=shown,
+                    kind=kind,  # type: ignore[arg-type]
+                    adapter=adapter,
+                    dir=str(directory),
+                    profile=profile,
+                    repo=repo,
+                    worktree=worktree,
+                    unattended=unattended,
+                    confidence=ad.state_source,
+                    run_log=str(run_log),
+                    adapter_id=spec.adapter_id,
+                    context_id=spec.adapter_id if getattr(ad, "start_context", False) else None,
+                    capabilities=grants,
+                    controllers=members,
+                    lane=references,
+                    role=str(role or ""),
+                    ledger=(str(ledger).strip() or None) if ledger else None,
+                    team=str(team or ""),  # badges (§4.9): stored as given, never validated here
+                    project=str(project or ""),
+                    run_until=self._team_stamp(str(team or ""), bool(unattended), _stop_time(run_until)),
+                    wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
+                    pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
+                    resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
+                    previous_run=previous_run,
+                    host=self.host,
+                    # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
+                    supervised=bool(supervised)
+                    or bool(
+                        resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised
+                    )
+                    or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
+                    run_only=bool(run_only),
+                    seat=dict(seat) if seat else None,
+                    builtin=builtin,
+                    scale=extra,
+                    review=reading,
+                    context_bound=bound,
+                    start_context=start_context,
+                    first_prompt=first_prompt,
+                    model_file=model_env.get("AGENT_MODEL_FILE"),
+                    scratch=run_scratch,
+                    tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
+                )
+                if self.mode != "node":
+                    # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
+                    # never passed — `supervised` and `seat` as the record is written, the caller as every
+                    # caller is read. A node's is the home's, set on its copy from this create's reply.
+                    s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
+                    _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
+                dropped: str | None = None  # the replaced run's address, when this create does not carry its mail
+                if isinstance(holder, Session):
+                    # the record of this name it replaced, for the home, which holds the mail (§4.4a)
+                    kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
+                    s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
+                    dropped = None if kept else self._address(holder)
+                s.worktree_made = made or _inherits_made(s, holder)
+                self.sessions[sid] = s
+            except BaseException:  # a cancelled create too: its pane has no record either
+                await asyncio.to_thread(self._kill_unrecorded_pane, sid)
+                raise
+            finally:
+                self._starting.discard(sid)
             self._cwd_raw.pop(sid, None)  # a new run starts in `dir`: its first report resolves afresh (TD-1988)
             self._cwd_asking.pop(sid, None)
             room.clear()  # counted live now, as a record
@@ -2095,8 +2153,9 @@ class HostAgent(
                     await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
                 except (OSError, RpcError) as e:  # the session exists: its create stands, the draft unclaimed
                     log.warning("create %s: could not claim %s: %s", s.id, draft_dir.name, e)
-            if isinstance(holder, Session) and holder.adapter_id != s.adapter_id:
-                self._drop_context(holder.adapter_id, holder)  # replaced in place, never forgotten
+            if isinstance(holder, Session):  # replaced in place, never forgotten
+                for held in {holder.adapter_id, holder.context_id} - {s.adapter_id, s.context_id}:
+                    self._drop_context(held, holder)
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
@@ -2181,6 +2240,7 @@ class HostAgent(
             supervised=True,  # it is started by the tick's replay, as any supervised record is restarted
             by_person=None if self.mode == "node" else False,  # supervised: a team's (§4.10, TD-1069)
             seat=dict(given["seat"]) if given.get("seat") else None,
+            builtin=given.get("builtin"),
             scale=given["extra"],
             review=given["reading"],
             context_bound=given["bound"],
@@ -2247,7 +2307,7 @@ class HostAgent(
             if not (system and start_context is None):
                 return prompt, {"start_context": mail.start_context_file_text(start_context)}
             with contextlib.suppress(ValueError):  # an id that cannot name a file has no file to keep
-                if await asyncio.to_thread(paths.context_file(resume).is_file):
+                if await asyncio.to_thread(_keep_file, paths.context_file(resume)):
                     return prompt, {"keep_context": True}
             carried = self._carried_launch(resume, holder)
             if carried.get("prompt_from") and isinstance(carried.get("prompt"), str) and not carried.get("argv"):
@@ -2497,15 +2557,26 @@ class HostAgent(
             )
         return holder
 
-    def _run_scratch(self, given: str | None, holder: Session | str | None) -> str:
+    def _run_scratch(self, given: str | None, holder: Session | str | None, unattended: bool = False) -> str:
         """The run's scratch directory (design §4.6 *A session's scratch*, TD-1944): `given` — the old run's,
-        handed by a restart or carried by a Resume — kept where it lies under this host's `shiftlead-<uid>/`
+        handed by a restart or carried by a Resume — kept where it lies under either root's `shiftlead-<uid>/`
         and its `owner.json` names `holder`'s record and this home (made again, empty, where it is gone);
-        else a new one. Off the loop: it touches the disk."""
-        root, home = _scratch_root(), paths.home()
+        else a new one, an `unattended` run's under `seat_root` where set (*Temporary space is a pool of its
+        own*, TD-2082). A carried path in a pool that cannot be used fails only a run that belongs in that
+        pool; any other gets a new directory in its own. Off the loop: it touches the disk."""
+        root, seat, home = _scratch_root(), _seat_root(), paths.home()
+        pool = seat if unattended and seat else root
         record = holder.id if isinstance(holder, Session) else ""
         try:
-            return (record and scratch_mod.kept(root, given, record, home)) or scratch_mod.make(root, record, home)
+            carried = scratch_mod.root_of(given, (root, seat)) if record else None
+            if carried:
+                try:
+                    if path := scratch_mod.kept(carried, given, record, home):
+                        return path
+                except (scratch_mod.ScratchError, OSError):
+                    if carried == pool:
+                        raise
+            return scratch_mod.make(pool, record, home)
         except (scratch_mod.ScratchError, OSError) as e:
             raise RpcError(f"no scratch directory for the run: {e}") from None
 
@@ -2762,6 +2833,14 @@ class HostAgent(
         grid = settings_mod.terminal_grid(settings_mod.load())  # read at each start (§5, TD-1919)
         self.tmux.new_session(sid, cwd, argv, env, logfile=run_log, grid=grid)  # log from the first byte (invariant 3)
         self._pane_cgroup(sid)
+
+    def _kill_unrecorded_pane(self, sid: str) -> None:
+        """A create that failed after its pane started leaves no pane for the tick to adopt (§4.1, TD-2125). A kill
+        that fails is logged and never replaces the create's own error."""
+        try:
+            self.tmux.kill_session(sid)
+        except Exception:  # noqa: BLE001 — the create's error is the one the caller must see
+            log.exception("%s: killing the pane of a failed create failed", sid)
 
     def _pane_cgroup(self, sid: str) -> None:
         """Under the installed home's tmux system unit (§4.1, `Delegate=yes`) tmux reaches no user bus
@@ -3045,6 +3124,17 @@ class HostAgent(
             s.branch_kept,
         )
 
+    def _tool_ids(self) -> set[str]:
+        """The tool's own ids of every session ShiftLead holds: each record's `adapter_id`, closed ones included, and
+        in home mode those of each container node whose link is up, so an outside session is told from ours (§4.1,
+        §4.6 *tool temp*). Reads copies of the maps."""
+        ours = {r.adapter_id for r in list(self.sessions.values()) if r.adapter_id}
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                if (self.links.get(host) or {}).get("up"):
+                    ours |= {r.adapter_id for r in list(self.remote.get(host, {}).values()) if r.adapter_id}
+        return ours
+
     def _reap_idle(self, s: Session | None, wt: Path) -> str | None:
         """The reaper's *idle*, through ShiftLead's own seams (§4.1): no live record of any adapter, a shell's
         included, has its `dir` inside `wt` — this host's, and while their link is up those of the container
@@ -3053,23 +3143,17 @@ class HostAgent(
         and an outside session whose tool id is one of ours, never count. Run in a thread: it reads copies of the
         maps."""
         wt = wt.resolve()
-
-        def inside(d: str) -> bool:
-            p = Path(d).resolve()
-            return p == wt or wt in p.parents
-
         mine = list(self.sessions.values())
-        ours = {r.adapter_id for r in mine if r.adapter_id}
+        ours = self._tool_ids()
         for r in mine:
-            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                 return f"in use by {r.id}"
         if self.mode == "home" and self.remote:
             for host in containers.container_nodes():
                 if not (self.links.get(host) or {}).get("up"):
                     return f"{host} unreachable"
                 for r in list(self.remote.get(host, {}).values()):
-                    ours.add(r.adapter_id or "")
-                    if r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+                    if r.state not in ("exited", "closed") and _dir_inside(r.dir, wt):
                         return f"in use by {r.id}@{host}"
         seen = adapters.external_sessions()
         if seen["blind"]:
@@ -3077,8 +3161,25 @@ class HostAgent(
         for ext in seen["items"]:
             if ext.tool_id and ext.tool_id in ours:
                 continue
-            if ext.cwd and inside(ext.cwd):
+            if _dir_inside(ext.cwd, wt):
                 return f"in use by {ext.name} ({ext.adapter}, outside shiftlead)"
+        return None
+
+    def _record_home(self, wt: Path) -> str | None:
+        """A detached worktree's recorded home (§4.6 *The disk sweep*, TD-2103): `record: <id>` for a record in any
+        state with its `dir` at or inside `wt`, this host's first, then `record: <id>@<host>` for a linked container
+        node's, or `<host> unreachable` for a node whose link is down. Run in a thread: it reads copies of the maps."""
+        wt = wt.resolve()
+        for r in list(self.sessions.values()):
+            if _dir_inside(r.dir, wt):
+                return f"record: {r.id}"
+        if self.mode == "home":
+            for host in containers.container_nodes():
+                if not (self.links.get(host) or {}).get("up"):
+                    return f"{host} unreachable"
+                for r in list(self.remote.get(host, {}).values()):
+                    if _dir_inside(r.dir, wt):
+                        return f"record: {r.id}@{host}"
         return None
 
     def _recover_reaps(self) -> None:
@@ -5061,6 +5162,8 @@ class HostAgent(
             raise RpcError(
                 f"only {s.id} may {said}: it is the session's own word about its own run (design §9 invariant 14)"
             )
+        if status == "restart" and self._first_shape_off and self._holds_stage(s):
+            raise RpcError("a stage's session ends its stage: `ao stage end <outcome>` (design §4.9e)")
         if not (why or "").strip():
             reason = "the search that came up empty" if status == "none" else "why this run is over"
             raise RpcError(
@@ -5319,19 +5422,27 @@ class HostAgent(
         return self._remote_stores[host]
 
 
-def _check_scratch_root(root: str) -> None:
-    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made."""
+def _check_scratch_root(root: str, seat: str = "") -> None:
+    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made;
+    a `seat_root`'s length and overlaps, its directory left alone (TD-2082)."""
     scratch_mod.check_root(root)
     roots, blind = adapters.transcript_roots()
     if blind:
         log.warning("transcript roots unread for %s: the scratch_root check covers the rest", ", ".join(blind))
     scratch_mod.check_transcripts(root, roots)
+    if seat:
+        scratch_mod.check_seat_root(seat, root, roots)
     scratch_mod.ensure_parent(root)
 
 
 def _scratch_root() -> str:
     """This host's `scratch_root` (§4.6), the default where a reading of the host carries none."""
     return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
+
+
+def _seat_root() -> str:
+    """This host's `seat_root` (§4.6, TD-2082), '' where unset or a reading of the host carries none."""
+    return getattr(hosts.local_host(), "seat_root", "") or ""
 
 
 async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:

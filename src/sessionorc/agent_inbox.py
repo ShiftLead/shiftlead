@@ -326,12 +326,13 @@ class InboxMixin:
             "red_pr",
             "fork_pr",
             "ci_not_run",
+            "disk_low",  # §4.5a *Inbox row: temporary space low* (TD-2083): `disk_low:<host>:<pool>`, by time alone
         )
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
                 f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, held_mail, cadence:<pr>, promote, work, "
-                "lanes, red_pr, fork_pr, ci_not_run"
+                "lanes, red_pr, fork_pr, ci_not_run, disk_low"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:
@@ -637,9 +638,10 @@ class InboxMixin:
             raise RpcError("the entry has no words: say what it is — a title is enough")
         pick = str(team or "").strip()
         order: list[dict[str, str]] = []  # a blank pick's teams, kept for the tick's move (§4.9b, TD-1480)
-        if teams is None:
+        if teams is None or self._first_shape_off:
             # the person's shell on a node, whose registry has no such repo and which has no `org.yml`
-            # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is
+            # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is. After the
+            # cut-over a caller's list of teams is the first shape's, and only a built-in seat is read (§4.9d, §4.9e)
             found_seat = await self._question_seat(team=pick, repo=name, entry=True)
             team = str(found_seat.team or "").strip()
             pick = team if pick else ""
@@ -2023,6 +2025,8 @@ class InboxMixin:
         team = str(team or "").strip()
         if not team:
             raise RpcError("work_start needs the team whose members to start")
+        if self._first_shape_off:  # rule 8 starts no team for work after the cut-over (§4.9e)
+            return {"team": team, "started": False, "ids": [], "held": None}
         teams = self._host_rec.setdefault("teams", {})
         rec = teams.get(team) or {}
         mark = rec.get("work_waiting")

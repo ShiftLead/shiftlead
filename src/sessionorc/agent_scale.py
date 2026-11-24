@@ -101,6 +101,8 @@ class ScaleMixin:
         if self.mode != "home":
             return
         claims, self._scale_claims = self._scale_claims, set()
+        if self._first_shape_off:  # no line scales after the cut-over (§4.9e)
+            return
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         teams: dict[str, list[Session]] = {}
         for r in records:

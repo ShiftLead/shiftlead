@@ -93,6 +93,7 @@ NOTE_ENDS = ("lapsed", "go_with_it", "declined", "not_clear")
 # every field of `Session` is in one and only one of the three.
 NODE_OWNED = frozenset(
     {
+        "context_id",
         "identity_alarms",
         "state",
         "since",
@@ -191,6 +192,7 @@ HOME_OWNED = frozenset(
         "seat_count",
         "seat_filled",
         "idle_open",
+        "builtin",
         "checks",
         "conventions_seen",
         "held_missed",
@@ -1144,6 +1146,9 @@ class Session:
     repo: str | None = None
     worktree: str | None = None
     adapter_id: str | None = None  # the tool's own session id (Claude Code uuid) once known
+    # the conversation whose start-context file the launch named (§4.6 *home files*, TD-2115): a `/clear` moves
+    # `adapter_id` and leaves this, since the pane's environment still names that file
+    context_id: str | None = None
     # the file the tool writes the conversation to, on this record's host (design §4.2, TD-578): set
     # with `adapter_id` from the hook, so a page links it without a read; None where none is reported
     transcript: str | None = None
@@ -1540,6 +1545,9 @@ class Session:
     # `ref` is the first open reference when it was written. The home's; cleared when the stretch
     # ends, the work closes or the member declares.
     idle_open: dict[str, Any] | None = None
+    # The seat key (`techlead`, `sweeper`, `prompts`) of a built-in seat's record, which the home writes (§4.9d *How
+    # each one runs*, TD-2065). After the cut-over rules 1, 3, 4 and 5 reach only such a record and the director's.
+    builtin: str | None = None
     # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`

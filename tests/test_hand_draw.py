@@ -126,7 +126,7 @@ def test_a_resolver_that_raises_resolves_nothing(tmp_path, monkeypatch):
 def test_the_draw_resolves_by_the_presss_own_function_once_per_pair(monkeypatch):
     calls: list[tuple] = []
 
-    def target(org, root, doer, host, declared=None):
+    def target(org, root, doer, host, declared=None, records=()):
         calls.append((root, doer, host, declared))
         return {"own": True} if doer == "mine" else None
 

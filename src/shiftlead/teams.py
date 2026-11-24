@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from sessionorc import brief as brief_mod
-from sessionorc import naming
+from sessionorc import naming, teamstore
 from sessionorc.models import REVIEW_BOUND
 
 # The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`), kept in `sessionorc.models` since the
@@ -631,6 +631,43 @@ def entry_teams(org: orgmod.Org, root: str, host: str, declared: Collection[str]
         return (not x["techlead"], order.index(name) if name in order else len(order))
 
     return sorted(out, key=key)
+
+
+def builtin_servicing(
+    records: Iterable[Mapping[str, Any]], root: str, declared: Collection[str] = ()
+) -> list[dict[str, str]]:
+    """`entry_teams`' rows after the cut-over, read from the records: one per team with a current built-in tech lead
+    on the checkout `root` (§4.9d *How each one runs*), in `declared`'s order, then by name."""
+    out: dict[str, dict[str, str]] = {}
+    for r in records:
+        repo, team = str(r.get("repo") or ""), str(r.get("team") or "")
+        if r.get("builtin") != "techlead" or r.get("superseded_by") or not repo or not team:
+            continue
+        if str(Path(repo).expanduser().resolve()) == root:
+            name = str(r.get("name") or "")
+            out.setdefault(team, {"team": team, "seat": str(r.get("id") or ""), "name": name, "techlead": name})
+    order = [str(d).casefold() for d in declared]
+
+    def key(x: dict[str, str]) -> tuple[int, str]:
+        name = x["team"].casefold()
+        return (order.index(name) if name in order else len(order), name)
+
+    return sorted(out.values(), key=key)
+
+
+def entry_servicing(
+    org: orgmod.Org,
+    root: str,
+    host: str,
+    declared: Collection[str],
+    records: Iterable[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    """Who an entry for `root` is handed to: the built-in tech leads after the cut-over, else `entry_teams`."""
+    return (
+        builtin_servicing(records, root, declared)
+        if teamstore.first_shape_off()
+        else entry_teams(org, root, host, declared)
+    )
 
 
 def stale_teams(declared: Collection[str], defs: Collection[str], entries: Collection[Any]) -> list[dict[str, Any]]:

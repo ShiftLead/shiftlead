@@ -96,3 +96,12 @@ def test_a_run_keeps_only_the_newest_runs_temporary_directories(pytestconfig):
     (`getini` raises).
     """
     assert int(pytestconfig.getini("tmp_path_retention_count")) == 1
+
+
+def test_a_long_named_tests_home_holds_its_socket_at_any_run_number(tmp_path):
+    """TD-2097: from a seat's `TMPDIR`, under xdist, at a high run number, `<tmp_path>/home/agent.sock` still fits."""
+    from conftest import TMP_NAME_MAX
+
+    assert len(tmp_path.name) <= TMP_NAME_MAX + 3  # the name, then pytest's number
+    run = "/tmp/shiftlead-1000/c9bfb7cb/pytest-of-kmaster/pytest-9999/popen-gw99"
+    assert len(f"{run}/{'x' * TMP_NAME_MAX}999/home/agent.sock".encode()) < 108

@@ -47,6 +47,12 @@ class StageMixin:
             raise RpcError("this session holds no stage: `ao stage end` is run by a stage's own session")
         return refs[0]
 
+    @staticmethod
+    def _holds_stage(s: Any) -> bool:
+        """Whether `s` is a stage's session: a team's, no seat, its lane one entry (§4.8)."""
+        refs = [r for r in lane_refs(s.lane or []) if r.startswith("TD-")]
+        return bool(s.team) and s.seat is None and not s.builtin and len(refs) == 1
+
     async def rpc_stage_end(self, id: str, outcome: str, reason: str = "", caller: Any = None) -> dict[str, Any]:
         """`ao stage end <outcome> [--reason]`: only the session itself may end its stage, and the entry is the one
         it holds. The body checks the outcome's fact and writes the move; a refusal changes nothing."""

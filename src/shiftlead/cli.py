@@ -28,6 +28,7 @@ from sessionorc import client as clientmod
 from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
+from sessionorc import notify as notify_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -731,7 +732,11 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
     live manager as a controller when the record is given none, and the record's `review` from the
     role's or else the team's (`teams.team_review`). Fills `defaults` in place and returns the
     line saying which reader the session got, "" when none. A team the org does not define stays
-    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says."""
+    a badge, said once on stderr; a shell asks for nothing, as `_launch_defaults` says. After the cut-over no
+    team definition or reader chain is read: the session gets no reader and no manager (§4.9e)."""
+    if teamstore.first_shape_off():
+        defaults["review"] = None
+        return ""
     name = getattr(args, "team", None) or ""
     if not name or args.adapter == "shell":
         return ""
@@ -1187,6 +1192,13 @@ def cmd_org(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _first_shape_gone(args: argparse.Namespace) -> int | None:
+    """The exit of a first-shape team verb after the cut-over (§4.9e *What decides which shape runs*), else None."""
+    if teamstore.first_shape_off():
+        return fail(args, teamstore.GONE, 1)
+    return None
+
+
 def cmd_team_start(args: argparse.Namespace) -> int:
     """`ao team start <name>` (design §4.9): the sequence itself lives in `shiftlead.teamrun`, which
     the Sessions page's **Teams** strip runs too, so the two cannot drift — every check before any
@@ -1426,6 +1438,39 @@ def cmd_team_show(args: argparse.Namespace) -> int:
         return fail(args, f"no team {args.name!r}", 1)
     got = call_sync("team_show", team=args.name)
     return emit(args, got, lambda: _team_show_prose(got))
+
+
+def _builtins_show_prose(got: dict[str, Any]) -> None:
+    """`ao builtins show`'s text: the same read as `--json`, in the page's order (§4.9d *The page*)."""
+    title = f"{got['set']} ({got['label']})" if got.get("label") else got["set"]
+    print(f"{title}: used by {', '.join(got['used_by']) or 'no repo'}")
+    print("sets: " + ", ".join(x["name"] + (" (cannot run a seat)" if x["cannot_run"] else "") for x in got["sets"]))
+    if got.get("note"):
+        print(got["note"])
+        return
+    for line in got.get("cannot_run") or ():
+        print(line)
+    for s in got["seats"]:
+        if s["director"]:
+            print(f"  {s['name']}: the director answers these")
+            continue
+        now = (
+            s["now"]["login"] or {"waits": "waits for a usable login", "none": "no login offers it"}[s["now"]["state"]]
+        )
+        print(f"  {s['name']}  {s['model']} on {now}  acts for {s['for']}")
+    for lg in got.get("logins") or ():
+        why = f" ({lg['why']})" if lg.get("why") else ""
+        print(f"login {lg['login']}  {'not read here' if lg['state'] == 'not_read' else lg['state']}{why}")
+    for r in got.get("repos") or ():
+        print(f"repo {r['repo']}: {r['set']}")
+
+
+def cmd_builtins_show(args: argparse.Namespace) -> int:
+    """`ao builtins show [<set>]` (§4.9d *The built-in seats and their page*, TD-2066): what the page shows; `--json` is
+    the host agent's `builtins_show` read, the one the page draws from, less the `tools` read it carries for it."""
+    got = call_sync("builtins_show", set=args.set or "default")
+    got.pop("tools", None)
+    return emit(args, got, lambda: _builtins_show_prose(got))
 
 
 def cmd_team_list(args: argparse.Namespace) -> int:
@@ -2809,6 +2854,8 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     """`ao team on-work <team> ask|start|off` (design §4.7, §6 rule 8, TD-227): what the home does
     when the team has wound down and its lanes gain work — the Inbox row, the start itself, or
     nothing — written to `teams.<team>.on_work` through `set_settings`, a person's own."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -2826,6 +2873,8 @@ def cmd_team_size(args: argparse.Namespace) -> int:
     Members dialog's **− / +**), refused for a line the definition does not name, below 0, below what
     a listed flow needs, and where a step up's next name is another line's. Prints *grinder-ao: 3 (file
     says 2)* and what it started or wound down."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -2842,6 +2891,8 @@ def cmd_team_max(args: argparse.Namespace) -> int:
     """`ao team max <team> <name> <n>` and `ao team max <team> off|on` (design §4.7, §4.9 *Scaling with the work*,
     TD-1545): the line's or seat's ceiling written to `teams.<team>.max.<name>`, or the team's `max: off`, or the
     whole key removed, through `set_settings` (`teamrun.set_max`) — a person's own, refused to a session."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     if os.environ.get("SHIFTLEAD_SESSION"):
         return fail(args, "ao team max writes a person's setting: refused to a session (design §4.7)", 1)
     if args.line in ("off", "on") and args.n is None:
@@ -2864,6 +2915,8 @@ def cmd_team_add(args: argparse.Namespace) -> int:
     member line's next member started for this run alone — never replayed after it, and no file or setting
     written — or with `--keep` the line's size one higher as `ao team size` writes it; refused on a team that
     is not running, and to a session. Prints the name it started."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     if os.environ.get("SHIFTLEAD_SESSION"):
         return fail(args, "ao team add starts a member: a person's own, refused to a session (design §4.7)", 1)
     try:
@@ -2885,6 +2938,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
     `--apply`, after the write where a flow is named, applies the definition as it reads now: the
     sit-outs, the starts and the relaunches (`teamrun.apply`, §4.9c *Switching*), one line per
     member, and one per PR already asked of a reader, which stays its (*What a switch leaves alone*)."""
+    if (gone := _first_shape_gone(args)) is not None:
+        return gone
     try:
         org = _org_here()
         name = _defined_team(args, org)
@@ -3399,6 +3454,9 @@ def cmd_pr(args: argparse.Namespace) -> int:
 
     if args.action == "wait":
         return _pr_wait(args)
+    if teamstore.first_shape_off():  # §4.9e: no reader chain runs after the marker
+        got = {"pr": args.n, "held": False, "paths": [], "text": teamstore.NO_PR_HELD}
+        return emit(args, got, lambda: print(f"PR #{args.n}: {teamstore.NO_PR_HELD}"))
     sid = _own_session(args)
     if sid is None:
         return 2
@@ -3812,6 +3870,13 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
                     out.append(f"    would remove {gone.get('path')} ({_bytes(gone.get('bytes'))})")
                 for kept in k.get("kept") or []:
                     out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+            if b := e.get("branches"):  # §4.6 *branches*, TD-2112
+                short = " (partial)" if b.get("partial") else ""
+                out.append(f"  branches   would delete {len(b.get('would_delete') or [])}{short}")
+                for gone in b.get("would_delete") or []:
+                    out.append(f"    would delete {gone.get('repo')} {gone.get('branch')} — {gone.get('proof')}")
+                for kept in b.get("kept") or []:
+                    out.append(f"    kept {kept.get('repo')} {kept.get('branch')} — {kept.get('why')}")
             continue
         out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
         for kind, k in (e.get("kinds") or {}).items():
@@ -3822,6 +3887,12 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             )
             for kept in k.get("kept") or []:
                 out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+        if b := e.get("branches"):  # §4.6 *branches*, TD-2112: counts, not bytes
+            out.append(f"  branches   deleted {b.get('deleted', 0)} last pass, {b.get('deleted_30d', 0)} in 30 days")
+            for kept in b.get("kept") or []:
+                out.append(f"    kept {kept.get('repo')} {kept.get('branch')} — {kept.get('why')}")
+            if b.get("kept_more"):
+                out.append(f"    and {b['kept_more']} more kept")
         free = e.get("free") or {}
         if "error" in free:
             out.append(f"  free under {free.get('path')}: unreadable — {free['error']}")
@@ -3837,6 +3908,28 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             )
         for w in e.get("warnings") or []:
             out.append(f"  ⚠ {free.get('path')}: {w}")
+        seat = e.get("seat_free") or {}  # §4.6 *Temporary space is a pool of its own*, TD-2082
+        if seat.get("not_mounted"):
+            out.append(f"  free under {seat.get('path')} (seats): not mounted")
+        elif "error" in seat:
+            out.append(f"  free under {seat.get('path')} (seats): unreadable — {seat['error']}")
+        elif seat:
+            inodes = (
+                f", {seat.get('inodes_free', 0):,} of {seat['inodes_total']:,} inodes"
+                if seat.get("inodes_total")
+                else ""
+            )
+            out.append(
+                f"  free under {seat.get('path')} (seats): {_bytes(seat.get('bytes_free'))} of "
+                f"{_bytes(seat.get('bytes_total'))}{inodes}"
+            )
+        for w in e.get("seat_warnings") or []:
+            out.append(f"  ⚠ {seat.get('path')}: {w}")
+        if e.get("no_pressure"):  # §4.6 *The pressure pass*, TD-2081
+            out.append(f"  {e['no_pressure']}: no pressure reading")
+        for pool, one in (e.get("pressure") or {}).items():  # §4.6 *Told before the pool is full*, TD-2083
+            words = notify_mod.disk_low_text({**one, "host": host, "pool": pool})
+            out.append(f"  ⚠ {words} (since {one.get('since')})")
     return out
 
 
@@ -4550,6 +4643,16 @@ def cmd_td_add(args: argparse.Namespace) -> int:
         got = call_sync(
             "entry_add",
             repo=args.repo,
+            type=args.type,
+            text=_entry_words(args),
+            team=args.team or "",
+            priority=args.priority,
+        )
+        return emit(args, got, lambda: _entry_prose(got, got.get("to"), "handed to"))
+    if teamstore.first_shape_off():  # the host agent resolves a built-in tech lead; no team definition is read (§4.9e)
+        got = call_sync(
+            "entry_add",
+            repo=root,
             type=args.type,
             text=_entry_words(args),
             team=args.team or "",
@@ -5901,6 +6004,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(fn=cmd_org)
 
+    p = add("builtins", help="the built-in sets: each seat's model and login, the logins and the repos (§4.9d)")
+    bisub = p.add_subparsers(dest="action", required=True)
+    q = bisub.add_parser("show", help="what the Built-in seats page shows")
+    q.add_argument("set", nargs="?", help="the set (default: default)")
+    q.set_defaults(fn=cmd_builtins_show)
+
     p = add("flow", help="check a flow file, or list the flows the org can see (§4.9c)")
     fsub = p.add_subparsers(dest="action", required=True)
     q = fsub.add_parser("check", help="run the check on a flow.yml: each problem, or what goes to the person and OK")
@@ -6065,7 +6174,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = add_login("note", help="the note shown under a login (never a secret: the file is committed); empty clears it")
     q.add_argument("login", help=login_help)
     q.add_argument("text", nargs="*")
-    q = add_login("forget", help="forget a login, leaving its folder on disk; refused while a session runs on it")
+    q = add_login(
+        "forget",
+        help="forget a login, leaving its folder on disk; "
+        "refused while a session runs on it or a team's or built-in set's list names it",
+    )
     q.add_argument("login", help=login_help)
     q = add_login("add", help="add a login: a folder that is the tool's home, or a new or empty one made one")
     q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")

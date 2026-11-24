@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -13,7 +14,10 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-from conftest import pinned_script
+import pytest
+from conftest import kill_private_server, pinned_script, private_socket_name
+
+from sessionorc.tmux import Tmux
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "look_home.py"
@@ -122,3 +126,41 @@ def test_v2_writes_the_fixture_ledger_as_a_directory_the_reader_reads(tmp_path):
     assert ledger.ledger_path(repo) == "docs/ledger"
     got = ledger.reading(repo, datetime.now(UTC), with_history=False)
     assert {e["id"] for e in got["entries"]} == {"TD-001", "TD-002", "TD-003", "TD-004"}
+
+
+def test_a_scratch_home_lies_under_the_runs_scratch(tmp_path, monkeypatch):
+    lh = _load()
+    monkeypatch.setenv("SHIFTLEAD_SCRATCH", str(tmp_path))
+    assert lh.scratch_home("aoj-").parent == tmp_path
+    monkeypatch.delenv("SHIFTLEAD_SCRATCH")
+    made = lh.scratch_home("aoj-")
+    try:
+        assert made.parent == Path("/tmp")
+    finally:
+        made.rmdir()
+
+
+@pytest.mark.integration
+def test_ending_a_private_server_ends_a_tool_that_ignores_the_hangup():
+    """TD-2102: `kill-server` only hangs up on a pane. A tool that ignores SIGHUP, and SIGTERM with it, is still ended,
+    along with a child in its session, and the socket file goes."""
+    if not shutil.which("tmux"):
+        pytest.skip("tmux is not installed")
+    look_home = _load()
+    sock = private_socket_name()
+    try:
+        tool = "trap '' HUP TERM; sleep 60 & wait"
+        subprocess.run(["tmux", "-L", sock, "-f", "/dev/null", "new", "-d", "-s", "t", "sh", "-c", tool], check=True)
+        pane = subprocess.run(
+            ["tmux", "-L", sock, "display", "-p", "-t", "t", "#{pane_pid}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        sid = int(pane.stdout)
+        assert look_home.wait_for(lambda: len(look_home.session_members({sid})) >= 2, 5)
+        look_home.end_server(sock, grace=0.3)
+        assert look_home.session_members({sid}) == []
+        assert not os.path.exists(f"/tmp/tmux-{os.getuid()}/{sock}")
+    finally:
+        kill_private_server(Tmux(socket_name=sock))

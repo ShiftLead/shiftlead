@@ -552,6 +552,15 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "disk-low-snooze",
+        "Snooze ▾",
+        "Inbox row: temporary space low",
+        (
+            "Sets this row aside until the time you pick: +1 day, +1 week or a date. It frees no space and changes "
+            "nothing on the host, and the row is not told on Telegram or push while it is snoozed."
+        ),
+    ),
+    Help(
         "stuck-open",
         "Open",
         "Queue card / Inbox: stuck row",
@@ -976,7 +985,7 @@ HELP: tuple[Help, ...] = (
         "Tools page: a login",
         (
             "Takes this login off the page and leaves its folder on disk; adding that folder again takes back its "
-            "name. Refused, naming them, while a session runs on it."
+            "name. Refused, naming them, while a session runs on it or a team's or built-in set's list names it."
         ),
     ),
     Help(
@@ -1160,6 +1169,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "ci-open",
             "ci-rerun",
             "ci-snooze",
+            "disk-low-snooze",
             "stuck-open",
             "board-answers",
             "board-go-with-it",

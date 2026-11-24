@@ -6,7 +6,9 @@ where unset) goes once it passes the five tests agent-cadence's `reap_worktrees.
 — and its newest write is older than `worktree_keep_days`. A worktree that is not *landed* is weighed by §4.2's one
 measure only for its why (a commit only on this machine), and is kept either way. It is taken out by
 `git worktree remove` without `--force`, never by `gitinfo.reap_worktree`; no branch is deleted. Never the main
-checkout, a detached worktree, a locked one, one that is, is inside or holds a transcript root.
+checkout, a locked one, one that is, is inside or holds a transcript root. A detached worktree (TD-2103) is weighed
+by its own tests: no session record at or inside it, no operation in progress, no commit only in its reflog, its
+`HEAD` on `origin/<default>` (`gitinfo.detached_landed`), and that `HEAD` unmoved just before the removal.
 
 Only the default home's host agent runs it (the caller gives that scope), and a pass weighs worktrees in path order
 for at most `SWEEP_WORKTREE_S`, the next carrying on after the path the last one weighed (`cursor`).
@@ -31,6 +33,7 @@ SWEEP_WORKTREE_S = 60.0  # a pass's budget for weighing worktrees; the next carr
 DEFAULT_ROOT = ".claude/worktrees"
 LANDED = ("yes", "since", "empty")  # `landed_of`'s answers the sweep reads *landed*; *empty* is the script's keep
 STEP = gitinfo.REAP_STEP
+OPERATIONS = ("rebase-merge", "rebase-apply", "BISECT_LOG", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD")
 
 
 def worktree_root(repo: Path) -> Path:
@@ -99,6 +102,52 @@ def newest_write(wt: Path, timeout: float = STEP) -> float | None:
     return max(times) if times else None
 
 
+def _detached_holds(wt: Path, repo: Path, deadline: float) -> str | None:
+    """Why detached worktree `wt` is kept before `worktree_holds` is asked, or None: an operation in progress, a
+    commit only in its reflog, a `HEAD` not on `origin/<default>` (§4.6 *A detached worktree*), each read started
+    only before `deadline`."""
+
+    def left() -> float:
+        return min(STEP, deadline - time.monotonic())
+
+    if left() <= 0:
+        return gitinfo.TIMED_OUT
+    asked = [a for name in OPERATIONS for a in ("--git-path", name)]
+    paths = gitinfo._git(wt, "rev-parse", "--path-format=absolute", *asked, timeout=left())
+    if paths is None or len(paths.splitlines()) != len(OPERATIONS):
+        return gitinfo.UNKNOWN
+    if any(os.path.lexists(p) for p in paths.splitlines()):
+        return "detached: operation in progress"
+    if left() <= 0:
+        return gitinfo.TIMED_OUT
+    reflog = gitinfo._git(wt, "log", "-g", "--format=%H", "HEAD", timeout=left())
+    if reflog is None:
+        return gitinfo.UNKNOWN
+    if left() <= 0:
+        return gitinfo.TIMED_OUT
+    commits = "".join(f"{c}\n" for c in dict.fromkeys(reflog.split()))
+    only = gitinfo._git(
+        wt, "rev-list", "--stdin", "--not", "--branches", "--remotes", "--tags", input=commits, timeout=left()
+    )
+    if only is None:
+        return gitinfo.UNKNOWN
+    if n := len(only.splitlines()):
+        return f"detached: {n} commit{'s' if n != 1 else ''} only in its reflog"
+    if left() <= 0:
+        return gitinfo.TIMED_OUT
+    landed = gitinfo.detached_landed(wt, root=repo, timeout=left())
+    if landed == "yes":
+        return None
+    if landed == "no" and left() > 0:
+        base = f"origin/{gitinfo.default_branch(wt, left())}"
+        if left() > 0:
+            count = gitinfo._git(wt, "rev-list", "--count", f"{base}..HEAD", timeout=left())
+            if count and count.strip().isdigit() and int(count):
+                n = int(count)
+                return f"detached: {n} commit{'s' if n != 1 else ''} not on {base}"
+    return "detached: not landed (unreadable)"
+
+
 def weigh(
     wt: Path,
     repo: Path,
@@ -109,22 +158,26 @@ def weigh(
     deadline: float,
     idle: Callable[[], str | None] | None = None,
     transcript_roots: Iterable[Path] = (),
+    record: Callable[[Path], str | None] | None = None,
 ) -> str | None:
     """Why worktree `wt` of `repo` is kept, or None when the sweep may remove it (the module's rule, in its order:
-    the guards, the age filter, *landed*, then `worktree_holds`)."""
+    the guards, the age filter, *landed*, then `worktree_holds`). A detached worktree (`branch` None) also asks
+    `record(wt)`, the host agent's `_record_home`, after the transcript guard."""
     if Path(os.path.realpath(wt)) == Path(os.path.realpath(repo)):
         return "main checkout"
     if wt.is_symlink() or not wt.is_dir():
         return "not a directory"
-    if branch is None:
-        return "detached"
     if any(overlaps(wt, t) for t in transcript_roots):
         return "transcripts"
+    if branch is None and record is not None and (why := record(wt)):
+        return why
     newest = newest_write(wt)
     if newest is None:
         return gitinfo.UNKNOWN
     if now - newest < keep_days * 86400:
         return f"written within {keep_days:g} days"
+    if branch is None:
+        return _detached_holds(wt, repo, deadline) or gitinfo.worktree_holds(wt, repo, deadline, idle=idle)
     landed = gitinfo.landed_of(wt, branch, root=repo)
     if landed not in LANDED:
         upstream = gitinfo._git(wt, "rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}", timeout=STEP)
@@ -168,11 +221,13 @@ def sweep(
     now: float | None = None,
     tally: Any = None,
     dry: bool = False,
+    record: Callable[[Path], str | None] | None = None,
 ) -> Pass:
     """One pass of the worktree rule over every worktree under each repo's worktree root, in path order from the
     first path after `cursor` (wrapping), until `budget` seconds are spent. `idle(wt)` is the host agent's
     `_reap_idle`; `hold(wt, main)` takes the create's locks without waiting and returns their release, or None when
-    either is busy (*busy: a start is using it*); it is asked, and `idle` again, just before each removal. `tally`
+    either is busy (*busy: a start is using it*); it is asked, and `idle` again, just before each removal, and for a
+    detached worktree `record(wt)` (`_record_home`) at the weigh and again there, beside a re-read of `HEAD`. `tally`
     (a `diskbook.Tally`) lists every worktree found and sizes each one weighed, a removed one's bytes counted. `dry`
     removes nothing, takes no lock and asks nothing again: `removed` is what the pass would remove (§4.6 *The sweep's
     reading*, TD-1946)."""
@@ -211,7 +266,7 @@ def sweep(
         if tally is not None and not known:  # sized before the weigh, which may remove it
             tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
         try:
-            why = _one(wt, repo, branch, now, keep_days, idle, hold, troots, dry)
+            why = _one(wt, repo, branch, now, keep_days, idle, hold, troots, dry, record)
         except Exception:  # noqa: BLE001 — one worktree that cannot be weighed never starves the rest
             log.exception("worktree sweep: %s could not be weighed", wt)
             why = gitinfo.NOT_WEIGHED
@@ -234,6 +289,23 @@ def sweep(
     return out
 
 
+def _head(wt: Path, deadline: float) -> str | None:
+    """The commit at `wt`'s `HEAD`, or None when it could not be read before `deadline`."""
+    left = min(STEP, deadline - time.monotonic())
+    if left <= 0:
+        return None
+    got = gitinfo._git(wt, "rev-parse", "--verify", "-q", "HEAD^{commit}", timeout=left)
+    return got.strip() or None if got else None
+
+
+def _head_moved(wt: Path, head: str | None, deadline: float) -> str | None:
+    """Why a detached worktree whose `HEAD` read `head` before the weigh is kept now, or None when it has not moved."""
+    now = _head(wt, deadline)
+    if now is None:
+        return gitinfo.TIMED_OUT if time.monotonic() >= deadline else gitinfo.UNKNOWN
+    return None if now == head else "detached: HEAD moved"
+
+
 def _one(
     wt: Path,
     repo: Path,
@@ -244,10 +316,16 @@ def _one(
     hold: Callable[[Path, Path], Callable[[], None] | None] | None,
     troots: list[Path],
     dry: bool = False,
+    record: Callable[[Path], str | None] | None = None,
 ) -> str | None:
     """One worktree's weigh and, where nothing keeps it, its removal under the create's locks (`dry`: none): its
-    why, or None."""
+    why, or None. A detached worktree's `HEAD` is read before the weigh and compared under the locks."""
     deadline = time.monotonic() + gitinfo.REAP_WITHIN
+    head = None
+    if branch is None and not dry:
+        head = _head(wt, deadline)
+        if head is None:
+            return gitinfo.TIMED_OUT if time.monotonic() >= deadline else gitinfo.UNKNOWN
     why = weigh(
         wt,
         repo,
@@ -257,6 +335,7 @@ def _one(
         deadline=deadline,
         idle=(lambda w=wt: idle(w)) if idle is not None else None,
         transcript_roots=troots,
+        record=record,
     )
     if why is None and not dry:
         release = hold(wt, repo) if hold is not None else (lambda: None)
@@ -265,6 +344,8 @@ def _one(
         else:
             try:
                 why = idle(wt) if idle is not None else None
+                if why is None and branch is None:
+                    why = (record(wt) if record is not None else None) or _head_moved(wt, head, deadline)
                 if why is None and not remove(wt, repo):
                     why = "git worktree remove refused"
             finally:

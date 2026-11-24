@@ -7,7 +7,10 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
+import signal
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -397,11 +400,32 @@ def test_an_enter_that_leaves_the_dialog_up_fails_the_step(tmp_path, monkeypatch
     real = fake.__call__
 
     def stuck(method, **p):
+        if method == "tail":
+            return ["", "older line", *[f"line {n}" for n in range(cw.FAILURE_PANE_LINES - 1)], "Allow once?   ", ""]
         return None if method == "keys" else real(method, **p)
 
     walk = cw.Walk("gemini", "conformance", tmp_path, stuck, out=said.append)
     assert not walk.run()
     assert said[-1].startswith("FAIL  a permission: Enter pressed on Bash: touch …, and it still reads state needs-you")
+    # TD-2119: the failure says what the tool showed, so reading it needs no second walk
+    shown = said[-1].split("the pane's last lines:\n")[1].splitlines()
+    assert len(shown) == cw.FAILURE_PANE_LINES and shown[0] == "line 0" and shown[-1] == "Allow once?"
+
+
+def test_a_pane_that_cannot_be_read_leaves_the_enters_failure_standing(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw, "TURN_WAIT", 0.0)
+    fake, said = FakeAgent(tmp_path, channel=False), []
+    real = fake.__call__
+
+    def stuck(method, **p):
+        if method == "tail":
+            raise OSError("no pane")
+        return None if method == "keys" else real(method, **p)
+
+    assert not cw.Walk("gemini", "conformance", tmp_path, stuck, out=said.append).run()
+    assert "it still reads state needs-you" in said[-1]
+    assert "the pane could not be read (OSError: no pane)" in said[-1]
 
 
 def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
@@ -632,3 +656,32 @@ def test_grok_walks_a_permission_with_a_command_it_asks_for_not_a_bare_touch():
     assert cw.permission_prompt("claude-code") == cw.PERMISSION_PROMPT == cw.permission_prompt("gemini")
     grok = cw.permission_prompt("grok")
     assert "touch" not in grok and grok.endswith("cp /dev/null conformance-permission.txt")
+
+
+def test_a_stop_signal_reaches_the_seat_smoke_and_a_second_cannot_cut_its_teardown(monkeypatch):
+    """TD-2102: the handlers were installed after the smoke's branch, so a SIGTERM skipped its `finally` and left the
+    host agent, the tmux server and the tool running. The first signal interrupts; the next is ignored."""
+    cw = _load()
+    saved = {sig: signal.getsignal(sig) for sig in cw.STOP_SIGNALS}
+    seen = {}
+
+    def smoke(_args, _entry, _env):
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)
+            time.sleep(1)
+        except KeyboardInterrupt:
+            seen["interrupted"] = True
+            os.kill(os.getpid(), signal.SIGHUP)  # during the teardown: must raise nothing
+            time.sleep(0.05)
+            seen["teardown_ran"] = True
+        return 0
+
+    monkeypatch.setattr(cw, "refusal", lambda _env, _profile: None)
+    monkeypatch.setattr(cw, "scratch_profile", lambda *_a, **_k: {})
+    monkeypatch.setattr(cw, "run_smoke", smoke)
+    try:
+        assert cw.main(["gemini", "--profile", "p", "--smoke"]) == 0
+    finally:
+        for sig, handler in saved.items():
+            signal.signal(sig, handler)
+    assert seen == {"interrupted": True, "teardown_ran": True}

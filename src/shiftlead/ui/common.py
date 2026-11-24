@@ -26,7 +26,7 @@ from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from sessionorc import build, hosts, identity, mail, paths, promote
+from sessionorc import build, hosts, identity, mail, paths, promote, teamstore
 from sessionorc import unanswered as unanswered_mod
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
@@ -1205,13 +1205,22 @@ def team_brief_ids(
     return teams.brief_ids(org, team, host_name(), role, cfg, read=read)
 
 
+def role_review(preset: Any) -> dict[str, Any] | None:
+    """A launch's reader from its role's own `review:`, none without a role; after the cut-over no reader chain is
+    read, so none whatever the role says (§4.9e)."""
+    return None if preset is None or teamstore.first_shape_off() else preset.review
+
+
 def team_reader(
     team: str, directory: str, cfg: repoconfig.RepoConfig | None = None, role: str | None = None
 ) -> dict[str, Any]:
     """The reader a person's session in `team` gets when its role has none (design §4.9 *A person in
     the team*): `{review, line}` — `teams.team_review` over the member roles resolved in
     `directory`'s repo (`cfg`, when it was read on another host: §4.4a *The New session form on
-    another host*), and the one line under the picker saying what that is."""
+    another host*), and the one line under the picker saying what that is. After the cut-over no team
+    definition or reader chain is read, so the session gets no reader (§4.9e)."""
+    if teamstore.first_shape_off():
+        return {"review": None, "line": teamstore.NO_PR_HELD}
     org, _notes = org_here()
     t = org.teams.get(team)
     if t is None:

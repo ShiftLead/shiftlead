@@ -11,6 +11,7 @@ import asyncio
 import copy
 import shutil
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from sessionorc import (
     adapters,
     agent_common,
     agent_spend,
+    builtinstore,
     defs,
     gitinfo,
     hosts,
@@ -44,6 +46,8 @@ from sessionorc.models import (
     Session,
     now_iso,
 )
+
+BUILTINS_SECTION = "§4.9d *The built-in seats and their page*"
 
 
 class SettingsMixin:
@@ -127,7 +131,13 @@ class SettingsMixin:
         if not read.get("switched"):
             return read
         gate, now = await self.rpc_gate(), datetime.now(UTC)
-        max_age = settings_mod.max_age(settings_mod.load())
+        whole = settings_mod.load()
+        max_age = settings_mod.max_age(whole)
+        # the lists are the home's: a node cannot read them, nor can anyone a broken file's, so the page draws no line
+        # rather than a false *in no team's list*
+        held_doc = settings_mod.read() if self.mode == "home" else None
+        readable = held_doc is not None or (self.mode == "home" and not settings_mod.settings_file().exists())
+        lists = builtinstore.login_lists(held_doc or {}) if readable else None
         cards = []
         for card in read.get("tools") or []:
             accounts, caps = [], {}
@@ -149,6 +159,9 @@ class SettingsMixin:
                 if lg.get("state") == "signed_in" and key in caps and not metered:
                     till = caps[key]
                     lg = {**lg, "state": "limited", "till": till.isoformat().replace("+00:00", "Z") if till else None}
+                if lists is not None:
+                    held = lists.get(f"{card.get('adapter')}:{lg.get('name')}") or {"teams": [], "sets": []}
+                    lg = {**lg, "lists": held}
                 logins.append(lg)
             cards.append({**card, "accounts": accounts, "logins": logins})
         return {**read, "tools": cards}
@@ -493,6 +506,12 @@ class SettingsMixin:
                 "(design §5 settings.yml)"
             )
         doc = settings_mod.load()
+        if (
+            teamstore.cut_over(doc)  # §4.9e: the first shape's writes end at the marker
+            and isinstance(teams, dict)
+            and any(isinstance(f, dict) and set(f) & set(teamstore.FIRST_SHAPE_KEYS) for f in teams.values())
+        ):
+            raise RpcError(teamstore.GONE)
         before = copy.deepcopy(doc)
         before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}
@@ -720,6 +739,88 @@ class SettingsMixin:
                 log.exception("writing the home's host record failed")
             await self._push_changes()
         return {"team": name, "change": words}
+
+    async def _builtins_write(self, edit: Callable[[dict[str, Any]], str]) -> dict[str, Any]:
+        """One write of the Built-in seats page (§4.9d, TD-2066): the store's refusal in the person's words, then the
+        team store's tail. Nothing awaits between the load and the save."""
+        doc = settings_mod.load()
+        before = copy.deepcopy(doc)
+        try:
+            words = edit(doc)
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        await self._team_store_saved(before, doc)
+        return {"change": words, "version": builtinstore.version(doc)}
+
+    async def rpc_builtins_new(self, name: str = "", label: Any = None, caller: Any = None) -> dict[str, Any]:
+        """**+ New set** (§4.9d, §4.5a): a person's own act, refused before the cut-over; `default`'s models and an
+        empty list."""
+        agent_common.person_only(caller, "make a built-in set", BUILTINS_SECTION, self._graph())
+        got = await self._builtins_write(lambda doc: builtinstore.new(doc, str(name or ""), label))
+        return {"set": name, **got}
+
+    async def rpc_builtins_set(
+        self,
+        set: str = "",  # noqa: A002 — the call's word in §4.9d
+        label: Any = None,
+        models: Any = None,
+        logins: Any = None,
+        version: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """A set's label, models or login list, one per call (§4.9d, §4.5a): a person's own act, version-checked. The
+        client sends no parameter that is None, and an empty label clears the label."""
+        agent_common.person_only(caller, "change a built-in set", BUILTINS_SECTION, self._graph())
+        given = {"label": label, "models": models, "logins": logins}
+        change = {k: v for k, v in given.items() if v is not None}
+        got = await self._builtins_write(lambda doc: builtinstore.apply(doc, str(set or ""), change, version))
+        return {"set": set, **got}
+
+    async def rpc_builtins_delete(
+        self,
+        set: str = "",  # noqa: A002 — the call's word in §4.9d
+        version: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """**Delete `<set>`** (§4.9d, §4.5a): refused for `default` and for a set a repo names, naming the repos."""
+        agent_common.person_only(caller, "delete a built-in set", BUILTINS_SECTION, self._graph())
+        got = await self._builtins_write(lambda doc: builtinstore.delete(doc, str(set or ""), version))
+        return {"set": set, **got}
+
+    async def rpc_repo_builtins(
+        self,
+        repo: str = "",
+        set: str = "",  # noqa: A002 — the call's word in §4.9d
+        version: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """A repo's pick of its built-in set (§4.9d, §4.5a): a person's own act on a registered repo, at a version."""
+        agent_common.person_only(caller, "pick a repo's built-in set", BUILTINS_SECTION, self._graph())
+        name = str(repo or "")
+        if name not in {Path(r).expanduser().name for r in hosts.local_host().repos()}:
+            raise RpcError(f"{name!r} is not a registered checkout here")
+        got = await self._builtins_write(lambda doc: builtinstore.pick(doc, name, str(set or ""), version))
+        return {"repo": name, "set": set, **got}
+
+    async def rpc_builtins_show(self, set: str = "", caller: Any = None) -> dict[str, Any]:  # noqa: A002
+        """`ao builtins show [<set>]` and the page's read (§4.9d): the home's reading of the home's logins, no team's
+        reserve added; the body is `shiftlead.team_show`. It carries the home's `tools` read, which the page's login
+        and model lists are built from, so a page opened at a node lists the home's."""
+        doc = settings_mod.load()
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), 0, now)
+        try:
+            view = await asyncio.to_thread(
+                home_call(TEAM).builtins_view,
+                name=str(set or builtinstore.DEFAULT),
+                doc=doc,
+                rows=rows,
+                roots=hosts.local_host().repos(),
+            )
+            return {**view, "tools": read}
+        except ValueError as e:  # a set of no such name
+            raise RpcError(str(e)) from None
 
     def _team_head(self, team: str) -> dict[str, Any]:
         """A team's head from the records the home holds (§4.9d *The page*): running with its live count, else wound

@@ -280,6 +280,45 @@ def stop(proc: subprocess.Popen | None) -> None:
         proc.wait(timeout=5)
 
 
+def session_members(sids: set[int]) -> list[int]:
+    """The running processes of these terminal sessions, read from `/proc` by session id and never by name."""
+    found = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        with contextlib.suppress(OSError, IndexError, ValueError):
+            fields = Path(f"/proc/{entry}/stat").read_text().rsplit(")", 1)[1].split()
+            if fields[0] != "Z" and int(fields[3]) in sids:
+                found.append(int(entry))
+    return found
+
+
+def end_server(sock: str, grace: float = 3.0) -> None:
+    """End a private tmux server and everything its panes run (TD-2102). `kill-server` only hangs up on a pane, so a
+    tool that ignores SIGHUP would outlive it: each pane's process leads its own session, and whatever is left of those
+    sessions after `grace` seconds is killed. A process that left its session on purpose is out of reach."""
+    sids: set[int] = set()
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        panes = subprocess.run(
+            ["tmux", "-L", sock, "list-panes", "-a", "-F", "#{pane_pid}"], capture_output=True, text=True, timeout=5
+        )
+        sids = {int(line) for line in panes.stdout.split() if line.isdigit() and int(line) > 1}
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
+    if sids and not wait_for(lambda: not session_members(sids), grace):
+        for pid in session_members(sids):
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGKILL)
+        wait_for(lambda: not session_members(sids), 2.0)
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+
+
+def scratch_home(prefix: str) -> Path:
+    """A new scratch home under this run's `$SHIFTLEAD_SCRATCH`, else `/tmp` (design §4.6)."""
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
+
+
 def remove_home(home: Path, quiet: float = 1.0, limit: float = 6.0, step: float = 0.2) -> None:
     """Remove the scratch home, and again while anything writes into it, until it stays gone for `quiet`
     seconds or `limit` passes (TD-311). A tool killed with the tmux server still runs its exit hooks,
@@ -323,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # the run's own scratch (§4.6, TD-1944) where it has one: at most 78 bytes,
         # so `agent.sock` at most 105 (AF_UNIX: 107)
-        home = Path(tempfile.mkdtemp(prefix="aolook-", dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
+        home = scratch_home("aolook-")
     sock = f"ao-look-{uuid.uuid4().hex[:8]}"
     port = args.port or free_port()
     env = child_env(home, sock)
@@ -394,10 +433,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         for p in reversed(procs):
             stop(p)
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        end_server(sock)
         remove_home(home)
 
 

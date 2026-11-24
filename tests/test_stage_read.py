@@ -1,0 +1,587 @@
+"""What the home reads of an entry's Log for a stage record (design §4.9c act 2, TD-2051)."""
+
+from __future__ import annotations
+
+import subprocess
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from sessionorc import board, ledgerboard
+from sessionorc.models import Pending, ProgressEntry, Session
+from shiftlead.stage_acts import Holder
+from shiftlead.stage_read import (
+    EntryAnswer,
+    EntryFacts,
+    EntryFlow,
+    EntryForge,
+    EntryLedger,
+    answer_on,
+    carried_on,
+    flow_on,
+    forge_on,
+    held_on,
+    holder_on,
+    ledger_on,
+    nothing_to_read_on,
+    pickable_on,
+    reading_on,
+    renumbered_on,
+    rows_for,
+    team_moved_on,
+)
+
+HEAD = "## TD-7: An entry\n\n**Priority:** Low\n**Status:** Open\n"
+ASKED = "- 2026-11-20: asked by the stage record: n1\n"
+LIFT = '- 2026-11-21: gate lifted: decision (paul) — by paul; answer "Polish it"\n'
+OVERRIDE = "- 2026-11-21: gate lifted: decision (paul) — by shiftlead; override: its entry moved to another team\n"
+
+
+def entry(*log: str, blocked: str = "") -> str:
+    gate = f"**Blocked by:** {blocked}\n" if blocked else ""
+    return f"{HEAD}{gate}\n**Why:** Because.\n\n**Log:**\n{''.join(log)}"
+
+
+def test_a_standing_gate_has_no_answer_even_after_an_earlier_lift():
+    assert answer_on(entry(ASKED, LIFT, blocked="decision (paul)"), "paul") == EntryAnswer(True, None, None)
+
+
+def test_an_answer_names_the_question_it_lifted():
+    assert answer_on(entry(ASKED, LIFT), "paul") == EntryAnswer(False, "Polish it", "n1")
+
+
+def test_a_lift_with_no_question_of_the_records_has_no_mark():
+    assert answer_on(entry(LIFT), "paul") == EntryAnswer(False, "Polish it", None)
+
+
+def test_an_override_is_no_answer():
+    assert answer_on(entry(ASKED, LIFT, OVERRIDE), "paul") == EntryAnswer(False, None, None)
+
+
+def test_a_newer_question_leaves_the_earlier_answer_behind():
+    newer = "- 2026-11-22: asked by the stage record: n2\n"
+    assert answer_on(entry(ASKED, LIFT, newer), "paul") == EntryAnswer(False, None, None)
+
+
+def test_another_persons_lift_is_not_this_gates():
+    other = LIFT.replace("(paul)", "(sam)").replace("by paul", "by sam")
+    assert answer_on(entry(ASKED, other), "paul") == EntryAnswer(False, None, None)
+
+
+def test_a_note_quoting_a_mark_is_no_question():
+    quoted = "- 2026-11-22: the Log's line asked by the stage record: n2 was checked\n"
+    assert answer_on(entry(ASKED, LIFT, quoted), "paul") == EntryAnswer(False, "Polish it", "n1")
+
+
+def test_an_entry_with_no_log_has_no_answer():
+    assert answer_on(f"{HEAD}\n**Why:** Because.\n", "paul") == EntryAnswer(False, None, None)
+
+
+@pytest.mark.parametrize("text", ["", "not an entry"])
+def test_an_unreadable_entry_is_no_reading_rather_than_no_gate(text):
+    with pytest.raises(ledgerboard.Refused):
+        answer_on(text, "paul")
+
+
+# -- what became of a record's holder (§4.9c act 4) ------------------------------------------------------------------
+
+NOW = datetime(2026, 11, 23, 18, 0, tzinfo=UTC)
+
+
+def ago(**delta) -> str:
+    return (NOW - timedelta(**delta)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def session(*, claimed=timedelta(hours=1), **fields) -> Session:
+    base = {"state": "idle", "unattended": True, "created": ago(hours=3), "turn_at": ago(minutes=5)}
+    s = Session(id="build-td-7", name="build-td-7", kind="agent", adapter="claude-code", dir="/r", **{**base, **fields})
+    if claimed is not None:
+        s.progress = [ProgressEntry(ref="TD-7", at=(NOW - claimed).strftime("%Y-%m-%dT%H:%M:%SZ"))]
+    return s
+
+
+def test_a_session_with_no_record_is_lost():
+    assert holder_on(None, "TD-7", NOW).lost
+
+
+def test_a_working_holder_is_neither_lost_nor_silent():
+    h = holder_on(session(), "TD-7", NOW)
+    assert not h.lost and not h.silent and h.idle_for == timedelta(minutes=5)
+
+
+def test_an_exited_holder_is_lost():
+    assert holder_on(session(state="exited"), "TD-7", NOW).lost
+
+
+def test_a_claim_past_its_lease_is_lost_and_a_renewed_one_is_not():
+    assert holder_on(session(claimed=timedelta(hours=13)), "TD-7", NOW).lost
+    s = session(claimed=timedelta(hours=13))
+    s.progress.append(ProgressEntry(ref="TD-7", at=ago(hours=1)))
+    assert not holder_on(s, "TD-7", NOW).lost
+
+
+def test_a_claim_released_or_on_another_entry_is_no_lapsed_lease():
+    s = session(claimed=None)
+    s.progress = [
+        ProgressEntry(ref="TD-7", status="done", at=ago(hours=13)),
+        ProgressEntry(ref="TD-8", at=ago(hours=13)),
+    ]
+    assert not holder_on(s, "TD-7", NOW).lease_lapsed
+
+
+def test_a_derived_claim_has_no_clock():
+    s = session(claimed=None)
+    s.progress = [ProgressEntry(ref="TD-7", at=ago(hours=13), source="derived")]
+    assert not holder_on(s, "TD-7", NOW).lease_lapsed
+
+
+def test_two_hours_with_no_turn_is_silent():
+    assert holder_on(session(turn_at=ago(hours=2)), "TD-7", NOW).silent
+    assert not holder_on(session(turn_at=ago(hours=1, minutes=59)), "TD-7", NOW).silent
+
+
+def test_work_inside_a_long_turn_keeps_a_holder_from_silent():
+    assert not holder_on(session(state="working", turn_at=ago(hours=5), work_at=ago(minutes=1)), "TD-7", NOW).silent
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"pending": Pending(kind="permission", text="run it?")},
+        {"pending": Pending(kind="question", text="which?")},
+        {"tool_open_at": ago(hours=3)},
+        {"subagents": 1, "subagent_at": ago(minutes=1)},
+    ],
+)
+def test_a_holder_waiting_on_something_of_its_own_is_never_silent(fields):
+    assert not holder_on(session(turn_at=ago(hours=3), **fields), "TD-7", NOW).silent
+
+
+def test_an_open_ask_keeps_a_holder_from_silent():
+    assert not holder_on(session(turn_at=ago(hours=3)), "TD-7", NOW, open_ask=True).silent
+
+
+def test_a_taken_over_holder_is_never_silent_but_is_lost_once_it_ends():
+    assert not holder_on(session(unattended=False, turn_at=ago(hours=3)), "TD-7", NOW).silent
+    assert holder_on(session(unattended=False, state="exited"), "TD-7", NOW).lost
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"state": "limited"},
+        {"state": "unreachable"},
+        {"gated": {"sent_at": "x"}},
+        {"stop_held": {"by": "person", "at": "x", "team": "t"}},
+        {"wrapup_at": "2026-11-23T17:00:00Z"},
+        {"suspended": {"at": "x", "by": "person", "why": "alarm"}},
+    ],
+)
+def test_a_holder_held_by_the_person_or_the_home_is_neither_lost_nor_silent(fields):
+    h = holder_on(session(claimed=timedelta(hours=13), turn_at=ago(hours=3), **fields), "TD-7", NOW)
+    assert h.held and not h.lost and not h.silent
+
+
+def test_a_stop_spends_no_offer():
+    s = session(state="exited", ended={"how": "kill", "by": "person", "at": ago(minutes=1)})
+    h = holder_on(s, "TD-7", NOW)
+    assert h.ended_by_stop and not h.lost
+
+
+def test_a_clock_ahead_of_the_home_reads_as_no_idle_time():
+    assert holder_on(session(turn_at=ago(minutes=-5), created=ago(minutes=-5)), "TD-7", NOW).idle_for == timedelta(0)
+
+
+def test_a_bare_holder_defaults_are_the_dataclass_ones():
+    assert holder_on(session(), "TD-7", NOW) == Holder(idle_for=timedelta(minutes=5))
+
+
+def test_a_tool_open_past_its_ceiling_no_longer_keeps_a_holder_from_silent():
+    assert holder_on(session(turn_at=ago(hours=4), tool_open_at=ago(hours=3, minutes=1)), "TD-7", NOW).silent
+
+
+def test_a_time_with_no_zone_reads_as_utc():
+    s = session(claimed=None, turn_at="2026-11-23T17:55:00")
+    s.progress = [ProgressEntry(ref="TD-7", at="2026-11-23T17:00:00")]
+    h = holder_on(s, "TD-7", NOW)
+    assert h.idle_for == timedelta(minutes=5) and not h.lease_lapsed
+
+
+def led(tid: str, *fields: str) -> str:
+    return "\n".join(
+        [f"## {tid}: An entry", "", "**Priority:** Low", "**Status:** Open", *fields, "", "**Why:** It.", ""]
+    )
+
+
+def test_an_open_entry_that_is_no_design():
+    assert ledger_on("TD-7", led("TD-7", "**Kind:** build"), "") == EntryLedger("open")
+
+
+def test_an_archived_entry_reads_archived_by_its_number():
+    assert ledger_on("TD-7", led("TD-8"), led("TD-007")) == EntryLedger("archived")
+
+
+def test_an_entry_in_neither_has_no_reading():
+    assert ledger_on("TD-7", led("TD-8"), None) is None
+
+
+def test_a_design_counts_its_open_parts_and_knows_it_had_parts():
+    text = led("TD-7", "**Kind:** design-first") + led("TD-8", "**Part of:** TD-007") + led("TD-9", "**Part of:** TD-7")
+    assert ledger_on("TD-7", text, led("TD-5", "**Part of:** TD-7")) == EntryLedger("open", True, 2, True)
+
+
+def test_a_design_whose_parts_are_all_archived_had_parts():
+    text = led("TD-7", "**Kind:** design-first")
+    assert ledger_on("TD-7", text, led("TD-5", "**Part of:** TD-7 the first")) == EntryLedger("open", True, 0, True)
+
+
+def test_a_design_with_no_parts_had_none():
+    text = led("TD-7", "**Kind:** design-first") + led("TD-8", "**Part of:** TD-70")
+    assert ledger_on("TD-7", text, led("TD-5")) == EntryLedger("open", True, 0, False)
+
+
+def git(root, *args: str) -> str:
+    who = ("-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false")
+    return subprocess.run(["git", "-C", str(root), *who, *args], check=True, capture_output=True, text=True).stdout
+
+
+@pytest.fixture
+def repo(tmp_path):
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "docs/ledger/archive").mkdir(parents=True)
+    (tmp_path / "docs/ledger/TD-7.md").write_text(
+        led("TD-7", "**Kind:** build") + "A body long enough to be alike.\n" * 9
+    )
+    (tmp_path / "docs/ledger/TD-8.md").write_text("## TD-8: Another\n\n**Status:** Open\n")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "first")
+    return tmp_path
+
+
+def test_a_renumbered_entry_names_its_new_id(repo):
+    git(repo, "mv", "docs/ledger/TD-7.md", "docs/ledger/TD-12.md")
+    git(repo, "commit", "-qm", "renumber")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") == "TD-12"
+
+
+def test_a_file_deleted_outright_was_not_renumbered(repo):
+    git(repo, "rm", "-q", "docs/ledger/TD-7.md")
+    git(repo, "commit", "-qm", "gone")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_a_move_into_the_archive_is_no_renumbering(repo):
+    git(repo, "mv", "docs/ledger/TD-7.md", "docs/ledger/archive/TD-7.md")
+    git(repo, "commit", "-qm", "archive")
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_an_entry_never_removed_was_not_renumbered(repo):
+    assert renumbered_on(repo, "main", "docs/ledger", "TD-7") is None
+
+
+def test_a_ref_git_cannot_read_is_no_reading(repo):
+    assert renumbered_on(repo, "no-such-ref", "docs/ledger", "TD-7") is None
+
+
+# -- the forge ----------------------------------------------------------------------------------------------------
+
+
+def pr_row(number: int, state: str = "open", head: str = "abc", title: str = "work") -> dict:
+    return {"number": number, "state": state, "head": head, "title": title}
+
+
+def test_an_open_pull_request_carries_its_head():
+    assert forge_on("TD-7", 4, [pr_row(4)]) == EntryForge("open", "abc")
+
+
+@pytest.mark.parametrize("state", ["merged", "closed"])
+def test_a_finished_pull_request_has_no_head_to_carry(state):
+    assert forge_on("TD-7", 4, [pr_row(4, state)]) == EntryForge(state, None)
+
+
+def test_an_open_row_with_no_head_reads_as_none():
+    assert forge_on("TD-7", 4, [pr_row(4, head="")]) == EntryForge("open", None)
+
+
+@pytest.mark.parametrize("rows", [[], [pr_row(5)], [pr_row(4, "unknown")]])
+def test_a_pull_request_not_read_is_no_reading_rather_than_gone(rows):
+    assert forge_on("TD-7", 4, rows) is None
+
+
+def test_a_record_with_no_pull_request_is_a_reading():
+    assert forge_on("TD-7", None, [pr_row(5)]) == EntryForge()
+
+
+def test_the_homes_open_archive_pull_request_is_seen():
+    row = pr_row(9, title=board.archive_subject("TD-7"))
+    assert forge_on("TD-7", None, [row]).archive_open
+    assert forge_on("TD-7", 4, [pr_row(4, "merged"), row]) == EntryForge("merged", None, True)
+
+
+@pytest.mark.parametrize(
+    "row",
+    [pr_row(9, "merged", title=board.archive_subject("TD-7")), pr_row(9, title=board.archive_subject("TD-70"))],
+)
+def test_a_finished_or_another_entrys_archive_pull_request_is_not_this_ones(row):
+    assert not forge_on("TD-7", None, [row]).archive_open
+
+
+FLOW = {"name": "f", "stages": [{"name": "Build", "does": "build"}, {"name": "Second read", "does": "review"}]}
+
+
+def test_a_record_in_a_stage_of_its_flow_is_known_and_current():
+    assert flow_on({"flow": "f", "stage": "second-read"}, FLOW) == EntryFlow(True, True)
+
+
+def test_a_stage_the_copy_lacks_is_not_known():
+    assert not flow_on({"flow": "f", "stage": "gone"}, FLOW).stage_known
+
+
+def test_a_record_written_under_another_flow_is_not_current():
+    assert flow_on({"flow": "old", "stage": "build"}, FLOW) == EntryFlow(True, False)
+
+
+def test_a_key_the_flow_it_was_written_under_had_as_another_kind_is_not_known():
+    was = {"name": "old", "stages": [{"name": "Build", "does": "review"}]}
+    assert not flow_on({"flow": "old", "stage": "build"}, FLOW, was).stage_known
+
+
+def test_a_key_of_one_kind_in_both_flows_is_known():
+    was = {"name": "old", "stages": [{"name": "Build", "does": "build"}]}
+    assert flow_on({"flow": "old", "stage": "build"}, FLOW, was).stage_known
+
+
+@pytest.mark.parametrize(
+    "team, named, moved",
+    [("a", "b", True), ("a", "B", True), ("a", "a", False), ("a", "A", False), ("a", None, False), (None, "b", False)],
+)
+def test_a_team_line_moves_an_entry_only_to_another_team_of_the_repo(team, named, moved):
+    assert team_moved_on(team, named, ["a", "b"]) is moved
+
+
+def test_a_team_line_naming_no_team_of_the_repo_moves_nothing():
+    assert not team_moved_on("a", "stale", ["a", "b"])
+
+
+CLOSED = {"closed_at": "2026-11-20T10:00:00Z", "carried": {"branch": "td7-x", "pr": 4}}
+
+
+def test_a_carried_pull_request_still_open_is_live():
+    assert carried_on(CLOSED, entry(), [pr_row(4)], [])
+
+
+@pytest.mark.parametrize("state", ["merged", "closed"])
+def test_a_carried_pull_request_that_ended_is_not_live_even_with_its_branch_pushed(state):
+    assert not carried_on(CLOSED, entry(), [pr_row(4, state)], ["td7-x"])
+
+
+def test_a_carried_branch_still_pushed_is_live_where_the_rows_lack_its_pull_request():
+    assert carried_on(CLOSED, entry(), [], ["td7-x"])
+    assert not carried_on(CLOSED, entry(), [], ["other"])
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["- 2026-11-20: reopened — again\n", "- 2026-11-22: reopened — again\n", "- 2026-11-21: archived: Resolved — x\n"],
+)
+def test_an_entry_archived_or_reopened_since_the_move_carries_nothing(line):
+    assert not carried_on(CLOSED, entry(line), [pr_row(4)], ["td7-x"])
+
+
+def test_a_reopen_before_the_move_does_not_count():
+    assert carried_on(CLOSED, entry("- 2026-11-19: reopened — earlier\n"), [pr_row(4)], [])
+
+
+@pytest.mark.parametrize("record", [{"closed_at": "2026-11-20T10:00:00Z"}, {"carried": {"branch": "b", "pr": 4}}])
+def test_a_record_with_nothing_carried_or_not_closed_carries_nothing(record):
+    assert not carried_on(record, entry(), [pr_row(4)], ["b"])
+
+
+ONLY = {
+    "stages": [{"name": "Build", "does": "build"}, {"name": "Read", "does": "review", "only-when": "protected-files"}]
+}
+AT_READ = {"stage": "read"}
+GLOBS = ["src/sessionorc/**", "docs/briefs/**"]
+
+
+def test_a_pull_request_touching_no_protected_file_has_nothing_to_read():
+    assert nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["src/shiftlead/x.py"], GLOBS)
+
+
+def test_a_pull_request_touching_a_protected_file_is_read():
+    assert not nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["a.py", "src/sessionorc/deep/x.py"], GLOBS)
+
+
+def test_a_rename_out_of_a_protected_path_is_read_by_its_old_name():
+    assert not nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["src/shiftlead/x.py", "src/sessionorc/x.py"], GLOBS)
+
+
+def test_a_repo_read_to_have_no_protected_files_has_nothing_to_read():
+    assert nothing_to_read_on(AT_READ, ONLY, "h1", "h1", ["a.py"], [])
+
+
+@pytest.mark.parametrize(
+    "head, read_at, files, protected",
+    [
+        ("h2", "h1", ["a.py"], GLOBS),  # pushed since the read
+        (None, None, ["a.py"], GLOBS),
+        ("h1", None, ["a.py"], GLOBS),
+        ("h1", "h1", None, GLOBS),  # the files could not be read
+        ("h1", "h1", [], GLOBS),  # an empty list proves nothing
+        ("h1", "h1", ["a.py"], None),  # the protected files could not be read
+    ],
+)
+def test_no_whole_reading_at_the_head_keeps_the_review(head, read_at, files, protected):
+    assert not nothing_to_read_on(AT_READ, ONLY, head, read_at, files, protected)
+
+
+@pytest.mark.parametrize("stage", ["build", "gone"])
+def test_a_stage_that_is_not_only_when_is_never_passed(stage):
+    assert not nothing_to_read_on({"stage": stage}, ONLY, "h1", "h1", ["a.py"], GLOBS)
+
+
+def open_entry(**over):
+    return {"id": "TD-7", "kind": "build", "owner": "grinder", "pickable": "yes", "team": "", **over}
+
+
+@pytest.mark.parametrize("kind", ["", "build", "live-check", "design-first"])
+def test_an_entry_a_flow_has_a_way_in_for_is_pickable(kind):
+    assert pickable_on(open_entry(kind=kind), "ao-grind")
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"pickable": "no"},
+        {"kind": "live-check", "pickable": "no"},  # its event (live) gate stands
+        {"kind": "live-check", "owner": "paul"},
+        {"kind": "evaluation"},
+        {"owner": "Paul"},
+        {"owner": "person"},
+        {"owner": "anchor"},
+        {"settling": True},
+        {"waiting": {"until": "2026-12-01"}},
+        {"needs_team": True},
+        {"team": "other"},
+        {"work_order": True},
+    ],
+)
+def test_an_entry_no_lane_of_the_team_would_take_is_not_pickable(over):
+    assert not pickable_on(open_entry(**over), "ao-grind")
+
+
+def test_an_entry_naming_the_team_in_another_case_is_pickable():
+    assert pickable_on(open_entry(team="AO-Grind"), "ao-grind")
+
+
+def live_record(**over):
+    return Session(
+        **{"id": "s1", "name": "s1", "dir": "/r", "kind": "agent", "adapter": "claude-code", "state": "working", **over}
+    )
+
+
+def test_a_pull_request_a_live_claim_or_checkout_holds_is_held():
+    prs = [
+        {"number": 1, "state": "open", "branch": "td1-a"},
+        {"number": 2, "state": "open", "branch": "td2-b"},
+        {"number": 3, "state": "open", "branch": "td3-c"},
+    ]
+    claim = ProgressEntry(ref="TD-1", status="claimed", review_pr=1)
+    records = [live_record(progress=[claim]), live_record(id="s2", name="s2", git={"branch": "td2-b"})]
+    assert held_on(prs, records) == {1, 2}
+
+
+def test_an_ended_session_and_a_closed_pull_request_hold_nothing():
+    claim = ProgressEntry(ref="pr:1", status="claimed")
+    assert held_on([{"number": 1, "state": "open"}], [live_record(state="exited", progress=[claim])]) == frozenset()
+    assert held_on([{"number": 1, "state": "closed"}], [live_record(progress=[claim])]) == frozenset()
+
+
+READ_AT = datetime(2026, 11, 23, 12, tzinfo=UTC)
+ONE_STAGE = {"name": "f", "stages": [{"name": "build", "does": "build"}]}
+LIVE = {"stage": "build", "flow": "f", "team": "t", "pr": 7, "holder": "s1"}
+
+
+def facts(**over) -> EntryFacts:
+    base = {
+        "tid": "TD-9",
+        "person": "paul",
+        "team": "t",
+        "now": READ_AT,
+        "doc": ONE_STAGE,
+        "ledger": EntryLedger("open"),
+    }
+    return EntryFacts(**{"text": entry(), **base, **over})
+
+
+def test_a_renumbered_entry_reads_only_its_new_id():
+    got = reading_on(LIVE, facts(ledger=None, renumbered_to="TD-10", merge_running=True))
+    assert (got.renumbered_to, got.merge_running) == ("TD-10", True)
+
+
+def test_an_entry_in_neither_file_is_no_reading():
+    assert reading_on(LIVE, facts(ledger=None)) is None
+
+
+def test_an_archived_entry_needs_no_forge_row():
+    assert reading_on(LIVE, facts(ledger=EntryLedger("archived"), rows=())).entry == "archived"
+
+
+@pytest.mark.parametrize("text", [None, "not an entry"])
+def test_a_missing_or_unreadable_text_is_no_reading(text):
+    assert reading_on(LIVE, facts(text=text, rows=({"number": 7, "state": "open"},))) is None
+
+
+def test_a_record_whose_pull_request_the_rows_lack_is_no_reading():
+    assert reading_on(LIVE, facts(rows=())) is None
+
+
+def test_a_live_record_reads_its_pull_request_flow_and_holder():
+    rows = ({"number": 7, "state": "open", "head": "abc"},)
+    got = reading_on(LIVE, facts(rows=rows, session=None, named="other", teams=("t", "other")))
+    assert (got.pr_state, got.head, got.team_moved, got.stage_known, got.flow_current) == (
+        "open",
+        "abc",
+        True,
+        True,
+        True,
+    )
+    assert got.holder == Holder(ended=True)
+
+
+def test_a_record_with_no_holder_reads_none():
+    rows = ({"number": 7, "state": "open", "head": "abc"},)
+    assert reading_on({**LIVE, "holder": None}, facts(rows=rows)).holder is None
+
+
+def test_a_closed_record_does_not_ask_the_forge_for_its_old_pull_request():
+    closed = {**LIVE, "closed_at": "2026-11-20T00:00:00Z", "holder": None}
+    got = reading_on(closed, facts(rows=()))
+    assert got is not None and got.pr_state is None
+
+
+def test_an_entry_with_no_record_reads_its_work_and_pickable():
+    row = {"number": 8, "state": "open", "branch": "td9-x", "head": "h", "filing_head": "h", "filing": False}
+    got = reading_on(None, facts(rows=(row,), held={8}, entry=open_entry()))
+    assert got.work.state == "wait" and got.pickable is True
+
+
+# -- the rows the forge reading is given -----------------------------------------------------------------------------
+
+
+def test_the_later_read_comes_first_so_a_stale_open_row_never_hides_a_merge():
+    rows = rows_for([[pr_row(4, "merged")], [pr_row(4), pr_row(5)]], [4], lambda n: pytest.fail(f"read {n}"))
+    assert [(r["number"], r["state"]) for r in rows] == [(4, "merged"), (5, "open")]
+    assert forge_on("TD-7", 4, rows) == EntryForge("merged", None)
+
+
+def test_a_record_s_pull_request_outside_the_rows_is_read_by_its_number():
+    asked = []
+    rows = rows_for([[pr_row(5)]], [4, 4, 5], lambda n: asked.append(n) or pr_row(n, "merged"))
+    assert asked == [4]
+    assert forge_on("TD-7", 4, rows) == EntryForge("merged", None)
+
+
+def test_a_pull_request_that_cannot_be_read_is_no_reading_of_its_entry():
+    assert forge_on("TD-7", 4, rows_for([[pr_row(5)]], [4], lambda _n: None)) is None
