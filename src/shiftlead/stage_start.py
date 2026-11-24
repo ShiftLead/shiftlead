@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sessionorc.client import AgentError
+from sessionorc.client import AgentError, AgentUnavailable
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
 
@@ -220,3 +220,15 @@ def claim(call: Any, holder: str, tid: str) -> str | None:
     except AgentError as e:
         return str(e)
     return None
+
+
+def end(call: Any, holder: str, why: str = "its stage record no longer names it") -> None:
+    """Close a session an act took its record from, as the tick closes one. A session already gone is no failure; an
+    agent that could not be reached is, so the caller reports the session as left running."""
+    try:
+        call("close", id=holder, closer={"by": "tick", "why": why})
+    except AgentUnavailable:
+        raise
+    except AgentError as e:
+        if not str(e).startswith("no session "):
+            raise
