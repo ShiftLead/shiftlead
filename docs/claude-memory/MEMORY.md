@@ -11,12 +11,12 @@
 - [Design review loop with Sonnet](design-review-loop-with-sonnet.md) — round counts are cadence §4.8 (Fable and Sonnet iterate until they agree); a mechanism that keeps failing rounds: ask if it is needed
 - [Alternate review rounds](alternate-review-rounds.md) — cadence §4.8: Sonnet, fix, Fable, fix; never both at once on the same text (Paul, 2026-10-19)
 - [Agree the layout before model reviews](agree-the-layout-before-model-reviews.md) — in a UI round with Paul, no Sonnet/Fable rounds until he and the session agree on the mockups (2026-10-21)
-- [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch SHIFTLEAD_HOME needs a short path like ~/.cache/ao<topic>
+- [Scratch homes and sockets go in the scratch](scratchpad-too-long-for-unix-sockets.md) — `$SHIFTLEAD_SCRATCH/home` fits a socket; nothing written to ~/.cache, /var/tmp or ~/ao-shots
 - [How a design round runs from a cloud session](cloud-design-round.md) — park on the board first, propose in chat, Sonnet rounds to READY, fact-check on the PR, one branch
 - [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — cadence §2.9 `forge.py in-flight`; a restarted run's own open design PRs too; reconcile, never design twice
 - [A park is a merged PR, not an open one](a-park-is-a-merged-pr.md) — cadence §3.6: a park holds once merged; §2.9: re-search the id's PRs in every state before the round
 - [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — cadence §2.9 `forge.py in-flight`; conformance-read a held step; `ao msg` for leads, never a peer message
-- [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot` at load; Playwright (`~/ao-shots/pwlib`, Chromium) for anything after scripts run; read-only against the live UI
+- [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — Playwright (`~/ao-shots/pwlib`, read) with Chromium; script and shots in `$SHIFTLEAD_SCRATCH/shots/`; read-only against the live UI
 - [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — cadence §2.8: a PR number is the forge's; `ao progress done --pr N` too
 - [pdm run fmt sweeps other sessions' files](pdm-run-fmt-sweeps-other-sessions-files.md) — it formats the whole repo; `git add -A` after it steals a sibling's merged files into your PR
 - [gh comment bodies go in a file](gh-comment-bodies-go-in-a-file.md) — `--body "…"` lets bash run its backticks; use `--body-file`

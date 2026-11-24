@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Screenshot artboards with headless Chromium for a quick look before republishing.
-# Usage: docs/mockups/shot.sh [OUT_DIR] [Name ...]   (default: all artboards, out dir /tmp/shiftlead-shots)
+# Usage: docs/mockups/shot.sh [OUT_DIR] [Name ...]   (default: all artboards, out dir $SHIFTLEAD_SCRATCH/shots, or /tmp/shiftlead-shots where it is unset)
 # Note: this Chromium hangs silently when given a fresh --user-data-dir here, so it uses the default
 # profile and runs one page at a time (the default profile is single-instance).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-out=${1:-/tmp/shiftlead-shots}; shift || true
+if [ -n "${SHIFTLEAD_SCRATCH:-}" ]; then def=$SHIFTLEAD_SCRATCH/shots; else def=/tmp/shiftlead-shots; fi
+out=${1:-$def}; shift || true
 mkdir -p "$out"
 ch=$(ls -d "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | tail -1)
 [ -n "$ch" ] || ch=$(command -v chromium || command -v google-chrome || true)
