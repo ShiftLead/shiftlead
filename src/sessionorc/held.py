@@ -23,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import naming, paths
+from sessionorc import naming, paths, yamltext
 from sessionorc.models import PERSON, Session, review_links
 
 GH_TIMEOUT = 30.0
@@ -91,7 +91,7 @@ def repo_key(root: Path | str, records: Iterable[Session]) -> list[str]:
     `ledger.ledger_path` reads `ledger:`; else the union of the `review` globs on the live records
     whose `repo` is the root. Sorted; empty for neither, and then nothing is held."""
     try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+        doc = yamltext.load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         doc = None
     got = doc.get("held") if isinstance(doc, dict) else None

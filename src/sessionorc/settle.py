@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 
 from sessionorc import ledger as ledger_mod
-from sessionorc import paths
+from sessionorc import paths, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc.store import _atomic_write
 
@@ -57,7 +57,7 @@ def repo_settle(root: Path | str) -> dict[str, Any]:
     """The repo's `.shiftlead.yml` `settle:` as written, `{}` when it has none or cannot be read."""
     f = paths.repo_file(root)
     try:
-        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        doc = yamltext.load(f.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return {}
     got = doc.get("settle") if isinstance(doc, dict) else None

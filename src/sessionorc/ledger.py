@@ -31,7 +31,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import cadence, mail, paths
+from sessionorc import cadence, mail, paths, yamltext
 from sessionorc import ledgerboard as lb
 from sessionorc.models import owner_word
 
@@ -1175,7 +1175,7 @@ def ledger_default(root: Path | str) -> str:
 def ledger_set(root: Path | str) -> str | None:
     """`.shiftlead.yml`'s `ledger:`, a trailing `/` dropped, or None where it names none."""
     try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+        doc = yamltext.load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return None
     got = doc.get("ledger") if isinstance(doc, dict) else None

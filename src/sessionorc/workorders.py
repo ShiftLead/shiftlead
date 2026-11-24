@@ -32,7 +32,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import gitinfo, ledger, ledgerboard, paths, reports
+from sessionorc import gitinfo, ledger, ledgerboard, paths, reports, yamltext
 
 BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*): a v3 board's stub, or a v2 file
 BOARD_DIR = Path(ledgerboard.BOARD_DIR)  # a v3 board's directory, the default where no stub names it (TD-1881)
@@ -347,7 +347,7 @@ def board_path(root: Path | str) -> tuple[str, Path | None]:
     or with a `..`: the write-back edits it in a tree of its own), is the key unset: the clients
     (`shiftlead.repoconfig`) refuse such a file by name."""
     try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+        doc = yamltext.load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         doc = None
     got = doc.get("board") if isinstance(doc, dict) else None
