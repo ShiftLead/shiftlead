@@ -12,11 +12,13 @@ from typing import Any
 import pytest
 
 from sessionorc.client import AgentError, AgentUnavailable
+from sessionorc.models import Session
 from shiftlead import stage_pass, stage_start
+from shiftlead.stage_fetch import LedgerRead, RepoFacts, SessionsRead
 from shiftlead.stage_pass import Reach, step
 from shiftlead.stage_read import EntryFacts, EntryLedger
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, new_record
+from shiftlead.stagerecord import StageStore, StateError, new_record
 
 TID = "TD-7"
 HEAD = "a" * 40
@@ -280,3 +282,145 @@ def test_the_reach_ends_a_session_through_the_close(monkeypatch: pytest.MonkeyPa
     call = Calls()
     reach(monkeypatch, call).end("a")
     assert [m for m, _ in call.seen] == ["close"]
+
+
+# -- one team's pass -----------------------------------------------------------------------------------------
+
+
+def row(tid: str = TID, **over: Any) -> dict[str, Any]:
+    return {"id": tid, "kind": "build", "pickable": "yes", **over}
+
+
+def stage_session(name: str = "build-td-7", lane: tuple[str, ...] = (TID,)) -> Session:
+    s = Session(id="a", name=name, dir="/r", kind="agent", adapter="claude-code", state="working")
+    s.team, s.lane, s.unattended = "t", list(lane), True
+    return s
+
+
+def repo_facts(store: StageStore, *entries: dict[str, Any]) -> RepoFacts:
+    return RepoFacts(
+        root=store.root,
+        ref="origin/main",
+        read=LedgerRead("docs/ledger", "", None, lambda _path: None),
+        person="paul",
+        team="t",
+        now=NOW,
+        doc=FLOW,
+        entries=entries,
+        sessions={},
+    )
+
+
+def offerable(tid: str) -> EntryFacts:
+    text = TEXT.replace(TID, tid)
+    return facts(tid=tid, text=text, entry=row(tid), may_start=True, within_size=True)
+
+
+def no_sessions() -> SessionsRead:
+    return SessionsRead({}, frozenset(), frozenset())
+
+
+@pytest.fixture
+def read_as_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each entry's facts without a ledger on disk: the pass's own order is what these tests read."""
+    monkeypatch.setattr(stage_pass, "facts_on", lambda _repo, tid, _record: offerable(tid))
+
+
+def test_a_pass_turns_to_its_open_records_then_what_its_lane_may_take() -> None:
+    records = {
+        "TD-1": {"team": "t"},
+        "TD-2": {"team": "other"},
+        "TD-3": {"team": "t", "closed_at": "2026-11-01"},
+        "TD-4": {"team": "other"},
+    }
+    entries = [row("TD-3"), row("TD-4"), row("TD-5"), row("TD-6", pickable="no"), row("board:x")]
+    assert stage_pass.targets(records, entries, "t") == ["TD-1", "TD-3", "TD-5"]
+
+
+def test_a_reopened_entry_is_turned_to_under_its_records_own_key() -> None:
+    assert stage_pass.targets({"TD-007": {"team": "t", "closed_at": "x"}}, [row("TD-7")], "t") == ["TD-007"]
+
+
+def test_a_pickable_entry_with_no_record_is_offered(store, read_as_given):
+    world = World()
+    got = stage_pass.team_pass(store, repo_facts(store, row()), no_sessions(), world.reach, local="home")
+    assert [s.act.name for s in got.steps] == ["offer"]
+    assert store.entry(TID)["holder"] == "s2"
+
+
+def test_a_stranded_session_is_ended_on_its_second_pass_and_its_entry_waits(store, read_as_given):
+    world = World()
+    read = SessionsRead({"a": stage_session()}, frozenset(), frozenset())
+    first = stage_pass.team_pass(store, repo_facts(store, row()), read, world.reach, local="home")
+    assert (first.seen, first.steps, world.ended) == (("a",), (), [])
+    second = stage_pass.team_pass(store, repo_facts(store, row()), read, world.reach, local="home", before=first.seen)
+    assert world.ended == ["a"] and second.steps == () and store.entry(TID) is None
+
+
+def test_a_stranded_session_that_cannot_be_ended_is_tried_again(store, read_as_given):
+    world = World(end_fails=True)
+    read = SessionsRead({"a": stage_session()}, frozenset(), frozenset())
+    got = stage_pass.team_pass(store, repo_facts(store), read, world.reach, local="home", before=("a",))
+    assert got.unended == ("a",) and got.seen == ("a",)
+
+
+def test_one_entrys_failed_read_never_stops_the_pass(store, monkeypatch):
+    def read(_repo: Any, tid: str, _record: Any) -> EntryFacts:
+        if tid == "TD-1":
+            raise OSError("the ledger could not be read")
+        return offerable(tid)
+
+    monkeypatch.setattr(stage_pass, "facts_on", read)
+    world = World()
+    repo = repo_facts(store, row("TD-1"), row("TD-2"))
+    got = stage_pass.team_pass(store, repo, no_sessions(), world.reach, local="h")
+    assert [(s.tid, s.read) for s in got.steps] == [("TD-1", False), ("TD-2", True)]
+    assert store.entry("TD-2")["holder"] == "s2"
+
+
+def test_unreadable_records_take_no_act_and_keep_the_last_passs_sightings(store, monkeypatch):
+    def broken() -> dict[str, Any]:
+        raise StateError("origin did not answer")
+
+    monkeypatch.setattr(store, "entries", broken)
+    world = World()
+    got = stage_pass.team_pass(store, repo_facts(store, row()), no_sessions(), world.reach, local="h", before=("a",))
+    assert got == stage_pass.TeamPass(seen=("a",)) and world.ended == []
+
+
+def test_the_flow_copy_is_stored_once_the_records_are_read(store, read_as_given):
+    order: list[str] = []
+    entries, put_flow = store.entries, store.put_flow
+    store.entries = lambda: (order.append("read"), entries())[1]  # type: ignore[method-assign]
+    store.put_flow = lambda team, text: (order.append("put"), put_flow(team, text))[1]  # type: ignore[method-assign]
+    stage_pass.team_pass(store, repo_facts(store), no_sessions(), World().reach, local="h", put="name: f\n")
+    assert order == ["read", "put"] and store.flow("t") == "name: f\n"
+
+
+def test_a_stranded_session_never_holds_back_the_acts_on_an_open_record(store, read_as_given, monkeypatch):
+    put(store, holder=None, waits="parts")
+    monkeypatch.setattr(stage_pass, "facts_on", lambda _r, tid, _rec: facts(tid=tid, ledger=EntryLedger("archived")))
+    world = World(end_fails=True)
+    read = SessionsRead({"a": stage_session()}, frozenset(), frozenset())
+    got = stage_pass.team_pass(store, repo_facts(store), read, world.reach, local="home", before=("a",))
+    assert got.unended == ("a",) and [s.tid for s in got.steps] == [TID]
+    assert store.entry(TID)["closed_at"]
+
+
+@pytest.mark.parametrize("error", [StateError("refused"), ValueError("not a team name")])
+def test_a_flow_copy_that_cannot_be_stored_steps_no_entry(store, read_as_given, monkeypatch, error):
+    def refuse(_team: str, _text: str) -> str:
+        raise error
+
+    monkeypatch.setattr(store, "put_flow", refuse)
+    got = stage_pass.team_pass(
+        store, repo_facts(store, row()), no_sessions(), World().reach, local="h", put="name: f\n"
+    )
+    assert got.flow_unstored and got.steps == () and store.entry(TID) is None
+
+
+def test_a_record_that_is_not_an_object_never_stops_the_pass(store, read_as_given, monkeypatch):
+    monkeypatch.setattr(store, "entries", lambda: {"TD-9": ["not", "a", "record"]})
+    monkeypatch.setattr(store, "put_entry", lambda *_a: "sha")
+    got = stage_pass.team_pass(store, repo_facts(store), no_sessions(), World().reach, local="h")
+    assert got == stage_pass.TeamPass()
