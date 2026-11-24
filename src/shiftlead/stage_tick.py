@@ -192,3 +192,8 @@ def run(
         return _reach(call, root, teams.get(team) or {}, local, kept, team, org)
 
     return stage_pass.repo_pass(StageStore(root), kept.state, flows, facts, sessions, reach, local=local, now=now)
+
+
+def call(**kwargs: Any) -> RepoPass | None:
+    """The `shiftlead.home_calls` entry point's call, as every home call module has one: `run`."""
+    return run(**kwargs)
