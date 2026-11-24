@@ -86,6 +86,52 @@ def test_rule_one_takes_finished_and_dead_runs_and_keeps_the_rest(pool, dead_pid
     assert recent.exists() and empty.exists() and live.exists() and current.exists() and clone.exists()
 
 
+FAR_AHEAD = datetime(2065, 1, 1, tzinfo=UTC).timestamp()  # as the suite's own fixtures date files
+
+
+def _future_dated(run: Path) -> Path:
+    """A file and a directory under `run` dated decades ahead, the directory holding an old file; `run` left old."""
+    (run / "ahead").write_text("x")
+    far = run / "far"
+    far.mkdir()
+    (far / "inside").write_text("x")
+    _age(run, 3600)
+    os.utime(run / "ahead", (FAR_AHEAD, FAR_AHEAD))
+    os.utime(far, (FAR_AHEAD, FAR_AHEAD))
+    return far
+
+
+@pytest.mark.unit
+def test_rule_one_takes_a_quiet_run_holding_future_dates_and_keeps_one_with_a_real_write(pool, dead_pid):
+    root, home = pool
+    seat = _seat(root, home)
+    quiet, written, written_deep = _run(seat, 1, str(dead_pid)), _run(seat, 2, str(dead_pid)), _run(seat, 3)
+    _future_dated(quiet)
+    _future_dated(written)
+    (written / "new").write_text("x")  # a real write beside the future-dated file
+    far = _future_dated(written_deep)
+    (far / "new").write_text("x")  # and one inside a directory so dated, which is still walked
+    os.utime(far, (FAR_AHEAD, FAR_AHEAD))
+    _reclaim(root, home)
+    assert not quiet.exists() and written.exists() and written_deep.exists()
+
+
+@pytest.mark.unit
+def test_a_time_just_past_now_is_a_write_and_one_past_the_day_is_not(tmp_path):
+    d = tmp_path / "tree"
+    d.mkdir()
+    (d / "f").write_text("x")
+    _age(d, 3600)
+    now = NOW
+    assert scratch._quiet(d, now, 600) and scratch._newest_write(d, now) == pytest.approx(now - 3600)
+    for ahead, counts in ((5, True), (scratch.FUTURE_AFTER_S, True), (scratch.FUTURE_AFTER_S + 1, False)):
+        os.utime(d / "f", (now + ahead, now + ahead))
+        assert scratch._quiet(d, now, 600) is not counts
+        assert scratch._newest_write(d, now) == pytest.approx(now + ahead if counts else now - 3600)
+    os.utime(d, (FAR_AHEAD, FAR_AHEAD))  # the root is read by the same rule
+    assert scratch._quiet(d, now, 600) and scratch._newest_write(d, now) == 0.0
+
+
 @pytest.mark.unit
 def test_rule_two_takes_an_ended_run_past_the_short_keep_unless_a_hold_keeps_it(pool):
     root, home = pool
