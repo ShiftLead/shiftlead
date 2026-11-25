@@ -788,6 +788,8 @@ def repos_via(call: Call) -> orgmod.ReposOf:
 
 
 NOTHING_TO_PICK = "nothing to pick: every lane is empty, so the team will wind down as soon as it starts"
+# Stop now after the cut-over (§4.9d *Start and Wind down*): `ao team stop --now` and the page refuse it alike
+NO_STOP_NOW = "after the switch-over Wind down ends no session: a stop time is the harder stop"
 # the page's kinds in the kind bar's order, each in its word (§4.4 *Repo facts*; `ui.repo.LEDGER_LISTS`,
 # written out since the page imports this module): how a lane's count reads by kind before a start
 LANE_WORDS = (

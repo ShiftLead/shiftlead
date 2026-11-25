@@ -1304,7 +1304,7 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     it clears the team's started mark instead, the Wind down: each running session ends its stage."""
     if teamstore.first_shape_off():
         if args.now:
-            return fail(args, "after the switch-over Wind down ends no session: a stop time is the harder stop", 1)
+            return fail(args, teamrun.NO_STOP_NOW, 1)
         return _team_mark(args, False)
     try:
         org = _org_here()
