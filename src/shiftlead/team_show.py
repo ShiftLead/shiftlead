@@ -338,14 +338,17 @@ SWITCH_LINES = {
 ENDED = "; its session is ended, and what it had not pushed is lost"
 
 
-def _offered(team: str, doc: Mapping[str, Any], roots: Iterable[str | Path]) -> list[Mapping[str, Any]]:
-    """The format-3 flows a team could be given: the package's, the org's, and its own repo's."""
-    repo = str(doc["teams"][team]["repo"])
+def offered(repo: str, roots: Iterable[str | Path]) -> list[Mapping[str, Any]]:
+    """The format-3 flows a team of `repo` could be given: the package's, the org's, and its own repo's."""
     rows = flow_save.listing(roots)["flows"]
     return [r for r in rows if r["doc"] is not None and (r["place"] != "repo" or r.get("repo") == repo)]
 
 
-def _cannot(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], rows: Mapping[str, Any], here: str) -> Any:
+def _offered(team: str, doc: Mapping[str, Any], roots: Iterable[str | Path]) -> list[Mapping[str, Any]]:
+    return offered(str(doc["teams"][team]["repo"]), roots)
+
+
+def cannot_pick(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], rows: Mapping[str, Any], here: str) -> Any:
     """Why `team` cannot run the flow of `row`, *cannot run here: …*, or None."""
     if row["problems"]:
         return f"cannot run here: {row['problems'][0]}"
@@ -376,7 +379,7 @@ def choices(
             "name": r["name"],
             "place": r["place"],
             "current": r["name"] == entry.get("flow"),
-            "cannot_run": _cannot(team, r, entry, rows, here),
+            "cannot_run": cannot_pick(team, r, entry, rows, here),
         }
         for r in _offered(team, doc, where)
     ]
@@ -408,7 +411,7 @@ def _picked(
         raise ValueError(f"there is no flow named {flow} that {team} could be given")
     if flow == entry.get("flow"):
         raise ValueError(f"{team} already runs {flow}")
-    why = _cannot(team, row, entry, rows, here) if check else None
+    why = cannot_pick(team, row, entry, rows, here) if check else None
     if why:
         raise ValueError(f"{team} cannot be switched to {flow}: {why}")
     return row
