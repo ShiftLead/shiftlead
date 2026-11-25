@@ -227,6 +227,26 @@ def test_a_start_that_raises_is_that_jobs_failure(store):
     assert not got.made and "tmux" in got.why and store.job(KEY) is None
 
 
+@pytest.mark.parametrize("fails", ["claim", "record"])
+def test_an_offer_that_fails_after_its_session_started_names_that_session_to_end(store, monkeypatch, fails):
+    """TD-2166: a started session whose claim or record could not be written is named in `end`, never left running."""
+    w = World()
+    reach = w.reach()
+
+    def boom(*_a, **_k):
+        raise RuntimeError("disk full")
+
+    if fails == "claim":
+        reach = stage_job_make.JobReach(reach.start, boom, reach.line, reach.close_line, reach.end)
+    else:
+        monkeypatch.setattr(store, "put_job", boom)
+    got = stage_job_make.make(
+        store, KEY, JobAct("offer", "new"), GO, reach, seat="board-answers", obj="1a2b3c4d", team="t", opened_at="x"
+    )
+    assert len(w.started) == 1 and not got.made
+    assert got.end == "s-1" and "the offer did not finish: disk full" in got.why
+
+
 def test_an_object_gone_not_waiting_on_the_person_closes_no_line(store):
     put(store)
     w = World()
