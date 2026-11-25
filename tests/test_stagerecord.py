@@ -319,6 +319,7 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
     users = sorted(p.name for p in src.rglob("*.py") if p.name != "stagerecord.py" and "stagerecord" in p.read_text())
     assert users == [
         "flow_save.py",
+        "job_prs.py",
         "stage_audit_end.py",
         "stage_audit_pass.py",
         "stage_end.py",
@@ -335,7 +336,7 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
         "team_show.py",
     ]  # stage_job takes only the job key's pattern, stage_job_make, stage_job_end and stage_job_merge write a job's
     # record, stage_job_pass and stage_job_tick read the seats' records, stage_audit_pass reads and writes an audit's
-    # run record, stage_audit_end writes a run's end, and team_show only reads
+    # run record, stage_audit_end writes a run's end, and team_show and job_prs only read
 
 
 def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):

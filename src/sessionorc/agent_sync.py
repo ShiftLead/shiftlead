@@ -19,6 +19,7 @@ from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import sync as sync_mod
 from sessionorc.agent_common import log
+from sessionorc.agent_stage import JOB_PRS, home_call
 from sessionorc.mail import PERSON
 from sessionorc.models import now_iso
 
@@ -40,9 +41,25 @@ class SyncMixin:
         ran = self._sync_ran.get(root)
         return on and ran is not None and now - ran <= SYNC_COVER
 
-    def _sync_held_by(self, root: str, pr: dict[str, Any]) -> bool:
-        """Whether a live record of the repo holds the PR (§4.4's test), read now."""
+    def _sync_held_by(self, root: str, pr: dict[str, Any], jobs: frozenset[int] = frozenset()) -> bool:
+        """Whether a live record of the repo holds the PR (§4.4's test), read now, or after the cut-over an open job
+        record names it (`jobs`, `_sync_jobs`' reading for the pass)."""
+        if isinstance(pr.get("number"), int) and pr["number"] in jobs:
+            return True
         return any(workorders.holds_pr(r, pr) for r in self._graph().values() if r.repo == root)
+
+    async def _sync_jobs(self, root: str) -> frozenset[int] | None:
+        """After the cut-over, the numbers of the pull requests the repo's open `pr-<n>` job records name, one waiting
+        on the person aside (§6 *Sync*, TD-2165), read once a pass in a thread through the `shiftlead.home_calls` entry
+        point; before it, none. None: no reading, and the pass judges none of the repo's sync PRs this turn."""
+        if not self._first_shape_off:
+            return frozenset()
+        try:
+            body = home_call(JOB_PRS)
+            return frozenset(await asyncio.to_thread(body.call, root))
+        except Exception:  # noqa: BLE001 — a failed read is no reading, never a pass that judges blind
+            log.exception("sync: the job records of %s could not be read; no sync PR judged this pass", root)
+            return None
 
     async def _sync_pass(self) -> None:
         """One pass at the home: each registered checkout's open sync PRs. One repo's surprise is a log line."""
@@ -79,6 +96,8 @@ class SyncMixin:
                 if pr.get("sync") is True and head and not sync_mod.settled(sync.get(n), head):
                     sync[n] = {"head": head, "verdict": "off", "why": "sync is off", "tries": 0,
                                "at": now_iso()}  # fmt: skip
+        elif (jobs := await self._sync_jobs(root)) is None:
+            pass  # no reading of the jobs' pull requests: nothing judged, and the pass covers nothing (§6 *Sync*)
         else:
             covered, repo = True, Path(root).name
             # where the repo sets `precheck`, a PR reading *none* is prechecked before its gate (§6 step 4, TD-1039)
@@ -95,7 +114,7 @@ class SyncMixin:
             else:
                 async with self._promote_lock:
                     counted = await asyncio.to_thread(sync_mod.tend_precheck, root, repo, prs, sync, now_iso())
-            for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p), prechecks):
+            for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p, jobs), prechecks):
                 n, head = str(pr["number"]), str(pr["head"])
                 if not self._sync_login:
                     self._sync_login = await asyncio.to_thread(sync_mod.gh_login)
@@ -116,7 +135,7 @@ class SyncMixin:
                 if e is None:
                     continue  # the head moved: the next pass checks the new one
                 if e.pop("ready", False):
-                    e = await self._sync_merge(root, pr, e)
+                    e = await self._sync_merge(root, pr, e, jobs)
                 if e is not None:
                     sync[n] = e
             if covered:
@@ -156,7 +175,9 @@ class SyncMixin:
                     log.info("sync: %s #%s: prechecking %s", repo, pr["number"], head[:7])
         return sync_mod.wait_entry(e, head, why or "", at)
 
-    async def _sync_merge(self, root: str, pr: dict[str, Any], e: dict[str, Any]) -> dict[str, Any] | None:
+    async def _sync_merge(
+        self, root: str, pr: dict[str, Any], e: dict[str, Any], jobs: frozenset[int] = frozenset()
+    ) -> dict[str, Any] | None:
         """Step 5: the holders and the head read again just before the merge. A new holder drops the merge
         with no verdict; a moved head drops it unwritten; the merge pinned with `--match-head-commit`. Where
         `judge` handed on a `gate_dir` (the tree composes, TD-1419), the merge is cadence step 5's line: the
@@ -165,18 +186,23 @@ class SyncMixin:
         never written to the reading, and is removed on every exit."""
         gate_dir = e.pop("gate_dir", None)
         try:
-            return await self._sync_merge_in(root, pr, e, Path(gate_dir) if gate_dir else None)
+            return await self._sync_merge_in(root, pr, e, Path(gate_dir) if gate_dir else None, jobs)
         finally:
             if gate_dir:
                 await asyncio.to_thread(shutil.rmtree, gate_dir, True)
 
     async def _sync_merge_in(
-        self, root: str, pr: dict[str, Any], e: dict[str, Any], gate_dir: Path | None
+        self,
+        root: str,
+        pr: dict[str, Any],
+        e: dict[str, Any],
+        gate_dir: Path | None,
+        jobs: frozenset[int] = frozenset(),
     ) -> dict[str, Any] | None:
         n, head = int(pr["number"]), str(pr["head"])
         if not (await asyncio.to_thread(self._sync_on)).get(Path(root).name, True):
             return e  # turned off while the pass ran: nothing merged
-        if self._sync_held_by(root, pr):
+        if self._sync_held_by(root, pr, jobs):
             return e  # no verdict: back on the list once the claim ends
         subject = body = None
         if gate_dir is not None:
@@ -188,7 +214,7 @@ class SyncMixin:
             except (OSError, UnicodeDecodeError) as err:
                 return sync_mod._no_reading(e, f"the composed squash could not be read: {err}", now_iso())
             body = gate_dir / "body"
-            if self._sync_held_by(root, pr):
+            if self._sync_held_by(root, pr, jobs):
                 return e  # held while it composed: no verdict
         now = await asyncio.to_thread(cadence.head, root, n)
         if now is None:

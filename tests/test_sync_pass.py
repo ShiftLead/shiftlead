@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import cadence, sync, workorders
+from sessionorc import agent_sync, cadence, sync, workorders
 from sessionorc import settings as settings_mod
 
 HEAD = "a" * 40
@@ -334,7 +334,7 @@ async def test_a_head_moved_before_the_merge_or_a_new_holder_is_not_merged_and_g
     assert "merge" not in _names(gh) and "1097" not in agent._repos[ROOT].get("sync", {})
     gh["head"], gh["calls"] = (HEAD, "open"), []
     seen = iter([False, True])  # free when taken up, held by the merge
-    monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr: next(seen))
+    monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr, jobs=frozenset(): next(seen))
     await agent._sync_pass()
     entry = agent._repos[ROOT]["sync"]["1097"]
     assert "merge" not in _names(gh) and entry["verdict"] == "" and entry["kind"] == "bump"
@@ -441,3 +441,74 @@ def test_held_globs_reads_the_repo_file(tmp_path):
     assert sync.held_globs(tmp_path) == ["src/x/**", "docs/b/**", "src/y/**"]
     (tmp_path / ".shiftlead.yml").write_text("held:\n  core: src/x\n")
     assert sync.held_globs(tmp_path) is None
+
+
+# -- after the cut-over: a job's sync PR is its flow's (§6 *Sync*, TD-2165) ----------------------------------------
+
+
+class _JobPrs:
+    def __init__(self, got):
+        self.got, self.roots = got, []
+
+    def call(self, root):
+        self.roots.append(root)
+        if isinstance(self.got, Exception):
+            raise self.got
+        return self.got
+
+
+def _job_prs(monkeypatch, got) -> _JobPrs:
+    body = _JobPrs(got)
+    monkeypatch.setattr(agent_sync, "home_call", lambda name: body if name == "job_prs" else None)
+    return body
+
+
+@pytest.mark.integration
+async def test_after_the_cut_over_a_sync_pr_an_open_job_names_is_left_to_its_flow(agent, gh, monkeypatch):
+    agent._first_shape_off = True
+    body = _job_prs(monkeypatch, frozenset({1097}))
+    _reading(agent, _pr(), _pr(1098))
+    await agent._sync_pass()
+    assert body.roots == [ROOT]  # read once for the pass
+    assert "1097" not in agent._repos[ROOT].get("sync", {})  # never judged, no verdict
+    assert agent._repos[ROOT]["sync"]["1098"]["verdict"] == "merged"
+    assert [c[1][1] for c in gh["calls"] if c[0] == "merge"] == [1098]
+
+
+@pytest.mark.integration
+async def test_after_the_cut_over_a_failed_read_of_the_jobs_judges_none_of_the_repos(agent, gh, monkeypatch):
+    agent._first_shape_off = True
+    _job_prs(monkeypatch, RuntimeError("no state branch"))
+    _reading(agent, _pr())
+    agent._sync_ran.pop(ROOT, None)
+    await agent._sync_pass()
+    assert gh["calls"] == [] and "1097" not in agent._repos[ROOT].get("sync", {})
+    assert ROOT not in agent._sync_ran  # covered nothing: the order stays the team's
+
+
+@pytest.mark.integration
+async def test_before_the_cut_over_the_jobs_are_not_read(agent, gh, monkeypatch):
+    agent._first_shape_off = False
+    body = _job_prs(monkeypatch, frozenset({1097}))
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert body.roots == [] and agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+
+
+@pytest.mark.integration
+async def test_a_merge_re_reads_the_jobs_reading_the_pass_kept(agent, gh, monkeypatch):
+    agent._first_shape_off = True
+    other = frozenset({4242})  # another PR's job: not this one's, so the merge goes on
+    _job_prs(monkeypatch, other)
+    _reading(agent, _pr())
+    held = []
+    real = agent._sync_held_by
+
+    def spy(root, pr, jobs=frozenset()):
+        held.append(jobs)
+        return real(root, pr, jobs)
+
+    monkeypatch.setattr(agent, "_sync_held_by", spy)
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+    assert len(held) >= 2 and all(j == other for j in held)  # the candidates' test and the merge's re-check

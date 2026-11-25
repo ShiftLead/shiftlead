@@ -42,6 +42,7 @@ stage = "shiftlead.stage_end"
 flow = "shiftlead.flow_save"
 team = "shiftlead.team_show"
 stage_tick = "shiftlead.stage_tick"
+job_prs = "shiftlead.job_prs"
 
 [build-system]
 requires = ["pdm-backend"]
