@@ -2109,7 +2109,7 @@ def has_fact(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]])
     """**The fact** (§4.4 *The card's status*, TD-1926, TD-2172): the member has an open part among its counted work,
     or is a gated `Owner: paul` entry with counted work of either kind. What the *waiting, then yours* word, the
     withheld answers, Lift and the home's stale refusal read, never `open_work` alone."""
-    if counted.parts.get(q):
+    if counted.parts.get(q):  # `counted` holds gated members alone, so the gate needs no test of its own
         return True
     e = entries.get(q) or {}
     return bool(counted.work.get(q)) and str(e.get("owner") or "").lower() == PERSON

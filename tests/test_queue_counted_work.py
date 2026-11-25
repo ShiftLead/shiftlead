@@ -104,3 +104,21 @@ def test_the_fact_is_an_open_part_or_any_counted_work_on_a_gated_owner_paul_entr
     c = queue.counted_work(es, lambda _item: None, {}, today=TODAY)
     assert not queue.has_fact("r#TD-001", c, es), "a blocker alone is a wait"
     assert queue.has_fact("r#TD-003", c, es) and queue.has_fact("r#TD-004", c, es)
+
+
+@pytest.mark.unit
+def test_a_chain_of_gated_links_counts_at_each_link_over_several_passes():
+    c = _count(_e(1, "TD-002", GATE), _e(2, "TD-003", GATE), _e(3, "TD-004", GATE), _e(4))
+    assert c.work == {"r#TD-001": ["r#TD-002"], "r#TD-002": ["r#TD-003"], "r#TD-003": ["r#TD-004"]}
+
+
+@pytest.mark.unit
+def test_a_gated_blocker_whose_only_work_is_its_held_builds_waits():
+    c = _count(
+        _e(1, "TD-002", GATE),
+        _e(2, GATE),
+        _e(3, "TD-004", GATE, part_of=2),
+        _e(4),
+        held={"r#TD-003": "r#TD-002"},
+    )
+    assert c.work["r#TD-002"] == ["r#TD-004"] and c.work["r#TD-001"] == ["r#TD-002"]
