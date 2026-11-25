@@ -198,3 +198,39 @@ def test_a_team_launches_from_the_flow_the_pass_runs(
     assert given[1][0] == copy and given[1][1]["place"] == "repo" and given[1][1]["flow_dir"] == d
     alone = stage_tick._reach(never, root, TEAM, "h", Kept(), "u", lambda: org, copy)
     assert len(given) == 2 and alone.start("build", object()) is None, "a team the org lacks starts nothing"
+
+
+# -- the built-in seats' jobs (TD-2053) -------------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_without_the_reading_of_orders_no_job_is_passed_over(root: Path, quiet: list[str]) -> None:
+    assert a_pass(root, Kept()).jobs == {}
+
+
+@pytest.mark.integration
+def test_with_the_orders_both_seats_are_passed_over_and_nothing_starts(root: Path, quiet: list[str]) -> None:
+    orders = [{"id": "board:1a2b3c4d", "decided": {"date": "2026-11-24"}}]
+    prs = [{"id": "pr:4", "pr": 4, "pr_order": True, "red_since": "2026-11-24"}]
+    got = a_pass(
+        root,
+        Kept(),
+        orders=orders,
+        pr_orders=prs,
+        boards={"boards": []},
+        prs={"open": [{"number": 4, "state": "open"}], "recent": []},
+    )
+    assert set(got.jobs) == {"board-answers", "unheld-pull-requests"}
+    assert [s.key for s in got.jobs["board-answers"]] == ["board-1a2b3c4d"]
+    assert all(s.act is None for steps in got.jobs.values() for s in steps), "no team is started before TD-2065"
+    assert StageStore(root).jobs() == {}
+
+
+@pytest.mark.integration
+def test_a_job_whose_object_is_gone_is_closed_by_the_tick(root: Path, quiet: list[str]) -> None:
+    from shiftlead import stage_job
+
+    StageStore(root).put_job(stage_job.new_job("board-answers", "1a2b3c4d", "t", "2026-11-24"), "test")
+    got = a_pass(root, Kept(), orders=[], pr_orders=[], boards={"boards": []})
+    assert got.jobs["board-answers"][0].act.case == "object-gone"
+    assert StageStore(root).job("board-1a2b3c4d")["closed_at"]

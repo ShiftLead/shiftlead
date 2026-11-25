@@ -7,12 +7,16 @@ whose snapshot has arrived, every node's checkouts of the repo, the repo's pull 
 itself (the ledger at origin's default branch, the protected files, each team's flow and its check, the person) and
 takes `stage_pass.repo_pass`. What one repo's passes keep between them (`Kept`) is the caller's to hold.
 
+Given the repo reading's work orders, pull request orders and boards, `run` then takes the two built-in seats' passes
+over their jobs (`stage_job_tick`, TD-2053); the home hands them over in a later slice.
+
 Nothing starts a session yet: `stage_start.team_started` is false until TD-2065, so no offer is made, and a team is
 read only after the cut-over, when the caller passes it.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
@@ -22,7 +26,7 @@ from typing import Any
 
 from sessionorc import gitinfo, ledger, paths, reports
 from sessionorc.models import Session
-from shiftlead import flow3, stage_end, stage_merge, stage_pass, stage_start
+from shiftlead import flow3, stage_end, stage_job_tick, stage_merge, stage_pass, stage_start
 from shiftlead import org as orgmod
 from shiftlead.stage_fetch import (
     TeamFlow,
@@ -31,7 +35,9 @@ from shiftlead.stage_fetch import (
     ledger_read,
     protected_at,
     pushed_branches,
+    rows_of,
     sessions_read,
+    team_flow,
 )
 from shiftlead.stage_pass import Reach, RepoPass, RepoState
 from shiftlead.stagerecord import StageStore
@@ -137,10 +143,15 @@ def run(
     call: Callable[..., Any],
     kept: Kept,
     now: datetime | None = None,
+    orders: Collection[Mapping[str, Any]] | None = None,
+    pr_orders: Collection[Mapping[str, Any]] | None = None,
+    boards: Mapping[str, Any] | None = None,
 ) -> RepoPass | None:
     """One pass over the switched `teams` of the repo at `root` (`settings.yml`'s `teams.<team>` whose `repo` is it).
     None: the repo's ledger or its person could not be read, so no record of it is read this pass. A gate the pass
-    runs takes as long as the cadence check does, so the caller runs this in a thread of its own."""
+    runs takes as long as the cadence check does, so the caller runs this in a thread of its own. With `orders` and
+    `pr_orders` (`teamrun.work_orders` and `pr_orders` of the repo reading) and its `boards`, the built-in seats' jobs
+    are passed over after the teams (`jobs`); without them, they are not."""
     root = Path(root)
     now = now or datetime.now(UTC)
     try:
@@ -213,7 +224,87 @@ def run(
     def reach(team: str, doc: Mapping[str, Any]) -> Reach:
         return _reach(call, root, teams.get(team) or {}, local, kept, team, org, doc)
 
-    return stage_pass.repo_pass(StageStore(root), kept.state, flows, facts, sessions, reach, local=local, now=now)
+    store = StageStore(root)
+    got = stage_pass.repo_pass(store, kept.state, flows, facts, sessions, reach, local=local, now=now)
+    if orders is None or pr_orders is None:
+        return got
+    try:
+        jobs = _jobs(
+            store,
+            root,
+            teams,
+            flows,
+            orders,
+            pr_orders,
+            boards,
+            prs,
+            entries,
+            sessions,
+            checkouts,
+            local,
+            call,
+            org,
+            now,
+        )
+        return dataclasses.replace(got, jobs=jobs)
+    except Exception:  # noqa: BLE001 — the jobs' pass failing is a log line and never the teams' pass
+        log.exception("the job pass of %s failed", root)
+        return got
+
+
+def _jobs(
+    store: StageStore,
+    root: Path,
+    teams: Mapping[str, Mapping[str, Any]],
+    flows: Mapping[str, tuple[str | None, tuple[str, ...]]],
+    orders: Collection[Mapping[str, Any]],
+    pr_orders: Collection[Mapping[str, Any]],
+    boards: Mapping[str, Any] | None,
+    prs: Mapping[str, Any] | None,
+    entries: Collection[Mapping[str, Any]],
+    sessions: Any,
+    checkouts: Mapping[str, Collection[str]],
+    local: str,
+    call: Callable[..., Any],
+    org: Callable[[], orgmod.Org | None],
+    now: datetime,
+) -> dict[str, Any]:
+    """The jobs' pass, once the teams' pass is done: each team's flow as its records read it, the last good copy
+    while it fails (`team_flow`), and the rows, with each open board answer's own pull request read by its number.
+    The repo's name, which picks its built-in set, is its teams' `repo`. A pull request reading that cannot be read
+    passes over no job."""
+    docs: dict[str, Mapping[str, Any]] = {}
+    for team, (current, problems) in flows.items():
+        flow = team_flow(current, problems, store.flow(team))
+        if flow is not None:
+            docs[team] = flow.doc
+    wanted = sorted({r["pr"] for r in store.jobs().values() if isinstance(r.get("pr"), int) and not r.get("closed_at")})
+    rows = rows_of(prs, wanted, lambda n: reports.pr_state_row(root, n))
+    if rows is None:
+        return {}
+    read = org()
+    started = sorted(
+        t for t in teams if read is not None and t in read.teams and stage_start.team_started(read, read.teams[t])
+    )
+    repo = next((str(e["repo"]) for e in teams.values() if e.get("repo")), root.name)
+    hosts = {t: str(e.get("host") or "") for t, e in teams.items()}
+    reach = stage_job_tick.reach_for(call, org, root, repo, local=local, hosts=hosts, docs=docs)
+    return stage_job_tick.run(
+        store,
+        reach,
+        now=now,
+        orders=orders,
+        pr_orders=pr_orders,
+        boards=boards,
+        rows=rows,
+        entries=entries,
+        sessions=sessions,
+        checkouts=checkouts,
+        local=local,
+        started=started,
+        docs=docs,
+        may_start=bool(started),
+    )
 
 
 def call(**kwargs: Any) -> RepoPass | None:
