@@ -914,3 +914,27 @@ def test_the_facts_carry_the_text_of_the_flow_that_runs(store):
     got = made(store, flow=stage_fetch.TeamFlow(FLOW, text=GOOD))
     assert got is not None and got.flow_text == GOOD
     assert stage_fetch.facts_on(got, TID, None).flow_text == GOOD
+
+
+def test_a_home_write_hands_make_the_holders_record_and_its_spend(store):
+    """§4.9c *Each holder leaves a `run`* (TD-2158): the lost row copies the holder's record as the pass read it."""
+    s = stage_session(name="s1")
+    s.model, s.tool_version, s.created, s.person_asks = "opus", "2.1", "2026-11-25T10:00:00Z", 1
+    s.state = "exited"
+    asked: list[str] = []
+    reach = replace(World().reach, spent=lambda sid: asked.append(sid) or {})
+    put(store, holder="s1@node", offers=1, spent_before={"s1": {}})
+    got = step(store, store.entry(TID), facts(may_start=True, within_size=True, session=s), reach)
+    assert got.made.made and asked == ["s1"]
+    run = store.entry(TID)["history"][-1]["run"]
+    assert (run["model"], run["tool"], run["tool_version"], run["asks"]) == ("opus", "claude-code", "2.1", 1)
+    assert run["started"] == "2026-11-25T10:00:00Z" and run["models"] == {}
+
+
+def test_the_session_fields_are_what_ao_stage_end_hands_its_row() -> None:
+    from sessionorc.agent_stage import _run_fields
+    from shiftlead.stagerecord import session_fields
+
+    s = stage_session()
+    s.model, s.tool_version, s.person_asks = "opus", "2.1", 3
+    assert session_fields(s) == _run_fields(s)

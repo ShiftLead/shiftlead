@@ -31,7 +31,7 @@ from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, _now, answer_move, bare, new_record
+from shiftlead.stagerecord import HOME_ROWS, StageStore, _now, answer_move, bare, new_record, run_of
 
 log = logging.getLogger(__name__)
 
@@ -388,10 +388,20 @@ def _pass(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, 
 
 
 def _offer_again(
-    store: StageStore, record: dict[str, Any], act: Act, s: Reading, doc: dict[str, Any], person: str
+    store: StageStore,
+    record: dict[str, Any],
+    act: Act,
+    s: Reading,
+    doc: dict[str, Any],
+    person: str,
+    run: dict[str, Any] | None,
 ) -> Made:
     """Act 4's write. A second loss goes to the person; any other clears the holder, and a loss that happened while
-    the team ran counts the offer the next pass makes. A holder ended by a Stop or a hold leaves the count as it is."""
+    the team ran counts the offer the next pass makes. A holder ended by a Stop or a hold leaves the count as it is.
+    Each writes a `lost` row carrying the lost holder's `run`, in the commit that clears it (§4.9c)."""
+    key = record["stage"]
+    lost = {"from": key, "to": key, "outcome": "lost", "by": "home", "reason": act.case, "run": run, "at": _now()}
+    record.setdefault("history", []).append(lost)
     if act.case == "to-person":
         ask = "Two sessions in a row were lost on this entry, what next?"
         context = f"The sessions holding it in the stage {record['stage']} ended or went silent twice."
@@ -403,8 +413,20 @@ def _offer_again(
     return Made(True)
 
 
-def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any], person: str) -> Made:
-    """Write `act` on `tid`'s record, if a fresh read under the lock still chooses it."""
+def make(
+    store: StageStore,
+    tid: str,
+    act: Act,
+    s: Reading,
+    doc: dict[str, Any],
+    person: str,
+    *,
+    session: Mapping[str, Any] | None = None,
+    spent: Callable[[str], Any] | None = None,
+) -> Made:
+    """Write `act` on `tid`'s record, if a fresh read under the lock still chooses it. `session` is the holder's
+    session record's fields (`stagerecord.session_fields`, None where it is forgotten) and `spent` reads a session id's
+    `models` sums, from which the held holder's `run` is built once, before the case writes it (§4.9c)."""
     with store.locked():
         record = store.entry(tid)
         if record is None:
@@ -412,12 +434,13 @@ def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any],
         if choose(record, s) != act:
             return Made(False, "the record moved since it was read")
         held = record.get("holder")
+        run = run_of(record, held, session, _spent_now(spent, held, tid)) if held else None
         if act.name == "answer":
             got = _answer(store, record, s, doc, person)
         elif act.name == "pass":
             got = _pass(store, record, s, doc, person)
         elif act.name == "offer-again":
-            got = _offer_again(store, record, act, s, doc, person)
+            got = _offer_again(store, record, act, s, doc, person, run)
         elif act.name == "reconcile" and act.case in _ASKS:
             got = _ASKS[act.case](store, record, s, doc, person)
         elif act.name == "reconcile" and act.case in _RECONCILE:
@@ -431,7 +454,7 @@ def _came(record: dict[str, Any], key: str) -> tuple[str | None, str | None]:
     """What a fresh session at `key` is told of how the entry got there: the reason of the last move the history
     records, where that move was into `key` (a refused merge names its failing row), and the person's own words. Where
     the person's answer made that move, the reason is the one of the move before it, which raised their question."""
-    steps = [h for h in record.get("history") or [] if isinstance(h, dict)]
+    steps = [h for h in record.get("history") or [] if isinstance(h, dict) and h.get("outcome") not in HOME_ROWS]
     words = record.get("answer")
     answer = str(words).strip() if isinstance(words, str) and words.strip() else None
     if not steps or steps[-1].get("to") != key:
@@ -510,6 +533,18 @@ def offer(
         except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
             return Made(False, f"the offer did not finish: {e}", end=holder)
         return Made(True)
+
+
+def _spent_now(spent: Callable[[str], Any] | None, holder: Any, tid: str) -> Any:
+    """The held holder's id's sums as the home's write finds them, or None where there is none, no reader, or it raised
+    (logged): the row is written with `models` null, never refused."""
+    if spent is None or not holder:
+        return None
+    try:
+        return spent(bare(holder))
+    except Exception:
+        log.warning("%s: the spend reading for its holder's row failed; the row's models is null", tid, exc_info=True)
+        return None
 
 
 def _spent_at_offer(spent: Callable[[str], Any] | None, holder: str, tid: str) -> Any:

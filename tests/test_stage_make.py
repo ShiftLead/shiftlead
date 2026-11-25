@@ -779,3 +779,109 @@ def test_a_refused_claim_keeps_no_version(store):
     act = choose(None, READY)
     got = offer(store, TID, act, READY, FLOW, lambda *_a: "s9", lambda *_a: "no", team="t", version=VERSION)
     assert not got.made and store.version(VERSION[1]) is None
+
+
+# -- the lost holder's row (§4.9c *Each holder leaves a `run`*, TD-2158) ------------------------------------------
+
+FIELDS = {
+    "model": "opus",
+    "tool": "claude-code",
+    "tool_version": "2.1",
+    "login": None,
+    "login_moves": None,
+    "created": "2026-11-25T10:00:00Z",
+    "person_asks": 2,
+}
+NOW_SUMS = {"opus": {"input": 15, "output": 3, "turns": 5, "unweighed": 0, "figure": {"≈$": 0.6}}}
+
+
+def _lose(store: StageStore, holder: Holder, *, session: Any = FIELDS, spent: Any = None, **over: Any) -> Any:
+    reading = Reading(holder=holder, may_start=True)
+    act = choose(store.entry(TID), reading)
+    return act, make(store, TID, act, reading, FLOW, "paul", session=session, spent=spent, **over)
+
+
+@pytest.mark.parametrize(
+    ("holder", "offers", "case"),
+    [
+        (Holder(ended=True), 1, "lost"),
+        (Holder(idle_for=timedelta(hours=3)), 1, "silent"),
+        (Holder(ended=True, stopped=True), 1, "stopped"),
+        (Holder(ended=True), 2, "to-person"),
+    ],
+)
+def test_each_loss_writes_a_lost_row_carrying_the_holders_run(store, holder, offers, case):
+    put(store, holder="s1@node", offers=offers, team="t", flow_hash="h" * 64, spent_before={"s1": SUMS})
+    asked: list[str] = []
+    act, got = _lose(store, holder, spent=lambda sid: asked.append(sid) or NOW_SUMS)
+    assert act.case == case and got.made and asked == ["s1"]
+    record = store.entry(TID)
+    *_, row = record["history"]
+    assert {k: row[k] for k in ("from", "to", "outcome", "by", "reason")} == {
+        "from": "build",
+        "to": "build",
+        "outcome": "lost",
+        "by": "home",
+        "reason": case,
+    }
+    run = row["run"]
+    assert (run["session"], run["team"], run["flow_hash"], run["spent_before"]) == ("s1", "t", "h" * 64, SUMS)
+    assert (run["model"], run["tool"], run["tool_version"], run["started"], run["asks"]) == (
+        "opus",
+        "claude-code",
+        "2.1",
+        "2026-11-25T10:00:00Z",
+        2,
+    )
+    assert run["models"]["opus"]["turns"] == 2 and run["models"]["opus"]["input"] == 5
+    assert len(record["history"]) == 1, "the second loss's question writes no row of its own here"
+
+
+def test_a_lost_row_of_a_forgotten_session_record_keeps_what_the_home_holds(store):
+    put(store, holder="s1", offers=1, team="t", flow="build-review", flow_hash="h" * 64, spent_before={"s1": SUMS})
+    _, got = _lose(store, Holder(ended=True), session=None, spent=lambda _sid: NOW_SUMS)
+    run = store.entry(TID)["history"][-1]["run"]
+    assert got.made
+    assert all(run[k] is None for k in ("model", "tool", "tool_version", "login", "login_moves", "started", "asks"))
+    assert (run["session"], run["team"], run["flow"], run["flow_hash"], run["spent_before"]) == (
+        "s1",
+        "t",
+        "build-review",
+        "h" * 64,
+        SUMS,
+    )
+    assert run["ended"] and run["models"] is not None
+
+
+def _raises(_sid: str) -> Any:
+    raise OSError("no seat ledger")
+
+
+@pytest.mark.parametrize("spent", [None, _raises])
+def test_a_lost_row_whose_reading_fails_has_null_models_and_is_written(store, spent):
+    put(store, holder="s1", offers=1, spent_before={"s1": SUMS})
+    _, got = _lose(store, Holder(ended=True), spent=spent)
+    assert got.made and store.entry(TID)["history"][-1]["run"]["models"] is None
+
+
+def test_a_lost_row_tells_a_fresh_session_nothing(store):
+    step = {"from": "review", "outcome": "refused", "reason": "the merge gate failed on ci", "to": "build"}
+    put(store, stage="build", branch="b", pr=3, holder="s1", offers=1, history=[step])
+    _lose(store, Holder(ended=True))
+    assert store.entry(TID)["history"][-1]["outcome"] == "lost"
+    got, started, _ = offer_it(store)
+    assert got.made and started[0][1].came == "the merge gate failed on ci (`refused` at `review`)"
+
+
+def test_a_later_offer_under_the_same_id_counts_from_its_own_offer(store):
+    """Two rows of one record under one id: the later's spent_before is at least the earlier's plus its models."""
+    put(store, holder="s9", offers=1, spent_before={"s9": SUMS})
+    _lose(store, Holder(ended=True), session=None, spent=lambda _sid: NOW_SUMS)
+    first = store.entry(TID)["history"][-1]["run"]
+    assert _offer_spent(store, lambda _sid: NOW_SUMS).made
+    later = {"opus": {"input": 20, "output": 3, "turns": 6, "unweighed": 0, "figure": {"≈$": 0.7}}}
+    _lose(store, Holder(ended=True), spent=lambda _sid: later)
+    second = store.entry(TID)["history"][-1]["run"]
+    assert second["spent_before"] == NOW_SUMS and second["models"]["opus"]["turns"] == 1
+    for k in ("input", "output", "turns"):
+        assert second["spent_before"]["opus"][k] >= first["spent_before"]["opus"][k] + first["models"]["opus"][k]
