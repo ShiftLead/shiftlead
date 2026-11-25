@@ -541,6 +541,7 @@ def test_a_director_the_answers_fill_has_no_blocker():
     ],
 )
 def test_each_director_case_blocks_by_name(row, whats):
+    assert [b.what for b in director([])[1]] == ["director is not a mapping"]
     assert [b.what for b in director(row)[1]] == whats
 
 

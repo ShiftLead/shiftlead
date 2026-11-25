@@ -670,6 +670,8 @@ def director(
     if row is None:
         return plan, [Blocker(DIRECTOR, "the org has a director and the answers give it none", f"write {shape}")]
     plan.given = True
+    if not isinstance(row, Mapping):  # `read_answers` refuses it; a caller with its own mapping meets it here
+        return plan, [Blocker(DIRECTOR, "director is not a mapping", f"write {shape}")]
     out: list[Blocker] = []
     given = row.get("model")
     if isinstance(given, str) and builtinstore._MODEL.fullmatch(given):
