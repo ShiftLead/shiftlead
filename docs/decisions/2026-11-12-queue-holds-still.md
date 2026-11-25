@@ -67,7 +67,7 @@ holding while a box is open. Links written as `/queue?card=…` redirect there. 
   card under the pointer holds.
 - **A pause toggle, as the page's default.** The bar is the page's pause (WCAG 2.2.2): nothing moves until it is
   pressed. Designed 2026-11-25 (TD-2182, built by TD-2197), the person may turn the other way: a **Held** |
-  **Live** switch on the Queue's bar, **Held** by default and remembered in the browser, draws each re-read whole
+  **Live** switch on the Queue's bar, **Held** by default and remembered in the browser, draws each re-read that changes a place, whole,
   in **Live**, for watching the work move, while the card the person is on keeps its place on the screen and the
   rest is drawn around it. **Held** stays the default for answering cards, since a card moving under a press is
   what TD-1555 was. **Live** is the person's own stored choice and **Held**, on the bar, stops it, so WCAG 2.2.2
