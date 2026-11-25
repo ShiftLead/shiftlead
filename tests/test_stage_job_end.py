@@ -262,10 +262,11 @@ def test_a_review_stages_ship_on_a_job_waits_merging_and_posts_its_review():
 
 
 def test_a_reviews_repeat_is_answered_and_a_verdict_sent_to_the_person_keeps_its_stage():
-    store = Store(_reviewed())
-    _end(store, "ship")
-    again = _end(store, "ship")
-    assert again["repeat"] and again["went"] == "merge" and len(store.writes) == 1
+    store, facts = Store(_reviewed()), Fake(_pr())
+    _end(store, "ship", facts=facts, counts=(2, 0))
+    again = _end(store, "ship", facts=Fake(_pr()), counts=(9, 0))
+    assert again["repeat"] and again["went"] == "merge" and len(store.writes) == 1, "changed counts are ignored"
+    assert facts.posted[1].startswith("cadence-review: SHIP · sonnet · code · 2 findings")
     doc = flow()
     doc["stages"][2]["ship"] = "person"
     store = Store(_reviewed())
