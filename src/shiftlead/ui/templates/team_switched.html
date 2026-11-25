@@ -1,10 +1,12 @@
-{#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's (§4.9d *The route map draws the flow as lines*) and the flow pick TD-2062's -#}
+{#- design §4.9d *The page*, *Sessions at once*, *The logins, in order*; §4.5a *Team page* (TD-2060): a switched team's numbers and logins, from `team_show`. `team.js` sends each press as `team_set` with this version. The route map is TD-2061's (§4.9d *The route map draws the flow as lines*); the flow pick and the switch preview are TD-2062's (§4.9d *The flow pick and a switch*), `team.js` reading the preview and sending **Switch now** -#}
 <div class="note warn" id="teamsaid" role="status" hidden></div>
 {% if sw.unread %}<div class="note warn">{{ sw.unread }}</div>{% endif %}
 <div id="teamset" data-team="{{ sw.team }}" data-version="{{ sw.version }}" data-order="{{ sw.order | tojson | forceescape }}">
 <section class="isec"><div class="h2">The flow it runs</div>
   {% if sw.cannot_run %}<div class="note warn">{{ sw.cannot_run }}</div>{% endif %}
-  <div class="note">{% if sw.flow %}<b>{{ sw.flow }}</b>{% if not sw.flow_read %} · not read{% endif %} · {% endif %}<a href="/flows">Edit on Flows</a></div>
+  <div class="row gap wrap">{% if sw.choices %}<select class="input setin" id="teamflow" aria-label="The flow it runs" data-flow="{{ sw.flow or '' }}">{% for c in sw.choices %}<option value="{{ c.name }}"{% if c.current %} selected{% endif %}{% if c.cannot_run %} disabled title="{{ c.cannot_run }}"{% endif %}>{{ c.name }}{% if c.cannot_run %} · {{ c.cannot_run }}{% endif %}</option>{% endfor %}</select>{% elif sw.flow %}<b>{{ sw.flow }}</b>{% endif %}{% if sw.flow and not sw.flow_read %}<span class="note">not read</span>{% endif %}<a class="note" href="/flows">Edit on Flows</a></div>
+  {% if sw.choices_unread %}<div class="note warn">The flows it could be given were not read, so it cannot be switched now: {{ sw.choices_unread }}</div>{% endif %}
+  <div class="teamswitch" id="teamswitch" role="region" aria-label="The switch preview" hidden></div>
   {% if sw.note %}<div class="note">{{ sw.note }}</div>{% endif %}
   {%- macro pill(x) %}<a class="teampill{% if x.dashed %} dashed{% endif %}" href="{{ x.href }}"{% if x.holder %} title="held by {{ x.holder }}"{% endif %}><b>{{ x.id }}</b>{% if x.word %} {{ x.word }}{% endif %}</a>{% endmacro %}
   <div class="teammap">

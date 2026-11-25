@@ -696,6 +696,28 @@ def switched_team(show: Mapping[str, Any], tools: Mapping[str, Any] | None) -> d
     }
 
 
+NO_RUN = "cannot run here:"  # a disabled flow's reason begins so (§4.9d *The flow pick and a switch*)
+
+
+def flow_pick(pick: Any, flow: str | None) -> dict[str, Any]:
+    """The flow pick (§4.9d *The flow pick and a switch*, §4.5a *Team page: the flow it runs*, TD-2062), from the
+    `team_switch_preview` read with no flow: every flow the team could be given, each it cannot run disabled with its
+    reason, the one it runs selected. A pick that was not read is said, and the flow's name is drawn alone."""
+    if not isinstance(pick, Mapping):
+        return {"choices": [], "choices_unread": str(getattr(pick, "detail", "") or "not read")}
+    choices = [
+        {
+            "name": str(c.get("name")),
+            "current": bool(c.get("current")),
+            "cannot_run": str(c["cannot_run"]) if c.get("cannot_run") else None,
+        }
+        for c in pick.get("choices") or ()
+    ]
+    if flow and not any(c["current"] for c in choices):  # the flow it runs, though no longer offered, stays drawn
+        choices.insert(0, {"name": flow, "current": True, "cannot_run": f"{NO_RUN} no flow of that name is found"})
+    return {"choices": choices, "choices_unread": None}
+
+
 def team_head(name: str, d: Any, group: Mapping[str, Any] | None, host: str) -> dict[str, Any]:
     """The head of a team that is not switched (§4.9d *Before and after the cut-over*): the state word the Sessions
     card shows for the team, and its counts from the team's live members as that card counts them."""
