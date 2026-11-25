@@ -126,6 +126,53 @@ def test_a_refused_move_unwritten_goes_to_the_person(store):
     assert made.made and "refused" in store.entry(TID)["intent"]["ask"]
 
 
+# -- after a switch (§4.9d *A record marked `merging` is not touched*, TD-2062) ---------------------------------------
+
+SWITCHED: dict[str, Any] = {
+    **FLOW,
+    "name": "g",
+    "stages": [
+        {"name": "build", "does": "build", "model": "m", "takes": "any", "work-pushed": "review"},
+        {"name": "fix", "does": "build", "model": "m", "work-pushed": "review"},
+        {"name": "review", "does": "review", "model": "m", "ship": {"to": "merge", "refused": "fix"}},
+    ],
+}
+
+
+def _after_switch(store: StageStore, got: Any, doc: dict[str, Any], s: Reading = READ) -> Any:
+    return run(store, TID, MERGING, s, doc, "paul", lambda _p, _h: got, lambda _p, _h: None, NOW)
+
+
+def test_a_merge_under_way_is_taken_by_the_merge_gate_after_a_switch(store):
+    put(store)  # written under f; the team now runs g, which keeps review as a review
+    before = store.entry(TID)
+    s = Reading(pr_state="open", head=HEAD, flow_current=False)  # the record still names f
+    assert choose(before, s) == MERGING, "not rewritten to the new flow while it merges"
+    made = _after_switch(store, {"verdict": "pass", "failed": []}, SWITCHED, s)
+    assert made.made and store.entry(TID) == before, "the merge finishes as it would have"
+
+
+def test_a_merge_refused_after_a_switch_takes_the_new_flows_refused_move(store):
+    put(store)
+    s = Reading(pr_state="open", head=HEAD, flow_current=False)
+    made = _after_switch(store, {"verdict": "fail", "failed": ["ci"]}, SWITCHED, s)
+    r = store.entry(TID)
+    assert made.made and (r["stage"], r["waits"]) == ("fix", None), "g's refused move, not f's back to build"
+
+
+@pytest.mark.parametrize(
+    "doc, known",
+    [({**SWITCHED, "stages": SWITCHED["stages"][:2]}, True), (SWITCHED, False)],
+    ids=["no-such-key", "another-kind"],
+)
+def test_a_merge_refused_after_a_switch_that_lost_its_stage_goes_to_the_person(store, doc, known):
+    put(store)
+    s = Reading(pr_state="open", head=HEAD, flow_current=False, stage_known=known)
+    made = _after_switch(store, {"verdict": "fail", "failed": ["ci"]}, doc, s)
+    r = store.entry(TID)
+    assert made.made and r["stage"] == "review" and "refused" in r["intent"]["context"] and not r.get("counts")
+
+
 def test_a_moved_head_is_refused_without_running_the_gate(store):
     put(store)
     ran: list[int] = []

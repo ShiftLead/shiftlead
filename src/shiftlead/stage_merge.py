@@ -146,14 +146,17 @@ def _refused(
     person: str,
     why: str,
 ) -> Made:
-    """A cause a session can cure: the outcome's `refused` move, with a limit counted as any move's."""
+    """A cause a session can cure: the outcome's `refused` move, with a limit counted as any move's. `doc` is the flow
+    the team runs now, so after a switch the move is the **new** flow's; where that flow lacks the record's stage, by
+    key or by kind (`s.stage_known`, the reading a switch's reconcile takes), the entry goes to the person (§4.9d *A
+    record marked `merging` is not touched*)."""
     with store.locked():
         record = _current(store, tid, head)
         if record is None:
             return Made(False, "the record moved while the gate ran")
         merging = record["merging"]
         key, outcome = str(merging.get("stage") or record["stage"]), str(merging.get("outcome") or "")
-        stage = _stage_or_none(doc, key)
+        stage = _stage_or_none(doc, key) if s.stage_known else None
         if stage is None:
             return _to_person(store, record, s, doc, person, f"The merge was refused: {why}.")
         raw = destination(stage, outcome).get("refused", "person")

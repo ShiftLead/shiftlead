@@ -508,3 +508,18 @@ def test_two_presses_at_once_make_one_switch(agent):
 def test_a_number_is_kept_only_for_a_stage_of_the_same_key_and_kind():
     assert team_show._keys(NEW, OLD) == ["build"], "docs is a review now, not a build: its number goes"
     assert team_show._keys(NEW, None) == ["build", "docs"]
+
+
+def test_a_stopped_team_is_switched_and_no_session_is_ended(agent, on_store):
+    """§4.9d: a stopped team may be switched; with no session of it live the preview says none is ended, every line
+    says so, and the switch ends nothing — the records named holders whose sessions are gone."""
+    _store, roots = on_store
+    got = team_show.switch_preview(team="t", flow="lean", doc=_doc(), rows=ROWS, here="home", roots=roots, live=())
+    assert got["none_ended"] and not any(x["ends"] or "lost" in x["line"] for x in got["records"])
+    gone = [SimpleNamespace(id="ao-t-2", team="t", state="exited")]
+    pushes, closed = [], []
+    a = agent(_body(pushes), gone)
+    a.rpc_close = lambda **kw: closed.append(kw)
+    assert a._team_live("t") == [], "an exited session of the team is not live"
+    asyncio.run(a.rpc_team_switch(team="t", flow="lean", version=ts.version(settings_mod.load(), "t")))
+    assert pushes == ["lean"] and settings_mod.load()["teams"]["t"]["flow"] == "lean" and not closed
