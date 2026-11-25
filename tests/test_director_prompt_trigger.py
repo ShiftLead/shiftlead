@@ -218,3 +218,23 @@ async def test_a_repos_prompts_seat_is_not_the_director(agent, tmp_path):
         assert [c["by"] for c in agent._team_causes(rm, [rm, rw, rp])] == ["pending"], "no director stands"
         for sid in (w, mgr, p):
             await person.call("kill", id=sid)
+
+
+async def test_a_repos_prompts_seat_reads_its_own_repos_prompts_alone(agent, tmp_path):
+    """§4.9d (TD-2065): the prompts seat's `prompt` cause reads the unattended sessions of its repo only; the
+    director's reads every repo's."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        p = await _make(person, tmp_path, "prompts-r", seat={"trigger": "prompt"}, builtin="prompts")
+        d = await _make(person, tmp_path, "director", seat={"trigger": "prompt"})
+        mine = await _make(person, tmp_path, "mine")
+        theirs = await _make(person, tmp_path, "theirs")
+        rp, rd, rm, rt = (agent.sessions[i] for i in (p, d, mine, theirs))
+        rp.repo, rm.repo, rt.repo = "/home/k/r", "/node/k/r", "/home/k/other"
+        _ask(rm)
+        _ask(rt)
+        records = [rp, rd, rm, rt]
+        assert [c["member"] for c in agent._prompt_causes(rp, records)] == [mine]
+        assert {c["member"] for c in agent._prompt_causes(rd, records)} == {mine, theirs}
+        for sid in (p, d, mine, theirs):
+            await person.call("kill", id=sid)

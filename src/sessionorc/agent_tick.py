@@ -4457,9 +4457,12 @@ class TickMixin:
         member and the prompt's own id (`prompt`: its `tool_use_id`, else its text). An interactive record's
         prompt is the person's alone, as is one only its terminal answers."""
         causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        # a repo's prompts seat reads the unattended sessions of its repo alone (§4.9d, TD-2065), by checkout name
+        mine = Path(str(s.repo)).name if s.builtin == "prompts" and s.repo else None
         for r in records:
             if (
                 r is not s
+                and (mine is None or (bool(r.repo) and Path(str(r.repo)).name == mine))
                 and r.supervised
                 and r.unattended
                 and not r.superseded_by
