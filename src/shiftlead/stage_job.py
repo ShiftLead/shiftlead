@@ -266,11 +266,13 @@ def pr_objects(
     work: Collection[int] = (),
 ) -> dict[str, PrObject]:
     """The trigger of the seat for pull requests nobody holds (design §4.9c *Two of the five are not seats today*): of
-    a repo reading's pull request orders (`teamrun.pr_orders`, each unheld, past its bound and never a fork's or a
-    draft's), the key of each red or filing pull request that asks for a job, with when it went red or opened. A
-    pull request an open stage record names (`entries`), or a board answer's open job (`jobs`), is that record's;
-    one in `work` is a pickable entry's (`entries_work`). A sync's and the gate sweep's are no red or filing pull
-    request of the seat's yet. Each key maps to a `PrObject`, its kind `red` or `filing`."""
+    a repo reading's pull request orders (`teamrun.pr_orders`, each unheld and past its bound), the key of each red,
+    filing, sync, lift or sweep pull request that asks for a job, with when it asked, on its kind's own stamp
+    (`red_since`, `filing_since`, `sync_since`, `lift_since`, `sweep_since`). A fork's sync is left out (`fork_sync`,
+    a sync row with no `fork` read as a fork's), so a stranger's pull request never reaches a session; another
+    login's sync and a sync draft are the seat's, and a lift or sweep order is never a fork's or a draft's. A pull
+    request an open stage record names (`entries`), or a board answer's open job (`jobs`), is that record's; one in
+    `work` is a pickable entry's (`entries_work`). Each key maps to a `PrObject`, its kind, and a sync's reason."""
     named = {str(r.get("pr")) for r in entries.values() if _open(r) and r.get("pr") is not None}
     named |= {str(r.get("pr")) for r in jobs.values() if _open(r) and r.get("seat") == "board-answers" and r.get("pr")}
     out: dict[str, PrObject] = {}
@@ -278,16 +280,23 @@ def pr_objects(
         num = o.get("pr")
         if not o.get("pr_order") or not isinstance(num, int) or isinstance(num, bool):
             continue
-        if o.get("sync") or o.get("lift") or o.get("sweep"):
-            continue
+        if fork_sync(o):
+            continue  # a stranger's pull request never reaches a session: the person's Inbox row draws it
         if str(num) in named or num in work:
             continue
         key = f"pr-{num}"
         if not JOB_KEY.fullmatch(key):
             continue  # no pull request's number: never a job, and never a raise that stops the pass
-        kind = "filing" if o.get("filing") else "red"
-        out[key] = PrObject(str(o.get(f"{kind}_since") or ""), kind)
+        kind = next((k for k in ("sync", "lift", "sweep", "filing") if o.get(k)), "red")
+        reason = str(o.get("reason") or "") if kind == "sync" else ""
+        out[key] = PrObject(str(o.get(f"{kind}_since") or ""), kind, reason)
     return out
+
+
+def fork_sync(order: Mapping[str, Any]) -> bool:
+    """Whether a pull request order is a fork's sync, which no session takes: its row's `fork` true, or missing, read
+    as a fork's so that a row written before forks were copied never reaches a session (TD-2165)."""
+    return bool(order.get("sync")) and order.get("fork", True) is not False
 
 
 def _now() -> str:
