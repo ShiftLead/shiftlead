@@ -137,3 +137,24 @@ def test_the_form_drops_a_role_s_own_reader_after_the_marker(form, monkeypatch, 
     assert r.status_code == 303, r.text
     made = next(p for m, p in calls if m == "create")
     assert (made.get("review") is None) is is_off
+
+
+@pytest.mark.parametrize(("verb", "started"), [("start", True), ("stop", False)])
+def test_ao_team_start_and_stop_set_and_clear_the_mark_after_the_marker(marked, monkeypatch, capsys, verb, started):
+    """`ao team start|stop` after the cut-over send `team_mark` and run no first-shape sequence (§4.7, TD-2065)."""
+    sent = []
+
+    def call(method, **params):
+        sent.append((method, params))
+        return {"team": "t", "started": started, "change": f"t {'started' if started else 'wound down'}"}
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["team", verb, "t"]) == 0
+    assert sent == [("team_mark", {"team": "t", "started": started})]
+    assert capsys.readouterr().out.strip() == f"t {'started' if started else 'wound down'}"
+
+
+def test_ao_team_stop_now_is_refused_after_the_marker(marked, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "call_sync", lambda *a, **k: pytest.fail("nothing is sent"))
+    assert cli.main(["team", "stop", "t", "--now"]) == 1
+    assert "ends no session" in capsys.readouterr().err

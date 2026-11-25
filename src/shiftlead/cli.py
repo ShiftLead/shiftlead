@@ -1199,13 +1199,22 @@ def _first_shape_gone(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _team_mark(args: argparse.Namespace, started: bool) -> int:
+    """`ao team start|stop` after the cut-over (§4.7, §4.9d *Started is a mark the home keeps*, TD-2065): the team's
+    started mark set or cleared at the home (`team_mark`), which starts and ends no session itself."""
+    got = call_sync("team_mark", team=args.name, started=started)
+    return emit(args, got, lambda: print(got["change"]))
+
+
 def cmd_team_start(args: argparse.Namespace) -> int:
     """`ao team start <name>` (design §4.9): the sequence itself lives in `shiftlead.teamrun`, which
     the Sessions page's **Teams** strip runs too, so the two cannot drift — every check before any
     create, the lead first, then each member with `controllers: [lead id]`. A live name holder
     refuses the whole start, so there is never half a team; an exited or closed holder is
     superseded, which makes this the restart too. What is left here is the terminal's half: the
-    messages and the exit code."""
+    messages and the exit code. After the cut-over it sets the team's started mark instead."""
+    if teamstore.first_shape_off():
+        return _team_mark(args, True)
     try:
         org = _org_here()
     except ValueError as e:
@@ -1291,7 +1300,12 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     """`ao team stop <name>` (design §4.9): the wrap-up prompt — the one the card's **Wrap up**
     sends, `shiftlead.teams.WRAPUP_PROMPT` — to each member, wait for each to go idle or the window
     to pass, then the lead. `--now` kills instead of asking. Both halves are `shiftlead.teamrun`'s,
-    shared with the Sessions page's strip; here they run in a row, because a terminal may wait."""
+    shared with the Sessions page's strip; here they run in a row, because a terminal may wait. After the cut-over
+    it clears the team's started mark instead, the Wind down: each running session ends its stage."""
+    if teamstore.first_shape_off():
+        if args.now:
+            return fail(args, "after the switch-over Wind down ends no session: a stop time is the harder stop", 1)
+        return _team_mark(args, False)
     try:
         org = _org_here()
         # A lead stopping its own team is the wind-down of §4.9a: same sequence, never typed at.

@@ -1,5 +1,5 @@
 """One repo's stage pass as the tick calls it (design §4.9c *The home acts only where no session will*, TD-2051): a
-switched team's flow found and checked, its records read against it, and no session started before TD-2065."""
+switched team's flow found and checked, its records read against it, and no session started for a team not started."""
 
 from __future__ import annotations
 
@@ -116,7 +116,7 @@ def test_a_pass_reads_a_switched_team_stores_its_flow_and_starts_nothing(root: P
     assert got is not None and got.unread == () and list(got.teams) == ["t"]
     store = StageStore(root)
     assert store.flow("t") == (flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8")
-    assert store.entry("TD-7") is None, "no team is started before TD-2065, so nothing is offered"
+    assert store.entry("TD-7") is None, "no team is started, so nothing is offered"
     assert got.tell == {}
     a_pass(root, kept)
     assert len(quiet) == 1, "one gate and land per repo, kept between passes"
@@ -179,6 +179,25 @@ def test_origins_branches_are_read_once_a_pass_and_only_for_a_carried_branch(
 
 
 @pytest.mark.unit
+def test_each_teams_facts_read_its_own_started_mark(
+    root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A team's facts may start a session only by the home's started mark in its `host` record (§4.9d *Started is a
+    mark the home keeps*, TD-2065): a started team's yes, a team the person stopped and one with no record no."""
+    given: dict[str, bool] = {}
+
+    def facts(*_a: Any, **kw: Any) -> None:
+        given[kw["team"]] = kw["started"]
+        return None
+
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_facts", facts)
+    three = {"t": TEAM, "u": TEAM, "v": TEAM}
+    marks = {"t": {"started": {"since": "x", "by": "person"}}, "u": {"stopped": {"at": "x", "by": "person"}}}
+    a_pass(root, Kept(), teams=three, host_teams=marks)
+    assert given == {"t": True, "u": False, "v": False}
+
+
+@pytest.mark.unit
 def test_a_team_launches_from_the_flow_the_pass_runs(
     root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -222,7 +241,7 @@ def test_with_the_orders_both_seats_are_passed_over_and_nothing_starts(root: Pat
     )
     assert set(got.jobs) == {"board-answers", "unheld-pull-requests"}
     assert [s.key for s in got.jobs["board-answers"]] == ["board-1a2b3c4d"]
-    assert all(s.act is None for steps in got.jobs.values() for s in steps), "no team is started before TD-2065"
+    assert all(s.act is None for steps in got.jobs.values() for s in steps), "no team is started"
     assert StageStore(root).jobs() == {}
 
 

@@ -222,13 +222,14 @@ def launched(host: str = "") -> stage_start.StageLaunch:
 def reach(monkeypatch: pytest.MonkeyPatch, call: Calls, *, started: bool = True, host: str = "") -> stage_pass.Reach:
     monkeypatch.setattr(stage_start, "launch", lambda *a, **k: launched(host))
     monkeypatch.setattr(stage_start, "team_started", lambda *a: started)
-    return stage_pass.reach_for(call, object(), object(), {}, lambda *a: None, lambda *a: None, host="", here="h")
+    team = SimpleNamespace(name="t")
+    return stage_pass.reach_for(call, object(), team, {}, lambda *a: None, lambda *a: None, host="", here="h")
 
 
 def test_a_start_creates_the_session_and_names_its_holder(monkeypatch: pytest.MonkeyPatch) -> None:
     call = Calls()
     assert reach(monkeypatch, call).start("build", Work("TD-7")) == "build-td-7"
-    assert [m for m, _ in call.seen] == ["name_check", "create"]
+    assert [m for m, _ in call.seen] == ["host", "name_check", "create"]
 
 
 def test_a_start_on_a_node_names_the_holder_by_its_address(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -238,13 +239,13 @@ def test_a_start_on_a_node_names_the_holder_by_its_address(monkeypatch: pytest.M
 def test_a_team_not_started_starts_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     call = Calls()
     assert reach(monkeypatch, call, started=False).start("build", Work("TD-7")) is None
-    assert call.seen == []
+    assert [m for m, _ in call.seen] == ["host"]
 
 
 def test_a_live_name_starts_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     call = Calls(verdict="live")
     assert reach(monkeypatch, call).start("build", Work("TD-7")) is None
-    assert [m for m, _ in call.seen] == ["name_check"]
+    assert [m for m, _ in call.seen] == ["host", "name_check"]
 
 
 def test_a_claim_is_written_on_the_holder_and_a_refusal_is_returned(monkeypatch: pytest.MonkeyPatch) -> None:

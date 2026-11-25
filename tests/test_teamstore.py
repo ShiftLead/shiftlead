@@ -395,3 +395,87 @@ def test_a_state_branch_not_read_refuses_the_delete(agent, monkeypatch):
     with pytest.raises(RpcError, match="not deleted: origin away"):
         asyncio.run(a.rpc_team_delete(team="a", version=v))
     assert "a" in settings_mod.load()["teams"]
+
+
+# the started mark (§4.9d *Started is a mark the home keeps*, TD-2065)
+
+
+def test_a_start_sets_the_mark_and_deletes_stopped_and_a_second_start_writes_nothing():
+    marks = {"a": {"stopped": {"at": "t0", "by": "person"}, "balance": {"keep": 1}}}
+    assert not ts.started(marks, "a")
+    assert ts.mark_started(marks, "a", "schedule", "t1")
+    assert marks == {"a": {"started": {"since": "t1", "by": "schedule"}, "balance": {"keep": 1}}}
+    assert ts.started(marks, "a") and not ts.started(marks, "b") and not ts.started(None, "a")
+    assert not ts.mark_started(marks, "a", "person", "t2") and marks["a"]["started"]["since"] == "t1"
+    with pytest.raises(ValueError):
+        ts.mark_started(marks, "b", "tick", "t1")
+
+
+def test_a_stop_clears_only_a_set_mark_so_a_stop_time_never_overwrites_the_persons():
+    marks = {"a": {"started": {"since": "t1", "by": "person"}}}
+    assert ts.mark_stopped(marks, "a", "person", "t2")
+    assert marks == {"a": {"stopped": {"at": "t2", "by": "person"}}}
+    assert not ts.mark_stopped(marks, "a", "until", "t3"), "a stop time on a stopped team is spent"
+    assert marks["a"]["stopped"] == {"at": "t2", "by": "person"}
+    assert not ts.mark_stopped(marks, "b", "until", "t3") and "b" not in marks
+    with pytest.raises(ValueError):
+        ts.mark_stopped(marks, "a", "schedule", "t3")
+
+
+def test_team_mark_starts_and_winds_down_a_switched_team_and_saves_the_record(agent, monkeypatch):
+    a = _agent_on(monkeypatch, SimpleNamespace())
+
+    async def go():
+        got = await a.rpc_team_mark(team="a", started=True)
+        assert got == {"team": "a", "started": True, "change": "a started"}
+        assert a._host_rec["teams"]["a"]["started"]["by"] == "person"
+        assert a.host_saves[-1]["teams"]["a"]["started"] and a.host_pushes == 1
+        again = await a.rpc_team_mark(team="a", started=True)
+        assert again["change"] == "a is already started" and a.host_pushes == 1
+        got = await a.rpc_team_mark(team="a", started=False)
+        assert got["change"] == "a wound down"
+        assert set(a._host_rec["teams"]["a"]) == {"stopped"} and a._host_rec["teams"]["a"]["stopped"]["by"] == "person"
+        assert (await a.rpc_team_mark(team="a", started=False))["change"] == "a is not started"
+        assert a.host_pushes == 2
+
+    asyncio.run(go())
+
+
+def test_team_mark_is_refused_before_the_cut_over_for_an_unswitched_team_and_without_a_word(agent, monkeypatch):
+    a = _agent_on(monkeypatch, SimpleNamespace())
+
+    async def go():
+        with pytest.raises(RpcError, match="no switched team 'zz'"):
+            await a.rpc_team_mark(team="zz", started=True)
+        with pytest.raises(RpcError, match="started: true"):
+            await a.rpc_team_mark(team="a", started="yes")
+        doc = settings_mod.load()
+        del doc["cut_over"]
+        settings_mod.save(doc)
+        with pytest.raises(RpcError, match=ts.BEFORE):
+            await a.rpc_team_mark(team="a", started=True)
+        assert a._host_rec == {} and not a.__dict__.get("host_saves")
+
+    asyncio.run(go())
+
+
+def test_a_mark_that_cannot_be_saved_is_put_back(agent, monkeypatch):
+    a = _agent_on(monkeypatch, SimpleNamespace())
+
+    def broken(_rec):
+        raise OSError("disk full")
+
+    a.host_store = SimpleNamespace(save=broken)
+    with pytest.raises(OSError):
+        asyncio.run(a.rpc_team_mark(team="a", started=True))
+    assert "a" not in a._host_rec.get("teams", {})
+
+
+def test_delete_is_refused_while_the_team_is_started(agent, monkeypatch):
+    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *_: None)
+    a = _agent_on(monkeypatch, body)
+    a._host_rec = {"teams": {"a": {"started": {"since": "t1", "by": "person"}}}}
+    v = ts.version(settings_mod.load(), "a")
+    with pytest.raises(RpcError, match="a is started: wind it down first"):
+        asyncio.run(a.rpc_team_delete(team="a", version=v))
+    assert "a" in settings_mod.load()["teams"]
