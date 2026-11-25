@@ -302,13 +302,13 @@ def test_the_jobs_reach_is_given_each_teams_flow_place_and_directory(
 ) -> None:
     """A review stage on a job reads its brief from its team's own flow (TD-2192): the jobs' reach is handed, by
     team, the place and directory its flow file is found in, and the package's where none is found."""
-    mine = root / flow3.REPO_DIR / "mine"
+    mine = root / flow3.REPO_DIR / "jobs-own"  # a name no other test writes in the shared home's org flows
     mine.mkdir(parents=True)
     (mine / flow3.FILE).write_text((flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8"))
     given: list[dict[str, Any]] = []
     monkeypatch.setattr(stage_tick.stage_job_tick, "reach_for", lambda *a, **k: given.append(k) or "reach")
     monkeypatch.setattr(stage_tick.stage_job_tick, "run", lambda *a, **k: {})
-    teams = {"t": TEAM, "m": {**TEAM, "flow": "mine"}, "n": {**TEAM, "flow": "nowhere"}}
+    teams = {"t": TEAM, "m": {**TEAM, "flow": "jobs-own"}, "n": {**TEAM, "flow": "nowhere"}}
     a_pass(root, Kept(), teams=teams, orders=[], pr_orders=[], boards={"boards": []})
     assert given[0]["flows_at"] == {
         "t": ("package", flow3.PACKAGE_DIR / "build"),
