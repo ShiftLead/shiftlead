@@ -2541,8 +2541,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   finds mechanical needs no session. The policy runs **at the home** (§4.4a), in the promote's pass
   and on its cadence (five minutes, detached as the `gh` reads are), over every checkout in the
   home's registry, from the open PRs of the repo's PR reading (§4.4 *Repo facts*: each with its
-  `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test) and, after the cut-over, that no open job
-  record names (its merge is the flow's, §4.9c *Two of the five are not seats today*, TD-2164),
+  `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test) and, after the cut-over (`teamstore.cut_over`), that no open job
+  record names (its merge is the flow's, §4.9c *Two of the five are not seats today*, TD-2164) — the
+  numbers of the pull requests open `pr-<n>` job records name, which the pass asks of `shiftlead` through
+  the `shiftlead.home_calls` entry point as the stage calls do, since `sessionorc` never imports it; a
+  call that fails is no reading, and the pass judges no sync PR of that repo that turn,
   that is not a draft and not `conflicting`, and whose `checks` read *green* — or, in a repo that
   sets `precheck` (*The precheck on main*, *Where `precheck` is read*), read *none* with no
   `cadence/precheck` on its head: no workflow runs on a PR there, so step 4's precheck is what makes
