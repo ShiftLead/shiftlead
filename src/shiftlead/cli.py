@@ -5532,7 +5532,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     from shiftlead import switchover
 
     try:
-        profs, _ = profiles_mod.load()
+        profs, default = profiles_mod.load()
     except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1
@@ -5540,7 +5540,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
-    plans, builtins = None, None
+    plans, builtins, director = None, None, None
     try:
         org, notes = _org_notes("ao switch-over check")
     except (ValueError, OSError, yaml.YAMLError) as e:  # a node, or an org file that cannot be read
@@ -5551,7 +5551,10 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos())
         builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
         blockers += more + sets
-    print("\n".join(switchover.report(host, made, blockers, plans, builtins)))
+        if org.director is not None:  # the profile it launches on today: its own, else the profiles file's default
+            director, more = switchover.director(answers, made, builtins, org.director.profile or default)
+            blockers += more
+    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director)))
     return 1 if any(not b.day for b in blockers) else 0
 
 

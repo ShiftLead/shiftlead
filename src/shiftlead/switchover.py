@@ -17,8 +17,11 @@ login its host would not have, a model no login in its list offers.
 `builtin_set` reads the answers' `builtins.default`, every seat's model with the package's where it is left out, and
 §4.9e *Blockers*' set cases: an empty list on a home with a team, a login the home would not have, a seat's model no
 login in the list offers.
-The director, the work in flight, a container node's logins, writing the answers file (`--answers`) and `--host` are
-later slices of TD-2071.
+Where the org has a director, `director` reads the answers' `director:`, suggests its model and login (the set's
+prompts model, and the login made from the profile it launches on today), and blocks on §4.9e *Blockers*' director
+cases: no entry, an empty list, a login the home would not have, a model no login in its list offers.
+A director list whose every login leaves its prompts on, the work in flight, a container node's logins, writing the
+answers file (`--answers`) and `--host` are later slices of TD-2071.
 """
 
 from __future__ import annotations
@@ -626,6 +629,91 @@ def set_lines(plan: SetPlan) -> list[str]:
     return lines
 
 
+@dataclass
+class DirectorPlan:
+    """The director the answers give (§4.9e *The answers file*, `director:`), beside what `--answers` would suggest:
+    the set's prompts model, the seat that stands in for it, and the login made from the profile the director
+    launches on today (`profile`; its role's precedence, the profiles file's default, where `org.yml` names none).
+    `given` is False where the answers have no `director:`."""
+
+    suggest_model: str
+    suggest_login: str | None
+    profile: str | None
+    given: bool = False
+    model: str | None = None
+    logins: list[str] = field(default_factory=list)
+
+
+DIRECTOR = "the director"  # a director blocker's `where`
+
+
+def director(
+    answers: Mapping[str, Any] | None,
+    made: Iterable[Login],
+    builtins: SetPlan | None,
+    profile: str | None,
+) -> tuple[DirectorPlan | None, list[Blocker]]:
+    """The answers' `director:` for an org that has a director, and §4.9e *Blockers*' director cases: no entry, a
+    model that is none, an empty list, a login the home would not have, a model no login in its list offers. The
+    director runs on the home, so its list is read against the home's logins alone. With no answers file, None and
+    nothing: the file's own blocker says so."""
+    if answers is None:
+        return None, []
+    made = list(made)
+    model = (builtins.models if builtins is not None else {}).get(builtinstore.PROMPTS) or builtinstore.model(
+        {}, builtinstore.PROMPTS
+    )
+    login = next((lg.key for lg in made if profile is not None and profile in lg.profiles), None)
+    plan = DirectorPlan(model, login, profile)
+    shape = f"director: {{model: {model}, logins: [{login or '<tool>:<name>'}]}}"
+    row = answers.get("director")
+    if row is None:
+        return plan, [Blocker(DIRECTOR, "the org has a director and the answers give it none", f"write {shape}")]
+    plan.given = True
+    out: list[Blocker] = []
+    given = row.get("model")
+    if isinstance(given, str) and builtinstore._MODEL.fullmatch(given):
+        plan.model = given
+    else:
+        what = "has no model" if given is None else "director.model is not a model"
+        out.append(Blocker(DIRECTOR, what, f"give director.model a model family: {model} stands in for it today"))
+    listed = row.get("logins")
+    if isinstance(listed, list) and all(isinstance(x, str) and all(logins.split(x)) for x in listed):
+        plan.logins = list(dict.fromkeys(listed))
+    elif listed is not None:
+        out.append(Blocker(DIRECTOR, "director.logins is not a list of <tool>:<name>", "mend it"))
+        return plan, out
+    if not plan.logins:
+        out.append(Blocker(DIRECTOR, "its login list is empty", f"list a login in director.logins: {shape}"))
+        return plan, out
+    rows = {lg.key: {"models": lg.models, "pin": lg.pin} for lg in made}
+    out += [
+        Blocker(DIRECTOR, f"lists {lk}, a login the home would not have", "take it out of director.logins")
+        for lk in plan.logins
+        if lk not in rows
+    ]
+    known = [lk for lk in plan.logins if lk in rows]
+    if plan.model and known and not any(teamstore.offers(rows[lk], plan.model) for lk in known):
+        out.append(
+            Blocker(
+                DIRECTOR,
+                f"no login in its list offers {plan.model}, its model",
+                "list a login that offers it, or give director.model another model",
+            )
+        )
+    return plan, out
+
+
+def director_lines(plan: DirectorPlan) -> list[str]:
+    """`ao switch-over check`'s lines for the director: what the answers give, and what `--answers` suggests."""
+    on = f" (from profile {plan.profile})" if plan.profile else ""
+    suggest = f"suggested: model {plan.suggest_model}, login {plan.suggest_login or 'none the home would make'}{on}"
+    if not plan.given:
+        return ["the director the answers give", f"  none; {suggest}"]
+    listed = ", ".join(plan.logins) or "none"
+    return ["the director the answers give", f"  model {plan.model or 'none'}; logins {listed}", f"    {suggest}"]
+
+
 def team_lines(plans: Iterable[TeamPlan]) -> list[str]:
     """`ao switch-over check`'s lines for the teams: each with what the answers give it."""
     plans = list(plans)
@@ -654,9 +742,10 @@ def report(
     blockers: Iterable[Blocker],
     plans: Iterable[TeamPlan] | None = None,
     builtins: SetPlan | None = None,
+    director: DirectorPlan | None = None,
 ) -> list[str]:
     """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, the built-in set where
-    `builtins` is, then every blocker, those of the day last."""
+    `builtins` is, the director where `director` is, then every blocker, those of the day last."""
     lines = [f"{host}: logins the move would make"]
     made = list(made)
     for login in made:
@@ -668,6 +757,8 @@ def report(
         lines += team_lines(plans)
     if builtins is not None:
         lines += set_lines(builtins)
+    if director is not None:
+        lines += director_lines(director)
     blockers = list(blockers)
     first = [b for b in blockers if not b.day]
     day = [b for b in blockers if b.day]
