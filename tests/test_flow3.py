@@ -67,6 +67,8 @@ def test_each_format3_builtin_passes(name):
             "Build: `work-pushed` goes to the audit `sweep`",
         ),
         (edit(0, ship="review"), "Build: `ship` is not an outcome of a build stage"),
+        (edit(0, **{"closed-unmerged": "review"}), "Build: unknown key `closed-unmerged`"),  # a job's outcome alone
+        (edit(1, **{"closed-unmerged": "merge"}), "Review: unknown key `closed-unmerged`"),
         (edit(1, **{"changes-wanted": "build"}, ship="build"), "a loop through it has no limit"),
         (edit(0, **{"work-pushed": "build", "other": "build"}), "(rule 3)"),
         (edit(0, **{"work-pushed": "done"}), "Build: `work-pushed: done` is not a destination"),

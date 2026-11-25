@@ -1029,7 +1029,7 @@ def cmd_stage_end(args: argparse.Namespace) -> int:
     if sid is None:
         return 2
     got = call_sync("stage_end", id=sid, outcome=args.outcome, reason=args.reason or "")
-    again = " (already taken)" if got.get("repeat") else ""
+    again = f" ({got.get('said') or 'already taken'})" if got.get("repeat") else ""
     return emit(args, got, lambda: print(f"{got['entry']}: {got['outcome']} → {got['went']}{again}"))
 
 
@@ -6189,7 +6189,11 @@ def build_parser() -> argparse.ArgumentParser:
     ssub = p.add_subparsers(dest="action", required=True)
     q = ssub.add_parser("end", help="end this session's stage with one outcome, which the home checks")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
-    q.add_argument("outcome", help="the outcome: the stage's prompt lists its kind's")
+    q.add_argument(
+        "outcome",
+        help="the outcome: the stage's prompt lists its kind's; closed-unmerged ends a pull request's job whose pull "
+        "request you closed unmerged",
+    )
     q.add_argument("--reason", help="why: needed by every outcome but work-pushed and ship")
     q.set_defaults(fn=cmd_stage_end)
     q = ssub.add_parser("show", help="print an entry's stage record")

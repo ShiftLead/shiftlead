@@ -265,3 +265,10 @@ def test_a_repeated_other_writes_no_second_line():
     _end(store, "other", "stuck", lines=lines)
     got = _end(store, "other", "stuck", lines=lines)
     assert got["repeat"] and got["went"] == "person" and len(lines) == 1 and len(store.writes) == 1
+
+
+def test_closed_unmerged_is_refused_from_an_audits_session():
+    store = Store(run())
+    with pytest.raises(Refused, match="closed-unmerged ends a pull request's job alone"):
+        _end(store, "closed-unmerged", "closed it")
+    assert store.writes == []

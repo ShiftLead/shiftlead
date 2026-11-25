@@ -317,5 +317,6 @@ def moved(record: Mapping[str, Any], team: str) -> dict[str, Any]:
 
 
 def closed(record: Mapping[str, Any]) -> dict[str, Any]:
-    """The job's object is gone: the record closed and its holder cleared."""
-    return {**record, "holder": None, "waits": None, "closed_at": _now()}
+    """The job's object is gone: the record closed and its holder cleared, the session it last named kept as
+    `closed_holder`, whose later `closed-unmerged` is answered as a repeat (§4.9d *The session ends its job*)."""
+    return {**record, "holder": None, "waits": None, "closed_at": _now(), "closed_holder": record.get("holder")}

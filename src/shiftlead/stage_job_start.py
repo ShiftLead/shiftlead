@@ -93,6 +93,12 @@ def told(record: Mapping[str, Any], *, team: str, adds_review: bool, came: str |
         f"- `work-pushed`: the branch is pushed and its pull request is open, its precheck green, and {closes}; no "
         "entry is archived, a job having none. The team's flow then reviews it and the home merges it."
     )
+    if seat == "unheld-pull-requests":
+        lines.append(
+            "- `closed-unmerged`: a reason is given, and the pull request is closed and not merged: where the cure is "
+            "to close it (its work done elsewhere, its filing already landed, or what its order's words say to close "
+            "it on), close it with a comment saying why, then end so; the job closes."
+        )
     lines.append("- `other`: a reason is given, and the job goes to the person with it; the last choice.")
     if adds_review:
         lines.append(
