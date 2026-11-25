@@ -238,8 +238,8 @@ def test_the_call_routes_a_job_reference_to_the_job_end(monkeypatch, tmp_path):
         def flow(self, team):
             return "format: 3\nname: t\nstages: []\n"
 
-    def fake_end_job(store, ref, caller, outcome, reason, doc, facts, line):
-        seen.update(ref=ref, caller=caller, outcome=outcome, doc=doc, line=callable(line))
+    def fake_end_job(store, ref, caller, outcome, reason, doc, facts, line, *, board):
+        seen.update(ref=ref, caller=caller, outcome=outcome, doc=doc, line=callable(line), board=board)
         return {"entry": ref, "outcome": outcome, "went": "review", "repeat": False}
 
     monkeypatch.setattr(stage_end, "StageStore", FakeStore)
@@ -260,4 +260,45 @@ def test_the_call_routes_a_job_reference_to_the_job_end(monkeypatch, tmp_path):
         "outcome": "work-pushed",
         "doc": {"format": 3, "name": "t", "stages": []},
         "line": True,
+        "board": "docs/user_attention",
     }
+
+
+def test_a_move_to_merge_is_never_counted_against_a_limit_or_the_cap():
+    store = Store(_record(moves=25, counts={"build:work-pushed": 3}))
+    doc = flow()
+    doc["stages"][1]["work-pushed"] = {"to": "merge", "limit": 3}
+    assert _end(store, doc=doc)["went"] == "merge"
+    assert store.record["moves"] == 25 and store.record["counts"] == {"build:work-pushed": 3}
+
+
+def test_the_line_is_closed_only_under_the_boards_own_archive():
+    moved = (f"docs/user_attention/archive/2026-11/2026-11-20-{ITEM}.md",)
+    assert closes_line(moved, ITEM) and not closes_line(moved, ITEM, "ops/board")
+    assert not closes_line((f"docs/other/archive/2026-11/2026-11-20-{ITEM}.md",), ITEM)
+    assert closes_line((f"ops/board/archive/2026-11/2026-11-20-{ITEM}.md",), ITEM, "ops/board")
+    store = Store(_record())
+    with pytest.raises(Refused, match="does not close the board line"):
+        end_job(store, f"board:{ITEM}", ME, "work-pushed", "", flow(), Fake(_pr()), Lines(), board="ops/board")
+
+
+def test_a_move_back_to_the_jobs_own_stage_is_counted_and_offered_afresh():
+    store = Store(_record())
+    assert _end(store, doc=flow("build"))["went"] == "build"
+    r = store.record
+    assert (r["stage"], r["holder"], r["offers"], r["moves"], r["waits"]) == ("build", None, 0, 1, None)
+    assert stage_job.choose(r, stage_job.JobReading(may_start=True)) == stage_job.JobAct("offer")
+
+
+def test_a_job_at_a_review_stage_is_no_offer_of_its_seat():
+    store = Store(_record())
+    _end(store)
+    reading = stage_job.JobReading(may_start=True, at_job_stage=False)
+    assert stage_job.choose(store.record, reading) is None
+    assert stage_job.order([store.record], {}, "build") == []
+
+
+def test_the_board_directory_is_the_stubs_name_less_md(tmp_path):
+    (tmp_path / "docs" / "user_attention").mkdir(parents=True)
+    (tmp_path / "docs" / "user_attention.md").write_text("stub\n")
+    assert stage_job_end.board_dir(tmp_path) == "docs/user_attention"

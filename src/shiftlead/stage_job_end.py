@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from sessionorc import workorders
@@ -28,6 +28,7 @@ from shiftlead.stage_job_start import job_stage, lane_of
 from shiftlead.stagerecord import StageStore, _now
 
 OUTCOMES = ("work-pushed", flow3.OTHER)
+BOARD_DIR = "docs/user_attention"
 REF = re.compile(rf"(?:{re.escape(workorders.PREFIX)}[0-9a-f]{{8}}|{re.escape(workorders.PR_PREFIX)}[1-9]\d{{0,6}})")
 
 
@@ -45,14 +46,22 @@ def key_of_ref(ref: str) -> str:
     return stage_job.key_of("unheld-pull-requests", ref[len(workorders.PR_PREFIX) :])
 
 
-def closes_line(files: tuple[str, ...], item: str) -> bool:
+def closes_line(files: tuple[str, ...], item: str, board: str = BOARD_DIR) -> bool:
     """Whether a pull request's files close the board item `item` (its eight hex digits): its file, named
-    `<date>-<id>.md`, lands under the board's `archive/<YYYY-MM>/`."""
+    `<date>-<id>.md`, lands under `archive/` of the board's directory `board` (a v3 board's, its stub's name less
+    `.md`)."""
+    under = PurePosixPath(board.rstrip("/")) / "archive"
     for f in files:
         p = PurePosixPath(f)
-        if p.name.endswith(f"-{item}.md") and "archive" in p.parts[:-1]:
+        if p.name.endswith(f"-{item}.md") and p.is_relative_to(under):
             return True
     return False
+
+
+def board_dir(root: str | Path) -> str:
+    """The board's directory in the repo at `root`, as `closes_line` reads it (`workorders.board_rel`)."""
+    rel = PurePosixPath(workorders.board_rel(root).as_posix())
+    return str(rel.with_suffix("") if rel.suffix == ".md" else rel)
 
 
 def _stage(doc: Mapping[str, Any], key: str | None) -> dict[str, Any] | None:
@@ -62,7 +71,7 @@ def _stage(doc: Mapping[str, Any], key: str | None) -> dict[str, Any] | None:
     return None
 
 
-def _check_pushed(record: Mapping[str, Any], facts: Any) -> PullRequest:
+def _check_pushed(record: Mapping[str, Any], facts: Any, board: str) -> PullRequest:
     """`work-pushed`'s fact for a job: a build stage's, no entry archived, and the job's own pull request."""
     seat, obj = str(record.get("seat")), str(record.get("object"))
     given = int(obj) if seat == "unheld-pull-requests" else None
@@ -80,7 +89,7 @@ def _check_pushed(record: Mapping[str, Any], facts: Any) -> PullRequest:
         raise Refused(f"this worktree's head is not pull request #{pr.number}'s head: push your work")
     if not pr.precheck:
         raise Refused(f"pull request #{pr.number}'s precheck is not green at its head")
-    if seat == "board-answers" and not closes_line(pr.files, obj):
+    if seat == "board-answers" and not closes_line(pr.files, obj, board):
         raise Refused(f"pull request #{pr.number} does not close the board line {obj}: close it on the branch")
     return pr
 
@@ -102,10 +111,13 @@ def end_job(
     doc: Mapping[str, Any],
     facts: Any,
     line: Callable[[Mapping[str, Any], str], str | None],
+    *,
+    board: str = BOARD_DIR,
 ) -> dict[str, Any]:
     """Check a job session's `outcome` and write its move: `{entry, outcome, went, repeat}`, `entry` the job's
     reference, or `Refused` with nothing written. `line(record, reason)` writes the home's plain board line for a job
-    sent to the person and returns its id."""
+    sent to the person and returns its id; `board` is the board's directory (`board_dir`). The line is written before
+    the record, so a record that then fails to be written leaves a line the retry writes again."""
     key = key_of_ref(ref)
     said = " ".join((reason or "").split())
     with store.locked():
@@ -133,7 +145,7 @@ def end_job(
         head: str | None = None
         went, why = "person", said
         if outcome == "work-pushed":
-            pr = _check_pushed(record, facts)
+            pr = _check_pushed(record, facts, board)
             record["branch"], record["pr"], head = pr.branch, pr.number, pr.head
             where = destination(stage, outcome)
             went = _where(doc, here, str(where["to"]))
@@ -141,7 +153,7 @@ def end_job(
                 why = f"the flow sends work-pushed from {here} to {where['to']}, a stage a job never goes to"
             elif went == "person":
                 why = f"the flow sends work-pushed from {here} to the person"
-            else:
+            elif went != "merge":  # a move to merge is no stage's, so never counted, as an entry's is not
                 count, counts = f"{here}:{outcome}", record.setdefault("counts", {})
                 limit, cap = where.get("limit"), doc.get("max-moves", flow3.MAX_MOVES)
                 if limit is not None and int(counts.get(count, 0)) >= int(limit):

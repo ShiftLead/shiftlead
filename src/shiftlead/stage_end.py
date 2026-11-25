@@ -414,7 +414,15 @@ def call(
         facts = ForgeFacts(directory) if seen is None else NodeFacts(root, seen)
         if stage_job_end.is_ref(tid):  # a built-in seat's job session holds its work order, not an entry (TD-2053)
             return stage_job_end.end_job(
-                store, tid, caller, outcome, reason, doc, facts, stage_job_tick.home_line(Path(root))
+                store,
+                tid,
+                caller,
+                outcome,
+                reason,
+                doc,
+                facts,
+                stage_job_tick.home_line(Path(root)),
+                board=stage_job_end.board_dir(root),
             )
         return end(
             store,
