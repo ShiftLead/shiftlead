@@ -237,6 +237,7 @@ def test_after_the_cut_over_the_inbox_draws_a_forks_sync_in_a_serviced_repo(tmp_
     html = c.get("/inbox").text
     assert "samscrape #1801 · sync · a fork&#39;s head · eye" in html and "samscrape #802" not in html
     assert 'data-sid="red_pr:samscrape:1801" data-row="red_pr"' in html
+    assert c.get("/api/person/inbox").json()["needs"] == 1  # the count reads the same rows
 
 
 # -- a draft is no work order (design §4.4, TD-745) -------------------------------------------------------
