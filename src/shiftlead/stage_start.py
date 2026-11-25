@@ -178,10 +178,12 @@ def launch(
     place: str = "package",
     flow_dir: Path | None = None,
     files: teams.Files | None = None,
+    name: str | None = None,
 ) -> StageLaunch:
-    """The session for `key` on `work`, nothing created: the role of the stage's kind, its lane the one entry."""
+    """The session for `key` on `work`, nothing created: the role of the stage's kind, its lane the one entry (or a
+    job's work order, `name` then the session's name, `stage_job_start.review_launch`)."""
     stage = stage_of(doc, key)
-    kind, name = stage["does"], f"{key}-{work.entry.lower()}"
+    kind, name = stage["does"], name or f"{key}-{work.entry.lower()}"
     where = f"team {team.name}: {name}"
     checkout, read = teams._checkout(org, team, team.repo, host, here, files, where)
     try:

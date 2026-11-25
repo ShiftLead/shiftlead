@@ -303,7 +303,11 @@ def _jobs(
     )
     repo = next((str(e["repo"]) for e in teams.values() if e.get("repo")), root.name)
     hosts = {t: str(e.get("host") or "") for t, e in teams.items()}
-    reach = stage_job_tick.reach_for(call, org, root, repo, local=local, hosts=hosts, docs=docs)
+    flows_at: dict[str, tuple[str, Path | None]] = {}
+    for t, e in teams.items():
+        at = flow_file(root, str(e.get("flow") or ""))
+        flows_at[t] = (at[1], at[0].parent) if at is not None else ("package", None)
+    reach = stage_job_tick.reach_for(call, org, root, repo, local=local, hosts=hosts, docs=docs, flows_at=flows_at)
     return stage_job_tick.run(
         store,
         reach,

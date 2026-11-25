@@ -16,7 +16,13 @@ from shiftlead.stagerecord import StageStore
 pytestmark = pytest.mark.unit
 
 NOW = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
-FLOW = {"stages": [{"name": "build", "takes": "other"}, {"name": "review", "takes": "none"}]}
+FLOW = {
+    "stages": [
+        {"name": "build", "does": "build", "takes": "other"},
+        {"name": "review", "does": "review", "takes": "none"},
+        {"name": "polish", "does": "build", "takes": "none"},
+    ]
+}
 
 
 def git(root: Path, *args: str) -> None:
@@ -126,6 +132,12 @@ def test_a_record_past_the_jobs_stage_or_on_a_stage_gone_reads_so():
     assert (at_review.at_job_stage, at_review.stage_known) == (False, True)
     gone = stage_job_pass.reading_on({**base, "stage": "qa"}, "k", facts(), seat_busy=False)
     assert not gone.stage_known
+    other = stage_job_pass.reading_on({**base, "stage": "polish"}, "k", facts(), seat_busy=False)
+    assert not other.stage_known  # a stage a job never stands at reads as its stage gone: a fresh job session
+    assert at_review.job_stage == "build"
+    no_job = {"stages": [{"name": "review", "does": "review", "takes": "none"}]}
+    lone = stage_job_pass.reading_on({**base, "stage": "review"}, "k", facts(docs={"t": no_job}), seat_busy=False)
+    assert not lone.stage_known  # no stage takes other entries: no job's session could end
     assert stage_job_pass.reading_on({**base, "stage": "build"}, "k", facts(docs={}), seat_busy=False) is None
 
 
@@ -233,6 +245,50 @@ def test_a_record_in_its_teams_review_does_not_hold_the_seat(store):
     f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions={"s-8": session("s-8")})
     stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-24"}, f, w.reach())
     assert w.started == ["board-0000aaaa"]
+
+
+def test_a_record_at_a_review_stage_is_offered_that_stages_session_while_a_job_session_runs(store):
+    put(store, key="board-1a2b3c4d", stage="review", entered_at="2026-11-24")
+    put(store, key="board-0000aaaa", holder="s-8", entered_at="2026-11-20")
+    w = World()
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions={"s-8": session("s-8", ref="board:0000aaaa")})
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    got = next(s for s in steps if s.key == "board-1a2b3c4d")
+    assert (got.act.name, got.act.case, got.made.made) == ("offer", "review", True)
+    assert w.started == ["board-1a2b3c4d"] and store.job("board-1a2b3c4d")["holder"] == "s-1"
+
+
+def test_a_review_stages_session_started_holds_no_new_job_back(store):
+    put(store, key="board-1a2b3c4d", stage="review", entered_at="2026-11-24")
+    w = World()
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"})
+    stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-20"}, f, w.reach())
+    assert w.started == ["board-1a2b3c4d", "board-0000aaaa"]
+
+
+def test_a_lost_review_session_is_offered_again_then_the_second_loss_goes_to_the_person(store):
+    put(store, stage="review", holder="s-9", offers=1)
+    w = World()
+    f = facts(live={"board-1a2b3c4d"}, sessions={"s-9": session("s-9", state="exited")})
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert steps[0].act.case == "review-lost" and w.ended == ["s-9"]
+    r = store.job("board-1a2b3c4d")
+    assert (r["holder"], r["offers"], r["stage"]) == ("s-1", 2, "review")
+    f = facts(live={"board-1a2b3c4d"}, sessions={"s-1": session("s-1", state="exited")})
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert steps[0].act.case == "to-person" and w.lines == [("board-1a2b3c4d", stage_job_make.LOST_TWICE)]
+    assert store.job("board-1a2b3c4d")["waits"] == "person" and w.started == ["board-1a2b3c4d"]
+
+
+def test_a_review_stage_cleared_of_the_person_is_offered_that_stages_session(store):
+    put(store, stage="review", waits="person", person_line="aaaa0001", offers=2)
+    w = World()
+    f = facts(live={"board-1a2b3c4d"}, lines_open=set())
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert steps[0].act.case == "person-cleared" and w.started == []
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert steps[0].act.case == "review" and w.started == ["board-1a2b3c4d"]
+    assert store.job("board-1a2b3c4d")["stage"] == "review"
 
 
 def test_a_gone_object_closes_though_its_own_pull_requests_row_is_not_read(store):

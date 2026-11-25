@@ -136,6 +136,47 @@ def test_the_reach_writes_and_closes_the_homes_line(monkeypatch, tmp_path):
     assert r.start(record, None) is None  # no org read: nothing starts
 
 
+def test_the_reach_starts_a_review_stages_session_where_the_record_stands_at_one(monkeypatch, tmp_path):
+    org = type("Org", (), {"teams": {"t": object()}})()
+    seen: list[tuple] = []
+
+    def review(read, team, doc, record, **kw):
+        seen.append(("review", record["stage"], kw["came"], kw["place"], kw["flow_dir"]))
+        return "review-launch"
+
+    def job(read, team, doc, record, model, **kw):
+        seen.append(("job", record["stage"], model))
+        return "job-launch"
+
+    monkeypatch.setattr(stage_job_tick.stage_job_start, "review_launch", review)
+    monkeypatch.setattr(stage_job_tick.stage_job_start, "launch", job)
+    monkeypatch.setattr(stage_job_tick.stage_start, "start", lambda call, read, team, got: {"id": got})
+    monkeypatch.setattr(stage_job_tick.stage_start, "holder_of", lambda got, made: made["id"])
+    monkeypatch.setattr(stage_job_tick.builtinstore, "sets", lambda sdoc: {"s": {}})
+    monkeypatch.setattr(stage_job_tick.builtinstore, "repo_set", lambda sdoc, repo: "s")
+    monkeypatch.setattr(stage_job_tick.builtinstore, "model", lambda entry, seat: "haiku")
+    r = stage_job_tick.reach_for(
+        lambda *a, **k: None,
+        lambda: org,
+        tmp_path,
+        "r",
+        local="h",
+        hosts={},
+        docs={"t": FLOW},
+        flows_at={"t": ("repo", tmp_path / "f")},
+        settings=dict,
+    )
+    record = stage_job.new_job("unheld-pull-requests", 4, "t", "x")
+    assert r.start({**record, "stage": "review"}, "pushed") == "review-launch"
+    assert r.start({**record, "stage": "build"}, None) == "job-launch"
+    assert r.start(record, None) == "job-launch"
+    assert seen == [
+        ("review", "review", "pushed", "repo", tmp_path / "f"),
+        ("job", "build", "haiku"),
+        ("job", None, "haiku"),
+    ]
+
+
 def test_a_job_waiting_merging_is_merged_after_the_seats_pass(store):
     record = {
         **stage_job.new_job("unheld-pull-requests", 4, "t", "2026-11-20T00:00:00Z"),

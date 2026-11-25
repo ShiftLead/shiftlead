@@ -6,7 +6,8 @@ already runs a job session. `seat_pass` takes one act on each of the seat's jobs
 by `stage_job_make.make`: the records already open first, then the objects with none, in `stage_job.order`'s order.
 **Each seat runs one job session at a time in a repo**, so once an offer this pass started one, no other job of the
 seat is offered until the next. A job with no reading this pass (its pull request's row missing, its holder's node not
-read, its team's flow not read) is left as it is. Nothing calls this yet; its wiring into the tick is a later slice.
+read, its team's flow not read) is left as it is. A record standing at one of its flow's review stages is offered
+that stage's session here too, which no job session of the seat holds back (`stage_job`); `stage_job_tick` calls this.
 """
 
 from __future__ import annotations
@@ -94,10 +95,17 @@ def _busy(record: Mapping[str, Any], f: JobFacts) -> bool:
 
 
 def _stage_known(record: Mapping[str, Any], doc: Mapping[str, Any]) -> bool:
-    stage = record.get("stage")
-    if stage is None:
+    """Whether the record's stage is one a job stands at in its team's flow: the job's own, or a review stage. One
+    that is no longer either (gone, or changed to another kind) reads as its stage gone."""
+    stage, own = record.get("stage"), job_stage(doc)
+    if stage is None or stage == own:
         return True
-    return any(isinstance(st, Mapping) and flow3.key_of(st.get("name")) == stage for st in doc.get("stages") or [])
+    if own is None:
+        return False  # no stage takes other entries, so no job's session could end: read as its stage gone
+    return any(
+        isinstance(st, Mapping) and flow3.key_of(st.get("name")) == stage and st.get("does") == "review"
+        for st in doc.get("stages") or []
+    )
 
 
 def reading_on(record: Mapping[str, Any] | None, key: str, f: JobFacts, *, seat_busy: bool) -> JobReading | None:
@@ -134,6 +142,7 @@ def reading_on(record: Mapping[str, Any] | None, key: str, f: JobFacts, *, seat_
         at_job_stage=record.get("stage") in (None, job_stage(doc or {})),
         stage_known=_stage_known(record, doc or {}),
         holder=holder,
+        job_stage=job_stage(doc or {}),
         **common,
     )
 
@@ -193,9 +202,10 @@ def step(
 
 
 def _started_one(got: JobStep) -> bool:
-    """Whether the step started a job session: an offer, or an offer again but the second loss's, to the person."""
+    """Whether the step started a job session: an offer, or an offer again but the second loss's, to the person. A
+    review stage's session on a job is no job session of the seat."""
     act = got.act
-    if act is None or not (got.made and got.made.made):
+    if act is None or act.review or not (got.made and got.made.made):
         return False
     return act.name == "offer" or (act.name == "offer-again" and act.case != "to-person")
 

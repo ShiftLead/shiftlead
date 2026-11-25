@@ -5,12 +5,15 @@ Board answers and pull requests nobody holds are jobs: a decided board line, or 
 `pr-<number>`) names the seat, the team whose host and flow it runs under, its holder and its offers, and what it waits
 on. This module is pure, as `stage_acts` is: `choose` names the first act whose condition holds, and `order` says which
 of a seat's jobs is offered next, since **each seat runs one job session at a time in a repo**; `board_objects` and
-`pr_objects` are the two seats' triggers, the objects `order` is given. Starting the session,
-writing the record and the home's board line are later slices of TD-2053.
+`pr_objects` are the two seats' triggers, the objects `order` is given.
 
 A job's record enters its team's flow at `work-pushed`, as a record of the stage that takes `other` entries would; from
-then on, while it is not at that stage, an entry's acts (`stage_acts`) move it, and only Reconcile's job cases here
-still apply. `JobReading.at_job_stage` says which.
+then on, while it stands at one of its flow's review stages, that stage reads its pull request with a fresh session of
+its own (§4.9d *Its pull request is reviewed and merged by the team's flow*): `choose` offers it (case `review`), and
+offers it again once where its holder was lost or went silent (cases `review-lost`, `review-silent`, `review-stopped`),
+the second loss going to the person as a job session's does. A review stage's session is no job session of the seat,
+so the seat's one job session at a time never holds it back. `JobReading.at_job_stage` says which stage the record is
+at; a record at a stage that is neither the job's nor a review stage reads as its stage gone.
 """
 
 from __future__ import annotations
@@ -60,9 +63,10 @@ class JobReading:
     person_line: Literal["open", "closed"] | None = None
     team_started: bool = True
     first_started: str | None = None
-    at_job_stage: bool = True  # the record is at the job's own stage, or has not yet entered the flow
-    stage_known: bool = True  # the record's stage is in its team's flow
+    at_job_stage: bool = True  # the record is at the job's own stage, or has not yet entered the flow; else a review's
+    stage_known: bool = True  # the record's stage is in its team's flow, the job's own or a review stage
     holder: Holder | None = None
+    job_stage: str | None = None  # the key of the job's own stage in the record's flow, where it was read
     may_start: bool = False  # the team is started, inside its schedule and not held by the usage gate
     seat_busy: bool = False
 
@@ -72,6 +76,11 @@ class JobAct:
     name: JobActName
     case: str = ""
     counted: bool = True  # offer-again: whether this loss spends an offer
+
+    @property
+    def review(self) -> bool:
+        """Whether the act starts a review stage's session on the job, which is no job session of the seat."""
+        return self.name in ("offer", "offer-again") and self.case.startswith("review")
 
 
 def new_job(seat: str, obj: str | int, team: str, opened_at: str) -> dict[str, Any]:
@@ -118,13 +127,16 @@ def _reconcile(record: Mapping[str, Any], s: JobReading) -> str | None:
 def _offer_again(record: Mapping[str, Any], holder: Holder, s: JobReading) -> JobAct | None:
     if not s.may_start:
         return None
+    review = not s.at_job_stage  # a review stage's session: the seat's one job session never holds it back
+    pre = "review-" if review else ""
+    busy = s.seat_busy and not review
     if holder.ended_by_stop:
-        return JobAct("offer-again", "stopped", counted=False) if not s.seat_busy else None
+        return JobAct("offer-again", f"{pre}stopped", counted=False) if not busy else None
     if int(record.get("offers") or 0) >= SECOND_LOSS:
         return JobAct("offer-again", "to-person")
-    if s.seat_busy:
+    if busy:
         return None  # another job session of the seat is live: this one waits, its lost holder named until then
-    return JobAct("offer-again", "lost" if holder.lost else "silent")
+    return JobAct("offer-again", f"{pre}lost" if holder.lost else f"{pre}silent")
 
 
 def choose(record: Mapping[str, Any] | None, s: JobReading) -> JobAct | None:
@@ -135,13 +147,15 @@ def choose(record: Mapping[str, Any] | None, s: JobReading) -> JobAct | None:
         return None
     if case := _reconcile(record, s):
         return JobAct("reconcile", case)
-    if record.get("waits") or not s.at_job_stage:
-        return None  # waiting, or in its team's flow past the job's stage, where an entry's acts move it
+    if record.get("waits"):
+        return None  # on the person, or on the home's merge
     if record.get("holder"):
         h = s.holder
         if h is not None and (h.lost or h.silent or h.ended_by_stop):
             return _offer_again(record, h, s)
         return None
+    if not s.at_job_stage:  # at a review stage, a cleared wait among them: that stage's fresh session reads it
+        return JobAct("offer", "review") if s.may_start else None
     return JobAct("offer") if s.may_start and not s.seat_busy else None
 
 

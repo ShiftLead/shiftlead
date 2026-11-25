@@ -397,12 +397,12 @@ def test_a_move_back_to_the_jobs_own_stage_is_counted_and_offered_afresh():
     assert stage_job.choose(r, stage_job.JobReading(may_start=True)) == stage_job.JobAct("offer")
 
 
-def test_a_job_at_a_review_stage_is_no_offer_of_its_seat():
+def test_a_job_at_a_review_stage_is_offered_that_stages_session_not_a_job_session():
     store = Store(_record())
     _end(store)
-    reading = stage_job.JobReading(may_start=True, at_job_stage=False)
-    assert stage_job.choose(store.record, reading) is None
-    assert stage_job.order([store.record], {}, "build") == []
+    reading = stage_job.JobReading(may_start=True, at_job_stage=False, seat_busy=True)
+    assert stage_job.choose(store.record, reading) == stage_job.JobAct("offer", "review")
+    assert stage_job.order([store.record], {}, "build") == []  # never queued among the seat's job sessions
 
 
 def test_the_board_directory_is_the_stubs_name_less_md(tmp_path):

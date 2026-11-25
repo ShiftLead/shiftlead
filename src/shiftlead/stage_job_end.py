@@ -18,7 +18,8 @@ review stage sends that outcome, by the same rule: back to the job's stage (a fr
 reason), to another review stage or to `merge`, counted as any move; anything else goes to the person.
 
 `stage_end.call` routes a job's reference here. A job sent to `merge` is merged by the home (`stage_job_merge`).
-Starting a review stage's session on a job, and `closed-unmerged` (TD-2165), are later work.
+The tick offers a review stage's session on a job (`stage_job.choose`, `stage_job_start.review_launch`);
+`closed-unmerged` (TD-2165) is later work.
 """
 
 from __future__ import annotations

@@ -80,12 +80,15 @@ def reach_for(
     local: str,
     hosts: Mapping[str, str],
     docs: Mapping[str, Mapping[str, Any]],
+    flows_at: Mapping[str, tuple[str, Path | None]] | None = None,
     settings: Callable[[], Mapping[str, Any] | None] = settings_mod.read,
     today: Callable[[], str] = lambda: date.today().isoformat(),
 ) -> JobReach:
     """A `JobReach` through the host agent's `call`. A job's session launches on the host of its record's team
     (`hosts`, each team's `host`, the home where none), from that team's flow (`docs`), on the seat's model from the
-    built-in set the repo uses. A team the org does not define starts nothing."""
+    built-in set the repo uses; a record standing at one of the flow's review stages starts that stage's session
+    instead, on the stage's model, its own brief read from the flow's place and directory (`flows_at`, by team; a
+    standard brief alone where none is given). A team the org does not define starts nothing."""
 
     def start(record: Mapping[str, Any], came: str | None) -> str | None:
         read = org()
@@ -94,11 +97,17 @@ def reach_for(
         doc = docs.get(team)
         if read is None or teamdef is None or doc is None:
             return None
-        sdoc = settings() or {}
-        entry = builtinstore.sets(sdoc)[builtinstore.repo_set(sdoc, repo)]
-        model = builtinstore.model(entry, str(record["seat"]))
         host = hosts.get(team) or local
-        got = stage_job_start.launch(read, teamdef, dict(doc), record, model, host=host, here=local, came=came)
+        if record.get("stage") is not None and record.get("stage") != stage_job_start.job_stage(doc):
+            place, flow_dir = (flows_at or {}).get(team, ("package", None))
+            got = stage_job_start.review_launch(
+                read, teamdef, dict(doc), record, host=host, here=local, came=came, place=place, flow_dir=flow_dir
+            )
+        else:
+            sdoc = settings() or {}
+            entry = builtinstore.sets(sdoc)[builtinstore.repo_set(sdoc, repo)]
+            model = builtinstore.model(entry, str(record["seat"]))
+            got = stage_job_start.launch(read, teamdef, dict(doc), record, model, host=host, here=local, came=came)
         made = stage_start.start(call, read, teamdef, got)
         return stage_start.holder_of(got, made) if made else None
 
