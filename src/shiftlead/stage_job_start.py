@@ -1,11 +1,12 @@
 """A session started for one job of a built-in seat, and what it is told (design §4.9d *How each one runs*, TD-2053).
 
 A job's session is a stage's session in all but its work (`stage_start`): the same mechanics and the same `ao stage
-end`, the repo's rules, and a brief — the seat's work order's words as they are today (`briefs/job/<seat>.md`). It is
+end`, the repo's rules, and a brief — the seat's work order's words (`briefs/job/<seat>.md`), a pull request's by its
+order's kind, the record's (`briefs/job/pr/<kind>.md`, TD-2165). It is
 started on the seat's model, given by the built-in set the repo uses (`builtinstore.seat`), in the build stage's role,
 with the work order's reference as its one lane (`board:<8 hex>`, `pr:<n>`), and names no `controllers`. Its outcomes
-are `work-pushed` and `other`. Launching on the set's login is TD-2068's, and `stage_start.start` starts nothing
-before the team's started mark (TD-2065).
+are `work-pushed` and `other`, and a pull request's job's also `closed-unmerged`. Launching on the set's login is
+TD-2068's, and `stage_start.start` starts nothing before the team's started mark (TD-2065).
 
 A job whose record stands at one of its flow's review stages is read by that stage's own fresh session
 (`review_launch`, §4.9d *Its pull request is reviewed and merged by the team's flow*): a review stage's session as an
@@ -28,6 +29,8 @@ from shiftlead.stage_start import launch as stage_launch
 
 JOB_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "job.md"
 JOB_BRIEFS = Path(__file__).resolve().parent / "briefs" / "job"
+KIND_MARK = "<!-- kind -->"  # where a pull request's brief takes its kind's section
+PR_KINDS = ("red", "filing", "sync", "lift", "sweep")  # a pull request's job's kinds, as its record keeps them
 SEAT_WORDS = {"board-answers": "board answers", "unheld-pull-requests": "pull requests nobody holds"}
 
 
@@ -52,11 +55,20 @@ def job_stage(doc: Mapping[str, Any]) -> str | None:
     return None
 
 
-def brief_of(seat: str) -> str:
-    """The seat's brief, the package's own."""
+def brief_of(seat: str, kind: str | None = None) -> str:
+    """The seat's brief, the package's own. A pull request's is its order's words by `kind`, the record's (TD-2165):
+    the seat's opening and close around its kind's section (`briefs/job/pr/<kind>.md`); a record that keeps no kind
+    (one written before kinds were kept) is a red or a filing one's, and is told both."""
     if seat not in SEATS:
         raise ValueError(f"a job's seat is one of {SEATS}, not {seat!r}")
-    return (JOB_BRIEFS / f"{seat}.md").read_text(encoding="utf-8").strip()
+    text = (JOB_BRIEFS / f"{seat}.md").read_text(encoding="utf-8").strip()
+    if KIND_MARK not in text:
+        return text
+    kinds = (kind,) if kind else ("red", "filing")
+    if any(k not in PR_KINDS for k in kinds):
+        raise ValueError(f"a pull request's job is of kind {', '.join(PR_KINDS)}, not {kind!r}")
+    parts = [(JOB_BRIEFS / "pr" / f"{k}.md").read_text(encoding="utf-8").strip() for k in kinds]
+    return text.replace(KIND_MARK, "\n\n".join(parts))
 
 
 def told(record: Mapping[str, Any], *, team: str, adds_review: bool, came: str | None = None) -> str:
@@ -65,7 +77,14 @@ def told(record: Mapping[str, Any], *, team: str, adds_review: bool, came: str |
     lines = [f"You hold the job **{lane}** of the built-in seat **{SEAT_WORDS[seat]}**, for team {team}."]
     branch, pr = record.get("branch"), record.get("pr")
     if seat == "unheld-pull-requests":
-        lines.append(f"Its pull request is #{int(record['object'])}: work on its own branch.")
+        kind = record.get("kind")
+        lines.append(
+            f"Its pull request is #{int(record['object'])}"
+            + (f", a **{kind}** one" if kind else "")
+            + ": work on its own branch."
+        )
+        if kind == "sync" and record.get("reason"):
+            lines.append(f"Its order's reason, as the first offer read it: {record['reason']}")
     elif branch or pr:
         where = " and ".join(
             x for x in (f"branch `{branch}`" if branch else "", f"pull request #{pr}" if pr else "") if x
@@ -137,7 +156,7 @@ def launch(
     stage = job_stage(doc)
     under = repoconfig.UnderFlow(
         told(record, team=team.name, adds_review=stage in flow3.independent_review(doc), came=came),
-        brief=brief_of(seat),
+        brief=brief_of(seat, record.get("kind") if seat == "unheld-pull-requests" else None),
     )
     try:
         prompt, made = role.compose(
