@@ -230,3 +230,61 @@ def test_a_metered_profile_of_an_adapter_with_no_spend_is_refused(tmp_path, home
     with pytest.raises(ValueError, match="s is metered, but shell reports no spend"):
         _load(tmp_path, "profiles:\n  s: {adapter: shell, billing: metered, config_dir: /c/s}\n")
     assert sorted(_load(tmp_path, "profiles:\n  odd: {adapter: [a]}\n")) == ["odd"]  # no adapter name: unread
+
+
+# §4.9e *A record's profile* (TD-2068): on a switched host the reader answers from `logins.yml`
+LOGINS = """logins:
+  claude-code:grind:
+    folder: /c/grind
+    account: acct-1
+    pin: sonnet
+    extra_args: [--x]
+    unattended_args: [--y]
+    permission_wait: 90
+  claude-code:api:
+    folder: /c/api
+    billing: metered
+    prices: {input: 3, output: 15}
+  claude-code:twin: {folder: /c/t1}
+  gemini:twin: {folder: /c/t2}
+accounts: {}
+forgotten: {}
+"""
+
+
+def test_a_switched_host_answers_a_profile_by_a_logins_name(tmp_path):
+    (tmp_path / "logins.yml").write_text(LOGINS)
+    got = _load(tmp_path, "profiles:\n  grind: {account: old}\n  sh: {adapter: shell}\n")
+    grind = got["grind"]
+    assert (grind.adapter, grind.account, grind.model, str(grind.config_dir)) == (
+        "claude-code",
+        "acct-1",
+        "sonnet",
+        "/c/grind",
+    )
+    assert (grind.extra_args, grind.unattended_args, grind.permission_wait) == (["--x"], ["--y"], 90)
+    assert "claude-code:grind" not in got, "each login once, under the name a launch writes"
+    assert got["sh"].adapter == "shell", "a profile with no login of its name is answered as today"
+    api = got["api"]
+    assert api.metered and api.prices == {"input": 3.0, "output": 15.0} and api.account == "claude-code:api"
+    assert "twin" not in got and got["gemini:twin"].adapter == "gemini", "a name two tools share is read by key"
+    assert len([p for p in got.values() if p.adapter != "shell"]) == 4, "the profile named grind is the login"
+
+
+def test_a_switched_host_with_no_profiles_file_answers_its_logins_and_the_default(tmp_path):
+    (tmp_path / "logins.yml").write_text(LOGINS)
+    got, default = profiles.load(tmp_path / "profiles.yml")
+    assert default == "default" and got["grind"].account == "acct-1"
+    assert profiles.account_of("grind", "claude-code", tmp_path / "profiles.yml") == "acct-1"
+    assert profiles.account_of("grind", "gemini", tmp_path / "profiles.yml") is None
+
+
+def test_a_host_not_switched_reads_no_logins(tmp_path):
+    assert set(_load(tmp_path, "profiles:\n  grind: {account: old}\n")) == {"grind"}
+
+
+def test_a_reader_of_the_profiles_file_itself_reads_no_logins(tmp_path):
+    (tmp_path / "logins.yml").write_text(LOGINS)
+    (tmp_path / "profiles.yml").write_text("profiles:\n  grind: {account: old}\n")
+    got, _ = profiles.load(tmp_path / "profiles.yml", with_logins=False)
+    assert set(got) == {"grind"} and got["grind"].account == "old"

@@ -292,7 +292,7 @@ def node_logins(
             out[name] = []
             continue
         try:
-            profs, _default = profiles_mod.load(path)
+            profs, _default = profiles_mod.load(path, with_logins=False)
         except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
             blockers.append(Blocker(f"host {name}", f"its profiles.yml cannot be read: {e}", f"mend {shown(path)}"))
             continue
