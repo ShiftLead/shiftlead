@@ -32,7 +32,6 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import queue as queue_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
-from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     ENTRY_PRIORITIES,
     ENTRY_TYPES,
@@ -518,7 +517,7 @@ class InboxMixin:
             return False
         graph = self._graph()
         r = graph.get(self._seat_followed(seat))
-        return r is None or not work_mod.held_for(r, list(graph.values()))
+        return r is None or not self._seat_held(r, list(graph.values()))  # type: ignore[attr-defined]
 
     async def rpc_entry_add(
         self,
