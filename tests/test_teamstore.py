@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -451,6 +452,18 @@ def test_a_stop_clears_only_a_set_mark_so_a_stop_time_never_overwrites_the_perso
     assert not ts.mark_stopped(marks, "b", "until", "t3") and "b" not in marks
     with pytest.raises(ValueError):
         ts.mark_stopped(marks, "a", "schedule", "t3")
+
+
+def test_a_stop_time_is_due_only_on_a_mark_set_before_its_instant_once_it_has_passed():
+    now = datetime(2026, 12, 2, 12, tzinfo=UTC)
+    marks = {"a": {"started": {"since": "2026-12-01T09:00:00+00:00", "by": "person"}}, "b": {"stopped": {}}}
+    assert ts.stop_time_due(marks, "a", "2026-12-02T10:00:00Z", now)
+    assert ts.stop_time_due(marks, "a", "2026-12-02T12:00:00+00:00", now), "at the instant itself"
+    assert not ts.stop_time_due(marks, "a", "2026-12-02T13:00:00Z", now), "still ahead"
+    assert not ts.stop_time_due(marks, "a", "2026-12-01T08:00:00Z", now), "spent: the Start came after it"
+    assert not ts.stop_time_due(marks, "b", "2026-12-02T10:00:00Z", now), "not started: nothing to clear"
+    assert not ts.stop_time_due(marks, "c", "2026-12-02T10:00:00Z", now) and not ts.stop_time_due(None, "a", "x", now)
+    assert not ts.stop_time_due(marks, "a", "not a time", now)
 
 
 def test_team_mark_starts_and_winds_down_a_switched_team_and_saves_the_record(agent, monkeypatch):

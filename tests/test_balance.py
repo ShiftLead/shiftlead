@@ -595,3 +595,34 @@ async def test_a_teams_started_mark_is_set_cleared_and_served_on_the_host_read(a
         assert json.loads(paths.host_file().read_text())["teams"]["db"]["started"] == marks["db"]["started"]
         await person.call("team_mark", team="db", started=False)
         assert set((await person.call("host"))["team_marks"]["db"]) == {"stopped"}
+
+
+async def test_a_switched_teams_stop_time_clears_its_started_mark_once(agent):
+    """§6 *Team stop time*, *After the cut-over* (TD-2065): at the instant the home clears a switched team's mark and
+    writes `stopped` by the stop time; a Start after the instant is not stopped again, and a team that is not switched,
+    or any team before the cut-over, keeps its mark."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    past = (now - timedelta(minutes=5)).isoformat()
+    teams = {
+        "db": {"repo": "shiftlead", "host": agent.host, "until": past},
+        "old": {"until": past},
+        "late": {"repo": "shiftlead", "host": agent.host, "until": past},
+    }
+    since = {"since": (now - timedelta(hours=1)).isoformat(), "by": "person"}
+    agent._host_rec["teams"] = {
+        "db": {"started": dict(since)},
+        "old": {"started": dict(since)},
+        "late": {"started": {"since": (now - timedelta(minutes=1)).isoformat(), "by": "schedule"}},
+    }
+    settings_mod.save({"teams": teams})
+    await agent._team_stop_marks(now)
+    assert all("started" in agent._host_rec["teams"][t] for t in teams), "before the cut-over nothing is cleared"
+    settings_mod.save({"cut_over": "2026-12-01", "teams": teams})
+    await agent._team_stop_marks(now)
+    marks, past = agent._host_rec["teams"], settings_mod.teams(settings_mod.load())["db"]["until"]  # as stored
+    assert marks["db"] == {"stopped": {"at": past, "by": "until"}}
+    assert "started" in marks["old"] and "started" in marks["late"]
+    assert json.loads(paths.host_file().read_text())["teams"]["db"]["stopped"]["by"] == "until"
+    await agent._team_stop_marks(now)
+    assert marks["db"] == {"stopped": {"at": past, "by": "until"}}, "spent: a second pass writes nothing"
