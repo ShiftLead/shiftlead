@@ -372,3 +372,99 @@ def test_the_pass_asks_the_home_nothing_where_its_snapshot_reads_as_the_key_want
     graph = {"d": record(id="d", name="director", team="", seat={"trigger": "prompt"})}
     assert stage_seats.write_director(home, org, graph) == []
     assert home.records == [] and home.removed == []
+
+
+# ── a record moved host (§4.9d *How each one runs*: where that host changes, the home makes the record there) ──
+
+
+class Mover(Home):
+    """The home's calls with `seat_moved` recorded too."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.moved: list[dict] = []
+
+    def __call__(self, method: str, **params):
+        if method == "seat_moved":
+            self.moved.append(params)
+            return {"old": params["old"], "new": params["new"]}
+        return super().__call__(method, **params)
+
+
+def test_an_ended_tech_lead_record_whose_host_changed_is_written_there_and_the_old_one_moved(world):
+    org, _team, _ = world
+    home = Mover()
+    graph = {"ao-r-techlead-t": record(builtin="techlead", state="closed", host="h")}
+    assert stage_seats.write_techleads(home, org, {"t": {"host": "node"}}, graph, STARTED, "h") == ["ao-r-techlead-t"]
+    assert home.created[0]["host"] == "node"
+    assert "keep_mail" not in home.created[0], "the mail comes by seat_moved, never by the new host's name rule"
+    assert home.moved == [{"old": "ao-r-techlead-t", "new": "ao-r-techlead-t@node"}]
+
+
+def test_a_record_on_a_node_moved_home_is_addressed_by_its_node(world):
+    org, _team, _ = world
+    home = Mover()
+    graph = {"ao-r-techlead-t@node": record(builtin="techlead", state="exited", host="node")}
+    stage_seats.write_techleads(home, org, {"t": {}}, graph, STARTED, "h")
+    assert "host" not in home.created[0] or not home.created[0]["host"]
+    assert home.moved == [{"old": "ao-r-techlead-t@node", "new": "ao-r-techlead-t"}]
+
+
+@pytest.mark.parametrize(
+    "over", [{"state": "idle"}, {"state": "working"}, {"state": "closed", "suspended": {"at": "x"}}]
+)
+def test_a_live_or_suspended_record_stays_where_it_is(world, over):
+    org, _team, _ = world
+    home = Mover()
+    graph = {"ao-r-techlead-t": record(builtin="techlead", host="h", **over)}
+    assert stage_seats.write_techleads(home, org, {"t": {"host": "node"}}, graph, STARTED, "h") == []
+    assert home.created == [] and home.moved == []
+
+
+def test_a_repo_seat_moves_with_its_first_started_team(world):
+    org, _team, _ = world
+    home = Mover()
+    rec = record(id="ao-r-sweeper-r", name="sweeper-r", team="", builtin="sweeper", state="closed", host="h")
+    assert stage_seats.write_sweepers(home, org, {"t": {"host": "node"}}, {rec.id: rec}, STARTED, "h", ON)
+    assert home.moved == [{"old": "ao-r-sweeper-r", "new": "ao-r-sweeper-r@node"}]
+
+
+def test_a_refused_move_is_a_log_line(world, caplog):
+    org, _team, _ = world
+
+    class Refuses(Mover):
+        def __call__(self, method, **params):
+            if method == "seat_moved":
+                raise RuntimeError("refused")
+            return super().__call__(method, **params)
+
+    graph = {"ao-r-techlead-t": record(builtin="techlead", state="closed", host="h")}
+    assert stage_seats.write_techleads(Refuses(), org, {"t": {"host": "node"}}, graph, STARTED, "h")
+    assert "was not marked superseded" in caplog.text
+
+
+@pytest.mark.integration
+async def test_the_home_marks_the_old_record_superseded_and_moves_its_mail(agent):
+    from sessionorc.agent import RpcError
+    from sessionorc.models import PERSON, MailEntry
+
+    old = record(builtin="techlead", state="closed", host=agent.host, unattended=True, seat={"trigger": "asks"})
+    old.inbox = [MailEntry(id="m-1", from_=PERSON, to=[old.id], at="2026-11-25T10:00:00Z", kind="ask", text="?")]
+    agent.sessions[old.id] = old
+    new = record(builtin="techlead", state="closed", host="node", unattended=True, seat={"trigger": "asks"})
+    agent.remote["node"] = {new.id: new}
+    with pytest.raises(RpcError, match="never a session's"):
+        await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node", caller="ao-r-worker")
+    with pytest.raises(RpcError, match="not one built-in seat's record on two hosts"):
+        await agent.rpc_seat_moved(old=old.id, new=old.id)
+    old.state = "idle"
+    with pytest.raises(RpcError, match="finishes where it runs"):
+        await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
+    old.state = "closed"
+    got = await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
+    assert got == {"old": old.id, "new": f"{new.id}@node"}
+    assert old.superseded_by == f"{new.id}@node"
+    assert [e.id for e in new.inbox] == ["m-1"] and old.inbox == []
+    assert new.supersedes[-1]["id"] == old.id
+    with pytest.raises(RpcError, match="superseded already"):
+        await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")

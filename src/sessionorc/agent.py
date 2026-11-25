@@ -2443,6 +2443,44 @@ class HostAgent(
             )
         return old
 
+    async def rpc_seat_moved(self, old: str = "", new: str = "", caller: Any = None) -> dict[str, Any]:
+        """A built-in seat's record moved host (design §4.9d *How each one runs*, TD-2065): the home's stage pass has
+        written the seat's record `new` on the host *Where a seat's session launches* now gives, and here the home
+        marks the old one, `old`, `superseded_by` it and moves its mail to it (`_move_mail`, as a fill's `keep_mail`
+        does), so one record of the name is ever current, and drops the old one's launch record so no fill replays it.
+        Both are addresses. The home's own call: refused at a node and from a session, and unless both carry the same
+        `builtin` and name on two hosts, `old` is ended (`exited` or `closed`), neither suspended, and neither is
+        superseded already. `superseded_by` is the home's field (§4.4a), so a node's record is marked on the home's
+        copy, which holds its mail."""
+        rule = "(design §4.9d How each one runs)"
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: seat_moved is the home's {rule}")
+        if not mail.is_person(caller):
+            raise RpcError(f"seat_moved is the home's own call, never a session's {rule}")
+        a, b = self._find(str(old)), self._find(str(new))
+        if not a.builtin or a.builtin != b.builtin or a.name != b.name or a.host == b.host:
+            raise RpcError(f"{old} and {new} are not one built-in seat's record on two hosts {rule}")
+        if a.superseded_by or b.superseded_by:
+            raise RpcError(f"{old} or {new} is superseded already {rule}")
+        if a.state not in ("exited", "closed"):
+            raise RpcError(f"{a.name} is {a.state}: a seat's live session finishes where it runs {rule}")
+        if a.suspended or b.suspended:
+            raise RpcError(f"{a.name} is suspended: a suspended record is never moved {rule}")
+        if a.state == "exited" and a.host == self.host:
+            with contextlib.suppress(Exception):
+                self.tmux.kill_session(a.id)
+            a.set_state("closed", confidence=a.confidence)
+            a.closed_at = now_iso()
+        was, now_at = self._address(a), self._address(b)
+        b.supersedes = [*b.supersedes, {"id": was, "mail": True, "at": b.created}]
+        self._move_mail(a, b)
+        a.superseded_by = now_at
+        self._drop_launch(was)
+        self._save(a)
+        self._save(b)
+        log.info("%s moved host: %s supersedes %s, its mail moved", a.name, now_at, was)
+        return {"old": was, "new": now_at}
+
     def _succeed(self, old: Session, new: Session) -> None:
         """A create under a new name succeeding `old` (design §4.9, TD-706): the old record's mail moves
         to the new one and the old one records `superseded_by`, as a resume under another id does
