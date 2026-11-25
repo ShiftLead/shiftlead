@@ -40,7 +40,7 @@ from shiftlead.stage_fetch import (
 from shiftlead.stage_make import Made
 from shiftlead.stage_read import EntryFacts, pickable_on, reading_on
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, StateError
+from shiftlead.stagerecord import StageStore, StateError, flow_version
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +55,7 @@ class Reach:
     claim: Callable[[str, str], str | None]
     end: Callable[[str], None]
     spent: Callable[[str], Any] | None = None  # a session id's `models` sums, for the offer's `spent_before` (§4.9c)
+    briefs: Callable[[Mapping[str, Any]], list[dict[str, str]]] | None = None  # each stage's resolved brief, to hash
 
 
 def reach_for(
@@ -81,6 +82,7 @@ def reach_for(
         claim=lambda holder, tid: stage_start.claim(call, holder, tid),
         end=lambda holder: stage_start.end(call, holder),
         spent=lambda sid: call("seats", record=sid)["models"],
+        briefs=lambda flow: stage_start.briefs(org, team, flow, **where),
     )
 
 
@@ -101,8 +103,25 @@ def _make(store: StageStore, act: Act, s: Reading, f: EntryFacts, reach: Reach) 
     if act == stage_merge.MERGING:
         return stage_merge.run(store, f.tid, act, s, doc, f.person, reach.gate, reach.land, f.now)
     if act.name == "offer":
-        return stage_make.offer(store, f.tid, act, s, doc, reach.start, reach.claim, team=f.team, spent=reach.spent)
+        version = _version(f, doc, reach)
+        return stage_make.offer(
+            store, f.tid, act, s, doc, reach.start, reach.claim, team=f.team, spent=reach.spent, version=version
+        )
     return stage_make.make(store, f.tid, act, s, doc, f.person)
+
+
+def _version(f: EntryFacts, doc: Mapping[str, Any], reach: Reach) -> tuple[str, str] | None:
+    """The flow's canonical text and hash for an offer (§4.9c *The flow's content hash*): the text the team's turn chose
+    and each stage's brief as a start reads it now. None, the offer made as without it, where the reach reads no
+    briefs, the pass has no text, or a brief cannot be read (logged)."""
+    if reach.briefs is None or f.flow_text is None:
+        return None
+    try:
+        briefs = reach.briefs(doc)
+    except Exception:  # noqa: BLE001 — the checkout's, a brief's or a decode's error: the offer goes on unhashed
+        log.warning("%s: the flow's briefs could not be read for its hash; flow_hash is null", f.tid, exc_info=True)
+        return None
+    return flow_version(f.flow_text, briefs)
 
 
 def offer_stage(record: Mapping[str, Any] | None, s: Reading, doc: Mapping[str, Any]) -> str | None:
@@ -295,6 +314,7 @@ def repo_facts(
         team=team,
         now=now,
         doc=flow.doc,
+        flow_text=flow.text,
         entries=tuple(entries),
         teams=teams_on(read),
         rows=rows,

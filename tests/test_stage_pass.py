@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -21,7 +22,7 @@ from shiftlead.stage_make import Made
 from shiftlead.stage_pass import Reach, Step, step
 from shiftlead.stage_read import EntryFacts, EntryLedger
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, StateError, new_record
+from shiftlead.stagerecord import StageStore, StateError, flow_version, new_record
 
 TID = "TD-7"
 HEAD = "a" * 40
@@ -812,3 +813,97 @@ def test_over_a_line_an_entry_in_a_stage_is_offered_and_a_new_entry_is_not(store
     put(store, holder=None)  # TD-7 in build, its holder gone
     got = stage_pass.team_pass(store, repo_facts(store, row("TD-1")), no_sessions(), World().reach, local="home")
     assert [(s.tid, s.act.name if s.act else None) for s in got.steps] == [(TID, "offer"), ("TD-1", None)]
+
+
+# -- the flow's content hash at an offer (§4.9c *The flow's content hash*, TD-2158) ----------------------------------
+
+BRIEFS = [{"stage": "build", "text": "Build it."}, {"stage": "review", "text": "Read it — then say."}]
+
+
+def versions(store: StageStore) -> list[str]:
+    return store._list(store.tip(), "flows/versions")
+
+
+def _hashing(world: World, briefs: Any) -> Reach:
+    return replace(world.reach, briefs=briefs)
+
+
+def test_an_offer_writes_the_flows_hash_from_the_text_the_turn_chose_and_keeps_its_text(store):
+    world = World()
+    seen: list[Any] = []
+    store.put_flow("t", "a copy a switch committed meanwhile\n")  # the offer never reads the store's copy
+    f = facts(may_start=True, within_size=True, flow_text=GOOD)
+    got = step(store, put(store, holder=None), f, _hashing(world, lambda doc: seen.append(doc) or BRIEFS))
+    assert got.made.made and seen == [FLOW]
+    text, want = flow_version(GOOD, BRIEFS)
+    assert store.entry(TID)["flow_hash"] == want
+    assert versions(store) == [f"flows/versions/{want}.json"]
+    kept = store.version(want)
+    assert kept == text and hashlib.sha256(kept.encode("utf-8")).hexdigest() == want, "no trailing newline"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [stage_start.teams.TeamError("no checkout"), OSError("gone"), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "")],
+)
+def test_a_brief_that_cannot_be_read_leaves_the_offer_made_with_no_hash(store, error):
+    def broken(_doc: Any) -> Any:
+        raise error
+
+    got = step(
+        store,
+        put(store, holder=None),
+        facts(may_start=True, within_size=True, flow_text=GOOD),
+        _hashing(World(), broken),
+    )
+    assert got.made.made and store.entry(TID)["holder"] == "s2"
+    assert store.entry(TID)["flow_hash"] is None and versions(store) == []
+
+
+@pytest.mark.parametrize(("briefs", "text"), [(None, GOOD), (lambda _doc: BRIEFS, None)])
+def test_no_briefs_reader_or_no_flow_text_offers_with_no_hash(store, briefs, text):
+    got = step(
+        store,
+        put(store, holder=None),
+        facts(may_start=True, within_size=True, flow_text=text),
+        _hashing(World(), briefs),
+    )
+    assert got.made.made and store.entry(TID)["flow_hash"] is None and versions(store) == []
+
+
+def test_an_act_other_than_an_offer_reads_no_brief(store):
+    put(store, holder="s1")
+    got = step(
+        store,
+        store.entry(TID),
+        facts(ledger=EntryLedger("archived"), flow_text=GOOD),
+        _hashing(World(), lambda _doc: pytest.fail("read a brief")),
+    )
+    assert got.act.name != "offer" and got.made.made
+
+
+def test_the_reach_reads_the_briefs_where_the_start_would(monkeypatch: pytest.MonkeyPatch) -> None:
+    given: list[Any] = []
+    monkeypatch.setattr(stage_start, "briefs", lambda *a, **k: given.append((a, k)) or BRIEFS)
+    team = SimpleNamespace(name="t")
+    got = stage_pass.reach_for(
+        Calls(),
+        "org",
+        team,
+        {},
+        lambda *a: None,
+        lambda *a: None,
+        host="n",
+        here="h",
+        place="repo",
+        flow_dir=Path("/f"),
+    )
+    assert got.briefs is not None and got.briefs(FLOW) == BRIEFS
+    assert given == [(("org", team, FLOW), {"host": "n", "here": "h", "place": "repo", "flow_dir": Path("/f")})]
+    assert stage_pass.Reach(None, None, None, None, None).briefs is None  # type: ignore[arg-type]
+
+
+def test_the_facts_carry_the_text_of_the_flow_that_runs(store):
+    got = made(store, flow=stage_fetch.TeamFlow(FLOW, text=GOOD))
+    assert got is not None and got.flow_text == GOOD
+    assert stage_fetch.facts_on(got, TID, None).flow_text == GOOD

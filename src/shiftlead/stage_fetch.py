@@ -172,12 +172,14 @@ def over_line(host_teams: Mapping[str, Any] | None, team: str) -> bool:
 class TeamFlow(NamedTuple):
     """The flow a team's records are read against this pass. `doc` is what runs, `was` the copy it replaces where the
     two differ, `put` the text to store as the team's copy once the pass has read its records, and `problems` why the
-    flow in use is the last good copy rather than the current flow."""
+    flow in use is the last good copy rather than the current flow. `text` is `doc`'s own text, the current flow's or
+    the kept copy's, which an offer hashes (§4.9c *The flow's content hash*)."""
 
     doc: Mapping[str, Any]
     was: Mapping[str, Any] | None = None
     put: str | None = None
     problems: tuple[str, ...] = ()
+    text: str | None = None
 
 
 def flow_doc_of(text: str | None) -> Mapping[str, Any] | None:
@@ -199,11 +201,11 @@ def team_flow(current: str | None, problems: Collection[str], kept: str | None) 
     doc = None if problems else flow_doc_of(current)
     if doc is not None:
         same = current == kept
-        return TeamFlow(doc, None if same else flow_doc_of(kept), None if same else current)
+        return TeamFlow(doc, None if same else flow_doc_of(kept), None if same else current, text=current)
     last = flow_doc_of(kept)
     if last is None:
         return None
-    return TeamFlow(last, problems=tuple(problems) or ("the flow could not be read",))
+    return TeamFlow(last, problems=tuple(problems) or ("the flow could not be read",), text=kept)
 
 
 class SessionsRead(NamedTuple):
@@ -341,6 +343,7 @@ class RepoFacts:
     limits: Limits | None = None
     holds_new: bool = False
     named: Callable[[str], Mapping[str, Any] | None] | None = None  # another flow's doc by its name, for a switch
+    flow_text: str | None = None  # `doc`'s own text (`TeamFlow.text`), which an offer hashes
 
 
 def _files_for(repo: RepoFacts, live: Mapping[str, Any] | None) -> tuple[str | None, list[str] | None]:
@@ -415,4 +418,5 @@ def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> Ent
         may_start=repo.may_start,
         within_size=repo.within_size,
         holds_new=repo.holds_new,
+        flow_text=repo.flow_text,
     )

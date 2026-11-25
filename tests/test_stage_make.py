@@ -17,7 +17,7 @@ from shiftlead.stage_end import ARCHIVE
 from shiftlead.stage_make import make, offer, sweep_closed
 from shiftlead.stage_start import Work
 from shiftlead.stage_work import EntryWork
-from shiftlead.stagerecord import OTHER, StageStore, StateError, new_record
+from shiftlead.stagerecord import OTHER, StageStore, StateError, flow_version, new_record
 
 TID = "TD-7"
 FLOW: dict[str, Any] = {
@@ -744,3 +744,38 @@ def test_an_offer_with_no_reading_is_made_and_drops_the_ids_value(store, spent):
 def test_a_refused_claim_writes_no_sums(store):
     got = _offer_spent(store, lambda _sid: SUMS, refused="held elsewhere")
     assert not got.made and store.entry(TID) is None
+
+
+# -- the flow's content hash (§4.9c *The flow's content hash*, TD-2158) -------------------------------------------
+
+VERSION = flow_version("format: 3\nname: f\n", [{"stage": "build", "text": "Build — it."}])
+
+
+def test_an_offer_writes_its_hash_and_keeps_the_text_once_in_its_own_commit(store, monkeypatch):
+    writes: list[list[str]] = []
+    real = store.write
+    monkeypatch.setattr(store, "write", lambda changes, msg: writes.append(sorted(changes)) or real(changes, msg))
+    act = choose(None, READY)
+    assert offer(store, TID, act, READY, FLOW, lambda *_a: "s9", lambda *_a: None, team="t", version=VERSION).made
+    path = f"flows/versions/{VERSION[1]}.json"
+    assert writes == [[f"entries/{TID}.json", path]], "the text and the record in one commit"
+    assert store.entry(TID)["flow_hash"] == VERSION[1] and store.version(VERSION[1]) == VERSION[0]
+    other = "TD-8"
+    got = offer(store, other, act, READY, FLOW, lambda *_a: "s8", lambda *_a: None, team="u", version=VERSION)
+    assert got.made and writes[-1] == [f"entries/{other}.json"], "another team's offer of one text keeps no second"
+    assert store.entry(other)["flow_hash"] == VERSION[1]
+
+
+def test_an_offer_with_no_version_writes_a_null_hash_and_keeps_no_text(store):
+    put(store, stage="build", flow_hash="f" * 64)
+    assert offer(
+        store, TID, choose(store.entry(TID), READY), READY, FLOW, lambda *_a: "s9", lambda *_a: None, team="t"
+    ).made
+    assert store.entry(TID)["flow_hash"] is None
+    assert store._list(store.tip(), "flows/versions") == []
+
+
+def test_a_refused_claim_keeps_no_version(store):
+    act = choose(None, READY)
+    got = offer(store, TID, act, READY, FLOW, lambda *_a: "s9", lambda *_a: "no", team="t", version=VERSION)
+    assert not got.made and store.version(VERSION[1]) is None

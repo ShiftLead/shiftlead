@@ -232,6 +232,7 @@ def test_a_team_launches_from_the_flow_the_pass_runs(
     assert given[1][0] == copy and given[1][1]["place"] == "repo" and given[1][1]["flow_dir"] == d
     alone = stage_tick._reach(never, root, TEAM, "h", Kept(), "u", lambda: org, copy)
     assert len(given) == 2 and alone.start("build", object()) is None, "a team the org lacks starts nothing"
+    assert alone.briefs is None and alone.spent is None, "nor reads a brief to hash (TD-2158)"
 
 
 # -- the built-in seats' jobs (TD-2053) -------------------------------------------------------------------------------
