@@ -31,7 +31,7 @@ from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, _now, answer_move, new_record
+from shiftlead.stagerecord import StageStore, _now, answer_move, bare, new_record
 
 log = logging.getLogger(__name__)
 
@@ -494,9 +494,9 @@ def offer(
                 record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
             before = dict(record.get("spent_before") or {})
             if sums is None:
-                before.pop(_bare(holder), None)
+                before.pop(bare(holder), None)
             else:
-                before[_bare(holder)] = sums
+                before[bare(holder)] = sums
             record["spent_before"] = before
             store.put_entry(record, f"offered at {key} to {holder}")
         except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
@@ -504,17 +504,12 @@ def offer(
         return Made(True)
 
 
-def _bare(holder: str) -> str:
-    """The holder's id as `seat_spend.json` keys it: the home's `<id>@<node>` without its `@<node>`."""
-    return holder.split("@", 1)[0]
-
-
 def _spent_at_offer(spent: Callable[[str], Any] | None, holder: str, tid: str) -> Any:
     """The holder's id's sums as the offer finds them, or None where there is no reader or it raised (logged)."""
     if spent is None:
         return None
     try:
-        got = spent(_bare(holder))
+        got = spent(bare(holder))
     except Exception:
         log.warning("%s: the spend reading at its offer failed; its run's models will be null", tid, exc_info=True)
         return None
