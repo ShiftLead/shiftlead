@@ -192,7 +192,19 @@ def test_a_stage_gone_starts_again_on_its_own_team_never_the_person(store):
     got = make(store, JobAct("reconcile", "stage-gone"), JobReading(stage_known=False), w)
     r = store.job(KEY)
     assert got.made and got.end == "s-4" and (r["team"], r["stage"], r["waits"]) == ("t", None, None)
+    assert r["holder"] is None, "its holder ended first: the record offered afresh names none"
     assert not w.lines
+
+
+def test_a_job_sent_back_by_a_move_is_told_that_moves_reason(store):
+    back = {"from": "review", "to": "build", "outcome": "changes-wanted", "reason": "the test asserts nothing"}
+    put(store, stage="build", flow="f", holder="s-0", offers=1, history=[back])
+    s = JobReading(may_start=True, holder=Holder(ended=True))
+    act = stage_job.choose(store.job(KEY), s)
+    assert act == JobAct("offer-again", "lost")
+    w = World(holder="s-2")
+    assert make(store, act, s, w).made
+    assert w.started[0][1] == "the test asserts nothing (`changes-wanted` at `review`)"
 
 
 def test_a_silent_holder_is_ended_before_another_session_starts(store):
