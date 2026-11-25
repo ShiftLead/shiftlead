@@ -398,6 +398,26 @@ def node_flow_paths(team: str, doc: Mapping[str, Any], here: str, roots: Iterabl
     }
 
 
+def node_checkout(team: str, doc: Mapping[str, Any], repos_of: orgmod.ReposOf) -> str:
+    """Where a node team's repo is checked out on its node, found as its start finds it (`org.host_checkout`: the org
+    file's path for the node first, else the node's one registry entry of the repo, asked through `repos_of`), for
+    the host agent to read its flows there (§4.9c). Where it cannot be told, raises with the start's reason, the node
+    named first; the pick then reads each repo flow *unknown*."""
+    entry = doc["teams"][team]
+    host, repo = str(entry.get("host") or ""), str(entry.get("repo") or "")
+    try:
+        org = orgmod.load()
+    except ValueError as e:  # a start refuses on the same file
+        raise ValueError(f"{host}'s checkout of {repo} could not be told: {e}") from None
+    try:
+        got = orgmod.host_checkout(org, repo, host, repos_of)
+    except OSError as e:
+        raise ValueError(f"{host}'s registry could not be read ({e})") from None
+    if isinstance(got, str):
+        raise ValueError(f"{host}'s registry {got}")
+    return str(got)
+
+
 def choices(
     team: str,
     doc: Mapping[str, Any],

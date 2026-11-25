@@ -7,15 +7,18 @@ from __future__ import annotations
 import asyncio
 import copy
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from sessionorc import link
 from sessionorc import settings as settings_mod
 from sessionorc import teamstore as ts
 from sessionorc.agent_common import RpcError
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_stage import stage_teams
+from shiftlead import org as orgmod
 from shiftlead import stage_fetch, team_show
 from shiftlead.stage_acts import Reading, choose, switch_case
 from shiftlead.stage_read import flow_on
@@ -167,41 +170,75 @@ def test_a_node_teams_repo_flow_is_judged_by_what_the_nodes_checkout_holds(monke
     assert pick(None)["merged"] == team_show.NODE_REPO_FLOW, "not asked: not read, as the switch-over check says"
 
 
-def test_the_host_agent_asks_the_node_which_repo_flows_its_checkout_holds(agent):
-    body = SimpleNamespace(node_flow_paths=lambda *_a: {"merged": "m.yml", "branch": "b.yml"})
+def _on_node_agent(agent, monkeypatch, repos, org=None):
+    """An agent whose node `far` answers its registry with `repos` (a list, or an error to raise) and its files with
+    `m.yml` held and `b.yml` not; the checkout found by the start's own helper, on `org` (the org file)."""
+    monkeypatch.setattr(team_show.orgmod, "load", lambda: org or orgmod.Org())
     a = agent(SimpleNamespace())
     asked = []
 
-    async def repos(host):
-        return {"host": host, "repos": ["/srv/other", "/srv/shiftlead"]}
+    async def registry(host):
+        if isinstance(repos, Exception):
+            raise repos
+        return {"host": host, "repos": list(repos)}
 
     class Mux:
         async def request(self, method, **kw):
             asked.append((method, kw["dir"], kw["paths"]))
             return {"dir": kw["dir"], "files": {"m.yml": "name: merged\n", "b.yml": None}}
 
-    a.rpc_host_repos, a._node_mux = repos, lambda _host: Mux()
-    doc = _doc(host="far")
-    got = asyncio.run(a._on_node(body, "t", doc, "home", []))
-    assert got == {"merged": True, "branch": False} and asked == [("files", "/srv/shiftlead", ["m.yml", "b.yml"])]
+    a.rpc_host_repos, a._node_mux = registry, lambda _host: Mux()
+    return a, asked
 
+
+def _node_body(paths=None):
+    paths = paths or {"merged": "m.yml", "branch": "b.yml"}
+    return SimpleNamespace(node_flow_paths=lambda *_a: paths, node_checkout=team_show.node_checkout)
+
+
+def _ask(a, body=None):
+    return asyncio.run(a._on_node(body or _node_body(), "t", _doc(host="far"), "home", []))
+
+
+def test_the_host_agent_asks_the_node_which_repo_flows_its_checkout_holds(agent, monkeypatch):
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/other", "/srv/shiftlead"])
+    assert _ask(a) == {"merged": True, "branch": False} and asked == [("files", "/srv/shiftlead", ["m.yml", "b.yml"])]
     many = {f"f{i}": f"f{i}.yml" for i in range(17)}  # past the 16 files a node reads in one request
     asked.clear()
-    got = asyncio.run(a._on_node(SimpleNamespace(node_flow_paths=lambda *_a: many), "t", doc, "home", []))
-    assert [len(p) for _m, _d, p in asked] == [16, 1] and got == dict.fromkeys(many, False)
-
-    async def none_here(host):
-        return {"host": host, "repos": ["/srv/other"]}
-
-    a.rpc_host_repos = none_here
-    assert asyncio.run(a._on_node(body, "t", doc, "home", [])) == "far registers no checkout of shiftlead"
-
-    async def away(host):
-        raise RpcError(f"{host} did not answer: the link dropped")
-
-    a.rpc_host_repos = away
-    assert asyncio.run(a._on_node(body, "t", doc, "home", [])) == "far did not answer: the link dropped"
+    assert _ask(a, _node_body(many)) == dict.fromkeys(many, False) and [len(p) for _m, _d, p in asked] == [16, 1]
     assert asyncio.run(a._on_node(SimpleNamespace(node_flow_paths=HERE), "t", _doc(), "home", [])) is None
+
+
+def test_the_nodes_checkout_is_found_as_a_start_finds_it(agent, monkeypatch):
+    """The org file's path for the node first, with nothing asked of the registry; else the registry's one entry,
+    two of them refused as a start refuses them (`org.host_checkout`, the helper `_land` takes)."""
+    org = orgmod.Org(checkouts={"shiftlead": {"far": Path("/org/shiftlead")}})
+    a, asked = _on_node_agent(agent, monkeypatch, OSError("the registry is not asked"), org)
+    assert _ask(a) == {"merged": True, "branch": False} and asked[0][1] == "/org/shiftlead"
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/shiftlead", "/home/x/shiftlead"])
+    assert (
+        _ask(a)
+        == (
+            "far's registry holds shiftlead 2 times (/srv/shiftlead, /home/x/shiftlead) — register the one checkout of"
+            " shiftlead on far (design §5 *Repos*)"
+        )
+        and not asked
+    )
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/other"])
+    assert _ask(a).startswith("far's registry holds no checkout named shiftlead — register") and not asked
+
+
+def test_a_node_that_cannot_be_read_says_why(agent, monkeypatch):
+    a, _ = _on_node_agent(agent, monkeypatch, RpcError("far did not answer: the link dropped"))
+    assert _ask(a) == "far's registry could not be read (far did not answer: the link dropped)"
+    a, _ = _on_node_agent(agent, monkeypatch, ["/srv/shiftlead"])
+
+    class Refusing:
+        async def request(self, method, **kw):
+            raise link.LinkError("path outside the checkout")
+
+    a._node_mux = lambda _host: Refusing()
+    assert _ask(a) == "far: path outside the checkout", "a node's refusal in host_files' words, not *did not answer*"
 
 
 # -- the preview and the push ---------------------------------------------------------------------------------------

@@ -25,6 +25,7 @@ from sessionorc import (
     defs,
     gitinfo,
     hosts,
+    link,
     logins,
     teamstore,
 )
@@ -798,19 +799,27 @@ class SettingsMixin:
         paths = await asyncio.to_thread(body.node_flow_paths, name, doc, here, roots)
         if not paths:
             return None
-        entry = doc["teams"][name]
-        host, repo = str(entry.get("host") or ""), str(entry.get("repo") or "")
+        host = str(doc["teams"][name].get("host") or "")
+        loop = asyncio.get_running_loop()
+
+        def repos_of(at: str) -> list[str]:  # the node's registry, asked from the thread the checkout is found on
+            try:
+                ask = asyncio.run_coroutine_threadsafe(self.rpc_host_repos(at), loop)
+                return list(ask.result(NODE_FLOWS_WAIT).get("repos") or [])
+            except Exception as e:  # noqa: BLE001 — not read, said: never read as *holds no checkout*
+                raise OSError(str(e) or type(e).__name__) from None
+
+        files: dict[str, Any] = {}
         try:
-            listed = (await asyncio.wait_for(self.rpc_host_repos(host), NODE_FLOWS_WAIT)).get("repos") or []
-            root = next((str(r) for r in listed if Path(str(r)).name == repo), None)
-            if root is None:
-                return f"{host} registers no checkout of {repo}"
-            wanted, files = [*paths.values()], {}
+            root = await asyncio.to_thread(body.node_checkout, name, doc, repos_of)
+            wanted = [*paths.values()]
             for at in range(0, len(wanted), FILES_MAX):  # a node reads at most FILES_MAX files in one request
                 part = wanted[at : at + FILES_MAX]
                 got = await self._node_mux(host).request("files", timeout=NODE_FLOWS_WAIT, dir=root, paths=part)
                 files.update((got if isinstance(got, dict) else {}).get("files") or {})
-        except Exception as e:  # noqa: BLE001 — a node away, a link refused or a checkout refused: not read, said
+        except link.LinkError as e:  # the node refused the read, as `host_files` says it
+            return f"{host}: {e}"
+        except Exception as e:  # noqa: BLE001 — a node away or its checkout not told: not read, said
             why = str(e) or type(e).__name__
             return why if why.startswith(host) else f"{host} did not answer: {why}"
         return {n: files.get(p) is not None for n, p in paths.items()}
