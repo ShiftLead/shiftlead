@@ -102,7 +102,7 @@ def test_a_board_answers_own_pull_request_is_read_from_the_rows_and_a_missing_ro
     record = {**stage_job.new_job("board-answers", "1a2b3c4d", "t", "x"), "pr": 7}
     f = facts(live={"board-1a2b3c4d"}, rows=({"number": 7, "state": "closed"},))
     assert stage_job_pass.reading_on(record, "board-1a2b3c4d", f, seat_busy=False).own_pr == "closed"
-    assert stage_job_pass.reading_on(record, "board-1a2b3c4d", facts(), seat_busy=False) is None
+    assert stage_job_pass.reading_on(record, "board-1a2b3c4d", facts(live={"board-1a2b3c4d"}), seat_busy=False) is None
 
 
 def test_the_homes_line_is_read_open_or_closed_and_unread_is_no_reading():
@@ -115,7 +115,7 @@ def test_the_homes_line_is_read_open_or_closed_and_unread_is_no_reading():
 
 def test_a_holder_on_a_node_not_read_is_no_reading_and_a_gone_one_reads_ended():
     record = {**stage_job.new_job("board-answers", "1a2b3c4d", "t", "x"), "holder": "s-1@node2"}
-    assert stage_job_pass.reading_on(record, "board-1a2b3c4d", facts(), seat_busy=False) is None
+    assert stage_job_pass.reading_on(record, "board-1a2b3c4d", facts(live={"board-1a2b3c4d"}), seat_busy=False) is None
     got = stage_job_pass.reading_on(record, "board-1a2b3c4d", facts(read_nodes={"node2"}), seat_busy=False)
     assert got.holder.ended and got.holder.lost
 
@@ -182,12 +182,63 @@ def test_an_object_gone_closes_its_record_and_ends_its_session(store):
     assert steps[0].act.case == "object-gone" and store.job("board-1a2b3c4d")["closed_at"] and w.ended == ["s-9"]
 
 
-def test_a_job_with_no_reading_is_left_and_the_pass_goes_on(store):
+def test_a_job_whose_holder_is_unread_is_left_and_holds_the_seat(store):
     put(store, holder="s-9@node2")
     w = World()
     f = facts(live={"board-1a2b3c4d", "board-0000aaaa"})
     steps = stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-20"}, f, w.reach())
-    assert not steps[0].read and w.started == []  # the unread holder may still run: the seat is busy
+    assert not steps[0].read and steps[1].read and w.started == []  # the unread holder may still run
+
+
+def test_a_job_with_no_reading_is_left_and_the_pass_goes_on(store):
+    put(store, pr=7)  # its own pull request's row was not read
+    w = World()
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"})
+    steps = stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-20"}, f, w.reach())
+    assert not steps[0].read and w.started == ["board-0000aaaa"]
+
+
+def test_a_lost_holder_waits_while_another_job_session_of_the_seat_is_live(store):
+    put(store, key="board-1a2b3c4d", holder="s-9", offers=1)
+    put(store, key="board-0000aaaa", holder="s-8")
+    w = World()
+    sessions = {"s-9": session("s-9", state="exited"), "s-8": session("s-8", ref="board:0000aaaa")}
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions=sessions)
+    stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert w.started == [] and store.job("board-1a2b3c4d")["holder"] == "s-9"
+
+
+def test_two_lost_holders_in_one_pass_start_one_session(store):
+    put(store, key="board-1a2b3c4d", holder="s-9", offers=1, entered_at="2026-11-20")
+    put(store, key="board-0000aaaa", holder="s-8", offers=1, entered_at="2026-11-21")
+    w = World()
+    sessions = {"s-9": session("s-9", state="exited"), "s-8": session("s-8", state="exited")}
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions=sessions)
+    stage_job_pass.seat_pass(store, "board-answers", {}, f, w.reach())
+    assert w.started == ["board-1a2b3c4d"]
+
+
+def test_a_second_loss_to_the_person_starts_nothing_so_the_next_object_is_offered(store):
+    put(store, holder="s-9", offers=2, entered_at="2026-11-20")
+    w = World()
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions={"s-9": session("s-9", state="exited")})
+    steps = stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-24"}, f, w.reach())
+    assert steps[0].act.case == "to-person" and w.lines == [("board-1a2b3c4d", stage_job_make.LOST_TWICE)]
+    assert w.started == ["board-0000aaaa"]
+
+
+def test_a_record_in_its_teams_review_does_not_hold_the_seat(store):
+    put(store, stage="review", holder="s-8")
+    w = World()
+    f = facts(live={"board-1a2b3c4d", "board-0000aaaa"}, sessions={"s-8": session("s-8")})
+    stage_job_pass.seat_pass(store, "board-answers", {"board-0000aaaa": "2026-11-24"}, f, w.reach())
+    assert w.started == ["board-0000aaaa"]
+
+
+def test_a_gone_object_closes_though_its_own_pull_requests_row_is_not_read(store):
+    put(store, pr=7)
+    steps = stage_job_pass.seat_pass(store, "board-answers", {}, facts(), World().reach())
+    assert steps[0].act.case == "object-gone" and store.job("board-1a2b3c4d")["closed_at"]
 
 
 def test_the_other_seats_records_are_not_this_seats(store):

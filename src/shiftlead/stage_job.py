@@ -119,9 +119,11 @@ def _offer_again(record: Mapping[str, Any], holder: Holder, s: JobReading) -> Jo
     if not s.may_start:
         return None
     if holder.ended_by_stop:
-        return JobAct("offer-again", "stopped", counted=False)
+        return JobAct("offer-again", "stopped", counted=False) if not s.seat_busy else None
     if int(record.get("offers") or 0) >= SECOND_LOSS:
         return JobAct("offer-again", "to-person")
+    if s.seat_busy:
+        return None  # another job session of the seat is live: this one waits, its lost holder named until then
     return JobAct("offer-again", "lost" if holder.lost else "silent")
 
 

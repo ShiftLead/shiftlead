@@ -35,10 +35,11 @@ class JobFacts:
     """What the pass read for a repo's jobs.
 
     `live` holds the key of each object that still asks for its job: a decided board line still open and decided, a
-    pull request still open (`live_keys`). `rows` are the repo's pull requests, for a board answer's own. `lines_open`
-    the ids of the board's open items, for the home's line a job waits on (None: not read). `sessions` the sessions by
-    address, of the nodes in `read_nodes`, and `open_asks` those with an open ask of their own. `started` the repo's
-    started teams and `docs` each one's flow; `may_start` whether the first of them may start a session now."""
+    pull request still open (`live_keys`). `rows` are the repo's pull requests, open and recently merged or closed, and
+    must hold each open board answer's own (`stage_fetch.rows_of`, its `wanted`), else that job has no reading.
+    `lines_open` the ids of the board's open items, for the home's line a job waits on (None: not read). `sessions` the
+    sessions by address, of the nodes in `read_nodes`, and `open_asks` those with an open ask of their own. `started`
+    the repo's started teams and `docs` each one's flow; `may_start` whether the first of them may start a session."""
 
     now: datetime
     live: Collection[str]
@@ -80,9 +81,12 @@ def _session(f: JobFacts, holder: str) -> tuple[bool, Session | None]:
 
 
 def _busy(record: Mapping[str, Any], f: JobFacts) -> bool:
-    """Whether `record`'s holder is a job session still running, or one whose node was not read, which may be."""
+    """Whether `record`'s holder is a job session still running, or one whose node was not read, which may be. A record
+    past the job's stage, in its team's flow, is held by that stage's session, which is no job session of the seat."""
     holder = str(record.get("holder") or "")
-    if not holder or record.get("closed_at"):
+    if not holder or record.get("closed_at") or record.get("waits"):
+        return False
+    if record.get("stage") not in (None, job_stage(f.docs.get(str(record.get("team"))) or {})):
         return False
     read, s = _session(f, holder)
     return not read or (s is not None and s.state not in ("exited", "closed"))
@@ -103,7 +107,7 @@ def reading_on(record: Mapping[str, Any] | None, key: str, f: JobFacts, *, seat_
         return JobReading(**common)
     team = str(record.get("team") or "")
     own_pr = None
-    if record.get("seat") == "board-answers" and isinstance(record.get("pr"), int):
+    if key in f.live and record.get("seat") == "board-answers" and isinstance(record.get("pr"), int):
         row = next((r for r in f.rows if r.get("number") == record["pr"]), None)
         own_pr = row.get("state") if row else None
         if own_pr not in ("open", "merged", "closed"):
@@ -188,7 +192,11 @@ def step(
 
 
 def _started_one(got: JobStep) -> bool:
-    return got.act is not None and got.act.name in ("offer", "offer-again") and bool(got.made and got.made.made)
+    """Whether the step started a job session: an offer, or an offer again but the second loss's, to the person."""
+    act = got.act
+    if act is None or not (got.made and got.made.made):
+        return False
+    return act.name == "offer" or (act.name == "offer-again" and act.case != "to-person")
 
 
 def seat_pass(
