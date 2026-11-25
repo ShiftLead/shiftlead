@@ -539,7 +539,8 @@ def test_delete_removes_the_teams_built_in_tech_lead_records_on_their_hosts(agen
 
 
 def test_a_tech_lead_record_not_removed_refuses_the_delete_and_keeps_the_team(agent, monkeypatch):
-    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *_: None)
+    dropped = []
+    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *a: dropped.append(a))
     a = _agent_on(monkeypatch, body)
     rec = SimpleNamespace(id="ao-s-techlead-a", team="a", state="closed", builtin="techlead")
     a._graph = lambda: {"ao-s-techlead-a@node": rec}
@@ -550,4 +551,4 @@ def test_a_tech_lead_record_not_removed_refuses_the_delete_and_keeps_the_team(ag
     a._route_act = route
     with pytest.raises(RpcError, match="not deleted: its tech lead's record ao-s-techlead-a@node was not removed"):
         asyncio.run(a.rpc_team_delete(team="a", version=ts.version(settings_mod.load(), "a")))
-    assert "a" in settings_mod.load()["teams"]
+    assert "a" in settings_mod.load()["teams"] and not dropped, "the state branch's copy is kept too"

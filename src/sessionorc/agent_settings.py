@@ -742,8 +742,8 @@ class SettingsMixin:
         """**Delete** (§4.9d *Delete*, §4.5a, TD-2063): a person's own act, version-checked, refused before the
         cut-over, while the team is started (the home's started mark), while any session of the team is live and
         while it has open stage records, naming them. The state branch's copy goes first, so a failed removal leaves
-        the team whole and a new team of this name never inherits an old flow; then the team's built-in tech lead
-        records (`_forget_techleads`)."""
+        the team whole and a new team of this name never inherits an old flow; the team's built-in tech lead records
+        (`_forget_techleads`) go before it, so a record not removed leaves the copy too."""
         agent_common.person_only(caller, "delete a team", "§4.9d *Delete*", self._graph())
         name = str(team or "")
         checked = settings_mod.load()
@@ -761,13 +761,15 @@ class SettingsMixin:
         body = home_call(TEAM)
         try:
             held = await asyncio.to_thread(body.open_records, name, repo, roots)
-            if not held:
-                await asyncio.to_thread(body.drop_copy, name, repo, roots)
-        except Exception as e:  # noqa: BLE001 — a state branch not read or not written refuses, and changes no setting
+        except Exception as e:  # noqa: BLE001 — a state branch not read refuses, and changes no setting
             raise RpcError(f"{name} was not deleted: {e}") from None
         if held:
             raise RpcError(f"{name} has open stage records: {'; '.join(held)}")
-        await self._forget_techleads(name, caller)
+        await self._forget_techleads(name, caller)  # before the copy goes, so a refusal here leaves the team whole
+        try:
+            await asyncio.to_thread(body.drop_copy, name, repo, roots)
+        except Exception as e:  # noqa: BLE001 — a state branch not written refuses, and changes no setting
+            raise RpcError(f"{name} was not deleted: {e}") from None
         doc = settings_mod.load()  # read again: the state branch's calls ran outside any lock on this file
         before = copy.deepcopy(doc)
         try:
