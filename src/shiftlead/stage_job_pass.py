@@ -86,8 +86,9 @@ def _busy(record: Mapping[str, Any], f: JobFacts) -> bool:
     holder = str(record.get("holder") or "")
     if not holder or record.get("closed_at") or record.get("waits"):
         return False
-    if record.get("stage") not in (None, job_stage(f.docs.get(str(record.get("team"))) or {})):
-        return False
+    doc = f.docs.get(str(record.get("team")))
+    if record.get("stage") is not None and doc is not None and record["stage"] != job_stage(doc):
+        return False  # a flow not read may be at the job's stage: read as busy, so no second session starts
     read, s = _session(f, holder)
     return not read or (s is not None and s.state not in ("exited", "closed"))
 
