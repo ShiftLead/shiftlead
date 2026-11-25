@@ -65,7 +65,8 @@ def test_a_job_starts_in_the_build_role_on_the_seats_model_its_lane_the_work_ord
 def test_a_job_takes_its_host_grants_project_bound_ledger_venv_and_listing_from_its_role_and_repo(world, monkeypatch):
     """TD-2168: the `Launch` fields a job takes from its role and its repo's config, as an entry stage's launch does."""
     org, team, root = world
-    (root / ".shiftlead.yml").write_text("ledger: docs/work\nroles:\n  grinder: {grants: [control], context: {bound: 150k}}\n")
+    role = "  grinder: {grants: [control], context: {bound: 150k}}\n"
+    (root / ".shiftlead.yml").write_text(f"ledger: docs/work\nroles:\n{role}")
     monkeypatch.setattr(teams, "_person", lambda *_a: ([], True))
     monkeypatch.setattr(teams, "node_venv", lambda host, here: None if host == here else f"/venv/{host}")
     venvs: list = []
