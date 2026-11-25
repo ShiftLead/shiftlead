@@ -294,6 +294,20 @@ def test_the_reach_ends_a_session_through_the_close(monkeypatch: pytest.MonkeyPa
     assert [m for m, _ in call.seen] == ["close"]
 
 
+class SeatCalls(Calls):
+    def __call__(self, method: str, **kw: Any) -> dict[str, Any]:
+        self.seen.append((method, kw))
+        return {"models": {"x": {}}}
+
+
+def test_the_reach_reads_a_sessions_spend_from_the_seat_ledger(monkeypatch: pytest.MonkeyPatch) -> None:
+    call = SeatCalls()
+    got = reach(monkeypatch, call).spent
+    assert got is not None and got("build-td-7") == {"x": {}}
+    assert call.seen == [("seats", {"record": "build-td-7"})]
+    assert stage_pass.Reach(None, None, None, None, None).spent is None  # type: ignore[arg-type]
+
+
 # -- one team's pass -----------------------------------------------------------------------------------------
 
 
