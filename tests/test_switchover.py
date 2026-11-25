@@ -1043,7 +1043,8 @@ def test_the_check_and_its_answers_read_a_container_nodes_logins(home, tmp_path,
 # -- `--host`: one ssh node's own part (§4.9e *The window* step 2) ----------------------------------------------------
 
 
-def test_check_host_answers_writes_this_hosts_part_alone_and_the_check_accepts_it(home, tmp_path, capsys):
+def test_check_host_answers_writes_this_hosts_part_alone_and_the_check_accepts_it(home, tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: True)
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
     (home / "org.yml").write_text("teams: [")  # a node reads no org: the check never asks for it
     before = {f: f.read_bytes() for f in home.rglob("*") if f.is_file()}
@@ -1076,7 +1077,7 @@ def test_a_home_shaped_like_todays_is_checked_whole_and_its_files_left_as_they_a
         "e": ["spare", "later"],
     }
     lines = [f"  {p}: {{config_dir: {tmp_path / f}, account: {ps[0]}}}" for f, ps in on.items() for p in ps]
-    lines.append(f"  reader: {{adapter: gemini, config_dir: {tmp_path / 'g'}}}")
+    lines.append(f"  reader: {{config_dir: {tmp_path / 'g'}, account: reader}}")
     (home / "profiles.yml").write_text("default: paul\nprofiles:\n" + "\n".join(lines) + "\n")
 
     def team(repo: str, profile: str, host: str = "") -> dict:
@@ -1090,7 +1091,8 @@ def test_a_home_shaped_like_todays_is_checked_whole_and_its_files_left_as_they_a
     node = Node(home / "nodes" / "cm", "profiles:\n  q: {config_dir: /shiftlead/profiles/q}\n")
     monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": node})
     monkeypatch.setattr(cli.hosts, "nodes", lambda: {"cm": {"container": {"devcontainer": "/x"}}})
-    reading = {"name": "r1", "ledger": {"entries": [Entry("TD-1"), Entry("TD-2")]}, "prs": {"open": [Pr(10, "td1-x")]}}
+    prs = [Pr(10, "td1-x"), Pr(11, "td2-y", draft=True), Pr(13, "td1-td2-both")]
+    reading = {"name": "r1", "ledger": {"entries": [Entry("TD-1"), Entry("TD-2")]}, "prs": {"open": prs}}
     (home / "repos.json").write_text(json.dumps({"/nowhere/r1": reading}))
     before = {f: f.read_bytes() for f in home.rglob("*") if f.is_file()}
     assert cli.main(["switch-over", "check"]) == 1, "no answers file: a blocker to cure beforehand"
@@ -1101,11 +1103,27 @@ def test_a_home_shaped_like_todays_is_checked_whole_and_its_files_left_as_they_a
     home_logins = out.split("h: logins the move would make\n")[1].split("cm: logins")[0].splitlines()
     assert [ln.split()[0] for ln in home_logins] == [
         "claude-code:paul", "claude-code:fable", "claude-code:sonnet", "claude-code:cm", "claude-code:spare",
-        "gemini:reader",
+        "claude-code:reader",
     ], "ten profiles on six folders make six logins, each named for its folder's first profile"  # fmt: skip
     assert "cm: logins the move would make, a container node\n  claude-code:q  /shiftlead/profiles/q  from q" in out
-    assert sum(1 for ln in out.splitlines() if ln.startswith("  t") or ln.startswith("  far")) >= 6
+    team_part = out.split("teams the answers give\n")[1].split("the built-in set")[0]
+    assert [ln.split(":")[0].strip() for ln in team_part.splitlines() if not ln.startswith("    ")] == [
+        "far", "t1", "t2", "t3", "t4", "t5",
+    ], "six teams"  # fmt: skip
     for name in ("t1", "t2", "t3", "t4", "t5", "far"):
         assert f"  {name}: " in out and "flow design-wise" in out.split(f"  {name}: ")[1].splitlines()[0]
     assert "    taken up with its pull request: TD-1 #10 (td1-x)" in out
+    assert "    waits, offered to nobody: TD-2 — #11 is a draft" in out
+    assert "    nothing will read: td1-td2-both — #13 holds TD-1, TD-2" in out
     assert "no blockers" in out
+    answers_file = home / "switch-over" / "answers.yml"
+    assert cli.main(["switch-over", "check"]) == 0
+    after = {f: f.read_bytes() for f in home.rglob("*") if f.is_file() and f != answers_file}
+    assert after == before, "only the answers file is new"
+
+
+def test_check_host_answers_on_a_home_writes_nothing(home, tmp_path, capsys):
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    assert cli.main(["switch-over", "check", "--host", "--answers"]) == 1
+    assert "an ssh node's" in capsys.readouterr().err
+    assert not (home / "switch-over").exists(), "the home's answers file is the whole one, written by --answers alone"

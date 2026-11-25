@@ -5614,6 +5614,12 @@ def _switch_over_check_host(args: argparse.Namespace, host: str, profs: Any) -> 
     own answers file, and their blockers; no team, set, director or work in flight, which are the home's."""
     from shiftlead import switchover
 
+    if args.answers and not hosts.is_node():  # the home's file is the whole one (§4.9e *The answers file*)
+        print(
+            "ao switch-over check: --host --answers is an ssh node's, written on it; on the home, --answers alone",
+            file=sys.stderr,
+        )
+        return 1
     if args.answers:
         path = switchover.answers_file()
         at = switchover.shown(path)
