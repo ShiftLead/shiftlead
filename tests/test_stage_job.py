@@ -233,3 +233,7 @@ def test_entries_work_is_a_pickable_entry_with_no_record() -> None:
     entries = {"TD-2054": waiting("TD-2054")}  # has a record: the Offer act took it already
     got = entries_work(["TD-2053", "TD-2054", "TD-2056", "TD-9999"], entries, prs)
     assert got == {12, 15}  # #15's files unread at its head: maybe an entry's, so skipped this reading
+
+
+def test_a_number_no_pull_request_has_is_skipped() -> None:
+    assert pr_objects([red(0), red(-3), red(12)], {}, {}) == {"pr-12": "2026-11-24T01:00:00Z"}

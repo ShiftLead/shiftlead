@@ -232,8 +232,11 @@ def pr_objects(
             continue
         if str(num) in named or num in work:
             continue
+        key = f"pr-{num}"
+        if not JOB_KEY.fullmatch(key):
+            continue  # no pull request's number: never a job, and never a raise that stops the pass
         since = o.get("filing_since") if o.get("filing") else o.get("red_since")
-        out[key_of("unheld-pull-requests", num)] = str(since or "")
+        out[key] = str(since or "")
     return out
 
 
