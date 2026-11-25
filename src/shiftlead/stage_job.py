@@ -273,7 +273,7 @@ def pr_objects(
     request of the seat's yet. Each key maps to a `PrObject`, its kind `red` or `filing`."""
     named = {str(r.get("pr")) for r in entries.values() if _open(r) and r.get("pr") is not None}
     named |= {str(r.get("pr")) for r in jobs.values() if _open(r) and r.get("seat") == "board-answers" and r.get("pr")}
-    out: dict[str, str] = {}
+    out: dict[str, PrObject] = {}
     for o in orders:
         num = o.get("pr")
         if not o.get("pr_order") or not isinstance(num, int) or isinstance(num, bool):
