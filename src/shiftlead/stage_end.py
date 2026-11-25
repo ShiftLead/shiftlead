@@ -11,8 +11,10 @@ are `stage_job_end`'s.
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import tempfile
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -23,7 +25,7 @@ import yaml
 from sessionorc import board, ledger, ledgerboard, reports, workorders
 from shiftlead import flow3, repoconfig, stage_work
 from shiftlead.stage_start import CHECK_WAITS
-from shiftlead.stagerecord import StageStore, StateError, _now, ask_words
+from shiftlead.stagerecord import HOME, StageStore, StateError, _now, ask_words, run_of, where_now
 
 GIT_TIMEOUT = 30.0
 GH_TIMEOUT = 30.0
@@ -37,6 +39,8 @@ CARRY_ON = "Carry on — a session takes the move that was stopped, and its coun
 ARCHIVE = "Archive the entry — the home archives it"
 BUILD_ANYWAY = "Build it anyway — a session builds it in this stage again"
 TRY_AGAIN = "Try the merge again — the home runs the gate and merges"
+
+log = logging.getLogger(__name__)
 
 
 class Refused(Exception):
@@ -426,8 +430,9 @@ def _apply(
     head: str | None,
     person: str,
     by: str,
+    run: dict[str, Any] | None = None,
 ) -> str:
-    """Write the move: returns where the entry went."""
+    """Write the move: returns where the entry went. `run` is what the row keeps of the holder's run (§4.9c)."""
     to, count = where["to"], f"{key}:{outcome}"
     record["holder"] = None
     record["answer"] = None
@@ -447,9 +452,12 @@ def _apply(
             record["stage"] = to
             record["entered_at"] = _now()
             record["offers"] = 0
-    record.setdefault("history", []).append(
-        {"from": key, "outcome": outcome, "reason": reason, "by": by, "to": went, "head": head, "at": _now()}
-    )
+    row: dict[str, Any] = {"from": key, "outcome": outcome, "reason": reason, "by": by, "to": went, "head": head}
+    if blocked is not None:
+        row["blocked"] = blocked  # kept on the row, since an answer clears the record's (§4.9c)
+    if run is not None:
+        row["run"] = run
+    record.setdefault("history", []).append({**row, "at": _now()})
     if went == "merge":
         record["waits"] = "merging"
         record["merging"] = {"head": head, "stage": key, "outcome": outcome}
@@ -471,8 +479,13 @@ def end(
     facts: Facts,
     person: str,
     records: Records | None = None,
+    *,
+    session: Mapping[str, Any] | None = None,
+    spent: Callable[[], Any] | None = None,
 ) -> dict[str, Any]:
-    """Check `outcome` and write its move: `{entry, outcome, went, repeat}`, or `Refused` with nothing written."""
+    """Check `outcome` and write its move: `{entry, outcome, went, repeat}`, or `Refused` with nothing written.
+    `session` is the calling session record's fields (`stagerecord.SESSION_FIELDS`), `spent` reads its id's `models`
+    sums for the row's `run` (§4.9c); a reading that raises, or none, leaves the row's `models` null."""
     if outcome == CLOSED_UNMERGED:
         raise Refused(PR_JOB_ALONE)
     said = " ".join((reason or "").split())
@@ -480,10 +493,9 @@ def end(
         record = store.entry(tid)
         if record is None:
             raise Refused(f"{tid} has no stage record")
-        last = (record.get("history") or [None])[-1]
         if record.get("holder") != caller:
-            if last and last.get("by") == caller and last.get("outcome") == outcome:
-                return {"entry": tid, "outcome": outcome, "went": last.get("to"), "repeat": True}
+            if _repeat(record, caller, outcome, session):
+                return {"entry": tid, "outcome": outcome, "went": where_now(record), "repeat": True}
             raise Refused("this entry is not yours")
         key = str(record["stage"])
         stage = _stage_or_none(doc, key)
@@ -512,8 +524,31 @@ def end(
         # the merge of this pull request alone closes the record with its entry open (§4.9c *A merge the person takes
         # over*): kept through a refused merge and a wait on the person, cleared by any other outcome taken
         record["check_waits"] = record["pr"] if outcome == CHECK_WAITS else None
-        went = _apply(store, record, doc, stage, key, outcome, said, where, head, person, caller)
+        run = run_of(record, caller, session, _reading(spent, tid))
+        went = _apply(store, record, doc, stage, key, outcome, said, where, head, person, caller, run)
     return {"entry": tid, "outcome": outcome, "went": went, "repeat": False}
+
+
+def _repeat(record: dict[str, Any], caller: str, outcome: str, session: Mapping[str, Any] | None) -> bool:
+    """A retry of this session's own accepted end (§4.9c): the last row the home did not write is the caller's, with
+    this outcome, and its `run` began with the calling session record, so an earlier run under the same id is no
+    match; a row with no `run` is matched on its `by` alone."""
+    rows = [r for r in record.get("history") or [] if isinstance(r, dict) and r.get("by") != HOME]
+    if not rows or rows[-1].get("by") != caller or rows[-1].get("outcome") != outcome:
+        return False
+    run = rows[-1].get("run")
+    return not isinstance(run, dict) or run.get("started") == (session or {}).get("created")
+
+
+def _reading(spent: Callable[[], Any] | None, tid: str) -> Any:
+    """The holder's `models` sums now, or None where there is no reader or it raised (logged, never raised)."""
+    if spent is None:
+        return None
+    try:
+        return spent()
+    except Exception:
+        log.warning("%s: the spend reading for its stage row failed; the row's models is null", tid, exc_info=True)
+        return None
 
 
 def _person_of(root: Path) -> str:
@@ -548,11 +583,15 @@ def call(
     outcome: str,
     reason: str,
     seen: dict[str, Any] | None = None,
+    session: Mapping[str, Any] | None = None,
+    spent: Callable[[], Any] | None = None,
 ) -> dict:
     """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`. `seen` is a
     node session's worktree as its node read it; `root` is then the home's checkout of that repo. `tid` is the entry the
     session holds, a job's work order reference (`board:<8 hex>`, `pr:<n>`), whose outcomes `stage_job_end` takes, or
-    an audit run's lease (`audit:<team>/<audit>`), whose outcomes `stage_audit_end` takes."""
+    an audit run's lease (`audit:<team>/<audit>`), whose outcomes `stage_audit_end` takes. `session` and `spent` are the
+    caller's record fields and the reader of its spend, for an entry's row's `run` alone (§4.9c): an audit's and a job's
+    rows carry none."""
     from shiftlead import stage_audit_end, stage_job_end, stage_job_tick  # each imports this module
 
     store = StageStore(root)
@@ -598,6 +637,8 @@ def call(
             facts,
             _person_of(Path(root)),
             Records.of(root),
+            session=session,
+            spent=spent,
         )
     except (Refused, StateError) as e:
         return {"refused": str(e)}
