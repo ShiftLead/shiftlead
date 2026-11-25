@@ -9,13 +9,14 @@ the settings, the login rows and the head. Reads only. The page draws from this 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from sessionorc import builtinstore, logins, teamstore
-from shiftlead import flow3, flow_save, flowdefs, repoconfig
+from sessionorc import builtinstore, gitinfo, logins, teamstore
+from shiftlead import flow3, flow_save, flowdefs, repoconfig, stage_audit, stage_audit_pass
 from shiftlead import org as orgmod
 from shiftlead.stage_acts import switch_case
 from shiftlead.stage_read import flow_on
@@ -102,8 +103,10 @@ def view(
     records: Iterable[Mapping[str, Any]],
     *,
     director: bool = False,
+    rounds: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """The reply, from what was read. A team not switched has no flow or logins to show yet."""
+    """The reply, from what was read. A team not switched has no flow or logins to show yet. `rounds` is when each
+    audit, by key, next comes round (`audit_rounds`); one not read is drawn with none."""
     teams = doc.get("teams")
     entry: Mapping[str, Any] = (teams.get(team) if isinstance(teams, Mapping) else None) or {}
     switched = teamstore.switched(doc, team)
@@ -168,6 +171,7 @@ def view(
             "name": a.get("name"),
             "model": a.get("model"),
             "every": a.get("every"),
+            "next": (rounds or {}).get(flow3.key_of(a.get("name"))) or None,
             "now": _now_on(order, a.get("model"), rows, on_node),
         }
         for a in audits
@@ -288,6 +292,34 @@ def drop_copy(team: str, repo: str, roots: Iterable[str | Path]) -> None:
     StageStore(root).drop_flow(team)
 
 
+def audit_rounds(
+    team: str, flow_doc: Any, store: StageStore | None, root: Path | None, now: datetime | None = None
+) -> dict[str, str]:
+    """When each of the flow's audits next comes round (`stage_audit.next_round`), by key, from its run record on the
+    state branch and, on a `merged-pull-requests` clock, the merges since its base on the default branch. An audit
+    whose record cannot be read is left out, so the page draws it with no next clock."""
+    if store is None or root is None or not isinstance(flow_doc, Mapping):
+        return {}
+    now = now or datetime.now(UTC)
+    count = None
+    out: dict[str, str] = {}
+    for a in _maps(flow_doc.get("audits")):
+        key, every = flow3.key_of(a.get("name")), stage_audit.clock(a.get("every"))
+        try:
+            run = store.audit(team, key)
+        except UNREADABLE:
+            continue
+        if run is not None and not isinstance(run, Mapping):
+            continue  # a hand-edited record that is no object: unread, never the page's failure
+        merged = None
+        if every is not None and every.unit == "merged-pull-requests" and run and run.get("base"):
+            if count is None:
+                count = stage_audit_pass.merged_since(root, f"origin/{gitinfo.default_branch(root)}")
+            merged = count(str(run["base"]))
+        out[key] = stage_audit.next_round(run, every, merged, now)
+    return out
+
+
 def call(
     *,
     team: str,
@@ -322,7 +354,9 @@ def call(
                 flow_doc = _flow_doc(team, name, None, where)
             except UNREADABLE as again:
                 unread = f"{unread}; the flow could not be read: {again}"
-    return {**view(team, doc, rows, head, here, flow_doc, records, director=director), "unread": unread}
+    rounds = audit_rounds(team, flow_doc, store, root) if unread is None else {}
+    reply = view(team, doc, rows, head, here, flow_doc, records, director=director, rounds=rounds)
+    return {**reply, "unread": unread}
 
 
 # -- the flow pick and a switch (§4.9d *The flow pick and a switch*, TD-2062) ---------------------------------------

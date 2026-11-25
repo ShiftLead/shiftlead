@@ -266,3 +266,35 @@ def test_open_records_are_named_for_delete_and_another_teams_are_not(tmp_path, m
     }
     monkeypatch.setattr(team_show, "StageStore", lambda r: SimpleNamespace(entries=lambda: rows))
     assert team_show.open_records("t", "shiftlead", [root]) == ["TD-1 is in check", "TD-2 waits on you"]
+
+
+# -- an audit's next clock (TD-2053) ---------------------------------------------------------------------------------
+
+
+def test_each_audit_is_drawn_with_when_it_next_comes_round(tmp_path, monkeypatch):
+    flow = {**FLOW, "audits": [*FLOW["audits"], {"name": "Code", "model": "sonnet", "every": "3 merged-pull-requests"}]}
+    runs = {"docs": {"started_at": _TWO_HOURS_AGO, "holder": None, "base": "b0"}, "code": {"base": "b1"}}
+    seen: list[tuple] = []
+    store = SimpleNamespace(audit=lambda team, key: runs.get(key))
+
+    def merged(root, ref):
+        seen.append(("count", ref))
+        return lambda base: {"b1": 1}.get(base)
+
+    monkeypatch.setattr(team_show.stage_audit_pass, "merged_since", merged)
+    monkeypatch.setattr(team_show.gitinfo, "default_branch", lambda root: "main")
+    got = team_show.audit_rounds("t", flow, store, tmp_path, NOW)
+    assert got == {"docs": "in 4h", "code": "2 to go"} and seen == [("count", "origin/main")]
+    view = team_show.view("t", _doc(), {}, HEAD, "home", flow, (), rounds=got)
+    assert [(a["name"], a["next"]) for a in view["audits"]] == [("Docs", "in 4h"), ("Code", "2 to go")]
+    assert team_show.view("t", _doc(), {}, HEAD, "home", flow, ())["audits"][0]["next"] is None
+
+
+def test_an_audit_whose_record_cannot_be_read_has_no_next_clock(tmp_path):
+    def boom(team, key):
+        raise ValueError("bad json")
+
+    assert team_show.audit_rounds("t", FLOW, SimpleNamespace(audit=boom), tmp_path, NOW) == {}
+    assert team_show.audit_rounds("t", FLOW, None, tmp_path, NOW) == {}
+    assert team_show.audit_rounds("t", FLOW, SimpleNamespace(audit=lambda team, key: [1]), tmp_path, NOW) == {}
+    assert team_show.audit_rounds("t", None, SimpleNamespace(audit=boom), tmp_path, NOW) == {}

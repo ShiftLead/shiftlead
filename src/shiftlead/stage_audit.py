@@ -6,8 +6,8 @@ branch's head when it started, `offers`, and `ended` (`{outcome, reason, at}`) o
 outcome, one of `OUTCOMES`, or `lost` for a run rested at its second loss.
 
 This module is pure, as `stage_acts` is: `choose` names the one act a pass takes on an audit, and `started`, `again`,
-`rested` and `finished` are the record each writes. It reads nothing and writes nothing; starting the session, writing
-the record and telling the person are later slices of TD-2053. An audit with no run record yet (its team's first start,
+`rested` and `finished` are the record each writes; `next_round` is when the audit next comes round, as the team page
+draws it. It reads nothing and writes nothing. An audit with no run record yet (its team's first start,
 or an audit just added) is due at once, so its first run sets the commit its count runs from. A run's lease is its
 holder's claim on `lease_ref`, renewed by claiming again (§4.9c, act 5) and read as lapsed as an entry's claim
 is (act 4).
@@ -93,6 +93,39 @@ def due(run: Mapping[str, Any], every: Clock, s: AuditReading, now: datetime) ->
         return None
     span = timedelta(hours=every.n) if every.unit == "hours" else timedelta(days=every.n)
     return now - start >= span
+
+
+def _span(left: timedelta) -> str:
+    """A wait as the team page words it: `2h 10m`, `3d 4h`, `25m` (never less than a minute)."""
+    mins = max(1, int(left.total_seconds() // 60))
+    days, rest = divmod(mins, 24 * 60)
+    hours, mins = divmod(rest, 60)
+    if days:
+        return f"{days}d {hours}h" if hours else f"{days}d"
+    return f"{hours}h {mins}m" if hours and mins else f"{hours}h" if hours else f"{mins}m"
+
+
+def next_round(run: Mapping[str, Any] | None, every: Clock | None, merged_since: int | None, now: datetime) -> str:
+    """When the audit next comes round, as the team page's *Beside the path* draws it beside its clock (§4.9d *The
+    page*), read as `due` reads it: `due now` (its first run among them), `running now` while a run holds its lease,
+    `n to go` on a `merged-pull-requests` clock, `in 2h 10m` on an hours' or days' one; `""` where it cannot be told (a
+    clock the flow check refuses, a count or a start not read)."""
+    if every is None:
+        return ""
+    if run is None:
+        return "due now"  # due at once: its first run sets the base
+    if run.get("holder"):
+        return "running now"
+    if every.unit == "merged-pull-requests":
+        if merged_since is None:
+            return ""
+        left = every.n - merged_since
+        return f"{left} to go" if left > 0 else "due now"
+    start = _at(run.get("started_at"))
+    if start is None:
+        return ""
+    left = start + (timedelta(hours=every.n) if every.unit == "hours" else timedelta(days=every.n)) - now
+    return f"in {_span(left)}" if left > timedelta(0) else "due now"
 
 
 def holds_lease(run: Mapping[str, Any], s: AuditReading) -> bool:

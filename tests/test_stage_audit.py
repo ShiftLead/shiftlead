@@ -20,6 +20,7 @@ from shiftlead.stage_audit import (
     finished,
     holds_lease,
     lease_ref,
+    next_round,
     rested,
     started,
 )
@@ -192,3 +193,25 @@ def test_finished_clears_the_holder_and_keeps_the_clock() -> None:
     f = finished(r, "findings-filed", "", NOW)
     assert f["holder"] is None and f["started_at"] == r["started_at"] and f["base"] == r["base"]
     assert f["ended"] == {"outcome": "findings-filed", "reason": "", "at": "2026-11-25T12:00:00Z"}
+
+
+@pytest.mark.parametrize(
+    ("record", "every", "merged", "want"),
+    [
+        (None, "6 hours", None, "due now"),
+        (run(), "6 hours", None, "running now"),
+        (done_run(), "6 hours", None, "due now"),
+        (done_run(), "10 hours", None, "in 3h"),
+        (done_run(started_at="2026-11-25T09:50:00Z"), "6 hours", None, "in 3h 50m"),
+        (done_run(started_at="2026-11-25T11:59:30Z"), "6 hours", None, "in 5h 59m"),
+        (done_run(), "2 days", None, "in 1d 17h"),
+        (done_run(started_at="2026-11-24T12:00:00Z"), "2 days", None, "in 1d"),
+        (done_run(), "10 merged-pull-requests", 6, "4 to go"),
+        (done_run(), "10 merged-pull-requests", 10, "due now"),
+        (done_run(), "10 merged-pull-requests", None, ""),
+        (done_run(started_at="junk"), "6 hours", None, ""),
+        (done_run(), "6 weeks", None, ""),
+    ],
+)
+def test_next_round_says_when_the_audit_next_comes_round(record, every, merged, want) -> None:
+    assert next_round(record, clock(every), merged, NOW) == want
