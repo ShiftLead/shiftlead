@@ -4,8 +4,13 @@ A job's session is a stage's session in all but its work (`stage_start`): the sa
 end`, the repo's rules, and a brief — the seat's work order's words as they are today (`briefs/job/<seat>.md`). It is
 started on the seat's model, given by the built-in set the repo uses (`builtinstore.seat`), in the build stage's role,
 with the work order's reference as its one lane (`board:<8 hex>`, `pr:<n>`), and names no `controllers`. Its outcomes
-are `work-pushed` and `other`. Launching on the set's login is TD-2068's; nothing calls `launch` until the job's offer
-is wired into the tick, and `stage_start.start` starts nothing before the team's started mark (TD-2065).
+are `work-pushed` and `other`. Launching on the set's login is TD-2068's, and `stage_start.start` starts nothing
+before the team's started mark (TD-2065).
+
+A job whose record stands at one of its flow's review stages is read by that stage's own fresh session
+(`review_launch`, §4.9d *Its pull request is reviewed and merged by the team's flow*): a review stage's session as an
+entry's would be (`stage_start.launch`: the reviewer role, the stage's model and brief), holding the job's work order
+and named `<stage>-job-<key>`, so no entry's session takes its name. Its outcomes are the review stage's.
 """
 
 from __future__ import annotations
@@ -18,7 +23,8 @@ from sessionorc import workorders
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
 from shiftlead.stage_job import SEATS, key_of
-from shiftlead.stage_start import ROLE_OF, StageLaunch
+from shiftlead.stage_start import ROLE_OF, StageLaunch, Work
+from shiftlead.stage_start import launch as stage_launch
 
 JOB_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "job.md"
 JOB_BRIEFS = Path(__file__).resolve().parent / "briefs" / "job"
@@ -157,3 +163,53 @@ def launch(
         unlisted=unlisted,
     )
     return StageLaunch(x, model)
+
+
+def review_name(record: Mapping[str, Any]) -> str:
+    """The name of a review stage's session on the job: the stage's key, `-job-` and the record's key
+    (`review-job-pr-12`), which no entry's stage session (`<stage>-td-<n>`) and no job session (`job-<key>`) takes."""
+    return f"{record.get('stage')}-{name_of(record)}"
+
+
+def review_launch(
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    doc: dict[str, Any],
+    record: Mapping[str, Any],
+    *,
+    host: str,
+    here: str,
+    came: str | None = None,
+    place: str = "package",
+    flow_dir: Path | None = None,
+    files: teams.Files | None = None,
+) -> StageLaunch:
+    """The session of the review stage the job's record stands at, nothing created: that stage's as an entry's would
+    be, on the stage's model, its lane the job's work order, told the job's branch and pull request and the reason of
+    the move that brought it there (`came`)."""
+    stage = str(record.get("stage") or "")
+    st = next(
+        (s for s in doc.get("stages") or [] if isinstance(s, Mapping) and flow3.key_of(s.get("name")) == stage), None
+    )
+    if st is None or st.get("does") != "review":
+        raise teams.TeamError(f"team {team.name}: {lane_of(record)} stands at {stage!r}, which is no review stage")
+    pr = record.get("pr")
+    work = Work(
+        entry=lane_of(record),
+        branch=str(record["branch"]) if record.get("branch") else None,
+        pr=pr if isinstance(pr, int) and not isinstance(pr, bool) else None,
+        came=came,
+    )
+    return stage_launch(
+        org,
+        team,
+        doc,
+        stage,
+        work,
+        host=host,
+        here=here,
+        place=place,
+        flow_dir=flow_dir,
+        files=files,
+        name=review_name(record),
+    )

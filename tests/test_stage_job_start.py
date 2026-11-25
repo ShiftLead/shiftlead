@@ -117,3 +117,34 @@ def test_a_flow_with_no_stage_for_other_entries_adds_no_review(world):
     doc["stages"][0]["takes"] = "design-first"
     assert stage_job_start.job_stage(doc) is None
     assert stage_job_start.job_stage({"stages": [{"name": "x", "takes": "any"}]}) == "x"
+
+
+# -- a review stage's session on a job -------------------------------------------------------------------------------
+
+
+def reviewed(world, record, doc=None, **kw):
+    org, team, _ = world
+    return stage_job_start.review_launch(org, team, doc or builtin("build-review"), record, host="h", here="h", **kw)
+
+
+def test_a_review_stages_session_on_a_job_is_that_stages_on_its_model_holding_the_work_order(world):
+    record = {**PR, "stage": "review", "branch": "td-x", "pr": 42}
+    got = reviewed(world, record, came="pushed for review")
+    x = got.launch
+    assert (x.role, x.lane, x.name, x.team, got.model) == ("reviewer", ["pr:42"], "review-job-pr-42", "t", "sonnet")
+    assert "**pr:42**" in x.prompt and "stage **Review**" in x.prompt and "pull request #42" in x.prompt
+    assert "- `ship`:" in x.prompt and "- `changes-wanted`:" in x.prompt and "pushed for review" in x.prompt
+    assert "work-pushed" not in x.prompt.split("The outcomes")[-1].split("\n\n")[0]
+
+
+def test_a_review_sessions_name_is_neither_an_entrys_stage_session_nor_a_job_session():
+    record = {**BOARD, "stage": "review"}
+    name = stage_job_start.review_name(record)
+    assert name == "review-job-board-1a2b3c4d" and name != stage_job_start.name_of(record)
+    assert not name.startswith("review-td-")
+
+
+def test_a_record_at_no_review_stage_is_refused_a_review_session(world):
+    for stage in ("build", "qa", None):
+        with pytest.raises(teams.TeamError):
+            reviewed(world, {**BOARD, "stage": stage})

@@ -116,12 +116,38 @@ def test_a_lost_job_waits_while_another_job_session_of_the_seat_is_live() -> Non
     assert named(second) == ("offer-again", "to-person")  # starts no session, so it never waits
 
 
-def test_a_job_in_its_teams_flow_is_moved_by_an_entrys_acts() -> None:
+def test_a_job_at_a_review_stage_is_offered_that_stages_session() -> None:
+    at = {"at_job_stage": False, **GO}
+    assert named(choose(job(stage="review"), JobReading(**at))) == ("offer", "review")
+    assert named(choose(job(stage="review"), JobReading(seat_busy=True, **at))) == ("offer", "review")
+    assert choose(job(stage="review"), JobReading(at_job_stage=False)) is None  # only while the team may start
+    assert choose(job(stage="review", waits="merging"), JobReading(**at)) is None
+    assert choose(held(stage="review"), JobReading(holder=Holder(), **at)) is None
     r = held(stage="review")
-    assert choose(r, JobReading(holder=Holder(ended=True), at_job_stage=False, **GO)) is None
     assert named(choose(r, JobReading(live=False, at_job_stage=False))) == ("reconcile", "object-gone")
     back = job(stage="build")  # moved back to the stage that takes `other` entries: a fresh job session
     assert named(choose(back, JobReading(**GO))) == ("offer", "")
+
+
+@pytest.mark.parametrize(
+    ("holder", "offers", "want"),
+    [
+        (Holder(ended=True), 1, ("offer-again", "review-lost")),
+        (Holder(idle_for=SILENT_AFTER), 1, ("offer-again", "review-silent")),
+        (Holder(ended=True), 2, ("offer-again", "to-person")),
+        (Holder(ended=True, stopped=True), 2, ("offer-again", "review-stopped")),
+    ],
+)
+def test_a_lost_review_session_on_a_job_is_offered_again_once(holder: Holder, offers: int, want: Any) -> None:
+    s = JobReading(holder=holder, at_job_stage=False, seat_busy=True, **GO)  # no job session of the seat holds it
+    act = choose(held(stage="review", offers=offers), s)
+    assert named(act) == want and act.review == (act.case != "to-person")
+
+
+def test_only_a_review_stages_offer_is_a_review_act() -> None:
+    assert JobAct("offer", "review").review and JobAct("offer-again", "review-lost").review
+    assert not JobAct("offer").review and not JobAct("offer-again", "lost").review
+    assert not JobAct("reconcile", "stage-gone").review
 
 
 def test_order_puts_begun_jobs_first_then_new_objects_oldest_first() -> None:
