@@ -90,6 +90,19 @@ def test_a_row_a_session_can_cure_takes_the_refused_move_and_counts_it(store):
     assert r["counts"]["review:refused"] == 1 and r["history"][-1]["by"] == "home"
 
 
+def test_a_refused_live_check_goes_back_to_its_stage_on_its_one_refused_count_and_keeps_its_mark(store):
+    merging = {"head": HEAD, "stage": "build", "outcome": "check-waits"}
+    put(store, stage="build", merging=merging, check_waits=4, counts={"build:refused": 2})
+    made, landed = go(store, {"verdict": "fail", "failed": ["ci"]})
+    r = store.entry(TID)
+    assert made.made and not landed
+    assert (r["stage"], r["waits"], r["counts"]["build:refused"], r["check_waits"]) == ("build", None, 3, 4)
+    put(store, stage="build", merging=merging, check_waits=4, counts={"build:refused": 3})  # the fourth: the person
+    made, _ = go(store, {"verdict": "fail", "failed": ["ci"]})
+    r = store.entry(TID)
+    assert made.made and r["intent"] and r["blocked"]["count"] == "build:refused" and r["check_waits"] == 4
+
+
 def test_the_refused_move_names_the_failing_row_in_its_reason(store):
     put(store)
     go(store, {"verdict": "fail", "failed": ["ci", "board"]})

@@ -110,6 +110,38 @@ def test_a_session_is_told_the_move_that_brought_it_and_the_persons_words(world)
     assert "a move whose reason was" not in plain and "in their own words" not in plain
 
 
+CHECK = "**This entry is a live check**"
+
+
+@pytest.mark.parametrize("own", [False, True])
+def test_a_live_checks_session_is_told_the_checks_rules_whatever_brief_the_stage_picks(world, own):
+    _, _, root = world
+    doc, kw = builtin("build-review"), {}
+    if own:
+        flow = root / ".shiftlead" / "flows" / "mine"
+        (flow / "briefs").mkdir(parents=True)
+        (flow / "briefs" / "own.md").write_text("---\nkind: build\n---\nBUILD THE THING\n")
+        doc["stages"][0]["brief"] = "own"
+        kw = {"place": "repo", "flow_dir": flow}
+    text = made(world, doc, "build", stage_start.Work("TD-7", live_check=True), **kw).launch.prompt
+    assert CHECK in text and "- `check-waits`: " in text and "never press it" in text
+    assert "replaces any building the brief below asks for" in text
+    assert "a new branch, its name holding the entry's id and not already on origin" in text
+    assert "post its `cadence-review:` comment" in text and "`ao td reserve`" in text
+    assert text.index(CHECK) < text.index("## Your brief")
+    assert ("BUILD THE THING" in text) is own
+
+
+def test_a_build_entrys_session_is_told_nothing_of_a_live_check(world):
+    text = made(world, builtin("build-review"), "build").launch.prompt
+    assert CHECK not in text and "check-waits" not in text
+
+
+def test_a_review_stage_holding_a_live_check_is_offered_no_check_waits(world):
+    text = made(world, builtin("build-review"), "review", stage_start.Work("TD-7", live_check=True)).launch.prompt
+    assert CHECK not in text and "check-waits" not in text
+
+
 def test_a_brief_a_stage_names_that_cannot_be_read_stops_the_launch(world):
     doc = builtin("build")
     doc["stages"][0]["brief"] = "gone"

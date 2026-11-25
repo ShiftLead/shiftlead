@@ -78,6 +78,7 @@ class EntryLedger(NamedTuple):
     design: bool = False
     open_parts: int = 0
     had_parts: bool = False
+    live_check: bool = False
 
 
 def _parent(e: dict) -> int | None:
@@ -99,6 +100,7 @@ def ledger_on(tid: str, text: str, archive: str | None) -> EntryLedger | None:
         "open",
         design=ledgerboard.first_word(own["fields"].get("kind")) == "design-first",
         open_parts=open_parts,
+        live_check=ledgerboard.first_word(own["fields"].get("kind")) == "live-check",
         had_parts=bool(open_parts) or any(_parent(e) == n for e in gone),
     )
 
@@ -375,6 +377,7 @@ def reading_on(record: Mapping[str, Any] | None, f: EntryFacts) -> Reading | Non
         return None
     common = {
         "design": f.ledger.design,
+        "live_check": f.ledger.live_check,
         "open_parts": f.ledger.open_parts,
         "had_parts": f.ledger.had_parts,
         "archive_open": forge.archive_open,

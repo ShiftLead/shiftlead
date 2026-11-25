@@ -354,6 +354,18 @@ def test_a_moved_entrys_question_is_cleared_in_one_pull_request(repo):
     assert git(repo, "rev-parse", "origin/main") == head
 
 
+def test_a_live_checks_question_is_cleared_with_its_own_words(repo):
+    """TD-2120, §4.9c *A merge the person takes over*: the same clear, its why the caller's."""
+    _push(repo, [ASKED], {190: _entry(190) + MOVED_LOG})
+    why = "its entry waits behind the blocker its live check merged"
+    assert board.clear_question(repo, "TD-190", "paul", "n1", why)["commit"]
+    git(repo, "fetch", "-q", "origin")
+    assert f"override: {why}" in git(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "TD-190, waits behind the blocker its live check merged" in git(
+        repo, "log", "-1", "--format=%s", "origin/main"
+    )
+
+
 @pytest.mark.parametrize("nonce", ["another", "n1"])
 def test_a_gate_this_question_did_not_set_is_left_standing(repo, nonce):
     log = MOVED_LOG if nonce == "another" else ""  # a different question's mark, or none at all

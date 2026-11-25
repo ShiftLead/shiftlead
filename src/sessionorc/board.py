@@ -1567,22 +1567,24 @@ CLEAR_BODY = (
 MOVED_WHY = "its entry moved to another team"
 
 
-def clear_question(root: str | Path, tid: str, person: str, nonce: str) -> dict[str, Any]:
-    """**A moved entry's question cleared** (design §4.9c, reconcile, TD-2051): on origin's head, the `decision
-    (<person>)` that the stage record's question `nonce` set on `tid` is removed with its Ask, and the board item
-    covering it alone is closed, landed as one pull request of the host agent's own. The ledger's writer removes no
-    Answers, Lifts or Context section, so those stay, read by nothing while the entry carries no decision, and the
-    next question replaces them. Returns the landing's `{commit, message, pr}` with `closed`, or `{"nothing": True}`
-    where there is nothing of that question to clear (already cleared, answered, or the entry gone)."""
+def clear_question(root: str | Path, tid: str, person: str, nonce: str, why: str = MOVED_WHY) -> dict[str, Any]:
+    """**A stage record's question cleared** (design §4.9c, reconcile, TD-2051, TD-2120): on origin's head, the
+    `decision (<person>)` that the stage record's question `nonce` set on `tid` is removed with its Ask, and the board
+    item covering it alone is closed, landed as one pull request of the host agent's own; `why` says why, on the
+    entry's Log, the item's close and the commit (an entry moved to another team, a live check's pull request merged).
+    The ledger's writer removes no Answers, Lifts or Context section, so those stay, read by nothing while the entry
+    carries no decision, and the next question replaces them. Returns the landing's `{commit, message, pr}` with
+    `closed`, or `{"nothing": True}` where there is nothing of that question to clear (already cleared, answered, or
+    the entry gone)."""
     root = Path(root)
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:
             raise unreachable("gh is not installed")
-        return _twice(lambda: _clear_question(root, tid, person, nonce, clock))
+        return _twice(lambda: _clear_question(root, tid, person, nonce, clock, why))
 
 
-def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock) -> dict[str, Any]:
+def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock, why: str) -> dict[str, Any]:
     t, want = _tree(root, clock)
     try:
         led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
@@ -1605,19 +1607,19 @@ def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock
             if state in ("open", "decided") and not _lists_other(it, tid, gate, led)
         ]
         day = datetime.now(UTC).date().isoformat()
-        out = ledgerboard.lift_gate(text, gate, TOOL, override=MOVED_WHY, today=day)
+        out = ledgerboard.lift_gate(text, gate, TOOL, override=why, today=day)
         declared = tuple(ledgerboard.declared(led.texts()[0])[0])
         out = ledgerboard.edit_entry(out, "edit", section="Ask", remove=True, today=day, declared_fields=declared)
         lb_ledger.gate(led, {path: out}, today=day)
         lb_ledger.write({path: out})
         for it in covering:
-            _apply(_plan(lb_board.plan_edit, str(t / rel), "done", it.id, why=MOVED_WHY, tool=TOOL))
+            _apply(_plan(lb_board.plan_edit, str(t / rel), "done", it.id, why=why, tool=TOOL))
         entry_rel = os.path.relpath(path, t)
         landed = _land(
             root,
             t,
             want,
-            f"{TOOL}: clear decision ({person}) on {tid}, moved to another team (session n/a)",
+            f"{TOOL}: clear decision ({person}) on {tid}, {why.removeprefix('its entry ')} (session n/a)",
             clock,
             lambda: _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0,
             body=CLEAR_BODY,

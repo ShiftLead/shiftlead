@@ -6,7 +6,8 @@ home's reading is never overwritten: the act is simply not made, and the next pa
 
 It makes reconcile's cases that start no session (`close`, `renumbered`, `land-intent`, `wait-for-parts`,
 `mark-waiting`, `rewrite-flow`, `re-enter`, `archive-design`, `team-moved`) and those that put a question to the person
-(`merged-entry-open`, `pr-closed`, `stage-gone`, `gate-again`), the person's answer (an archive answer landing its own
+(`merged-entry-open`, `pr-closed`, `stage-gone`, `gate-again`), a live check's merge closing its record with the
+entry open (`check-merged`, TD-2120), the person's answer (an archive answer landing its own
 pull request, a lift on a record whose pull request has since merged applied to nothing and said on the Log), the
 pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
@@ -150,6 +151,33 @@ def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dic
     return Made(True)
 
 
+CHECKED_WHY = "its entry waits behind the blocker its live check merged"
+
+
+def _check_merged(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], person: str) -> Made:
+    """A live check's `check-waits` merged: its record closes with the entry open behind its blocker, writing no
+    `carried`, so the next check starts a fresh branch (§4.9c *A live check under a flow*). A question this record
+    asked, landed or still an intent, is cleared first in the team move's order: the record marked `clearing`, the
+    pull request, then the close. `clear_question` touches only a gate whose nonce the entry's Log names, so an intent
+    that never landed clears nothing, and a `decision` the check's own pull request wrote stands."""
+    nonce = (
+        record.get("clearing") or (record.get("asked") or {}).get("nonce") or (record.get("intent") or {}).get("nonce")
+    )
+    if nonce:
+        if record.get("clearing") != nonce:
+            record["clearing"] = nonce
+            store.put_entry(record, "its live check merged: its question is to be cleared")
+        try:
+            store.clear_question(str(record["id"]), person, str(nonce), CHECKED_WHY)
+        except board.Refused as e:
+            return Made(False, f"the question could not be cleared: {e}")
+    record.update(
+        closed_at=_now(), holder=None, waits=None, intent=None, asked=None, clearing=None, carried=None, merging=None
+    )
+    store.put_entry(record, "closed: its live check merged, the entry waits behind its blocker")
+    return Made(True)
+
+
 def _knew_merge(record: dict[str, Any]) -> bool:
     """Whether the question the record waits on was put knowing its pull request had merged."""
     return bool((record.get("asked") or {}).get("after_merge") or record.get("gate_after_merge"))
@@ -233,6 +261,7 @@ _ASKS: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any], 
     "stage-gone": _stage_gone,
     "gate-again": _gate_again,
     "team-moved": _team_moved,
+    "check-merged": _check_merged,
 }
 
 _RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any]], Made]] = {
@@ -446,7 +475,7 @@ def offer(
         if key is None or not name:
             return Made(False, "the flow has no stage that takes this entry")
         came, answer = _came(record, key) if record is not None and not first else (None, None)
-        holder = start(key, Work(tid, branch, pr, came, answer))
+        holder = start(key, Work(tid, branch, pr, came, answer, live_check=s.live_check))
         if holder is None:
             return Made(False, "no session was started")
         try:

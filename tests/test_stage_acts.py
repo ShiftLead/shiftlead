@@ -32,6 +32,17 @@ def named(act: Any) -> tuple[str, str] | None:
         (held(), Reading(entry="archived"), ("reconcile", "close")),
         (held(), Reading(renumbered_to="TD-9"), ("reconcile", "renumbered")),
         (held(intent={"ask": "?"}), Reading(), ("reconcile", "land-intent")),
+        # a live check's merge closes its record, ahead of an intent and whatever it waited on (TD-2120)
+        (rec(pr=4, check_waits=4, intent={"ask": "?"}), Reading(pr_state="merged"), ("reconcile", "check-merged")),
+        (
+            rec(pr=4, check_waits=4, waits="person"),
+            Reading(pr_state="merged", gate=True),
+            ("reconcile", "check-merged"),
+        ),
+        (rec(pr=4, check_waits=4, waits="merging"), Reading(pr_state="merged"), ("reconcile", "check-merged")),
+        (rec(pr=4, check_waits=4), Reading(entry="archived"), ("reconcile", "close")),
+        (rec(pr=5, check_waits=4), Reading(pr_state="merged"), ("reconcile", "merged-entry-open")),
+        (rec(pr=4, check_waits=4, waits="merging"), Reading(pr_state="open"), ("reconcile", "merging")),
         (held(pr=4), Reading(pr_state="merged"), ("reconcile", "merged-entry-open")),
         (held(pr=4), Reading(pr_state="closed"), ("reconcile", "pr-closed")),
         (rec(pr=4), Reading(pr_state="merged", design=True, open_parts=2), ("reconcile", "wait-for-parts")),

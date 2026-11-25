@@ -14,20 +14,22 @@ import json
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import yaml
 
-from sessionorc import board, ledgerboard, reports, workorders
+from sessionorc import board, ledger, ledgerboard, reports, workorders
 from shiftlead import flow3, repoconfig, stage_work
+from shiftlead.stage_start import CHECK_WAITS
 from shiftlead.stagerecord import StageStore, StateError, _now, ask_words
 
 GIT_TIMEOUT = 30.0
 GH_TIMEOUT = 30.0
 FILES_CAP = 100  # what `gh pr view --json files` returns at most
 NEEDS_NO_REASON = ("work-pushed", "ship")
+CHECK_WAITS_LIMIT = 3  # a live check's refused merges back to its stage, on the stage's one `refused` count
 AUDIT_OUTCOMES = ("findings-filed", "nothing-found")
 CARRY_ON = "Carry on — a session takes the move that was stopped, and its counts start again"
 ARCHIVE = "Archive the entry — the home archives it"
@@ -48,6 +50,21 @@ class PullRequest:
     fork: bool
     precheck: bool
     files: tuple[str, ...]
+    base: str = "main"  # the branch it merges into, whose copy of the ledger a live check's blockers add to
+
+
+class Records(NamedTuple):
+    """Where the repo keeps its ledger and its board, relative to its root: what `check-waits` reads at a head."""
+
+    ledger: str = "docs/ledger"
+    board: str = "docs/user_attention"
+    filing: tuple[str, ...] = ("docs/ledger", "docs/user_attention.md", "docs/user_attention")
+
+    @classmethod
+    def of(cls, root: str | Path) -> Records:
+        rel = Path(workorders.board_rel(root))
+        directory = rel.with_suffix("") if rel.suffix == ".md" else rel
+        return cls(ledger.ledger_path(root), directory.as_posix(), tuple(workorders.filing_paths(root)))
 
 
 class Facts(Protocol):
@@ -58,6 +75,8 @@ class Facts(Protocol):
     def fetched_head(self, branch: str) -> str | None: ...
     def pull_request(self, branch: str | None, number: int | None) -> PullRequest | None: ...
     def post_review(self, number: int, body: str) -> None: ...
+    def text_at(self, path: str, ref: str) -> str | None: ...  # a file's text at `ref` on the forge, None if absent
+    def names_at(self, path: str, ref: str) -> list[str]: ...  # the file names of a directory at `ref` on the forge
 
 
 class ForgeFacts:
@@ -116,7 +135,7 @@ class ForgeFacts:
         return out
 
     def pull_request(self, branch: str | None, number: int | None) -> PullRequest | None:
-        fields = "number,headRefOid,headRefName,state,isCrossRepository,statusCheckRollup,files"
+        fields = "number,headRefOid,headRefName,baseRefName,state,isCrossRepository,statusCheckRollup,files"
         if number is not None:
             rows = [json.loads(self._gh("pr", "view", str(number), "--json", fields))]
         elif branch:
@@ -136,6 +155,7 @@ class ForgeFacts:
             fork=bool(r.get("isCrossRepository")),
             precheck=green,
             files=self._files(r),
+            base=str(r.get("baseRefName") or "main"),
         )
 
     def _files(self, row: dict[str, Any]) -> tuple[str, ...]:
@@ -144,6 +164,26 @@ class ForgeFacts:
         if len(files) < FILES_CAP:
             return files
         return tuple(self._gh("pr", "diff", str(row["number"]), "--name-only").split("\n")[:-1])
+
+    def _contents(self, path: str, ref: str, *, raw: bool) -> str | None:
+        """The forge's contents API at `ref` (`gh api`, in this repo): None where it has no such path."""
+        args = ["api", f"repos/{{owner}}/{{repo}}/contents/{path}?ref={ref}"]
+        if raw:
+            args[1:1] = ["-H", "Accept: application/vnd.github.raw"]
+        try:
+            return self._gh(*args)
+        except Refused as e:
+            if "Not Found" in str(e) or "HTTP 404" in str(e):
+                return None
+            raise
+
+    def text_at(self, path: str, ref: str) -> str | None:
+        return self._contents(path, ref, raw=True)
+
+    def names_at(self, path: str, ref: str) -> list[str]:
+        got = self._contents(path, ref, raw=False)
+        rows = json.loads(got) if got else []
+        return [str(r.get("name")) for r in rows if isinstance(r, dict) and r.get("type") == "file"]
 
     def post_review(self, number: int, body: str) -> None:
         said = json.loads(self._gh("pr", "view", str(number), "--json", "comments"))
@@ -191,7 +231,10 @@ def worktree_reading(directory: str) -> dict[str, Any]:
 
 
 def destination(stage: dict[str, Any], outcome: str) -> dict[str, Any]:
-    """Where `outcome` goes from `stage`, as `{to, limit, answers, refused}`; unwritten, to the person."""
+    """Where `outcome` goes from `stage`, as `{to, limit, answers, refused}`; unwritten, to the person. `check-waits`
+    is written by no flow: its move is fixed, to merge, and a refused merge back to this stage at most three times."""
+    if outcome == CHECK_WAITS:
+        return {"to": "merge", "refused": {"to": flow3.key_of(stage.get("name")), "limit": CHECK_WAITS_LIMIT}}
     raw = stage.get(outcome, "person")
     got = dict(raw) if isinstance(raw, dict) else {"to": raw}
     to = str(got.get("to"))
@@ -214,6 +257,21 @@ def _check_pushed(
 ) -> PullRequest:
     """`work-pushed`'s fact, and the first place the entry's branch and pull request are written (§4.9c)."""
     tid = record["id"]
+    pr = _pushed_pr(record, facts)
+    after = _stage_or_none(doc, where["to"])
+    if not (stage["does"] == "build" and after is not None and after["does"] == "build") and not pr.precheck:
+        raise Refused(f"pull request #{pr.number}'s precheck is not green at its head")
+    if stage["does"] == "build" and (where["to"] == "merge" or (after is not None and after["does"] == "review")):
+        archived = f"docs/ledger/archive/{tid}.md"
+        if not any(f == archived or f.endswith(f"/archive/{tid}.md") for f in pr.files):
+            raise Refused(f"pull request #{pr.number} does not archive {tid}: archive the entry on the branch")
+    return pr
+
+
+def _pushed_pr(record: dict[str, Any], facts: Facts) -> PullRequest:
+    """The entry's pull request, open on this repo at the worktree's head, from the branch the record or worktree
+    names: a branch first written here holds the entry's id and no other."""
+    tid = record["id"]
     branch = record.get("branch") or facts.branch()
     if not branch:
         raise Refused("this worktree is on no branch: work on the entry's branch and push it")
@@ -226,13 +284,79 @@ def _check_pushed(
         raise Refused(f"pull request #{pr.number} is not open on this repo")
     if facts.worktree_head() != pr.head:
         raise Refused(f"this worktree's head is not pull request #{pr.number}'s head: push your work")
-    after = _stage_or_none(doc, where["to"])
-    if not (stage["does"] == "build" and after is not None and after["does"] == "build") and not pr.precheck:
+    return pr
+
+
+def _entry_at(facts: Facts, records: Records, tid: str, ref: str) -> dict[str, Any] | None:
+    """The entry `tid` as its own file holds it at `ref`, or None where that file is not there."""
+    text = facts.text_at(f"{records.ledger}/{tid}.md", ref)
+    found = ledgerboard.entries(text or "")
+    return {**found[0], "text": text} if found else None
+
+
+def _decide_open(facts: Facts, records: Records, tid: str, gate: str, ref: str) -> bool:
+    """Whether the board at `ref` holds an open `decide` item whose Context names `tid`'s `gate`."""
+    for name in facts.names_at(records.board, ref):
+        if not name.endswith(".md") or not ledgerboard.is_item_id(name[: -len(".md")]):
+            continue
+        item = ledgerboard.parse_item(facts.text_at(f"{records.board}/{name}", ref) or "", name)
+        if item is None or item.kind != "decide" or item.closed is not None:
+            continue
+        ref_of, named = ledgerboard._item_gate(item)
+        if ref_of and ledgerboard._num(ref_of) == ledgerboard._num(tid) and " ".join(str(named).split()) == gate:
+            return True
+    return False
+
+
+def _holding(facts: Facts, records: Records, tid: str, entry: dict[str, Any], ref: str, was: str | None) -> list[str]:
+    """The blockers the entry's `Blocked by` at `ref` adds to `was`, the default branch's value, that hold at `ref`
+    (§4.9c *An outcome is the session's word, checked*, `check-waits`): an id whose entry file is there and not
+    archived, an `until` after today's UTC day, an `event` whose section the entry holds, and a `decision` with its
+    open `decide` item on the board."""
+    now, before = ledgerboard.parse_gates(entry.get("blocked_raw")), ledgerboard.parse_gates(was)
+    today = datetime.now(UTC).date().isoformat()
+    out: list[str] = []
+    for item in now["ids"]:
+        if item not in before["ids"] and "#" not in item and facts.text_at(f"{records.ledger}/{item}.md", ref):
+            out.append(item)
+    out += [f"until {d}" for d in now["until"] if d not in before["until"] and d > today]
+    text = str(entry.get("text") or "")
+    out += [f"event ({n})" for n in now["events"] if n not in before["events"] and f"**Event ({n}):**" in text]
+    for who in now["decisions"]:
+        gate = f"decision ({who.lower()})"
+        if who.lower() not in {w.lower() for w in before["decisions"]} and _decide_open(facts, records, tid, gate, ref):
+            out.append(gate)
+    return out
+
+
+def _check_waits(record: dict[str, Any], stage: dict[str, Any], facts: Facts, records: Records) -> PullRequest:
+    """`check-waits`'s fact (§4.9c *A live check under a flow*): a live check's pull request of ledger and board files
+    alone, unread by any review stage, that leaves the entry open behind a blocker it adds and that holds."""
+    tid = str(record["id"])
+    if stage["does"] not in flow3.WRITES:
+        raise Refused(f"{CHECK_WAITS} is taken on a design or build stage alone")
+    pr = _pushed_pr(record, facts)
+    if record.get("verdicts") and record.get("pr") == pr.number:
+        raise Refused(
+            f"a review stage has given pull request #{pr.number} a verdict, which is never merged past: end with "
+            f"{flow3.OTHER}, which goes to the person"
+        )
+    if not pr.precheck:
         raise Refused(f"pull request #{pr.number}'s precheck is not green at its head")
-    if stage["does"] == "build" and (where["to"] == "merge" or (after is not None and after["does"] == "review")):
-        archived = f"docs/ledger/archive/{tid}.md"
-        if not any(f == archived or f.endswith(f"/archive/{tid}.md") for f in pr.files):
-            raise Refused(f"pull request #{pr.number} does not archive {tid}: archive the entry on the branch")
+    base = _entry_at(facts, records, tid, pr.base)
+    if base is None or ledgerboard.first_word(base["fields"].get("kind")) != "live-check":
+        raise Refused(f"{tid} is not a live check on {pr.base}: {CHECK_WAITS} is a live check's alone")
+    outside = [f for f in pr.files if not reports.filing([f], records.filing)]
+    if outside:
+        raise Refused(f"pull request #{pr.number} changes {outside[0]}, outside the ledger and the board")
+    head = None if any(f.endswith(f"/archive/{tid}.md") for f in pr.files) else _entry_at(facts, records, tid, pr.head)
+    if head is None:
+        raise Refused(f"pull request #{pr.number} archives {tid}: a check that holds ends with work-pushed")
+    if not _holding(facts, records, tid, head, pr.head, base.get("blocked_raw")):
+        raise Refused(
+            f"pull request #{pr.number} adds no blocker that holds to {tid}'s Blocked by: an open entry's id, an "
+            "`until` after today, an `event` with its section, or a `decision` with its open `decide` item"
+        )
     return pr
 
 
@@ -344,6 +468,7 @@ def end(
     doc: dict[str, Any],
     facts: Facts,
     person: str,
+    records: Records | None = None,
 ) -> dict[str, Any]:
     """Check `outcome` and write its move: `{entry, outcome, went, repeat}`, or `Refused` with nothing written."""
     said = " ".join((reason or "").split())
@@ -361,7 +486,8 @@ def end(
         if stage is None:
             raise Refused(f"the flow has no stage {key}")
         kind = stage["does"]
-        if outcome in AUDIT_OUTCOMES or outcome not in (*flow3.OUTCOMES[kind], flow3.OTHER):
+        taken = (*flow3.OUTCOMES[kind], flow3.OTHER, *((CHECK_WAITS,) if kind in flow3.WRITES else ()))
+        if outcome in AUDIT_OUTCOMES or outcome not in taken:
             listed = ", ".join((*flow3.OUTCOMES[kind], flow3.OTHER))
             raise Refused(f"{outcome} is not an outcome of a {kind} stage: its outcomes are {listed}")
         if outcome not in NEEDS_NO_REASON and not said:
@@ -371,11 +497,17 @@ def end(
         if outcome == "work-pushed":
             pr = _check_pushed(record, stage, where, doc, facts)
             record["branch"], record["pr"], head = pr.branch, pr.number, pr.head
+        elif outcome == CHECK_WAITS:
+            pr = _check_waits(record, stage, facts, records or Records())
+            record["branch"], record["pr"], head = pr.branch, pr.number, pr.head
         elif outcome in ("ship", "changes-wanted"):
             pr, head = _check_read(record, facts, ship=outcome == "ship")
             verdict = "SHIP" if outcome == "ship" else "BLOCK"
             facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said))
             record.setdefault("verdicts", {})[key] = {"head": head, "stage": key, "outcome": outcome}
+        # the merge of this pull request alone closes the record with its entry open (§4.9c *A merge the person takes
+        # over*): kept through a refused merge and a wait on the person, cleared by any other outcome taken
+        record["check_waits"] = record["pr"] if outcome == CHECK_WAITS else None
         went = _apply(store, record, doc, stage, key, outcome, said, where, head, person, caller)
     return {"entry": tid, "outcome": outcome, "went": went, "repeat": False}
 
@@ -461,6 +593,7 @@ def call(
             doc,
             facts,
             _person_of(Path(root)),
+            Records.of(root),
         )
     except (Refused, StateError) as e:
         return {"refused": str(e)}

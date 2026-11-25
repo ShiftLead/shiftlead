@@ -217,6 +217,10 @@ def test_an_open_entry_that_is_no_design():
     assert ledger_on("TD-7", led("TD-7", "**Kind:** build"), "") == EntryLedger("open")
 
 
+def test_a_live_check_is_read_as_one_whatever_build_its_kind_names():
+    assert ledger_on("TD-7", led("TD-7", "**Kind:** live-check #4553"), "") == EntryLedger("open", live_check=True)
+
+
 def test_an_archived_entry_reads_archived_by_its_number():
     assert ledger_on("TD-7", led("TD-8"), led("TD-007")) == EntryLedger("archived")
 
