@@ -60,7 +60,20 @@ def _to_person(store: StageStore, record: dict[str, Any], reason: str, line: Lin
         return Made(False, f"the home's board line could not be written: {e}")
     if not got:
         return Made(False, "the home's board line could not be written")
-    store.put_job(stage_job.to_person({**record, "merging": None}, got), f"merging: to the person ({reason})")
+    merging = record.get("merging") or {}
+    step = {
+        "from": merging.get("stage") or record.get("stage"),
+        "outcome": "refused",
+        "reason": reason,
+        "by": "home",
+        "to": "person",
+        "head": merging.get("head"),
+        "at": _now(),
+    }
+    history = [*(record.get("history") or []), step]
+    store.put_job(
+        stage_job.to_person({**record, "merging": None, "history": history}, got), f"merging: to the person ({reason})"
+    )
     return Made(True)
 
 

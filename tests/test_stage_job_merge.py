@@ -147,12 +147,14 @@ def test_a_session_row_may_go_back_to_a_review_stage():
     assert store.records[KEY]["stage"] == "review"
 
 
-def test_a_refused_move_unwritten_goes_to_the_person_by_the_homes_line():
+def test_a_refused_move_left_to_its_default_goes_to_the_person_by_the_homes_line():
     store, lines = Store(merging_record()), Lines()
     made = a_run(store, gate=gate_of("fail", ("ci",))[0], line=lines)
     r = store.records[KEY]
     assert made.made and (r["waits"], r["person_line"], r["merging"]) == ("person", "9f9f9f9f", None)
     assert lines.written == [(KEY, "the merge was refused: the merge gate failed on ci")]
+    step = r["history"][-1]
+    assert (step["outcome"], step["to"], step["by"], step["head"]) == ("refused", "person", "home", HEAD)
 
 
 def test_a_refused_move_past_its_limit_goes_to_the_person():
@@ -234,3 +236,33 @@ def test_the_tick_merges_each_job_waiting_by_its_open_rows_head_and_its_teams_fl
     assert list(got) == ["unheld-pull-requests"]
     (step,) = got["unheld-pull-requests"]
     assert isinstance(step, JobStep) and step.key == KEY and step.act == stage_job_tick.MERGING and step.made.made
+
+
+def test_a_refused_move_to_merge_itself_is_the_persons():
+    store = Store(merging_record())
+    assert a_run(store, gate=gate_of("fail", ("ci",))[0], doc=flow(refused="merge")).made
+    assert store.records[KEY]["waits"] == "person" and not store.records[KEY].get("counts")
+
+
+def test_a_refused_move_at_the_flows_cap_goes_to_the_person_uncounted():
+    store, lines = Store(merging_record(moves=25)), Lines()
+    assert a_run(store, gate=gate_of("fail", ("ci",))[0], doc=flow(refused="build"), line=lines).made
+    r = store.records[KEY]
+    assert r["waits"] == "person" and r["moves"] == 25 and "cap" in lines.written[0][1]
+
+
+@pytest.mark.parametrize("line", [Lines(give=None), lambda record, reason: 1 / 0], ids=["none", "raises"])
+def test_a_line_that_cannot_be_written_leaves_the_record_merging(line):
+    store = Store(merging_record())
+    assert not a_run(store, gate=gate_of("fail", ("reach",))[0], line=line).made
+    assert store.records[KEY]["waits"] == "merging" and not store.writes
+
+
+def test_a_failure_read_after_the_record_moved_writes_nothing():
+    store = Store(merging_record())
+
+    def gate(pr, head):
+        store.records[KEY]["merging"]["head"] = "a" * 40  # a fresh work-pushed landed meanwhile
+        return {"verdict": "fail", "failed": ["ci"]}
+
+    assert not a_run(store, gate=gate, doc=flow(refused="build")).made and not store.writes
