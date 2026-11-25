@@ -972,11 +972,16 @@ def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directo
     text = "profiles:\n  p: {config_dir: /shiftlead/profiles/p}\n  bare: {}\n  out: {config_dir: /elsewhere/x}\n"
     nodes = {"cm": Node(root, text + "  up: {config_dir: /shiftlead/../x}\n")}
     seen: list[Path] = []
+    offered: list[Path] = []
 
     class Spy(Fake):
         def identity(self, home: Path, salt: bytes) -> dict | None:
             seen.append(Path(home))
             return super().identity(home, salt)
+
+        def models(self, home: Path, _plan: str | None) -> dict:
+            offered.append(Path(home))
+            return {"families": ["opus"]}
 
     made, blockers = switchover.node_logins(
         None, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path / "d", signed)
@@ -984,6 +989,9 @@ def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directo
     assert [(m.name, m.folder, m.match) for m in made["cm"]] == [("p", Path("/shiftlead/profiles/p"), "who")]
     assert seen == [root / "profiles" / "p"], (
         "read where the folder is on the home; a bare profile, one elsewhere or one climbing out makes none"
+    )
+    assert offered == [root / "profiles" / "p"] and made["cm"][0].models == ["opus"], (
+        "the offer is read where the folder is on the home too, never at the node's own path"
     )
     assert made["cm"][0].found == "claude-code:/shiftlead/profiles/p" and blockers == []
     named, blockers = switchover.node_logins({"hosts": {}}, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path))
@@ -1054,6 +1062,27 @@ def test_the_check_and_its_answers_read_a_container_nodes_logins(home, tmp_path,
     assert doc["hosts"]["cm"] == {"logins": {"claude-code:/shiftlead/profiles/q": {"name": "q"}}}
     assert doc["teams"]["grind"]["logins"] == ["claude-code:q"]
     assert "a login cm would not have" not in out and "has no name in the answers" not in out
+
+
+def test_the_check_prints_and_counts_a_container_nodes_blocker(home, tmp_path, capsys, monkeypatch):
+    from sessionorc import containers
+
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    team = {
+        "repo": "r",
+        "manager": {"role": "person"},
+        "flows": ["td"],
+        "members": [{"role": "grinder", "profile": "p"}],
+    }
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    node = Node(home / "nodes" / "cm", "profiles:\n  q: {config_dir: /shiftlead/profiles/q}\n")
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": node})
+    assert cli.main(["switch-over", "check", "--answers"]) == 0, capsys.readouterr().out
+    capsys.readouterr()
+    (node.node_dir / "home" / "profiles.yml").write_text("profiles: [")
+    assert cli.main(["switch-over", "check"]) == 1, "the node's blocker is counted"
+    out = capsys.readouterr().out
+    assert "its profiles.yml cannot be read" in out, "and printed"
 
 
 # -- `--host`: one ssh node's own part (§4.9e *The window* step 2) ----------------------------------------------------
