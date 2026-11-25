@@ -782,7 +782,7 @@ class MailMixin:
                 if (e.entry is not None or e.handed) and not blank:
                     continue  # the person's pick, a session's own ledger request and a settled entry stay
                 if blank and why is None and held is None:
-                    held = work_mod.held_for(seat, records.values())
+                    held = self._seat_held(seat, list(records.values()))
                 if blank and why is None and held:
                     self._move_handed(e, key, seat, "its team is stopped", stamp, touched)
                     continue
@@ -2235,7 +2235,30 @@ class MailMixin:
             records = self._graph().values()
         elif isinstance(records, dict):
             records = records.values()
+        if r.builtin and self._first_shape_off:  # type: ignore[attr-defined]
+            hold = self._builtin_held(r, list(records))
+            if hold is None:
+                return None
+            by = hold.get("by")
+            return {"by": by, "team": hold.get("team") or r.team, "wound": by == "person", "repo": not r.team}
         return work_mod.held_words(r, list(records))
+
+    def _builtin_held(self, r: Session, records: list[Session]) -> dict[str, Any] | None:
+        """After the cut-over, a built-in seat's hold (§4.9d *When they run*, TD-2065): the tick's `_builtin_hold`, the
+        reading its fill uses, for a seat rule 3 would fill (supervised, unattended, neither superseded, suspended nor
+        sat out), else None."""
+        if not (r.seat and r.supervised and r.unattended) or r.superseded_by or r.suspended:
+            return None
+        if r.sit_out or work_mod.sat_out(r):
+            return None
+        return self._builtin_hold(r, records)  # type: ignore[attr-defined]
+
+    def _seat_held(self, r: Session, records: Any) -> bool:
+        """Whether a seat is held (§6 rule 3 *A stopped team's seats are held*): after the cut-over a built-in seat by
+        §4.9d *When they run* (`_builtin_held`), every other by `work.held_for`."""
+        if r.builtin and self._first_shape_off:  # type: ignore[attr-defined]
+            return self._builtin_held(r, list(records)) is not None
+        return work_mod.held_for(r, records)
 
     def _read_when_kwargs(self, r: Session, now: datetime, records: Any = None) -> dict[str, Any]:
         """The record's own facts `mail.read_when` reads, as the send computes them; `held` read over `records`

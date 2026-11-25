@@ -145,3 +145,53 @@ async def test_a_prompts_seat_is_held_once_the_org_has_a_director(agent):
     assert agent._builtin_hold(seat, [seat]) is None
     director = _seat(agent, "director", None, trigger={"trigger": "prompt"})
     assert agent._builtin_hold(seat, [seat, director]) == {"at": "", "by": "director", "team": ""}
+
+
+async def test_a_held_built_in_seat_s_reply_line_reads_when_they_run(agent):
+    """§4.10's reply line for a held seat (TD-2065): after the cut-over a built-in seat's `held` is its §4.9d hold, so a
+    tech lead whose team is started reads no hold however its first-shape crew reads, and one wound down says so."""
+    from sessionorc import mail
+
+    await _cut(agent, a=STARTED)
+    lead = _seat(agent, "techlead-a", "techlead", team="a")
+    assert agent._held_words(lead, [lead]) is None and not agent._seat_held(lead, [lead])
+    agent._host_rec["teams"]["a"] = _stopped()
+    held = agent._held_words(lead, [lead])
+    assert held == {"by": "person", "team": "a", "wound": True, "repo": False} and agent._seat_held(lead, [lead])
+    line = mail.read_when(lead, "ask", datetime.now(UTC), held=held)
+    assert line.startswith("waits in the seat's mailbox: its team a is wound down (by you)")
+    agent._host_rec["teams"]["a"] = _stopped("until")
+    assert "its team a is stopped (at its stop time)" in mail.read_when(
+        lead, "ask", datetime.now(UTC), held=agent._held_words(lead, [lead])
+    )
+    lead.suspended = {"at": "2026-12-01T10:00:00Z"}
+    assert agent._held_words(lead, [lead]) is None, "a seat rule 3 would not fill is never held"
+
+
+async def test_a_repo_s_seat_and_a_prompts_seat_under_a_director_read_their_own_reply_lines(agent):
+    from sessionorc import mail
+
+    await _cut(agent, a=_stopped(), b=_stopped())
+    sweeper = _seat(agent, "sweeper-repo", "sweeper", trigger={"trigger": "swept"})
+    held = agent._held_words(sweeper, [sweeper])
+    assert held["repo"] is True
+    line = mail.read_when(sweeper, "ask", datetime.now(UTC), held=held, person=True)
+    assert line.startswith("waits in the seat's mailbox: every team of its repo is stopped") and "Start the team" in line
+    agent._host_rec["teams"]["a"] = STARTED
+    prompts = _seat(agent, "prompts-repo", "prompts", trigger={"trigger": "prompt"})
+    director = _seat(agent, "director", None, trigger={"trigger": "prompt"})
+    held = agent._held_words(prompts, [prompts, director])
+    assert held["by"] == "director"
+    line = mail.read_when(prompts, "ask", datetime.now(UTC), held=held)
+    assert line.startswith("waits in the seat's mailbox: the org's director answers in its place")
+
+
+async def test_before_the_cut_over_a_built_in_mark_reads_the_first_shape_hold(agent, monkeypatch):
+    await park_ticks(agent)
+    assert not agent._first_shape_off
+    lead = _seat(agent, "techlead-a", "techlead", team="a")
+    calls = []
+    monkeypatch.setattr(agent, "_builtin_hold", lambda *a: calls.append(a) or {"by": "person"})
+    agent._held_words(lead, [lead])
+    agent._seat_held(lead, [lead])
+    assert calls == []

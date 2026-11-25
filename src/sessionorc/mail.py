@@ -1225,7 +1225,9 @@ def read_when(
     `limited` record's cap is a modal rule's, a dialog with no reset (§4.3 *The limit dialog is read off
     the screen*: `agent_common.limit_is_modal` on a record of its own host). `held` is the home's word that the
     record is a seat held by its team's stop (§6 rule 3 *A stopped team's seats are held*, TD-1564): `{by, team,
-    wound}`, computed by the caller from `work.held_for` over the team's records, never from the stored mark — first
+    wound}` (after the cut-over a built-in seat's §4.9d hold: `repo` set for a repo's seat, `by: director` for a
+    prompts seat a director stands in for, TD-2065), computed by the caller from `work.held_for` over the team's
+    records, never from the stored mark — first
     among the seat-on-call rows, below `unreachable`. `extras` is the send's choice for a scaled seat (§4.9 *Mail to
     a scaled seat*, TD-1547), made by the host agent over the seat's extras' records and whether one can be filled
     (`seat_send.choose`, which reads what this module cannot: a live subagent or shell): `{fill: <extra>}` with `s`
@@ -1267,13 +1269,23 @@ def read_when(
         # whatever its last state, so the sentence under that card must too (techlead, PR #583)
         return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
     if held:
+        after = " — Start the team to have it read" if person else " — `ao msg person` if it cannot wait"
+        if held.get("by") == "director":  # a prompts seat once the org has a director (§4.9d, TD-2065)
+            line = "waits in the seat's mailbox: the org's director answers in its place, so the seat is not filled"
+            return line + tail
+        if held.get("repo"):  # a repo's built-in seat, held while none of the repo's teams is started (§4.9d)
+            line = (
+                "waits in the seat's mailbox: every team of its repo is stopped,"
+                " and the seat is filled at the next Start of one"
+            )
+            return line + after + tail
         word = "wound down" if held.get("wound") else "stopped"
         by = "by you" if held.get("by") == "person" else "at its stop time"
         line = (
             f"waits in the seat's mailbox: its team {held.get('team') or ''} is {word} ({by}),"
             " and the seat is filled at its next Start"
         )
-        return line + (" — Start the team to have it read" if person else " — `ao msg person` if it cannot wait") + tail
+        return line + after + tail
     on_call = (seat or (s is not None and bool(s.seat))) and state in ("exited", "closed")
     if on_call:
         if ask or refills:
