@@ -321,12 +321,13 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
         "flow_save.py",
         "stage_end.py",
         "stage_job.py",
+        "stage_job_make.py",
         "stage_make.py",
         "stage_merge.py",
         "stage_pass.py",
         "stage_tick.py",
         "team_show.py",
-    ]  # stage_job takes only the job key's pattern, and team_show only reads
+    ]  # stage_job takes only the job key's pattern, stage_job_make writes a job's record, and team_show only reads
 
 
 def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):
