@@ -903,27 +903,32 @@ class TickMixin:
             return
         try:
             doc = settings_mod.load()
+            conf = settings_mod.teams(doc) if teamstore.cut_over(doc) else {}
         except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
             log.exception("reading the teams' settings for a stop time failed")
             return
-        if not teamstore.cut_over(doc):
-            return
         marks = self._host_rec.get("teams")
+        before = copy.deepcopy(marks)
         stopped: list[str] = []
-        for team, conf in settings_mod.teams(doc).items():
-            until = conf.get("until")
+        for team, t in conf.items():
+            until = t.get("until")
             if not until or not teamstore.switched(doc, team) or not teamstore.stop_time_due(marks, team, until, now):
                 continue
             if teamstore.mark_stopped(self._host_rec.setdefault("teams", {}), team, "until", str(until)):
                 stopped.append(team)
         if not stopped:
             return
-        for team in stopped:
-            log.info("team %s reached its stop time: its started mark is cleared", team)
         try:
             self.host_store.save(self._host_rec)
-        except OSError:
+        except OSError:  # the record in memory is put back, so it never says what the file does not; next tick again
+            if before is None:
+                self._host_rec.pop("teams", None)
+            else:
+                self._host_rec["teams"] = before
             log.exception("writing the home's host record failed")
+            return
+        for team in stopped:
+            log.info("team %s reached its stop time: its started mark is cleared", team)
         await self._push_changes()
 
     async def _carry_controllers(self) -> None:

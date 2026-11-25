@@ -613,7 +613,7 @@ async def test_a_switched_teams_stop_time_clears_its_started_mark_once(agent):
     agent._host_rec["teams"] = {
         "db": {"started": dict(since)},
         "old": {"started": dict(since)},
-        "late": {"started": {"since": now.isoformat(), "by": "schedule"}},
+        "late": {"started": {"since": (now - timedelta(minutes=1)).isoformat(), "by": "schedule"}},
     }
     settings_mod.save({"teams": teams})
     await agent._team_stop_marks(now)
