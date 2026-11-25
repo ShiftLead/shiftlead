@@ -266,7 +266,8 @@ class Adapter(Protocol):
     #                                                      `metered`, None where it does not say — only a suggestion
     #   model_family(model: str) -> str | None            the family a model id maps to through the adapter's table
     #                                                      (§4.2b), None for one it has none for: the switch-over's
-    #                                                      pin of a login (TD-2071)
+    #                                                      pin of a login (TD-2071); declared in `implements`,
+    #                                                      with `models`, whose table it reads (TD-2177)
     #   models(home: Path, plan: str | None) -> dict      the model families the account offers (§4.2b):
     #                                                      {families, default, unconfirmed} — `model_offer` over the
     #                                                      adapter's tables of each plan's families; a plan the table
@@ -315,6 +316,7 @@ OPTIONAL_METHODS = (
     "links",
     "mail",
     "make_home",
+    "model_family",
     "models",
     "new_home",
     "prompts",

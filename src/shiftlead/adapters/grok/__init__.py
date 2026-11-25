@@ -183,7 +183,7 @@ class GrokAdapter:
     implements: frozenset[str] = frozenset(
         {
             *("composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            *("models", "new_home", "make_home"),
+            *("models", "model_family", "new_home", "make_home"),
         }
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
