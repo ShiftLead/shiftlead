@@ -57,21 +57,25 @@ def _newest(row: Mapping[str, Any]) -> tuple[str, int]:
     return str(row.get("created") or ""), int(row["number"])
 
 
-def entry_work(tid: str, prs: Iterable[Mapping[str, Any]], *, held: Collection[int] = ()) -> EntryWork:
-    """What `tid`'s open pull requests mean for its offer. `prs` are the repo's rows and `held` the numbers of those a
-    live session holds, which the caller reads with its own view of who is live (the switch-over's check passes the
-    view with every session it will have ended taken as gone)."""
-    matches = [
-        row
-        for row in prs
-        if isinstance(row.get("number"), int)
+def may_be_work(row: Mapping[str, Any]) -> bool:
+    """Whether an open pull request's row may be some entry's work at all: not a fork's, a sync's, the gate sweep's,
+    or a filing pull request's as read at its head. The switch-over's check reads the same test for the branches it
+    names nobody's work."""
+    return (
+        isinstance(row.get("number"), int)
         and row.get("state") == "open"
         and not row.get("fork")
         and not row.get("sync")
         and not reports.gate_head(row.get("branch"))  # the sweep's own: its files are never read for `filing`
-        and branch_ids(row.get("branch")) == {tid}
         and _filing(row) is not True
-    ]
+    )
+
+
+def entry_work(tid: str, prs: Iterable[Mapping[str, Any]], *, held: Collection[int] = ()) -> EntryWork:
+    """What `tid`'s open pull requests mean for its offer. `prs` are the repo's rows and `held` the numbers of those a
+    live session holds, which the caller reads with its own view of who is live (the switch-over's check passes the
+    view with every session it will have ended taken as gone)."""
+    matches = [row for row in prs if may_be_work(row) and branch_ids(row.get("branch")) == {tid}]
     if not matches:
         return EntryWork("none")
     row = max(matches, key=_newest)

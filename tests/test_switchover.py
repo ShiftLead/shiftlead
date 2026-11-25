@@ -4,6 +4,7 @@ switch-over makes*, TD-2071)."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -732,3 +733,105 @@ def test_check_answers_for_an_org_with_a_director_writes_one_the_check_accepts(h
     assert doc["director"] == {"model": "sonnet", "logins": ["claude-code:p"]}
     assert "prompts" not in doc["builtins"]["default"]["models"]
     assert "no blockers" in capsys.readouterr().out
+
+
+# -- the work in flight (§4.9e *Work in flight*) ---------------------------------------------------------------------
+
+
+def Entry(tid: str, **kw: Any) -> dict:  # noqa: N802
+    return {"id": tid, "kind": "build", "owner": "grinder", "pickable": "yes", "for_page": "pickable", **kw}
+
+
+def Pr(n: int, branch: str, *, filing: bool | None = False, **kw: Any) -> dict:  # noqa: N802
+    head = f"h{n}"
+    row = {"number": n, "branch": branch, "state": "open", "head": head, "created": f"2026-11-{n:02d}"}
+    if filing is not None:
+        row |= {"filing": filing, "filing_head": head}
+    return row | kw
+
+
+def test_in_flight_lists_the_entries_taken_up_those_that_wait_and_branches_nothing_reads(tmp_path):
+    blocked = Entry("TD-5", pickable="no", for_page="blocked")
+    entries = [Entry("TD-1"), Entry("TD-2"), Entry("TD-3"), Entry("TD-4", owner="paul"), blocked, Entry("TD-6")]
+    prs = [
+        Pr(10, "td1-x"),
+        Pr(11, "td2-y", draft=True),
+        Pr(12, "td3-z", filing=None),
+        Pr(13, "td1-td2-both"),
+        Pr(14, "td4-mine"),
+        Pr(15, "td6-filing", filing=True),
+    ]
+    readings = {str(tmp_path): {"name": "r", "ledger": {"entries": entries}, "prs": {"open": prs}}}
+    org = SimpleNamespace(teams={"grind": SimpleNamespace(repo="r")}, unlanded={})
+    seen: list[str] = []
+
+    def branches(root: str) -> frozenset[str]:
+        seen.append(root)
+        return frozenset({"main", "td1-x", "td5-lost", "notes"})
+
+    (f,) = switchover.in_flight(readings, org, branches_of=branches)
+    assert seen == [str(tmp_path)]
+    assert f.taken == [("TD-1", 10, "td1-x")], "the newest single-id match; TD-4 is the person's; a filing PR is none"
+    assert f.waits == [("TD-2", "#11 is a draft")] and f.unknown == [
+        ("TD-3", "#12's files have not been read at its head")
+    ]
+    assert f.nobodys == [
+        ("td1-td2-both", "#13 holds TD-1, TD-2"),
+        ("td5-lost", "holds TD-5 and has no open pull request"),
+    ]
+    lines = switchover.flight_lines([f])
+    assert "    taken up with its pull request: TD-1 #10 (td1-x)" in lines
+    assert "    nothing will read: td5-lost — holds TD-5 and has no open pull request" in lines
+
+
+def test_in_flight_says_a_repo_not_read_and_reads_no_branch_of_a_checkout_that_is_not_here(tmp_path):
+    org = SimpleNamespace(teams={"a": SimpleNamespace(repo="r"), "b": SimpleNamespace(repo="s")}, unlanded={})
+    readings = {
+        str(tmp_path / "gone"): {"name": "s", "ledger": {"entries": []}, "prs": {"open": []}},
+        "/x": {"name": "q", "prs": {"error": "gh failed", "open": []}},
+    }
+    r, s = switchover.in_flight(readings, org, branches_of=lambda _root: pytest.fail("not read"))
+    assert r.unread == "the home has not read its pull requests"
+    assert s.branches_unread and s.nobodys == []
+    readings["/y"] = {"name": "r", "prs": {"at": "t"}}
+    assert switchover.in_flight(readings, org, branches_of=lambda _r: None)[0].unread == (
+        "its pull request reading holds no open list"
+    )
+    readings["/y"] = {"name": "r", "prs": {"error": "gh failed"}}
+    r, _ = switchover.in_flight(readings, org, branches_of=lambda _root: frozenset())
+    assert r.unread == "its pull requests could not be read: gh failed"
+    assert switchover.flight_lines([r])[1] == "  r: not read — its pull requests could not be read: gh failed"
+
+
+def test_the_check_prints_the_work_in_flight_from_the_homes_repo_reading(home, tmp_path, capsys):
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    reading = {"name": "r", "ledger": {"entries": [Entry("TD-1")]}, "prs": {"open": [Pr(10, "td1-x")]}}
+    (home / "repos.json").write_text(json.dumps({"/nowhere/r": reading}))
+    cli.main(["switch-over", "check"])
+    out = capsys.readouterr().out
+    assert "work in flight, as the home will take it up after the window" in out
+    assert "    taken up with its pull request: TD-1 #10 (td1-x)" in out
+
+
+def test_in_flight_names_no_filing_fork_sync_or_sweep_branch_and_no_branch_of_an_entry_not_in_the_reading(tmp_path):
+    entries = [Entry("TD-1"), Entry("TD-2"), Entry("TD-7")]
+    prs = [
+        Pr(20, "td1-td2-filing", filing=True),
+        Pr(21, "td1-td2-fork", fork=True),
+        Pr(22, "td1-td2-sync", sync=True),
+        Pr(23, "lift/TD-1/until-2026-12-01"),
+        Pr(24, "td7-fork-named", fork=True),
+        Pr(25, "td1-old"),
+        Pr(26, "td1-new"),
+    ]
+    readings = {str(tmp_path): {"name": "r", "ledger": {"entries": entries}, "prs": {"open": prs, "at": "t0"}}}
+    org = SimpleNamespace(teams={"grind": SimpleNamespace(repo="r")}, unlanded={})
+    pushed = frozenset({"td7-fork-named", "td999-archived", "td1-old", "td1-new"})
+    (f,) = switchover.in_flight(readings, org, branches_of=lambda _r: pushed)
+    assert f.taken == [("TD-1", 26, "td1-new")], "the newest of two matches"
+    assert f.nobodys == [("td7-fork-named", "holds TD-7 and has no open pull request")], (
+        "a fork's branch hides no origin branch; an id no entry of the reading has is not named"
+    )
+    assert switchover.flight_lines([f])[1] == "  r: (its pull requests read t0)"
