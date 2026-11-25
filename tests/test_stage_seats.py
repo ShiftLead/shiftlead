@@ -490,6 +490,8 @@ async def test_a_seat_s_host_move_closes_an_exited_record_and_drops_its_launch_a
     """`rpc_seat_moved`'s other clauses (design §4.9d *How each one runs*, TD-2209): an exited old record on the home's
     host is closed and its pane killed, its launch record is dropped so no fill replays it, a suspended record on either
     side is never moved, a node never takes the call, and a node's forward of it is refused (`modes.HOME_ONLY`)."""
+    from pathlib import Path
+
     from sessionorc import modes, paths
     from sessionorc.agent import RpcError
 
@@ -504,15 +506,16 @@ async def test_a_seat_s_host_move_closes_an_exited_record_and_drops_its_launch_a
         with pytest.raises(RpcError, match="suspended"):
             await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
         side.suspended = None
-    monkeypatch.setattr(agent, "mode", "node")
-    with pytest.raises(RpcError, match="is a node of"):
-        await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
-    monkeypatch.undo()
+    with monkeypatch.context() as m:  # scoped: the fixtures' own patches (the scratch home among them) stay
+        m.setattr(agent, "mode", "node")
+        with pytest.raises(RpcError, match="is a node of"):
+            await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
+    assert agent.mode == "home"
     assert killed == [] and old.state == "exited", "a refused move changes nothing"
     launch = paths.launch_dir() / f"{old.id}.json"
+    assert paths.home() != Path.home() / ".shiftlead", "the test writes on its scratch home alone"
     launch.parent.mkdir(parents=True, exist_ok=True)
     launch.write_text("{}")
-    monkeypatch.setattr(agent.tmux, "kill_session", killed.append)
     await agent.rpc_seat_moved(old=old.id, new=f"{new.id}@node")
     assert killed == [old.id]
     assert old.state == "closed" and old.closed_at
