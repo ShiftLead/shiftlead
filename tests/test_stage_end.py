@@ -111,8 +111,8 @@ def _store(stage="build", **kw) -> Store:
     return Store({**new_record("TD-7", "t", stage, holder=ME), **kw})
 
 
-def _end(store, outcome, reason="", facts=None, doc=FLOW, caller=ME):
-    return end(store, "TD-7", caller, outcome, reason, doc, facts or Fake(_pr()), "paul")
+def _end(store, outcome, reason="", facts=None, doc=FLOW, caller=ME, counts=None):
+    return end(store, "TD-7", caller, outcome, reason, doc, facts or Fake(_pr()), "paul", review_counts=counts)
 
 
 def test_work_pushed_is_taken_and_writes_the_branch_and_pull_request():
@@ -175,6 +175,7 @@ def test_ship_records_the_verdict_posts_the_comment_and_marks_merging():
     assert r["waits"] == "merging" and r["merging"] == {"head": HEAD, "stage": "review", "outcome": "ship"}
     assert r["verdicts"]["review"] == {"head": HEAD, "stage": "review", "outcome": "ship"}
     assert facts.posted[0][1].startswith("cadence-review: SHIP · sonnet · code · 0 findings")
+    assert r["history"][-1]["findings"] == {"all": 0, "blocking": 0}, "a ship given no counts reads 0 for both"
 
 
 def test_ship_is_refused_when_the_head_moved_since_it_was_read():
@@ -190,15 +191,17 @@ def test_changes_wanted_needs_a_reason_and_posts_a_block():
     with pytest.raises(Refused, match="needs --reason"):
         _end(store, "changes-wanted")
     facts = Fake(_pr())
-    assert _end(store, "changes-wanted", "the test is wrong", facts=facts)["went"] == "build"
-    assert facts.posted[0][1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
+    assert _end(store, "changes-wanted", "the test is wrong", facts=facts, counts=(4, 2))["went"] == "build"
+    assert facts.posted[0][1].startswith("cadence-review: BLOCK · sonnet · code · 4 findings")
+    assert store.record["history"][-1]["findings"] == {"all": 4, "blocking": 2}, "the row's count is the comment's"
     assert "the test is wrong" in facts.posted[0][1]
 
 
 def test_changes_wanted_is_taken_when_the_head_moved_since_it_was_read():
     store = _store("review", branch="td7-thing", pr=9)
     facts = Fake(_pr(), fetched="d" * 40)
-    assert _end(store, "changes-wanted", "the test is wrong", facts=facts)["went"] == "build", "only ship needs it"
+    got = _end(store, "changes-wanted", "the test is wrong", facts=facts, counts=(1, 1))
+    assert got["went"] == "build", "only ship needs it"
     assert facts.posted[0][1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
     assert store.record["verdicts"]["review"]["head"] == "d" * 40, "the verdict names the head the review read"
 
@@ -295,6 +298,174 @@ def test_a_siblings_push_does_not_move_what_a_reviewers_worktree_fetched(tmp_pat
     _git(builder, "push", "-q", "origin", "td-7")
     assert _git(reviewer, "rev-parse", "refs/remotes/origin/td-7") == b  # the shared ref moved
     assert facts.fetched_head("td-7") == a
+
+
+# -- a review's counts (§4.9c *A review counts its findings*, TD-2159) ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("outcome", "n", "m", "words"),
+    [
+        ("work-pushed", 1, None, "a review's"),
+        ("other", 0, None, "a review's"),
+        ("nothing-found", 2, None, "a review's"),
+        ("closed-unmerged", 1, 0, "a review's"),
+        ("changes-wanted", None, None, "at least 1"),
+        ("changes-wanted", 3, None, "at least 1"),
+        ("changes-wanted", 3, 0, "at least 1"),
+        ("ship", 2, 1, "is changes-wanted"),
+        ("ship", None, 0, "needs --findings"),
+        ("changes-wanted", None, 1, "needs --findings"),
+        ("changes-wanted", 1, 2, "more than --findings"),
+        ("ship", -1, None, "0 or more"),
+    ],
+)
+def test_a_reviews_counts_are_refused_where_they_do_not_hold(outcome, n, m, words):
+    with pytest.raises(Refused, match=words):
+        stage_end.counts(outcome, n, m)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "n", "m", "want"),
+    [
+        ("ship", None, None, (0, 0)),
+        ("ship", 3, None, (3, 0)),
+        ("ship", 3, 0, (3, 0)),
+        ("changes-wanted", 3, 1, (3, 1)),
+        ("changes-wanted", 2, 2, (2, 2)),
+        ("work-pushed", None, None, None),
+        ("other", None, None, None),
+    ],
+)
+def test_a_reviews_counts_are_read_where_they_hold(outcome, n, m, want):
+    assert stage_end.counts(outcome, n, m) == want
+
+
+class _NoRoute:
+    """A store whose flow, and every route, fails the test: a refused count is refused before any of them."""
+
+    def __init__(self, root):
+        pass
+
+    def flow(self, team):
+        pytest.fail("a refused count reached the flow")
+
+
+@pytest.mark.parametrize(
+    ("tid", "outcome", "kw"),
+    [
+        ("TD-7", "work-pushed", {"findings": 1}),
+        ("TD-7", "changes-wanted", {}),
+        ("TD-7", "ship", {"findings": 2, "blocking": 1}),
+        ("pr:41", "work-pushed", {"findings": 0}),
+        ("board:1a2b3c4d", "changes-wanted", {"findings": 2, "blocking": 0}),
+        ("audit:t/docs", "nothing-found", {"findings": 1}),
+        ("audit:t/docs", "findings-filed", {"blocking": 1}),
+    ],
+)
+def test_the_call_refuses_a_bad_count_before_any_route_so_nothing_is_posted(monkeypatch, tmp_path, tid, outcome, kw):
+    from shiftlead import stage_audit_end, stage_job_end
+
+    monkeypatch.setattr(stage_end, "StageStore", _NoRoute)
+    monkeypatch.setattr(stage_audit_end, "end_audit", lambda *a, **k: pytest.fail("the audit route was taken"))
+    monkeypatch.setattr(stage_job_end, "end_job", lambda *a, **k: pytest.fail("the job route was taken"))
+    monkeypatch.setattr(stage_end, "end", lambda *a, **k: pytest.fail("the entry route was taken"))
+    got = stage_end.call(
+        root=str(tmp_path), directory=str(tmp_path), team="t", tid=tid, caller=ME, outcome=outcome, reason="x", **kw
+    )
+    assert "refused" in got
+
+
+@pytest.mark.parametrize(
+    ("tid", "kw", "want"),
+    [
+        ("TD-7", {"findings": 3}, (3, 0)),
+        ("TD-7", {}, (0, 0)),
+        ("pr:41", {"findings": 5, "blocking": 0}, (5, 0)),
+    ],
+)
+def test_the_call_hands_each_route_the_counts_it_read(monkeypatch, tmp_path, tid, kw, want):
+    from shiftlead import stage_job_end
+
+    seen = {}
+
+    class _Flow(_NoRoute):
+        def flow(self, team):
+            return "format: 3\nname: t\nstages: []\n"
+
+    def entry_end(*a, review_counts, **k):
+        seen["counts"] = review_counts
+        return {"entry": tid}
+
+    def job_end(*a, review_counts, **k):
+        seen["counts"] = review_counts
+        return {"entry": tid}
+
+    monkeypatch.setattr(stage_end, "StageStore", _Flow)
+    monkeypatch.setattr(stage_end, "_person_of", lambda root: "paul")
+    monkeypatch.setattr(stage_end, "end", entry_end)
+    monkeypatch.setattr(stage_job_end, "end_job", job_end)
+    stage_end.call(
+        root=str(tmp_path), directory=str(tmp_path), team="t", tid=tid, caller=ME, outcome="ship", reason="", **kw
+    )
+    assert seen["counts"] == want
+
+
+def test_a_repeated_ship_is_answered_as_the_first_with_its_changed_counts_ignored():
+    store = _store("review", branch="td7-thing", pr=9)
+    facts = Fake(_pr())
+    _end(store, "ship", facts=facts, counts=(2, 0))
+    writes = store.writes
+    got = _end(store, "ship", facts=facts, counts=(7, 0))
+    assert got["repeat"] is True and got["went"] == "merge" and store.writes == writes
+    assert len(facts.posted) == 1 and store.record["history"][-1]["findings"] == {"all": 2, "blocking": 0}
+
+
+def test_only_a_reviews_row_carries_findings():
+    store = _store()
+    _end(store, "work-pushed")
+    assert "findings" not in store.record["history"][-1]
+
+
+def test_a_review_stage_is_told_the_counts_and_its_brief_names_them():
+    from shiftlead import stage_start
+
+    work = stage_start.Work(entry="TD-7")
+    review = stage_start.told(FLOW["stages"][1], "review", work, adds_review=False)
+    assert '`ao stage end <outcome> [--reason "…"] [--findings <n> [--blocking <m>]]`' in review
+    assert "--findings <n>" in review and "--blocking <m>" in review
+    build = stage_start.told(FLOW["stages"][0], "build", work, adds_review=False)
+    assert "--findings" not in build, "a build stage's session is told no count"
+    brief = (Path(stage_start.__file__).parent / "briefs" / "standard" / "review.md").read_text()
+    assert "--findings <n>" in brief and "--blocking <m>" in brief
+
+
+def test_the_command_sends_the_counts_and_leaves_out_those_not_given(monkeypatch):
+    from shiftlead import cli
+
+    sent = []
+    monkeypatch.setenv("SHIFTLEAD_SESSION", ME)
+    monkeypatch.setattr(cli, "_own_session", lambda args: ME)
+    monkeypatch.setattr(
+        cli, "call_sync", lambda method, **kw: sent.append(kw) or {"entry": "TD-7", "outcome": "ship", "went": "merge"}
+    )
+    parser = cli.build_parser()
+    for argv in (["stage", "end", "ship", "--findings", "3"], ["stage", "end", "ship"]):
+        args = parser.parse_args(argv)
+        assert args.fn(args) == 0
+    assert (sent[0]["findings"], sent[0]["blocking"]) == (3, None)
+    assert (sent[1]["findings"], sent[1]["blocking"]) == (None, None)
+
+
+def test_the_host_agent_passes_the_counts_to_the_body(monkeypatch):
+    got = {}
+    body = SimpleNamespace(call=lambda **kw: got.update(kw) or {"entry": "TD-7", "went": "build"})
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    s = _node_session()
+    s.lane = ["TD-7"]
+    agent = _NodeAgent(s, NODE_READING)
+    asyncio.run(agent.rpc_stage_end(ME, "changes-wanted", reason="x", caller=f"{ME}@node", findings=3, blocking=1))
+    assert (got["findings"], got["blocking"]) == (3, 1)
 
 
 # -- the host agent's layer ------------------------------------------------------------------------------------------

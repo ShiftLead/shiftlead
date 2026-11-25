@@ -24,8 +24,10 @@ STAGE_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "stage.md"
 FACTS = {
     "work-pushed": "the entry's branch is pushed and its pull request is open; its precheck is green unless the next "
     "stage is another build; where a build's next is `merge` or a review, the pull request archives the entry",
-    "ship": "the pull request's head is the commit you read",
-    "changes-wanted": "a reason is given, which is the review",
+    "ship": "the pull request's head is the commit you read; give `--findings <n>`, every finding you raised, "
+    "0 where it is omitted",
+    "changes-wanted": "a reason is given, which is the review, with `--findings <n> --blocking <m>`: every finding "
+    "you raised, and of those the ones you would not ship with, at least 1",
     "no-design-needed": "a reason is given",
     "not-needed": "a reason is given",
     "design-needs-changing": "a reason is given",
@@ -177,6 +179,8 @@ def told(stage: dict[str, Any], key: str, work: Work, *, adds_review: bool) -> s
         "fact and refuses one the facts contradict, saying which, and you carry on. Every outcome but `work-pushed` "
         "and `ship` needs `--reason`. The outcomes, and what each is checked on:"
     )
+    if kind == "review":
+        lines[-1] = lines[-1].replace('[--reason "…"]', '[--reason "…"] [--findings <n> [--blocking <m>]]')
     check = work.live_check and kind in flow3.WRITES
     lines += [f"- `{o}`: {FACTS[o]}" for o in (*flow3.OUTCOMES[kind], flow3.OTHER)]
     if check:
