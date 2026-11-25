@@ -380,3 +380,54 @@ def test_the_pass_writes_a_started_teams_tech_lead_and_its_repos_sweeper_through
     calls.clear()
     a_pass(root, Kept(), host_teams=None, call=call)
     assert calls == [], "a team not started writes no seat and reads no sweep switch"
+
+
+def _director_pass(root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An org whose `org.yml` has `director:`, its create read as given, and a teams' pass over no flow."""
+    from types import SimpleNamespace
+
+    from shiftlead import org as orgmod
+    from shiftlead import teams
+
+    org = SimpleNamespace(teams={}, director=SimpleNamespace(name="director"))
+    params = {"name": "director", "dir": str(tmp_path / "director"), "seat": {"trigger": "prompt"}, "held": True}
+    monkeypatch.setattr(orgmod, "load", lambda: org)
+    monkeypatch.setattr(teams, "director_create", lambda _org: params)
+    real = stage_tick.stage_pass.repo_pass
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_pass", lambda s, st, _flows, *a, **k: real(s, st, {}, *a, **k))
+    monkeypatch.setattr(stage_tick, "_audits", lambda *_a: ())
+
+
+@pytest.mark.unit
+def test_the_pass_writes_the_orgs_director_record_through_the_homes_call(
+    root: Path, tmp_path: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With `director:` in `org.yml` and no record holding the seat, the pass writes the director's record through the
+    `call` the home gives it, whether or not a team is started (§4.9d *How each one runs*, TD-2065)."""
+    _director_pass(root, tmp_path, monkeypatch)
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def call(method: str, **params: Any) -> Any:
+        calls.append((method, params))
+        if method == "list":
+            return []
+        assert method == "create", method
+        return {"id": f"ao-{params['name']}"}
+
+    a_pass(root, Kept(), call=call)
+    assert [(m, p.get("name")) for m, p in calls] == [("list", None), ("create", "director")]
+
+
+@pytest.mark.unit
+def test_a_director_record_that_cannot_be_written_never_fails_the_pass(
+    root: Path, tmp_path: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The director's write raising is a log line: the pass still passes over the seats' jobs and returns."""
+    _director_pass(root, tmp_path, monkeypatch)
+
+    def boom(*_a: Any, **_k: Any) -> list[str]:
+        raise RuntimeError("the home refused")
+
+    monkeypatch.setattr(stage_tick.stage_seats, "write_director", boom)
+    got = a_pass(root, Kept(), orders=[], pr_orders=[], boards={"boards": []})
+    assert got is not None and got.jobs is not None
