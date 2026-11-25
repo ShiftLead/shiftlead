@@ -4,7 +4,8 @@ Board answers and pull requests nobody holds are jobs: a decided board line, or 
 **object**, and its record on the state branch (`StageStore.job`, `jobs/<key>.json`, keyed `board-<item id>` or
 `pr-<number>`) names the seat, the team whose host and flow it runs under, its holder and its offers, and what it waits
 on. This module is pure, as `stage_acts` is: `choose` names the first act whose condition holds, and `order` says which
-of a seat's jobs is offered next, since **each seat runs one job session at a time in a repo**. Starting the session,
+of a seat's jobs is offered next, since **each seat runs one job session at a time in a repo**; `board_objects` and
+`pr_objects` are the two seats' triggers, the objects `order` is given. Starting the session,
 writing the record and the home's board line are later slices of TD-2053.
 
 A job's record enters its team's flow at `work-pushed`, as a record of the stage that takes `other` entries would; from
@@ -14,11 +15,13 @@ still apply. `JobReading.at_job_stage` says which.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from sessionorc import workorders
+from shiftlead import stage_work
 from shiftlead.stage_acts import SECOND_LOSS, Holder
 from shiftlead.stagerecord import JOB_KEY
 
@@ -155,6 +158,86 @@ def order(records: Iterable[Mapping[str, Any]], objects: Mapping[str, str], job_
     first = sorted(begun, key=lambda r: (str(r.get("entered_at") or ""), str(r["id"])))
     rest = sorted(((at, k) for k, at in objects.items() if k not in open_keys), key=lambda p: (str(p[0]), p[1]))
     return [str(r["id"]) for r in first] + [k for _at, k in rest]
+
+
+def _open(record: object) -> bool:
+    return isinstance(record, Mapping) and not record.get("closed_at")
+
+
+def board_objects(orders: Iterable[Mapping[str, Any]], entries: Mapping[str, Mapping[str, Any]]) -> dict[str, str]:
+    """The board-answers seat's trigger (design §4.9c *Two of the five are not seats today*): of a repo reading's work
+    orders (`teamrun.work_orders`, each a decided board line), the key of each that asks for a job, mapped to the day
+    it was decided. A line that is the covering item of an entry — its Context names that one entry and its
+    `decision (…)` gate — whose open stage record (`entries`, by id) waits on the person, or is about to (its question
+    recorded and not yet landed), is the home's to apply and asks for no job."""
+    out: dict[str, str] = {}
+    for o in orders:
+        oid = str(o.get("id") or "")
+        if not oid.startswith(workorders.PREFIX):
+            continue
+        key = f"board-{oid[len(workorders.PREFIX) :]}"
+        if not JOB_KEY.fullmatch(key):
+            continue
+        tid = workorders.design_of(dict(o))
+        r = entries.get(tid) if tid else None
+        if r is not None and _open(r) and (r.get("waits") == "person" or r.get("intent")):
+            continue
+        out[key] = str((o.get("decided") or {}).get("date") or "")
+    return out
+
+
+def entries_work(
+    pickable: Iterable[str],
+    entries: Mapping[str, Mapping[str, Any]],
+    prs: Iterable[Mapping[str, Any]],
+    *,
+    held: Collection[int] = (),
+) -> frozenset[int]:
+    """The numbers of the open pull requests that are the work of a pickable entry with no open stage record, which
+    the Offer act takes and the seat for pull requests nobody holds skips (design §4.9c *Ways in*, §4.9e *Work in
+    flight*): `stage_work.entry_work`'s match, the one the Offer act reads. One whose files are not read at its head
+    yet may be an entry's, so it is skipped on this reading too."""
+    rows = list(prs)
+    out: set[int] = set()
+    for tid in pickable:
+        if _open(entries.get(tid)):
+            continue
+        got = stage_work.entry_work(tid, rows, held=held)
+        if got.pr is not None and isinstance(got.pr.get("number"), int):
+            out.add(got.pr["number"])
+    return frozenset(out)
+
+
+def pr_objects(
+    orders: Iterable[Mapping[str, Any]],
+    entries: Mapping[str, Mapping[str, Any]],
+    jobs: Mapping[str, Mapping[str, Any]],
+    *,
+    work: Collection[int] = (),
+) -> dict[str, str]:
+    """The trigger of the seat for pull requests nobody holds (design §4.9c *Two of the five are not seats today*): of
+    a repo reading's pull request orders (`teamrun.pr_orders`, each unheld, past its bound and never a fork's or a
+    draft's), the key of each red or filing pull request that asks for a job, mapped to when it went red or opened. A
+    pull request an open stage record names (`entries`), or a board answer's open job (`jobs`), is that record's;
+    one in `work` is a pickable entry's (`entries_work`). A sync's and the gate sweep's are no red or filing pull
+    request of the seat's."""
+    named = {str(r.get("pr")) for r in entries.values() if _open(r) and r.get("pr") is not None}
+    named |= {str(r.get("pr")) for r in jobs.values() if _open(r) and r.get("seat") == "board-answers" and r.get("pr")}
+    out: dict[str, str] = {}
+    for o in orders:
+        num = o.get("pr")
+        if not o.get("pr_order") or not isinstance(num, int) or isinstance(num, bool):
+            continue
+        if o.get("sync") or o.get("lift") or o.get("sweep"):
+            continue
+        if str(num) in named or num in work:
+            continue
+        key = f"pr-{num}"
+        if not JOB_KEY.fullmatch(key):
+            continue  # no pull request's number: never a job, and never a raise that stops the pass
+        since = o.get("filing_since") if o.get("filing") else o.get("red_since")
+        out[key] = str(since or "")
+    return out
 
 
 def _now() -> str:
