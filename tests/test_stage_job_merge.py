@@ -147,6 +147,18 @@ def test_a_session_row_may_go_back_to_a_review_stage():
     assert store.records[KEY]["stage"] == "review"
 
 
+def test_a_refused_merge_after_a_reviews_ship_takes_the_review_stages_refused_move():
+    doc = flow()
+    doc["stages"][1]["ship"] = {"to": "merge", "refused": "build"}
+    merging = {"head": HEAD, "stage": "review", "outcome": "ship"}
+    store = Store(merging_record(stage="review", merging=merging))
+    made = a_run(store, gate=gate_of("fail", ("ci",))[0], doc=doc)
+    r = store.records[KEY]
+    assert made.made and (r["stage"], r["waits"], r["holder"]) == ("build", None, None)
+    assert r["counts"] == {"review:refused": 1} and r["moves"] == 1
+    assert (r["history"][-1]["from"], r["history"][-1]["to"]) == ("review", "build")
+
+
 def test_a_refused_move_left_to_its_default_goes_to_the_person_by_the_homes_line():
     store, lines = Store(merging_record()), Lines()
     made = a_run(store, gate=gate_of("fail", ("ci",))[0], line=lines)

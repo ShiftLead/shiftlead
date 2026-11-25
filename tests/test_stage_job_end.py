@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from shiftlead import stage_end, stage_job, stage_job_end
+from shiftlead import stage_end, stage_job, stage_job_end, stage_make
 from shiftlead.stage_end import PullRequest, Refused
 from shiftlead.stage_job_end import closes_line, end_job, is_ref, key_of_ref
 
@@ -56,12 +56,19 @@ class Fake:
     pr: PullRequest | None
     on: str | None = "fix-board-line"
     local: str = HEAD
+    read: str | None = HEAD
 
     def branch(self):
         return self.on
 
     def worktree_head(self):
         return self.local
+
+    def fetched_head(self, _branch):
+        return self.read
+
+    def post_review(self, number, body):
+        self.posted = (number, body)
 
     def pull_request(self, branch, number):
         self.asked = (branch, number)
@@ -217,8 +224,95 @@ def test_a_closed_job_is_refused_as_closed():
 
 
 def test_a_job_past_its_own_stage_is_not_ended_by_a_job_session():
-    with pytest.raises(Refused, match="stands at stage review"):
+    with pytest.raises(Refused, match="work-pushed is not an outcome of a review stage"):
         _end(Store(_record(stage="review")))
+    with pytest.raises(Refused, match="stands at stage design, which is no review stage"):
+        _end(Store(_record(stage="design")), "other", "x")
+
+
+def _reviewed(**kw) -> dict:
+    """A job the flow sent to its review stage, held by that stage's session."""
+    return _record(
+        **{
+            "stage": "review",
+            "branch": "fix-board-line",
+            "pr": 41,
+            "counts": {"build:work-pushed": 1},
+            "moves": 1,
+            **kw,
+        }
+    )
+
+
+def test_a_review_stages_ship_on_a_job_waits_merging_and_posts_its_review():
+    store, facts = Store(_reviewed()), Fake(_pr())
+    got = _end(store, "ship", facts=facts)
+    assert got == {"entry": f"board:{ITEM}", "outcome": "ship", "went": "merge", "repeat": False}
+    r = store.record
+    assert (r["stage"], r["holder"], r["waits"]) == ("review", None, "merging")
+    assert r["merging"] == {"head": HEAD, "stage": "review", "outcome": "ship"}
+    assert r["verdicts"] == {"review": {"head": HEAD, "stage": "review", "outcome": "ship"}}
+    assert r["counts"] == {"build:work-pushed": 1} and r["moves"] == 1, "a move to merge is never counted"
+    number, body = facts.posted
+    assert number == 41 and body.startswith("cadence-review: SHIP · sonnet · code · 0 findings")
+    step = r["history"][-1]
+    assert (step["from"], step["outcome"], step["to"], step["head"]) == ("review", "ship", "merge", HEAD)
+    assert "run" not in step and "findings" not in step, "a job's rows carry no run and no findings"
+
+
+def test_a_ship_on_a_head_the_review_did_not_read_is_refused_and_writes_nothing():
+    store = Store(_reviewed())
+    with pytest.raises(Refused, match="not what you read"):
+        _end(store, "ship", facts=Fake(_pr(), read="d" * 40))
+    assert store.writes == []
+    with pytest.raises(Refused, match="no open pull request to give a verdict on"):
+        _end(store, "ship", facts=Fake(_pr(state="CLOSED")))
+
+
+def test_changes_wanted_sends_the_job_back_to_a_fresh_job_session_told_the_review():
+    store, facts = Store(_reviewed()), Fake(_pr())
+    with pytest.raises(Refused, match="changes-wanted needs --reason"):
+        _end(store, "changes-wanted", facts=facts)
+    assert _end(store, "changes-wanted", "the test misses the closed line", facts=facts)["went"] == "build"
+    r = store.record
+    assert (r["stage"], r["holder"], r["offers"], r["waits"]) == ("build", None, 0, None)
+    assert r["counts"] == {"build:work-pushed": 1, "review:changes-wanted": 1} and r["moves"] == 2
+    assert facts.posted[1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
+    assert stage_job.choose(r, stage_job.JobReading(may_start=True)) == stage_job.JobAct("offer")
+    came, _answer = stage_make._came(r, "build")
+    assert came == "the test misses the closed line (`changes-wanted` at `review`)"
+
+
+def test_a_reviews_move_past_its_limit_or_the_cap_goes_to_the_person():
+    doc = flow()
+    doc["stages"][2]["changes-wanted"] = {"to": "build", "limit": 1}
+    store, lines = Store(_reviewed(counts={"review:changes-wanted": 1})), Lines()
+    assert _end(store, "changes-wanted", "again", doc=doc, lines=lines)["went"] == "person"
+    assert lines.written == [(f"board-{ITEM}", "changes-wanted from review reached its limit of 1")]
+    assert store.record["stage"] == "review" and store.record["person_line"] == "9f9f9f9f"
+    doc = flow()
+    doc["max-moves"] = 1
+    store, lines = Store(_reviewed()), Lines()
+    assert _end(store, "changes-wanted", "again", doc=doc, lines=lines)["went"] == "person"
+    assert lines.written[0][1] == "the job reached the flow's cap of 1 moves"
+
+
+def test_a_reviews_other_and_a_stage_a_job_never_goes_to_are_the_persons():
+    store, lines = Store(_reviewed()), Lines()
+    assert _end(store, "other", "the diff is not what the line asked", lines=lines)["went"] == "person"
+    assert lines.written == [(f"board-{ITEM}", "the diff is not what the line asked")]
+    doc = flow()
+    doc["stages"][2]["changes-wanted"] = "design"
+    store, lines = Store(_reviewed()), Lines()
+    assert _end(store, "changes-wanted", "x", doc=doc, lines=lines)["went"] == "person"
+    assert lines.written[0][1] == "the flow sends changes-wanted from review to design, a stage a job never goes to"
+
+
+def test_a_job_outcome_is_refused_from_a_review_stages_session_and_a_review_outcome_from_a_job_session():
+    with pytest.raises(Refused, match="not an outcome of a review stage"):
+        _end(Store(_reviewed()), "work-pushed")
+    with pytest.raises(Refused, match="ship is not an outcome of a job"):
+        _end(Store(_record()), "ship")
 
 
 def test_a_flow_with_no_stage_that_takes_other_entries_refuses():

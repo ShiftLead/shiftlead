@@ -10,8 +10,15 @@ the flow's limits and its cap on moves as an entry's move is. A job goes only to
 `merge`; any other destination, a limit or the cap reached, and `other` send the job to the person: the home's plain
 board line is written first (`line`), its id kept on the record as `person_line`, and the record waits.
 
-`stage_end.call` routes a job's reference here. A job sent to `merge` is merged by the home (`stage_job_merge`). A
-review stage's verdict on a job's pull request and `closed-unmerged` (TD-2165) are later work.
+A record the flow sent to one of its review stages is ended by that stage's session, which holds the same reference:
+its outcomes are the review stage's (`ship`, `changes-wanted`, `other`), checked as an entry's verdict is (`ship` on
+the head the session read being the pull request's head now) and posted as the `cadence-review:` comment the gate's
+review row reads; its rows carry no `run` and no `findings` (§4.9c *What a run records*). Its move goes where the
+review stage sends that outcome, by the same rule: back to the job's stage (a fresh job session, told the review's
+reason), to another review stage or to `merge`, counted as any move; anything else goes to the person.
+
+`stage_end.call` routes a job's reference here. A job sent to `merge` is merged by the home (`stage_job_merge`).
+Starting a review stage's session on a job, and `closed-unmerged` (TD-2165), are later work.
 """
 
 from __future__ import annotations
@@ -23,11 +30,12 @@ from typing import Any
 
 from sessionorc import workorders
 from shiftlead import flow3, stage_job
-from shiftlead.stage_end import PullRequest, Refused, destination
+from shiftlead.stage_end import NEEDS_NO_REASON, PullRequest, Refused, _check_read, _review_body, destination
 from shiftlead.stage_job_start import job_stage, lane_of
 from shiftlead.stagerecord import StageStore, _now
 
 OUTCOMES = ("work-pushed", flow3.OTHER)
+REVIEW_OUTCOMES = (*flow3.OUTCOMES["review"], flow3.OTHER)
 BOARD_DIR = "docs/user_attention"
 REF = re.compile(rf"(?:{re.escape(workorders.PREFIX)}[0-9a-f]{{8}}|{re.escape(workorders.PR_PREFIX)}[1-9]\d{{0,6}})")
 
@@ -102,6 +110,19 @@ def _where(doc: Mapping[str, Any], here: str, to: str) -> str:
     return to if after is not None and after.get("does") == "review" else "person"
 
 
+def _counted(record: dict[str, Any], doc: Mapping[str, Any], at: str, outcome: str, where: Mapping[str, Any]) -> str:
+    """Count a move from `at` to a stage, as an entry's is: the reason it goes to the person instead, or `""`."""
+    count, counts = f"{at}:{outcome}", record.setdefault("counts", {})
+    limit, cap = where.get("limit"), doc.get("max-moves", flow3.MAX_MOVES)
+    if limit is not None and int(counts.get(count, 0)) >= int(limit):
+        return f"{outcome} from {at} reached its limit of {limit}"
+    if int(record.get("moves") or 0) >= int(cap):
+        return f"the job reached the flow's cap of {cap} moves"
+    counts[count] = int(counts.get(count, 0)) + 1
+    record["moves"] = int(record.get("moves") or 0) + 1
+    return ""
+
+
 def end_job(
     store: StageStore,
     ref: str,
@@ -130,50 +151,53 @@ def end_job(
             if last and last.get("by") == caller and last.get("outcome") == outcome:
                 return {"entry": ref, "outcome": outcome, "went": last.get("to"), "repeat": True}
             raise Refused("the job is closed" if record.get("closed_at") else "this job is not yours")
-        if outcome not in OUTCOMES:
-            raise Refused(f"{outcome} is not an outcome of a job: its outcomes are {', '.join(OUTCOMES)}")
         here = job_stage(doc)
         stage = _stage(doc, here)
         if here is None or stage is None:
             raise Refused("the team's flow has no stage that takes other entries, so a job has no place in it")
-        if record.get("stage") not in (None, here):
-            raise Refused(
-                f"{ref} stands at stage {record.get('stage')}, not the job's own: its session is not ended so"
-            )
-        if outcome != "work-pushed" and not said:
+        at = here if record.get("stage") in (None, here) else str(record.get("stage"))
+        if at != here:  # a review stage's session on the job's pull request
+            stage = _stage(doc, at)
+            if stage is None or stage.get("does") != "review":
+                raise Refused(f"{ref} stands at stage {at}, which is no review stage of the team's flow")
+            if outcome not in REVIEW_OUTCOMES:
+                listed = ", ".join(REVIEW_OUTCOMES)
+                raise Refused(f"{outcome} is not an outcome of a review stage: its outcomes are {listed}")
+        elif outcome not in OUTCOMES:
+            raise Refused(f"{outcome} is not an outcome of a job: its outcomes are {', '.join(OUTCOMES)}")
+        if outcome not in NEEDS_NO_REASON and not said:
             raise Refused(f"{outcome} needs --reason")
         head: str | None = None
         went, why = "person", said
         if outcome == "work-pushed":
             pr = _check_pushed(record, facts, board)
             record["branch"], record["pr"], head = pr.branch, pr.number, pr.head
+        elif outcome in ("ship", "changes-wanted"):
+            pr, head = _check_read(record, facts, ship=outcome == "ship")
+            verdict = "SHIP" if outcome == "ship" else "BLOCK"
+            facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said))
+            record.setdefault("verdicts", {})[at] = {"head": head, "stage": at, "outcome": outcome}
+        if outcome != flow3.OTHER:
             where = destination(stage, outcome)
             went = _where(doc, here, str(where["to"]))
             if went == "person" and where["to"] != "person":
-                why = f"the flow sends work-pushed from {here} to {where['to']}, a stage a job never goes to"
+                why = f"the flow sends {outcome} from {at} to {where['to']}, a stage a job never goes to"
             elif went == "person":
-                why = f"the flow sends work-pushed from {here} to the person"
+                why = f"the flow sends {outcome} from {at} to the person"
             elif went != "merge":  # a move to merge is no stage's, so never counted, as an entry's is not
-                count, counts = f"{here}:{outcome}", record.setdefault("counts", {})
-                limit, cap = where.get("limit"), doc.get("max-moves", flow3.MAX_MOVES)
-                if limit is not None and int(counts.get(count, 0)) >= int(limit):
-                    went, why = "person", f"work-pushed from {here} reached its limit of {limit}"
-                elif int(record.get("moves") or 0) >= int(cap):
-                    went, why = "person", f"the job reached the flow's cap of {cap} moves"
-                else:
-                    counts[count] = int(counts.get(count, 0)) + 1
-                    record["moves"] = int(record.get("moves") or 0) + 1
+                why = _counted(record, doc, at, outcome, where)
+                went = "person" if why else went
         record["history"] = [
             *(record.get("history") or []),
-            {"from": here, "outcome": outcome, "reason": said, "by": caller, "to": went, "head": head, "at": _now()},
+            {"from": at, "outcome": outcome, "reason": said, "by": caller, "to": went, "head": head, "at": _now()},
         ]
         record["holder"] = None
-        record["stage"] = here if went in ("person", "merge") else went
+        record["stage"] = at if went in ("person", "merge") else went
         record["entered_at"] = _now()
         record["offers"] = 0
         if went == "merge":
             record["waits"] = "merging"
-            record["merging"] = {"head": head, "stage": here, "outcome": outcome}
+            record["merging"] = {"head": head, "stage": at, "outcome": outcome}
             store.put_job(record, f"{outcome}: merging")
         elif went == "person":
             try:
