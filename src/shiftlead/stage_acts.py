@@ -83,6 +83,7 @@ class Reading:
     holder: Holder | None = None
     may_start: bool = False  # the team is started, inside its schedule and not held by the usage gate
     within_size: bool = False
+    holds_new: bool = False  # the team is over a Balance line, so no entry without a stage record is offered (§4.9d)
     pickable: bool = False
     work: EntryWork = EntryWork("none")
     carried_open: bool = False  # a moved entry's carried work is still live, and it was not archived since the move
@@ -182,8 +183,9 @@ def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
 
 
 def _first_offer(s: Reading) -> Act | None:
-    """An entry with no record, or a closed record of an entry reopened (§4.9c *Ways in*)."""
-    if s.entry != "open" or not s.pickable or s.work.state in ("wait", "unread"):
+    """An entry with no record, or a closed record of an entry reopened (§4.9c *Ways in*). A team over a Balance line
+    takes no new entry (§4.9d *Holds new work*)."""
+    if s.entry != "open" or not s.pickable or s.holds_new or s.work.state in ("wait", "unread"):
         return None
     return Act("offer", work=s.work) if s.may_start and s.within_size else None
 

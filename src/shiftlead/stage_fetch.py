@@ -161,8 +161,9 @@ def teams_on(read: LedgerRead) -> tuple[str, ...]:
 
 def over_line(host_teams: Mapping[str, Any] | None, team: str) -> bool:
     """Whether `team` is over its line on open pull requests (design §6 *Balance*), read from the home's `host` record
-    as the claim's refusal reads it. The wiring withholds `may_start` while it holds: an offer's claim would be refused,
-    so each pass would start a session only to end it."""
+    as the claim's refusal reads it. While it holds the pass offers no entry without a stage record (`holds_new`, §4.9d
+    *Holds new work*), whose claim would be refused; an entry already in a stage carries on, since a stage session's
+    claim on the one entry its lane names passes the line."""
     rec = (host_teams or {}).get(team)
     mark = rec.get("balance") if isinstance(rec, Mapping) else None
     return isinstance(mark, Mapping) and bool(mark.get("crossed"))
@@ -338,6 +339,7 @@ class RepoFacts:
     may_start: bool = False
     within_size: bool = False
     limits: Limits | None = None
+    holds_new: bool = False
     named: Callable[[str], Mapping[str, Any] | None] | None = None  # another flow's doc by its name, for a switch
 
 
@@ -412,4 +414,5 @@ def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> Ent
         merge_running=tid in repo.merging,
         may_start=repo.may_start,
         within_size=repo.within_size,
+        holds_new=repo.holds_new,
     )

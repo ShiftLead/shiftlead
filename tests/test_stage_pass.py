@@ -494,17 +494,18 @@ def test_an_open_records_pull_request_the_reading_lacks_is_read_by_its_number(st
 
 
 @pytest.mark.parametrize(
-    ("started", "host_teams", "may"),
+    ("started", "host_teams", "may", "holds"),
     [
-        (True, {}, True),
-        (True, {"t": {"balance": {"crossed": True}}}, False),
-        (True, {"other": {"balance": {"crossed": True}}}, True),
-        (False, {}, False),
+        (True, {}, True, False),
+        (True, {"t": {"balance": {"crossed": True}}}, True, True),
+        (True, {"other": {"balance": {"crossed": True}}}, True, False),
+        (False, {}, False, False),
     ],
 )
-def test_a_team_over_its_line_may_not_start_a_session(store, started, host_teams, may):
+def test_a_team_over_its_line_holds_new_entries_and_may_still_start(store, started, host_teams, may, holds):
+    """§4.9d *Holds new work* (TD-2065): over a line the team takes no new entry; its entries in stages go on."""
     got = made(store, started=started, host_teams=host_teams, within_size=True)
-    assert got is not None and got.may_start is may and got.within_size
+    assert got is not None and got.may_start is may and got.holds_new is holds and got.within_size
 
 
 def test_a_holder_written_in_the_homes_address_form_is_read_as_the_session_here(store):
@@ -787,3 +788,13 @@ def test_without_numbers_the_reading_s_own_within_size_stands(store, monkeypatch
     as_offered(monkeypatch)
     got = stage_pass.team_pass(store, repo_facts(store, row("TD-1")), no_sessions(), World().reach, local="home")
     assert [s.act for s in got.steps] == [None]
+
+
+def test_over_a_line_an_entry_in_a_stage_is_offered_and_a_new_entry_is_not(store, monkeypatch):
+    def given(_repo, tid, _record):
+        return replace(offerable(tid), holds_new=True)
+
+    monkeypatch.setattr(stage_pass, "facts_on", given)
+    put(store, holder=None)  # TD-7 in build, its holder gone
+    got = stage_pass.team_pass(store, repo_facts(store, row("TD-1")), no_sessions(), World().reach, local="home")
+    assert [(s.tid, s.act.name if s.act else None) for s in got.steps] == [(TID, "offer"), ("TD-1", None)]
