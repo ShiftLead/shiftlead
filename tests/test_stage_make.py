@@ -14,10 +14,10 @@ import pytest
 from sessionorc import board
 from shiftlead.stage_acts import Act, Holder, Reading, choose
 from shiftlead.stage_end import ARCHIVE
-from shiftlead.stage_make import make, offer, sweep_closed
+from shiftlead.stage_make import _offer_again, make, offer, sweep_closed
 from shiftlead.stage_start import Work
 from shiftlead.stage_work import EntryWork
-from shiftlead.stagerecord import OTHER, StageStore, StateError, flow_version, new_record
+from shiftlead.stagerecord import OTHER, StageStore, StateError, flow_version, new_record, run_of
 
 TID = "TD-7"
 FLOW: dict[str, Any] = {
@@ -816,7 +816,7 @@ def test_each_loss_writes_a_lost_row_carrying_the_holders_run(store, holder, off
     act, got = _lose(store, holder, spent=lambda sid: asked.append(sid) or NOW_SUMS)
     assert act.case == case and got.made and asked == ["s1"]
     record = store.entry(TID)
-    *_, row = record["history"]
+    row = record["history"][0]
     assert {k: row[k] for k in ("from", "to", "outcome", "by", "reason")} == {
         "from": "build",
         "to": "build",
@@ -834,7 +834,11 @@ def test_each_loss_writes_a_lost_row_carrying_the_holders_run(store, holder, off
         2,
     )
     assert run["models"]["opus"]["turns"] == 2 and run["models"]["opus"]["input"] == 5
-    assert len(record["history"]) == 1, "the second loss's question writes no row of its own here"
+    if case == "to-person":  # its question's ask row, in the same commit, carries no run: the lost row has it
+        assert [h["outcome"] for h in record["history"]] == ["lost", "ask"] and "run" not in record["history"][1]
+        assert record["history"][1]["reason"] == "to-person" and record["intent"]
+    else:
+        assert len(record["history"]) == 1
 
 
 def test_a_lost_row_of_a_forgotten_session_record_keeps_what_the_home_holds(store):
@@ -881,7 +885,192 @@ def test_a_later_offer_under_the_same_id_counts_from_its_own_offer(store):
     assert _offer_spent(store, lambda _sid: NOW_SUMS).made
     later = {"opus": {"input": 20, "output": 3, "turns": 6, "unweighed": 0, "figure": {"≈$": 0.7}}}
     _lose(store, Holder(ended=True), spent=lambda _sid: later)
-    second = store.entry(TID)["history"][-1]["run"]
+    second = next(h for h in reversed(store.entry(TID)["history"]) if h["outcome"] == "lost")["run"]
     assert second["spent_before"] == NOW_SUMS and second["models"]["opus"]["turns"] == 1
     for k in ("input", "output", "turns"):
         assert second["spent_before"]["opus"][k] >= first["spent_before"]["opus"][k] + first["models"]["opus"][k]
+
+
+# -- the home's other rows: a reconcile case's, an `ended` row, an `ask` row and the answer's (§4.9c, TD-2158) -------
+
+
+def _home(store: StageStore, reading: Reading, doc: dict[str, Any] = FLOW) -> Any:
+    act = choose(store.entry(TID), reading)
+    assert act is not None
+    return make(store, TID, act, reading, doc, "paul", session=FIELDS, spent=lambda _sid: NOW_SUMS)
+
+
+def _commits(store: StageStore) -> int:
+    out = subprocess.run(
+        ["git", "-C", str(store.root), "rev-list", "--count", str(store.tip())], capture_output=True, text=True
+    )
+    return int(out.stdout)
+
+
+def _run_is_s1(row: dict[str, Any]) -> None:
+    run = row["run"]
+    assert (run["session"], run["model"], run["spent_before"]) == ("s1", "opus", SUMS)
+    assert run["models"]["opus"]["turns"] == 2
+
+
+ENDS = {
+    "close": ({}, Reading(entry="archived")),
+    "wait-for-parts": ({"pr": 4}, Reading(pr_state="merged", design=True, open_parts=2)),
+    "team-moved": ({"pr": 4}, Reading(team_moved=True, pr_state="open")),
+    "check-merged": (
+        {"pr": 4, "check_waits": 4, "waits": "merging", "merging": {"head": "a" * 40}},
+        Reading(pr_state="merged"),
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(ENDS))
+def test_a_reconcile_case_that_clears_a_holder_writes_an_ended_row_with_its_run(store, case):
+    over, reading = ENDS[case]
+    put(store, holder="s1@node", spent_before={"s1": SUMS}, **over)
+    got = _home(store, reading)
+    assert got.made and got.end == "s1@node"
+    (row,) = store.entry(TID)["history"]
+    assert {k: row[k] for k in ("from", "to", "outcome", "by", "reason")} == {
+        "from": "build",
+        "to": "build",
+        "outcome": "ended",
+        "by": "home",
+        "reason": case,
+    }
+    _run_is_s1(row)
+
+
+@pytest.mark.parametrize("case", list(ENDS))
+def test_a_reconcile_case_with_no_holder_writes_no_row(store, case):
+    over, reading = ENDS[case]
+    put(store, **over)
+    assert _home(store, reading).made
+    assert not store.entry(TID)["history"]
+
+
+def test_a_re_entry_row_carries_the_holders_run(store):
+    put(store, stage="dropped", holder="s1", spent_before={"s1": SUMS})
+    assert _home(store, Reading(stage_known=False)).made
+    (row,) = store.entry(TID)["history"]
+    assert row["outcome"] == "re-enter"
+    _run_is_s1(row)
+
+
+@pytest.mark.parametrize(
+    "reading",
+    [Reading(flow_current=False), Reading(renumbered_to="TD-9"), Reading(gate=True)],
+    ids=["rewrite-flow", "renumbered", "mark-waiting"],
+)
+def test_a_write_that_keeps_or_moves_its_holder_writes_no_run(store, reading):
+    put(store, holder="s1", spent_before={"s1": SUMS})
+    got = _home(store, reading)
+    record = store.entry(TID) or store.entry("TD-9")
+    assert got.made and got.end is None and record["holder"] == "s1"
+    assert not record["history"]
+
+
+QUESTIONS = {
+    "merged-entry-open": ({"pr": 4}, Reading(pr_state="merged")),
+    "pr-closed": ({"pr": 4}, Reading(pr_state="closed")),
+    "stage-gone": ({"stage": "dropped", "moves": 2}, Reading(stage_known=False)),
+}
+
+
+@pytest.mark.parametrize("case", list(QUESTIONS))
+def test_a_question_the_home_asks_writes_an_ask_row_with_the_cleared_holders_run_in_its_intents_commit(store, case):
+    over, reading = QUESTIONS[case]
+    put(store, holder="s1", spent_before={"s1": SUMS}, **over)
+    before = _commits(store)
+    assert _home(store, reading).made
+    record = store.entry(TID)
+    (row,) = record["history"]
+    assert (row["to"], row["outcome"], row["by"], row["reason"]) == ("person", "ask", "home", case)
+    _run_is_s1(row)
+    assert record["intent"] and record["holder"] is None and _commits(store) == before + 1
+
+
+@pytest.mark.parametrize("case", list(QUESTIONS))
+def test_a_question_with_no_holder_writes_its_ask_row_with_no_run(store, case):
+    over, reading = QUESTIONS[case]
+    put(store, **over)
+    assert _home(store, reading).made
+    (row,) = store.entry(TID)["history"]
+    assert row["outcome"] == "ask" and row["reason"] == case and "run" not in row
+
+
+@pytest.mark.parametrize("case", list(QUESTIONS))
+def test_an_ask_case_on_an_entry_carrying_the_gate_writes_an_ended_row_and_no_ask_row(store, case):
+    over, reading = QUESTIONS[case]
+    put(store, holder="s1", spent_before={"s1": SUMS}, **over)
+    assert _home(store, replace(reading, gate=True)).made
+    record = store.entry(TID)
+    (row,) = record["history"]
+    assert (row["outcome"], row["reason"]) == ("ended", case) and record["waits"] == "person"
+    assert record["intent"] is None
+    _run_is_s1(row)
+
+
+def test_a_second_loss_on_an_entry_carrying_the_gate_writes_its_lost_row_alone(store):
+    """`choose` reconciles a gate before a loss, so `_offer_again` is called as `make` would call it."""
+    record = put(store, holder="s1", offers=2, spent_before={"s1": SUMS})
+    run = run_of(record, "s1", FIELDS, NOW_SUMS)
+    act = Act("offer-again", "to-person")
+    reading = Reading(holder=Holder(ended=True), may_start=True, gate=True)
+    assert _offer_again(store, record, act, reading, FLOW, "paul", run).made
+    record = store.entry(TID)
+    assert record["waits"] == "person" and record["intent"] is None
+    (row,) = record["history"]
+    assert row["outcome"] == "lost"
+    _run_is_s1(row)
+
+
+def test_a_gate_asked_again_writes_no_row(store):
+    asked = {"nonce": "n1", "ask": "Why?", "context": "c", "answers": {"Go — a session goes": "build"}}
+    put(store, waits="person", asked=asked)
+    assert _home(store, Reading()).made
+    assert store.entry(TID)["intent"] and not store.entry(TID)["history"]
+
+
+def test_an_answer_that_moves_a_kept_holders_stage_carries_its_run(store):
+    put(store, holder="s1", waits="person", spent_before={"s1": SUMS}, answers={"Polish it": "polish", OTHER: None})
+    got = _home(store, Reading(lifted="Polish it"))
+    assert got.made and got.end == "s1"
+    (row,) = store.entry(TID)["history"]
+    assert (row["outcome"], row["by"], row["to"]) == ("answer", "paul", "polish")
+    _run_is_s1(row)
+
+
+def test_an_answer_with_no_holder_carries_no_run(store):
+    put(store, waits="person", answers={"Polish it": "polish", OTHER: None})
+    assert _home(store, Reading(lifted="Polish it")).made
+    (row,) = store.entry(TID)["history"]
+    assert row["outcome"] == "answer" and "run" not in row
+
+
+def test_an_answer_naming_a_stage_gone_asks_with_the_kept_holders_run(store):
+    put(store, holder="s1", waits="person", spent_before={"s1": SUMS}, answers={"Gone": "nowhere", OTHER: None})
+    assert _home(store, Reading(lifted="Gone")).made
+    record = store.entry(TID)
+    (row,) = record["history"]
+    assert (row["outcome"], row["reason"]) == ("ask", "answer-stage-gone") and record["intent"]
+    _run_is_s1(row)
+
+
+def test_an_answer_applied_to_nothing_writes_no_row_and_keeps_its_holder(store, monkeypatch):
+    monkeypatch.setattr(store, "note_unapplied", lambda *_a: {"commit": "abc"})
+    put(store, holder="s1", pr=4, waits="person", answers={"Polish it": "polish", OTHER: None})
+    got = _home(store, Reading(pr_state="merged", lifted="Polish it"))
+    record = store.entry(TID)
+    assert got.made and got.end is None and record["holder"] == "s1" and not record["history"]
+
+
+def test_the_homes_rows_tell_a_fresh_session_nothing(store):
+    step = {"from": "review", "outcome": "refused", "reason": "the merge gate failed on ci", "to": "build"}
+    put(store, stage="build", branch="b", pr=4, holder="s1", history=[step])
+    assert _home(store, Reading(pr_state="closed", gate=True)).made  # an ended row
+    record = store.entry(TID)
+    record.update(waits=None, history=[*record["history"], {"from": "build", "to": "person", "outcome": "ask"}])
+    store.put_entry(record, "an ask row as well")
+    got, started, _ = offer_it(store, replace(READY, work=None))
+    assert got.made and started[0][1].came == "the merge gate failed on ci (`refused` at `review`)"

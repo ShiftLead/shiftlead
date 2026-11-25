@@ -101,10 +101,12 @@ def _current(store: StageStore, tid: str, head: str | None) -> dict[str, Any] | 
 
 
 def _to_person(
-    store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, context: str
+    store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, context: str, case: str
 ) -> Made:
+    """The merge gate's question to the person, its `ask` row's reason `case`; a `merging` record holds no holder, so
+    the row carries no `run` (§4.9c *A question the home asks is a row*)."""
     ask = "The merge of this entry needs you, what next?"
-    return _ask(store, record, s, person, ask, context, {TRY_AGAIN: {"merge": True}, **_back(record, doc)})
+    return _ask(store, record, s, person, ask, context, {TRY_AGAIN: {"merge": True}, **_back(record, doc)}, case, None)
 
 
 def _no_reading(
@@ -134,7 +136,8 @@ def _no_reading(
             began = now - NO_READING_FOR  # a stamp nobody can read must not keep the record here for good
         if now - began < NO_READING_FOR:
             return Made(False, why)
-        return _to_person(store, record, s, doc, person, f"The merge gate gave no reading for an hour: {why}.")
+        context = f"The merge gate gave no reading for an hour: {why}."
+        return _to_person(store, record, s, doc, person, context, "merge-unread")
 
 
 def _refused(
@@ -158,13 +161,14 @@ def _refused(
         key, outcome = str(merging.get("stage") or record["stage"]), str(merging.get("outcome") or "")
         stage = _stage_or_none(doc, key) if s.stage_known else None
         if stage is None:
-            return _to_person(store, record, s, doc, person, f"The merge was refused: {why}.")
+            return _to_person(store, record, s, doc, person, f"The merge was refused: {why}.", "merge-stage-gone")
         raw = destination(stage, outcome).get("refused", "person")
         where = destination({"refused": raw}, "refused")
         if where["to"] == "person":
             context = f"The merge was refused: {why}."
             ask = "The merge of this entry was refused, what next?"
-            return _ask(store, record, s, person, ask, context, _answers(stage, key, "refused", where, False))
+            answers = _answers(stage, key, "refused", where, False)
+            return _ask(store, record, s, person, ask, context, answers, "merge-refused", None)
         record.update(waits=None, merging=None)
         _apply(store, record, doc, stage, key, "refused", why, where, head, person, "home")
         return Made(True)
@@ -212,7 +216,7 @@ def run(
                 if record is None:
                     return Made(False, "the record moved while the gate ran")
                 context = f"The merge gate failed on {rows}, which needs a person."
-                return _to_person(store, record, s, doc, person, context)
+                return _to_person(store, record, s, doc, person, context, "merge-person")
         return _refused(store, tid, head, s, doc, person, f"the merge gate failed on {rows}")
     if verdict != "pass":
         return unread("the merge gate gave no reading")

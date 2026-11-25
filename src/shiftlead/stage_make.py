@@ -31,7 +31,7 @@ from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import HOME_ROWS, StageStore, _now, answer_move, bare, new_record, run_of
+from shiftlead.stagerecord import HOME, HOME_ROWS, StageStore, _now, answer_move, bare, new_record, run_of
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +43,28 @@ class Made:
     end: str | None = None  # the session this write took the record from
 
 
-def _close(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+Run = dict[str, Any] | None  # the held holder's `run`, built once by `make` (§4.9c *Every holder the home ends*)
+
+
+def _ended(record: dict[str, Any], case: str, run: Run) -> None:
+    """A write that clears a holder and makes no row of its own leaves an `ended` row carrying that holder's `run`
+    (§4.9c); with no holder held there is nothing ended, and no row."""
+    if run is not None:
+        key = record["stage"]
+        row = {"from": key, "to": key, "outcome": "ended", "by": HOME, "reason": case, "run": run, "at": _now()}
+        record.setdefault("history", []).append(row)
+
+
+def _close(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], *, run: Run = None) -> Made:
+    _ended(record, "close", run)
     record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None)
     store.put_entry(record, "closed: the entry is archived")
     return Made(True)
 
 
-def _renumbered(store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any]) -> Made:
+def _renumbered(
+    store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any], *, run: Run = None
+) -> Made:
     old, new = str(record["id"]), str(s.renumbered_to)
     if store.entry(new) is not None:
         return Made(False, f"{new} already has a record")
@@ -58,24 +73,33 @@ def _renumbered(store: StageStore, record: dict[str, Any], s: Reading, _doc: dic
     return Made(True)
 
 
-def _land_intent(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+def _land_intent(
+    store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], *, run: Run = None
+) -> Made:
     store.land_intent(str(record["id"]))
     return Made(True)
 
 
-def _wait_for_parts(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+def _wait_for_parts(
+    store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], *, run: Run = None
+) -> Made:
+    _ended(record, "wait-for-parts", run)
     record.update(waits="parts", holder=None)
     store.put_entry(record, "merged: waits for its parts")
     return Made(True)
 
 
-def _mark_waiting(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+def _mark_waiting(
+    store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], *, run: Run = None
+) -> Made:
     record["waits"] = "person"
     store.put_entry(record, "carries the home's gate: waits on the person")
     return Made(True)
 
 
-def _rewrite_flow(store: StageStore, record: dict[str, Any], _s: Reading, doc: dict[str, Any]) -> Made:
+def _rewrite_flow(
+    store: StageStore, record: dict[str, Any], _s: Reading, doc: dict[str, Any], *, run: Run = None
+) -> Made:
     """The record moves to the team's copy of its flow: its stage and holder stand, and the counts of moves the new
     flow lacks are dropped."""
     name = doc.get("name")
@@ -101,29 +125,30 @@ def _way_in(doc: dict[str, Any], design: bool) -> str | None:
     return None
 
 
-def _re_enter(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any]) -> Made:
+def _re_enter(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], *, run: Run = None) -> Made:
     """A record that has made no move, whose stage its flow lacks: it enters again by the way in for its kind, keeping
     its branch and pull request."""
     to, name = _way_in(doc, s.design), doc.get("name")
     if to is None or not name:
         return Made(False, "the flow has no stage that takes this entry")
-    record.setdefault("history", []).append(
-        {
-            "from": record["stage"],
-            "outcome": "re-enter",
-            "reason": "its stage left the flow",
-            "by": "home",
-            "to": to,
-            "head": None,
-            "at": _now(),
-        }
-    )
+    row = {
+        "from": record["stage"],
+        "outcome": "re-enter",
+        "reason": "its stage left the flow",
+        "by": "home",
+        "to": to,
+        "head": None,
+        "at": _now(),
+    }
+    record.setdefault("history", []).append({**row, "run": run} if run is not None else row)
     record.update(flow=name, stage=to, holder=None, offers=0, entered_at=_now(), answer=None)
     store.put_entry(record, f"re-entered at {to}")
     return Made(True)
 
 
-def _archive_design(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any]) -> Made:
+def _archive_design(
+    store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], *, run: Run = None
+) -> Made:
     """A design entry left open after its last part merged: the home archives it in a pull request of its own, and the
     record closes when the ledger reads it archived (§4.9c *Who archives the entry*)."""
     try:
@@ -133,7 +158,9 @@ def _archive_design(store: StageStore, record: dict[str, Any], _s: Reading, _doc
     return Made(True)
 
 
-def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any], person: str) -> Made:
+def _team_moved(
+    store: StageStore, record: dict[str, Any], s: Reading, _doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
     """An entry whose `Team:` line now names another team: its record closes here, keeping the branch and open pull
     request for the new team's first record. One that waits on a question this record asked has that question cleared
     first, in the order of a move to the person: the intent on the record, the pull request, and the close only once
@@ -149,6 +176,7 @@ def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dic
             return Made(False, f"the question could not be cleared: {e}")
     pushed = s.pr_state not in ("merged", "closed") and (record.get("branch") or record.get("pr"))
     carried = {"branch": record.get("branch"), "pr": record.get("pr")} if pushed else None
+    _ended(record, "team-moved", run)
     record.update(closed_at=_now(), holder=None, waits=None, intent=None, asked=None, clearing=None, carried=carried)
     store.put_entry(record, "closed: its entry moved to another team")
     return Made(True)
@@ -157,7 +185,9 @@ def _team_moved(store: StageStore, record: dict[str, Any], s: Reading, _doc: dic
 CHECKED_WHY = "its entry waits behind the blocker its live check merged"
 
 
-def _check_merged(store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], person: str) -> Made:
+def _check_merged(
+    store: StageStore, record: dict[str, Any], _s: Reading, _doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
     """A live check's `check-waits` merged: its record closes with the entry open behind its blocker, writing no
     `carried`, so the next check starts a fresh branch (§4.9c *A live check under a flow*). A question this record
     asked, landed or still an intent, is cleared first in the team move's order: the record marked `clearing`, the
@@ -174,6 +204,7 @@ def _check_merged(store: StageStore, record: dict[str, Any], _s: Reading, _doc: 
             store.clear_question(str(record["id"]), person, str(nonce), CHECKED_WHY)
         except board.Refused as e:
             return Made(False, f"the question could not be cleared: {e}")
+    _ended(record, "check-merged", run)
     record.update(
         closed_at=_now(), holder=None, waits=None, intent=None, asked=None, clearing=None, carried=None, merging=None
     )
@@ -187,9 +218,25 @@ def _knew_merge(record: dict[str, Any]) -> bool:
 
 
 def _ask(
-    store: StageStore, record: dict[str, Any], s: Reading, person: str, ask: str, context: str, answers: dict[str, Any]
+    store: StageStore,
+    record: dict[str, Any],
+    s: Reading,
+    person: str,
+    ask: str,
+    context: str,
+    answers: dict[str, Any],
+    case: str,
+    run: Run,
 ) -> Made:
-    """A move to the person, as its intent. An entry already carrying the gate is not asked a second time."""
+    """A move to the person, as its intent, with its `ask` row (reason `case`, the cleared holder's `run` where there
+    is one) in the intent's commit. An entry already carrying the gate is not asked a second time: it writes no `ask`
+    row, only an `ended` row for a holder it clears (§4.9c *A question the home asks is a row*). A second loss passes
+    no `run`, its `lost` row carrying it; a merge gate's question none, a `merging` record holding no holder."""
+    if s.gate:
+        _ended(record, case, run)
+    else:
+        row = {"from": record["stage"], "to": "person", "outcome": "ask", "by": HOME, "reason": case, "at": _now()}
+        record.setdefault("history", []).append({**row, "run": run} if run is not None else row)
     record.update(holder=None, waits="person" if s.gate else None, gate_after_merge=s.gate and s.pr_state == "merged")
     if s.gate:  # a gate this record did not ask: no earlier question's map or mark applies to its answer
         record.update(answers=None, asked=None)
@@ -214,10 +261,12 @@ def _to_stages(doc: dict[str, Any]) -> dict[str, Any]:
     return {f"{st['name']} — a session takes it to this stage": flow3.key_of(st["name"]) for st in stages}
 
 
-def _merged_open(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+def _merged_open(
+    store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
     ask = "Its pull request merged but the entry is still open, what next?"
     context = f"Pull request {record.get('pr')} merged and did not archive this entry."
-    return _ask(store, record, s, person, ask, context, {ARCHIVE: {"archive": True}})
+    return _ask(store, record, s, person, ask, context, {ARCHIVE: {"archive": True}}, "merged-entry-open", run)
 
 
 def _back(record: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
@@ -227,20 +276,27 @@ def _back(record: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
     return {f"Back to {stage['name']} — a session starts this stage again": key} if stage else _to_stages(doc)
 
 
-def _pr_closed(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+def _pr_closed(
+    store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
     ask = "Its pull request was closed without merging, what next?"
     context = f"Pull request {record.get('pr')} was closed unmerged."
-    return _ask(store, record, s, person, ask, context, _back(record, doc))
+    return _ask(store, record, s, person, ask, context, _back(record, doc), "pr-closed", run)
 
 
-def _stage_gone(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+def _stage_gone(
+    store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
     ask = "The stage this entry was in has left its flow, which stage next?"
     context = f"The flow no longer has the stage {record['stage']}."
-    return _ask(store, record, s, person, ask, context, _to_stages(doc))
+    return _ask(store, record, s, person, ask, context, _to_stages(doc), "stage-gone", run)
 
 
-def _gate_again(store: StageStore, record: dict[str, Any], _s: Reading, doc: dict[str, Any], person: str) -> Made:
-    """The gate and its item are gone with no answer: the same question again, under a new mark."""
+def _gate_again(
+    store: StageStore, record: dict[str, Any], _s: Reading, doc: dict[str, Any], person: str, *, run: Run = None
+) -> Made:
+    """The gate and its item are gone with no answer: the same question again, under a new mark. Its question already
+    has its `ask` row, so it writes none (§4.9c)."""
     asked = record.get("asked") or {}
     ask = asked.get("ask") or "This entry was waiting on you and its question is gone, what next?"
     context = asked.get("context") or "The entry's decision was removed with no answer recorded."
@@ -258,7 +314,7 @@ def _gate_again(store: StageStore, record: dict[str, Any], _s: Reading, doc: dic
     return Made(True)
 
 
-_ASKS: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any], str], Made]] = {
+_ASKS: dict[str, Callable[..., Made]] = {
     "merged-entry-open": _merged_open,
     "pr-closed": _pr_closed,
     "stage-gone": _stage_gone,
@@ -267,7 +323,7 @@ _ASKS: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any], 
     "check-merged": _check_merged,
 }
 
-_RECONCILE: dict[str, Callable[[StageStore, dict[str, Any], Reading, dict[str, Any]], Made]] = {
+_RECONCILE: dict[str, Callable[..., Made]] = {
     "close": _close,
     "renumbered": _renumbered,
     "land-intent": _land_intent,
@@ -306,10 +362,11 @@ def _unapplied(store: StageStore, record: dict[str, Any], label: str) -> Made:
     return Made(True)
 
 
-def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str) -> Made:
+def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str, Any], person: str, run: Run) -> Made:
     """The person's lifted label, mapped to a move by the record's answer map (act 2). An answer at a limit or the cap
     takes the stopped move, in the person's own words too, and only it starts that move's count and the cap's again.
-    The move is not counted."""
+    The move is not counted. `run` is the holder's that `_mark_waiting` kept, None where the question cleared it: an
+    answer that moves the stage, or asks again, is the write that ends it and its row carries it (§4.9c)."""
     label = str(s.lifted)
     if s.pr_state == "merged" and not _knew_merge(record):
         return _unapplied(store, record, label)
@@ -336,21 +393,13 @@ def _answer(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[str
         return Made(False, f"the answer {label!r} goes to {to}, which is a later slice's move")
     if _stage_or_none(doc, to) is None:
         ask = "The stage that answer names has left the flow, which stage next?"
-        return _ask(store, record, s, person, ask, f"The answer {label} goes to {to}.", _to_stages(doc))
+        context = f"The answer {label} goes to {to}."
+        return _ask(store, record, s, person, ask, context, _to_stages(doc), "answer-stage-gone", run)
     if isinstance(move, dict):
         record.setdefault("counts", {}).pop(blocked.get("count"), None)
         record["moves"] = 0
-    record.setdefault("history", []).append(
-        {
-            "from": record["stage"],
-            "outcome": "answer",
-            "reason": words,
-            "by": person,
-            "to": to,
-            "head": None,
-            "at": _now(),
-        }
-    )
+    row = {"from": record["stage"], "outcome": "answer", "reason": words, "by": person, "to": to, "head": None}
+    record.setdefault("history", []).append({**row, "at": _now(), **({"run": run} if run is not None else {})})
     record.update(
         stage=to,
         holder=None,
@@ -405,7 +454,7 @@ def _offer_again(
     if act.case == "to-person":
         ask = "Two sessions in a row were lost on this entry, what next?"
         context = f"The sessions holding it in the stage {record['stage']} ended or went silent twice."
-        return _ask(store, record, s, person, ask, context, _back(record, doc))
+        return _ask(store, record, s, person, ask, context, _back(record, doc), "to-person", None)
     record["holder"] = None
     if act.counted:
         record["offers"] = int(record.get("offers") or 0) + 1
@@ -436,15 +485,15 @@ def make(
         held = record.get("holder")
         run = run_of(record, held, session, _spent_now(spent, held, tid)) if held else None
         if act.name == "answer":
-            got = _answer(store, record, s, doc, person)
+            got = _answer(store, record, s, doc, person, run)
         elif act.name == "pass":
             got = _pass(store, record, s, doc, person)
         elif act.name == "offer-again":
             got = _offer_again(store, record, act, s, doc, person, run)
         elif act.name == "reconcile" and act.case in _ASKS:
-            got = _ASKS[act.case](store, record, s, doc, person)
+            got = _ASKS[act.case](store, record, s, doc, person, run=run)
         elif act.name == "reconcile" and act.case in _RECONCILE:
-            got = _RECONCILE[act.case](store, record, s, doc)
+            got = _RECONCILE[act.case](store, record, s, doc, run=run)
         else:
             return Made(False, f"{act.name} {act.case} is a later slice's")
         return replace(got, end=held) if got.made and held and not record.get("holder") else got
