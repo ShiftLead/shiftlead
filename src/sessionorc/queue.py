@@ -18,7 +18,7 @@ import re
 from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
@@ -1497,8 +1497,7 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
     # taking in its held builds', and each held build's design (§4.4 *A design's question is asked once*, TD-2026)
     held_by = held_map(open_, boards, linked)
     resolve = item_resolver(rs.origins)
-    for q, work in with_held(open_work(open_, resolve), held_by, open_, resolve).items():
-        open_[q]["open_work"] = work
+    _stamp(open_, counted_work(open_, resolve, held_by))
     for b, d in held_by.items():
         open_[b]["held_by"] = d
     pressing = _pressing(open_, boards, linked)
@@ -1726,8 +1725,7 @@ def reading(
     # taking in its held builds' (§4.4 *A design's question is asked once, on the design*, TD-2026), so it is read
     # once the boards and `linked` are
     held_by = held_map(open_, boards, linked)
-    for q, work in with_held(open_work(open_, xref), held_by, open_, xref).items():
-        open_[q]["open_work"] = work
+    _stamp(open_, counted_work(open_, xref, held_by, today=now.astimezone(UTC).date().isoformat()))
     for b, d in held_by.items():
         open_[b]["held_by"] = d  # the entry stamp, on every held build whatever its row's word (TD-2026)
     go = go_builds(held_by, open_)
@@ -2022,6 +2020,99 @@ def with_held(
         if got:
             out[d] = sorted(got, key=lambda w: _key_sort(str((entries.get(w) or {}).get("key") or ""), w))
     return out
+
+
+class Counted(NamedTuple):
+    """`counted_work`'s reading: `work`, each member's counted ids (stamped `open_work`); `parts`, those that are open
+    parts (`open_parts`); `gates`, each member's own date or event wait words (`early_gates`). Each by `<repo>#TD-n`,
+    holding only members with some."""
+
+    work: dict[str, list[str]]
+    parts: dict[str, list[str]]
+    gates: dict[str, list[str]]
+
+
+def gate_waits(e: Mapping[str, Any], today: str) -> list[str]:
+    """An entry's own date or event waits (§4.4 *A question whose entry only waits is asked early*, TD-2172), read
+    from its `gates` (`ledger.gates_of`): `until <date>` for each `until` day after `today`, then `event (<name>)`
+    for each event gate."""
+    g = e.get("gates")
+    if not isinstance(g, Mapping):
+        return []
+    days = sorted(str(d) for d in g.get("until") or () if str(d) > today)
+    events = [str(x.get("name") or "") for x in g.get("events") or () if isinstance(x, Mapping)]
+    return [f"until {d}" for d in days] + [f"event ({n})" for n in events if n]
+
+
+def counted_work(
+    entries: Mapping[str, Mapping[str, Any]],
+    xref: Callable[[str], str | None],
+    held: Mapping[str, str],
+    *,
+    today: str | None = None,
+) -> Counted:
+    """Each `decision (paul)` member's counted open work in its two kinds (§4.4 *A question whose entry only waits is
+    asked early*, TD-2172), the one builder every site reads in place of `with_held(open_work(…))`: `open_work` once,
+    then `with_held` (`held` is `held_map`'s) and a gated-wait step repeated until nothing is added — the step adds
+    to each member each gated blocker in its `Blocked by:` (one carrying `decision (paul)`, which `open_work` sets
+    aside) whose merged work, or own date or event wait, is non-empty, so a chain of gated entries that ends in open
+    work counts at each link and a held build that waits only on a gated blocker passes it to its design. A gated
+    blocker whose own chain reaches the member is not added, as `open_work` drops one (a cycle of gated ids counts
+    for nothing). `parts` are the counted ids naming the member, or one of its held builds, in `Part of:`; `gates`
+    each member's own `gate_waits` (`today`, the UTC day, by default the clock's)."""
+    today = today or datetime.now(UTC).date().isoformat()
+    blockers = _open_blockers(entries, xref)
+
+    def gated(q: str) -> bool:
+        return ledger_mod.decided_by(dict(entries[q]), PERSON)
+
+    members = [q for q in entries if gated(q)]
+    gates = {q: w for q in members if (w := gate_waits(entries[q], today))}
+    work = {q: list(ids) for q, ids in open_work(entries, xref).items()}
+    while True:
+        merged = with_held(work, held, entries, xref)
+        added = False
+        for q in members:
+            for b in sorted(blockers[q]):
+                if b in (work.get(q) or ()) or not gated(b) or _reaches(blockers, b, q):
+                    continue
+                if merged.get(b) or b in gates:
+                    work.setdefault(q, []).append(b)
+                    added = True
+        if not added:
+            break
+    for q, ids in work.items():
+        work[q] = sorted(ids, key=lambda w: _key_sort(str(entries[w].get("key") or ""), w))
+    merged = with_held(work, held, entries, xref)
+
+    def within(p: str | None, q: str) -> bool:  # `p` is `q` or one of its held builds, however deep
+        seen: set[str] = set()
+        while p and p not in seen:
+            if p == q:
+                return True
+            seen.add(p)
+            p = held.get(p)
+        return False
+
+    parts = {q: ps for q, ids in merged.items() if (ps := [w for w in ids if within(parent_qid(entries[w]), q)])}
+    return Counted(merged, parts, gates)
+
+
+def _stamp(open_: Mapping[str, dict[str, Any]], counted: Counted) -> None:
+    """Stamp `counted_work`'s reading on its members: `open_work`, `open_parts` and `early_gates` (TD-2172)."""
+    for name, by in (("open_work", counted.work), ("open_parts", counted.parts), ("early_gates", counted.gates)):
+        for q, ids in by.items():
+            open_[q][name] = ids
+
+
+def has_fact(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]]) -> bool:
+    """**The fact** (§4.4 *The card's status*, TD-1926, TD-2172): the member has an open part among its counted work,
+    or is a gated `Owner: paul` entry with counted work of either kind. What the *waiting, then yours* word, the
+    withheld answers, Lift and the home's stale refusal read, never `open_work` alone."""
+    if counted.parts.get(q):
+        return True
+    e = entries.get(q) or {}
+    return bool(counted.work.get(q)) and str(e.get("owner") or "").lower() == PERSON
 
 
 def _holder(rec: Any) -> dict[str, Any]:

@@ -3408,7 +3408,7 @@ def ledger_for_you(
     # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
     held_of = queue_mod.held_map(opens, boards, linked)
     resolve = queue_mod.item_resolver(origins)
-    work = queue_mod.with_held(queue_mod.open_work(opens, resolve), held_of, opens, resolve)
+    work = queue_mod.counted_work(opens, resolve, held_of, today=now.astimezone(UTC).date().isoformat()).work
     go = queue_mod.go_builds(held_of, opens)  # each design with a question's held builds, its row's `go_builds`
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():

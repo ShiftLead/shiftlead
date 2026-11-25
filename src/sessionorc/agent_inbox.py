@@ -1311,7 +1311,7 @@ class InboxMixin:
             if e is None or not ledger_mod.decided_by(e, ledger_mod.PERSON_OWNER):
                 return {"repo": root, "id": id, "gone": True}
             me = queue_mod.qid(name, id)
-            opens, work, _linked, heldmap = self._open_work()
+            opens, work, _linked, heldmap, _parts = self._open_work()
             if design := heldmap.get(me):  # a held build alone (a stale page, the CLI)
                 raise RpcError(queue_mod.held_build_words(id, design, name), conflict=True)
             go = queue_mod.go_builds(heldmap, opens).get(me) or []
@@ -1425,11 +1425,12 @@ class InboxMixin:
 
     def _open_work(
         self,
-    ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str], dict[str, str]]:
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str], dict[str, str], dict[str, list[str]]]:
         """The open entries of every reading the home holds by `<repo>#TD-n`, each `decision (paul)` member's counted
         open work over them (`queue.open_work`, the one builder the Queue and the Inbox read, §4.4 *The card's
         status*, TD-1926), the index a line's refs link through, and the `held_map` read with them (`{build:
-        design}`, TD-2026), which `_press_lift` and `_refuse_waiting` read (TD-2027)."""
+        design}`, TD-2026), which `_press_lift` and `_refuse_waiting` read (TD-2027), and each member's counted ids that
+        are open parts (`queue.counted_work`'s `parts`, TD-2172)."""
         readings = {str(r.get("name") or Path(root).name): r for root, r in self._repos.items() if isinstance(r, dict)}
         opens = {
             queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
@@ -1443,8 +1444,8 @@ class InboxMixin:
         # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
         held = queue_mod.held_map(opens, boards, linked)
         resolve = queue_mod.item_resolver(origins)
-        work = queue_mod.with_held(queue_mod.open_work(opens, resolve), held, opens, resolve)
-        return opens, work, linked, held
+        counted = queue_mod.counted_work(opens, resolve, held)
+        return opens, counted.work, linked, held, counted.parts
 
     def _refuse_waiting(self, qids: Iterable[str], work: Mapping[str, list[str]] | None = None) -> None:
         """A press on a member whose question still waits on counted open work is stale (§4.4 *The card's status*,
@@ -1452,7 +1453,7 @@ class InboxMixin:
         member's first counted id (bare in the member's own repo). `work` is the counted work a caller already read
         (`_press_lift`'s one reading, TD-2027), else read here."""
         if work is None:
-            _, work, _, _ = self._open_work()
+            _, work, _, _, _ = self._open_work()
         for q in qids:
             if counted := work.get(q):
                 repo, _, tid = q.partition("#")
@@ -1464,7 +1465,7 @@ class InboxMixin:
         id ending with it) else its words, in the board of `root`; none where no open line is found."""
         view = self._repos.get(root) or {}
         name = str(view.get("name") or Path(root).name)
-        opens, _, linked, _ = self._open_work()
+        opens, _, linked, _, _ = self._open_work()
         want = key.removeprefix("board:").strip()
         for b in (view.get("boards") or {}).get("boards") or ():
             for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
