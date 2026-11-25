@@ -4650,6 +4650,12 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         return done
 
+    async def _team_mark(name: str, started: bool) -> JSONResponse:
+        """Start and Wind down after the cut-over (§4.9d *Start and Wind down*, TD-2065): the team's started mark set
+        or cleared at the home (`team_mark`), as `ao team start|stop` does; no session is started or ended here."""
+        got = await call("team_mark", team=name, started=started)
+        return JSONResponse({"ok": True, "team": name, "sessions": [], "text": got.get("change") or ""})
+
     @app.get("/api/teams")
     async def api_teams():
         # read fresh, not from the headers' cache: what this answers is whether Start is offered (TD-274)
@@ -4669,6 +4675,8 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         what no lane will take (`no_lane`, `no_lane_line`, TD-1573, built by TD-1687), read for the press alone."""
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
+        if await asyncio.to_thread(teamstore.first_shape_off):  # a Start sets the mark and creates no lane (§4.9d)
+            return JSONResponse({"line": "", "empty": False, "roles": {}})
         org, _notes = org_here()
         got = await asyncio.to_thread(teamrun.lanes, rpc, org, name, host_name(), no_lane=True)
         return JSONResponse(got or {"line": "", "empty": False, "roles": {}})
@@ -4682,6 +4690,8 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = body if isinstance(body, dict) else {}
         if hosts.is_node():
             raise HTTPException(409, node_org_note())  # the strip's note, as the toast (§4.4a)
+        if await asyncio.to_thread(teamstore.first_shape_off):
+            return await _team_mark(name, True)
         org, _notes = org_here()
         if not body.get("anyway"):
             # every lane empty is the dialog's to ask (§4.5a, TD-265); a press that reaches here
@@ -4797,6 +4807,10 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         now = bool(body.get("now"))
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
+        if await asyncio.to_thread(teamstore.first_shape_off):
+            if now:
+                raise HTTPException(409, teamrun.NO_STOP_NOW)
+            return await _team_mark(name, False)
         org, _notes = org_here()
         try:
             st = await asyncio.to_thread(teamrun.stop_members, rpc, org, name, now=now)

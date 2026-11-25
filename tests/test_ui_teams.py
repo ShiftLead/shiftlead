@@ -19,6 +19,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from sessionorc import teamstore
 from shiftlead import teamrun
 from shiftlead.ui import app as uiapp
 from shiftlead.ui import settings_page as setmod
@@ -1755,3 +1756,52 @@ def test_a_start_is_refused_where_a_team_made_on_its_page_makes_the_repo_two_tea
     assert "add `Team = b | a`" in teamrun.undeclared(call, None, plan, "h")
     made.pop("b")
     assert teamrun.undeclared(call, None, plan, "h") is None, "one team needs no declaration"
+
+
+def test_a_switched_teams_head_presses_start_and_wind_down_after_the_cut_over(world, client, monkeypatch):
+    """§4.9d *Start and Wind down*, §4.5a *Team page: the head* (TD-2065): a team only settings.yml holds draws Start
+    while it is not started and Wind down while it is, once the cut-over's marker stands; each press sets or clears its
+    started mark (`team_mark`) and runs no first-shape start or stop. Before the marker the head keeps its link."""
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    marker = {"cut_over": None}
+    head = {"word": "running", "sessions": 2, "by": None, "most": 3}
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead"}, **marker}
+        if method == "team_show":
+            return _switched_show(head=head)
+        if method == "tools":
+            return _switched_tools()
+        if method == "flows":
+            return {"flows": [{"name": "build"}]}
+        if method == "team_mark":
+            fleet.calls.append((method, params))
+            return {"team": params["team"], "started": params["started"], "change": "solo wound down"}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+
+    def head_of():
+        return client.get("/teams/solo").text.split('id="teamhead"')[1].split("</div>")[0]
+
+    assert "Start or wind down on Sessions" in head_of() and "data-team-act" not in head_of()
+    marker["cut_over"] = "2026-12-01"
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
+    got = head_of()
+    assert 'data-team-act="stop" data-team="solo"' in got and 'data-team-act="start"' not in got
+    assert "Start or wind down on Sessions" not in got
+    head.update(word="stopped", by="person", finishing=1)
+    got = head_of()
+    assert 'data-team-act="start" data-team="solo"' in got and 'data-team-act="stop' not in got
+    said = client.post("/api/teams/solo/stop", json={})
+    assert said.status_code == 200 and said.json()["text"] == "solo wound down"
+    assert client.post("/api/teams/solo/start", json={}).status_code == 200
+    assert [p for m, p in fleet.calls if m == "team_mark"] == [
+        {"team": "solo", "started": False},
+        {"team": "solo", "started": True},
+    ]
+    now = client.post("/api/teams/solo/stop", json={"now": True})
+    assert now.status_code == 409 and now.json()["detail"] == teamrun.NO_STOP_NOW
+    assert client.get("/api/teams/solo/lanes").json() == {"line": "", "empty": False, "roles": {}}
