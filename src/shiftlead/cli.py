@@ -5534,7 +5534,8 @@ def _repo_readings() -> dict[str, Any]:
 def cmd_switch_over_check(args: argparse.Namespace) -> int:
     """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles, named by the
     answers file, each team with what the answers give it, and every blocker, nothing changed; exit 1 while a blocker
-    to cure beforehand stands. `--answers` first writes the answers file where there is none."""
+    to cure beforehand stands. `--answers` first writes the answers file where there is none, the seats each team's
+    suggested flow lacks in its head."""
     import yaml
 
     from shiftlead import profiles as profiles_mod
@@ -5565,6 +5566,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
             from sessionorc import settings as settings_mod
 
             made, _ = switchover.host_logins(host, profs)
+            lacks: dict[str, list[str]] = {}
             doc = switchover.suggest(
                 org,
                 host,
@@ -5572,9 +5574,10 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
                 hosts.local_host().repos(),
                 default=default,
                 schedules=settings_mod.teams(settings_mod.load()),
+                lacks=lacks,
             )
             try:
-                wrote = switchover.write_answers(doc)
+                wrote = switchover.write_answers(doc, lacks=lacks)
             except OSError as e:
                 print(f"ao switch-over check: {at} cannot be written: {e}", file=sys.stderr)
                 return 1
@@ -5582,7 +5585,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
-    plans, builtins, director, flights = None, None, None, None
+    plans, builtins, director, flights, asks = None, None, None, None, None
     if org is None:
         blockers.append(switchover.Blocker("the org", str(org_error), "mend org.yml, or run the check on the home"))
     else:
@@ -5593,7 +5596,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
             director, more = switchover.director(answers, made, builtins, org.director.profile or default)
             blockers += more
         flights = switchover.in_flight(_repo_readings(), org)
-    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director, flights)))
+        asks = switchover.first_shape_asks(switchover.stored_records())
+    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director, flights, asks)))
     return 1 if any(not b.day for b in blockers) else 0
 
 

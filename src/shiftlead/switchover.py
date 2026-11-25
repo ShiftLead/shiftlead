@@ -23,13 +23,16 @@ cases: no entry, an empty list, a login the home would not have, a model no logi
 It blocks too on a director list whose every login leaves its prompts on: its `unattended_args` lack the adapter's
 `skip_args` (§4.9d *How each one runs*).
 `suggest` and `write_answers` are `--answers`: the answers file written where there is none, with what §4.9e *The
-answers file* says the home can suggest. The seats a picked flow lacks, the open asks to a first-shape member or seat,
-a container node's logins and `--host` are later slices of TD-2071. `in_flight` lists the work in flight from the home's
-last repo reading, by the Offer act's own function, each session the window ends taken as gone.
+answers file* says the home can suggest, with the seats each team runs today that its suggested flow lacks (`lacking`)
+in the file's head; the check lists those of the flow the answers pick beside each team. A container node's logins and
+`--host` are later slices of TD-2071. `in_flight` lists the work in flight from the home's last repo reading, by the
+Offer act's own function, each session the window ends taken as gone, and `first_shape_asks` each open ask to a member
+or seat of the first shape (§4.9e *Work in flight*: nothing answers it after the window).
 """
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -38,7 +41,8 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, builtinstore, logins, naming, paths, teamstore, yamltext
+from sessionorc import adapters, builtinstore, logins, mail, naming, paths, teamstore, yamltext
+from sessionorc.models import Session
 from shiftlead.profiles import Profile
 
 SETTINGS = ("billing", "prices", "extra_args", "unattended_args", "permission_wait")  # what one folder's must share
@@ -402,6 +406,37 @@ class TeamPlan:
     most: int | None = None
     label: str | None = None
     note: str | None = None
+    lacks: list[str] = field(default_factory=list)  # the seats it runs today that its flow lacks (`lacking`)
+
+
+# A seat of the first shape whose work a built-in seat takes after the window (§4.9d *The built-in seats and their
+# page*): the techlead seat is the set's tech-lead, a sweeper the set's sweeper.
+SET_ROLES = ("sweeper",)
+
+
+def lacking(team: Any, doc: Any) -> list[str]:
+    """The seats `team` runs today that the format-3 flow `doc` lacks (§4.9e *The answers file*, §4.9d *What the
+    cut-over's move must produce*), each as `<name> (<role>)`, which go at the window. The techlead seat and a
+    sweeper are the built-in set's, never lacking. An auditor is had where the flow has an audit whose brief begins
+    with, or is begun by, the first word of its own brief's file name, else of its name (`docs-audit.md` and an audit's
+    `docs`; `test-audit-ao-1` and `tests`). Every other seat — a fact-checker, an asks seat of any other role — has no
+    place in a format-3 flow, whose stages each run on the flow's own model (ao-grind's fact-check seats, Paul,
+    2026-11-22). A pool is its one line."""
+    audits = doc.get("audits") if isinstance(doc, Mapping) else None
+    briefs = [str(a["brief"]) for a in audits or () if isinstance(a, Mapping) and isinstance(a.get("brief"), str)]
+    out: list[str] = []
+    for seat in getattr(team, "seats", None) or ():
+        role = str(getattr(seat, "role", "") or "")
+        if role in SET_ROLES:
+            continue
+        name = str(getattr(seat, "name", "") or role)
+        if role == "auditor":
+            brief = getattr(seat, "brief", None)
+            word = (Path(str(brief)).stem if brief else name).split("-")[0].lower()
+            if word and any(b.lower().startswith(word) or word.startswith(b.lower()) for b in briefs if b):
+                continue
+        out.append(f"{name} ({role})")
+    return out
 
 
 def _count(value: Any) -> bool:
@@ -470,6 +505,8 @@ def teams(
                 if lk not in rows
             ]
         row = next((r for r in offered(team.repo) if r["name"] == plan.flow), None)
+        if row is not None:
+            plan.lacks = lacking(team, row.get("doc"))
         if row is None:
             out.append(
                 Blocker(
@@ -757,6 +794,8 @@ def team_lines(plans: Iterable[TeamPlan]) -> list[str]:
             lines.append(
                 f"  {p.name}{label}: {p.repo} on {p.host}, flow {p.flow}; logins {listed}; at once {counts}{most}"
             )
+        if p.lacks:
+            lines.append(f"    seats it runs today that {p.flow} lacks, which go: {', '.join(p.lacks)}")
         if p.note:
             lines.append(f"    {p.note}")
     if not plans:
@@ -772,6 +811,7 @@ def report(
     builtins: SetPlan | None = None,
     director: DirectorPlan | None = None,
     flights: Iterable[Flight] | None = None,
+    asks: Iterable[FirstShapeAsk] | None = None,
 ) -> list[str]:
     """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, the built-in set where
     `builtins` is, the director where `director` is, then every blocker, those of the day last."""
@@ -790,6 +830,8 @@ def report(
         lines += director_lines(director)
     if flights is not None:
         lines += flight_lines(flights)
+    if asks is not None:
+        lines += ask_lines(asks)
     blockers = list(blockers)
     first = [b for b in blockers if not b.day]
     day = [b for b in blockers if b.day]
@@ -851,6 +893,7 @@ def suggest(
     schedules: Mapping[str, Mapping[str, Any]] | None = None,
     offered: Callable[[str], list[Mapping[str, Any]]] | None = None,
     ran_on: Callable[[Any], list[str]] | None = None,
+    lacks: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     """The answers file `--answers` writes where there is none (§4.9e *The answers file*): each folder named for its
     first profile; each team the format-3 flow of the name its flow has today (`design-wise` for `td`), the logins
@@ -858,7 +901,8 @@ def suggest(
     ready-to-build entries the sum of today's builder lines' sizes, and a `schedule_login` where its schedule names a
     profile; the set the package's models and the first home team's logins; the director, where `org` has one, the
     package's prompts model and the login made from its profile. A team on a node is given no logins: its host's are
-    not read here. `schedules` is `settings.teams`' reading; `offered` and `ran_on` stand in for the home's readings."""
+    not read here. `schedules` is `settings.teams`' reading; `offered` and `ran_on` stand in for the home's readings.
+    `lacks`, where given, gains each team the seats it runs today that its suggested flow lacks (`lacking`)."""
     from shiftlead import flow3, team_show
     from shiftlead import teams as teamsmod
 
@@ -881,6 +925,8 @@ def suggest(
         row = next((r for r in offered(team.repo) if want and r["name"] == want), None)
         if row is not None:
             pick["flow"] = want
+            if lacks is not None and (gone := lacking(team, row.get("doc"))):
+                lacks[name] = gone
         on_home = not team.host or team.host == here
         listed: list[str] = []
         if on_home:
@@ -911,14 +957,21 @@ def suggest(
     return doc
 
 
-def write_answers(doc: Mapping[str, Any], path: Path | None = None) -> bool:
+def write_answers(
+    doc: Mapping[str, Any], path: Path | None = None, lacks: Mapping[str, Iterable[str]] | None = None
+) -> bool:
     """Write `doc` as the answers file where there is none; False, and nothing written, where there is one (a
-    dangling link included). The file is linked into place, so one written meanwhile is never replaced."""
+    dangling link included). The file is linked into place, so one written meanwhile is never replaced. `lacks`
+    (`suggest`'s) is written in the head, a comment line a team: the seats it runs today that its flow lacks."""
     path = path or answers_file()
     if path.exists() or path.is_symlink():
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     head = "# written by ao switch-over check --answers (design §4.9e The answers file): read it, change it, check\n"
+    rows = [(t, list(seats)) for t, seats in (lacks or {}).items()]
+    if any(seats for _t, seats in rows):
+        head += "# seats each team runs today that its suggested flow lacks, which go (their logins are still made):\n"
+        head += "".join(f"#   {t}: {', '.join(seats)}\n" for t, seats in rows if seats)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         tmp.write_text(head + yaml.safe_dump(dict(doc), sort_keys=False, allow_unicode=True), encoding="utf-8")
@@ -1033,4 +1086,62 @@ def flight_lines(flights: Iterable[Flight]) -> list[str]:
             lines.append("    nothing in flight: every pickable entry is offered afresh")
     if not flights:
         lines.append("  none: the org defines no team")
+    return lines
+
+
+# -- open asks to the first shape (§4.9e *Work in flight*) ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FirstShapeAsk:
+    """An open ask in the mailbox of a member or seat of the first shape, which nothing answers after the window."""
+
+    id: str
+    to: str
+    sender: str
+    subject: str
+    at: str
+
+
+def stored_records(root: Path | None = None) -> dict[str, Session]:
+    """The home's stored session records, read and never written (no directory is made where there is none)."""
+    root = root or paths.sessions_dir()
+    out: dict[str, Session] = {}
+    for p in sorted(root.glob("*.json")) if root.is_dir() else ():
+        try:
+            s = Session.from_dict(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue  # a half-written or foreign file is passed over, as the store passes it
+        out[s.id] = s
+    return out
+
+
+def first_shape(r: Session) -> bool:
+    """A member or seat of the first shape (§4.9e *What decides which shape runs*, rule 13): a record with a `team`,
+    no `builtin`, and not the person's own (`mail.by_person`). Every stored record was made before the cut-over."""
+    return bool(r.team) and not r.builtin and not mail.by_person(r)
+
+
+def first_shape_asks(records: Mapping[str, Session]) -> list[FirstShapeAsk]:
+    """Each open ask to a member or seat of the first shape, in the order the records hold them (§4.9e *Work in
+    flight*: for the person to answer or close before the window), the person's own and one passed up to the person
+    left out, as `stuck.open_asks` leaves them out."""
+    out: list[FirstShapeAsk] = []
+    for key, r in records.items():
+        if not first_shape(r):
+            continue
+        for e in r.inbox:
+            if e.kind != "ask" or not e.open or e.passed_to == mail.PERSON or mail.PERSON in e.to:
+                continue
+            out.append(FirstShapeAsk(e.id, r.id or key, e.from_, mail.heading(e), e.at))
+    return out
+
+
+def ask_lines(asks: Iterable[FirstShapeAsk]) -> list[str]:
+    """`ao switch-over check`'s lines for the open asks to the first shape."""
+    asks = list(asks)
+    lines = ["open asks to a member or seat of the first shape, to answer or close before the window"]
+    lines += [f"  {a.id} to {a.to} from {a.sender} ({a.at}): {a.subject}" for a in asks]
+    if not asks:
+        lines.append("  none")
     return lines

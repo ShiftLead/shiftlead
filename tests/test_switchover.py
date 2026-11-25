@@ -835,3 +835,102 @@ def test_in_flight_names_no_filing_fork_sync_or_sweep_branch_and_no_branch_of_an
         "a fork's branch hides no origin branch; an id no entry of the reading has is not named"
     )
     assert switchover.flight_lines([f])[1] == "  r: (its pull requests read t0)"
+
+
+# -- the seats a picked flow lacks, and the open asks to the first shape (§4.9e) --------------------------------------
+
+
+def Seat(role: str, name: str = "", brief: str | None = None) -> SimpleNamespace:  # noqa: N802
+    return SimpleNamespace(role=role, name=name or f"grind-{role}", brief=brief)
+
+
+AUDITED = {"stages": [], "audits": [{"name": "Docs audit", "brief": "docs"}, {"name": "Tests audit", "brief": "tests"}]}
+
+
+def test_a_flow_lacks_a_fact_checker_and_an_unmatched_auditor_but_never_the_sets_seats():
+    team = SimpleNamespace(
+        techlead=SimpleNamespace(profile=None),
+        seats=[
+            Seat("fact-checker", "fc-gemini"),
+            Seat("auditor", "docs-audit-ao-1", "docs/briefs/docs-audit.md"),
+            Seat("auditor", "test-audit-ao-1"),
+            Seat("auditor", "security-audit"),
+            Seat("sweeper"),
+        ],
+    )
+    assert switchover.lacking(team, AUDITED) == ["fc-gemini (fact-checker)", "security-audit (auditor)"]
+    assert switchover.lacking(team, {"stages": []})[1:] == [
+        "docs-audit-ao-1 (auditor)",
+        "test-audit-ao-1 (auditor)",
+        "security-audit (auditor)",
+    ], "a flow with no audits has no auditor's place"
+    assert switchover.lacking(SimpleNamespace(), AUDITED) == [], "a team with no seats lacks nothing"
+
+
+def test_the_check_lists_beside_a_team_the_seats_its_picked_flow_lacks():
+    team = SimpleNamespace(repo="r", host="", seats=[Seat("fact-checker", "fc-grok")])
+    plans, blockers = plan(Org(grind=team), pick())
+    assert plans[0].lacks == ["fc-grok (fact-checker)"] and blockers == [], "a lacking seat is no blocker"
+    lines = switchover.team_lines(plans)
+    assert "    seats it runs today that design-wise lacks, which go: fc-grok (fact-checker)" in lines
+
+
+def test_answers_write_the_seats_each_suggested_flow_lacks_in_the_files_head(tmp_path):
+    org = SimpleNamespace(teams={"grind": Def(members=(Line(),))}, unlanded={}, director=None)
+    org.teams["grind"].seats = [Seat("fact-checker", "fc-gemini")]
+    lacks: dict[str, list[str]] = {}
+    doc = suggest(org, lacks=lacks)
+    assert lacks == {"grind": ["fc-gemini (fact-checker)"]} and "lacks" not in doc["teams"]["grind"]
+    path = tmp_path / "answers.yml"
+    assert switchover.write_answers(doc, path, lacks=lacks)
+    text = path.read_text()
+    assert "#   grind: fc-gemini (fact-checker)\n" in text and yaml.safe_load(text) == doc
+    other = tmp_path / "other.yml"
+    assert switchover.write_answers(doc, other, lacks={}) and "lacks" not in other.read_text()
+
+
+def Rec(n: str, *, team: str = "grind", **kw: Any) -> Any:  # noqa: N802
+    from sessionorc import models
+
+    kw.setdefault("unattended", True)
+    return models.Session(id=f"ao-{n}", name=n, kind="claude", adapter="claude-code", dir="/w", team=team, **kw)
+
+
+def Ask(mid: str, to: str, *, kind: str = "ask", **kw: Any) -> Any:  # noqa: N802
+    from sessionorc.models import MailEntry
+
+    return MailEntry(id=mid, from_="ao-x", to=[to], at="2026-11-24T10:00:00Z", kind=kind, text="which way? more", **kw)
+
+
+def test_first_shape_asks_are_open_asks_to_a_teams_member_or_seat_alone():
+    from sessionorc.models import PERSON
+
+    member = Rec("m")
+    member.inbox = [Ask("m-1", "ao-m"), Ask("m-2", "ao-m", kind="note"), Ask("m-3", "ao-m", closed_reason="answered")]
+    member.inbox.append(Ask("m-4", PERSON))
+    seat = Rec("s", builtin="techlead")
+    seat.inbox = [Ask("m-5", "ao-s")]
+    loose = Rec("l", team="")
+    loose.inbox = [Ask("m-6", "ao-l")]
+    own = Rec("o", unattended=False, by_person=True)
+    own.inbox = [Ask("m-7", "ao-o")]
+    got = switchover.first_shape_asks({r.id: r for r in (member, seat, loose, own)})
+    assert [(a.id, a.to, a.sender, a.subject) for a in got] == [("m-1", "ao-m", "ao-x", "which way?")]
+    assert switchover.ask_lines(got)[1] == "  m-1 to ao-m from ao-x (2026-11-24T10:00:00Z): which way?"
+    assert switchover.ask_lines([])[1:] == ["  none"]
+
+
+def test_the_check_prints_the_open_asks_to_the_first_shape_and_makes_no_sessions_directory(home, tmp_path, capsys):
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    cli.main(["switch-over", "check"])
+    assert "open asks to a member or seat of the first shape" in capsys.readouterr().out
+    assert not (home / "sessions").exists(), "read, never made"
+    member = Rec("m")
+    member.inbox = [Ask("m-1", "ao-m")]
+    (home / "sessions").mkdir()
+    (home / "sessions" / "ao-m.json").write_text(json.dumps(member.to_dict()))
+    (home / "sessions" / "bad.json").write_text("{")
+    cli.main(["switch-over", "check"])
+    assert "  m-1 to ao-m from ao-x (2026-11-24T10:00:00Z): which way?" in capsys.readouterr().out
