@@ -457,10 +457,12 @@ def teams(
                 )
             )
             continue
-        why = team_show.cannot_pick(name, row, {"host": host, "logins": plan.logins}, rows, here)
+        # a login the home lacks is its own blocker above, so the models are read of the logins it would have
+        known = plan.logins if on_node else [lk for lk in plan.logins if lk in rows]
+        why = team_show.cannot_pick(name, row, {"host": host, "logins": known}, rows, here)
         if why == team_show.NODE_REPO_FLOW:
             plan.note = f"not checked: {host}'s checkout of {team.repo} is not read here"
-        elif why and not (plan.logins == [] and why.endswith("its login list is empty")):
+        elif why and not (known == [] and why.endswith("its login list is empty")):
             out.append(
                 Blocker(at, f"its flow {plan.flow}: {why}", f"pick another flow, or mend {plan.flow} or its list")
             )

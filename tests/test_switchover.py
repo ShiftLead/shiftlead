@@ -328,6 +328,13 @@ def test_an_empty_list_is_one_blocker_not_two():
     assert len(blockers) == 1
 
 
+def test_a_login_the_home_lacks_is_one_blocker_not_two():
+    _, blockers = plan(Org(grind=Team()), pick(logins=["claude-code:gone"]))
+    assert [b.what for b in blockers] == ["lists claude-code:gone, a login h would not have"]
+    _, blockers = plan(Org(grind=Team()), pick(logins=["claude-code:gone", "claude-code:paul"]))
+    assert len(blockers) == 1
+
+
 def test_a_model_its_flow_names_that_no_login_in_its_list_offers_blocks():
     made = [switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"], models=["opus"])]
     _, blockers = plan(Org(grind=Team()), pick(), made=made)
