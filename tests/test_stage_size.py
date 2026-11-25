@@ -9,11 +9,11 @@ from shiftlead.stage_size import Limits, Room
 
 
 def test_a_stage_with_no_number_runs_one_and_a_team_with_no_most_has_no_limit():
-    got = stage_size.limits({"at_once": {"build": 3, "review": "two", "check": -1, "flag": True}})
+    got = stage_size.limits({"at_once": {"build": 3, "review": "two", "check": 0, "flag": True}})
     assert got == Limits({"build": 3}, None)
     assert stage_size.limits(None) == Limits({}, None)
     assert stage_size.limits({"at_once": [1], "most": "5"}) == Limits({}, None)
-    assert stage_size.limits({"most": 4}).most == 4
+    assert stage_size.limits({"most": 4}).most == 4 and stage_size.limits({"most": 0}).most is None
 
 
 def test_a_stage_fits_below_its_number_and_the_team_below_its_limit():

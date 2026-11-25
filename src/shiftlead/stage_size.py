@@ -26,12 +26,12 @@ class Limits:
 
 
 def _count(value: Any) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 1 else None
 
 
 def limits(entry: Mapping[str, Any] | None) -> Limits:
-    """The team's `Limits`. A hand-edited number that is no count is read as its default: 1 for a stage, no limit for
-    the team."""
+    """The team's `Limits`. A hand-edited number that is no whole number of 1 or more is read as its default: 1 for a
+    stage, no limit for the team."""
     entry = entry or {}
     raw = entry.get("at_once")
     at_once = {str(k): n for k, v in raw.items() if (n := _count(v)) is not None} if isinstance(raw, Mapping) else {}

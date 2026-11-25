@@ -106,7 +106,7 @@ def _make(store: StageStore, act: Act, s: Reading, f: EntryFacts, reach: Reach) 
 def offer_stage(record: Mapping[str, Any] | None, s: Reading, doc: Mapping[str, Any]) -> str | None:
     """The stage an offer of the entry would start a session in: an open record's own, else the way in for its kind."""
     if record is not None and not record.get("closed_at"):
-        return str(record.get("stage"))
+        return str(record["stage"]) if record.get("stage") else None
     return stage_make._way_in(dict(doc), s.design)
 
 
