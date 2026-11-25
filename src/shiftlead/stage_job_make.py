@@ -3,8 +3,8 @@
 `stage_job.choose` names the act; `make` writes it on the job's record under the store's lock, as `stage_make` writes an
 entry's, after a fresh read still chooses it. What reaches the world — a session's start and its claim on the job's
 work order, the home's plain board line and its close — is given as a `JobReach`, so one job's failure is that job's.
-A session the write took the record from is named in `Made.end` for the caller to end. Nothing calls this yet; the
-home's board line is a later slice of TD-2053.
+A session the write took the record from is named in `Made.end` for the caller to end. `stage_job_pass` calls it, and
+nothing calls that yet; the home's board line is a later slice of TD-2053.
 """
 
 from __future__ import annotations

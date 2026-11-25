@@ -108,6 +108,14 @@ def test_a_lost_or_silent_job_is_offered_again_once(holder: Holder, offers: int,
     assert choose(held(offers=offers), JobReading(holder=holder)) is None  # only while the team may start
 
 
+def test_a_lost_job_waits_while_another_job_session_of_the_seat_is_live() -> None:
+    busy = {"seat_busy": True, **GO}
+    assert choose(held(offers=1), JobReading(holder=Holder(ended=True), **busy)) is None
+    assert choose(held(offers=1), JobReading(holder=Holder(ended=True, stopped=True), **busy)) is None
+    second = choose(held(offers=2), JobReading(holder=Holder(ended=True), **busy))
+    assert named(second) == ("offer-again", "to-person")  # starts no session, so it never waits
+
+
 def test_a_job_in_its_teams_flow_is_moved_by_an_entrys_acts() -> None:
     r = held(stage="review")
     assert choose(r, JobReading(holder=Holder(ended=True), at_job_stage=False, **GO)) is None
