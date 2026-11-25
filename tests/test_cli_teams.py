@@ -2901,3 +2901,12 @@ def test_close_says_a_member_the_tick_closed_after_the_wind_down(world, capsys, 
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert "ao-shiftlead-grind-1" not in [p["id"] for m, p in state["calls"] if m == "close"]
     assert "closed by the tick after the wind-down" in capsys.readouterr().out
+
+
+def test_team_show_says_how_many_of_a_stopped_teams_sessions_are_still_finishing(capsys):
+    """`ao team show`'s head line names a wound-down team's sessions still ending, and a team with none names no
+    count (§4.9d *Start and Wind down*, TD-2065 slice 6)."""
+    head = {"word": "stopped", "sessions": 2, "by": "person"}
+    cli._team_show_prose({"team": "grind", "head": {**head, "finishing": 2}})
+    cli._team_show_prose({"team": "grind", "head": head})
+    assert capsys.readouterr().out.splitlines() == ["grind: stopped by you · 2 finishing", "grind: stopped by you"]
