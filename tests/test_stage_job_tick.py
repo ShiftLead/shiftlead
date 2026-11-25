@@ -1,0 +1,136 @@
+"""The two built-in seats' passes as the tick takes them (design §4.9d *How each one runs*, TD-2053)."""
+
+from __future__ import annotations
+
+import subprocess
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from shiftlead import stage_job, stage_job_make, stage_job_tick
+from shiftlead.stage_fetch import SessionsRead
+from shiftlead.stagerecord import StageStore
+
+pytestmark = pytest.mark.unit
+
+NOW = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
+FLOW = {"stages": [{"name": "build", "takes": "other"}, {"name": "review", "takes": "none"}]}
+
+
+def git(root: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> StageStore:
+    origin, root = tmp_path / "o.git", tmp_path / "r"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    git(root, "config", "user.email", "t@example.com")
+    git(root, "config", "user.name", "t")
+    git(root, "remote", "add", "origin", str(origin))
+    git(root, "commit", "-q", "--allow-empty", "-m", "init")
+    git(root, "push", "-q", "origin", "main")
+    s = StageStore(root)
+    s.ensure_branch()
+    return s
+
+
+def reach(started: list[str]) -> stage_job_make.JobReach:
+    def start(record, _came):
+        started.append(record["id"])
+        return f"s-{len(started)}"
+
+    return stage_job_make.JobReach(start, lambda h, r: None, lambda r, why: "aaaa0001", lambda i: None, lambda h: None)
+
+
+def a_run(store: StageStore, made: list[str], **over: Any) -> dict[str, Any]:
+    args: dict[str, Any] = {
+        "now": NOW,
+        "orders": [{"id": "board:1a2b3c4d", "decided": {"date": "2026-11-24"}}],
+        "pr_orders": [{"id": "pr:4", "pr": 4, "pr_order": True, "red_since": "2026-11-20"}],
+        "boards": {"boards": []},
+        "rows": [{"number": 4, "state": "open"}],
+        "entries": [],
+        "sessions": SessionsRead({}, frozenset(), frozenset()),
+        "checkouts": {},
+        "local": "h",
+        "started": ["t"],
+        "docs": {"t": FLOW},
+        "may_start": True,
+    }
+    return stage_job_tick.run(store, reach(made), **{**args, **over})
+
+
+def test_the_open_lines_are_read_by_their_eight_hex_digits_and_an_unread_board_is_none():
+    boards = {"boards": [{"items": [{"key": "board:1a2b3c4d"}, {"key": "TD-9"}, "junk"]}]}
+    assert stage_job_tick.lines_open(boards) == {"1a2b3c4d"}
+    assert stage_job_tick.lines_open({"error": "x"}) is None and stage_job_tick.lines_open(None) is None
+
+
+def test_the_homes_line_names_the_seat_the_work_order_and_the_reason():
+    record = stage_job.new_job("unheld-pull-requests", 4, "t", "x")
+    text = stage_job_tick.line_text(record, "two job sessions in a row were lost")
+    assert "pull requests nobody holds" in text and "pr:4" in text and "were lost" in text and "\n" not in text
+
+
+def test_each_seat_offers_its_oldest_object(store):
+    started: list[str] = []
+    got = a_run(store, started)
+    assert started == ["board-1a2b3c4d", "pr-4"]
+    assert store.job("pr-4")["holder"] == "s-2" and store.job("board-1a2b3c4d")["team"] == "t"
+    assert set(got) == set(stage_job.SEATS)
+
+
+def test_no_started_team_offers_nothing(store):
+    started: list[str] = []
+    a_run(store, started, started=[], may_start=False)
+    assert started == [] and store.jobs() == {}
+
+
+def test_a_node_not_read_with_a_checkout_offers_no_pull_request(store):
+    started: list[str] = []
+    a_run(store, started, checkouts={"node2": ["/r"]})
+    assert started == ["board-1a2b3c4d"]
+
+
+def test_a_pickable_entrys_pull_request_is_the_entrys(store, monkeypatch):
+    monkeypatch.setattr(stage_job_tick, "pickable_on", lambda e, team: True)
+    seen: list[Any] = []
+
+    def work(pickable, records, rows, *, held):
+        seen.append(list(pickable))
+        return frozenset({4})
+
+    monkeypatch.setattr(stage_job, "entries_work", work)
+    started: list[str] = []
+    a_run(store, started, entries=[{"id": "TD-7"}])
+    assert seen == [["TD-7"]] and started == ["board-1a2b3c4d"]
+
+
+def test_unread_records_run_neither_seat(store, monkeypatch):
+    def boom():
+        raise ValueError("bad")
+
+    monkeypatch.setattr(store, "entries", boom)
+    assert a_run(store, []) == dict.fromkeys(stage_job.SEATS)
+
+
+def test_the_reach_writes_and_closes_the_homes_line(monkeypatch, tmp_path):
+    calls: list[tuple] = []
+    monkeypatch.setattr(
+        stage_job_tick.board, "add", lambda root, text, due: calls.append(("add", due)) or {"key": "board:0000beef"}
+    )
+    monkeypatch.setattr(
+        stage_job_tick.board, "write_back", lambda root, line, text, action, **kw: calls.append((action, kw["key"]))
+    )
+    r = stage_job_tick.reach_for(
+        lambda *a, **k: None, lambda: None, tmp_path, "r", local="h", hosts={}, docs={}, today=lambda: "2026-11-25"
+    )
+    record = stage_job.new_job("board-answers", "1a2b3c4d", "t", "x")
+    assert r.line(record, "why") == "0000beef"
+    r.close_line("0000beef")
+    assert calls == [("add", "2026-11-25"), ("done", "board:0000beef")]
+    assert r.start(record, None) is None  # no org read: nothing starts

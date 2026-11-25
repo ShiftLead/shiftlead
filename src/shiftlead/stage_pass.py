@@ -356,13 +356,15 @@ def note_refusals(state: RepoState, team: str, steps: Iterable[Step], now: datet
 class RepoPass:
     """What one repo's pass did. `unread`: the teams with no reading this pass. `tell`: the teams whose flow has newly
     stopped passing its check, with its problems, for the person to be told once. `swept`: closed records removed.
-    `refused`: the entries whose act's refusal has newly come to stand, for the person to be told once each."""
+    `refused`: the entries whose act's refusal has newly come to stand, for the person to be told once each. `jobs`:
+    the built-in seats' steps, where the caller read them (`stage_tick.run`)."""
 
     teams: Mapping[str, TeamPass] = field(default_factory=dict)
     unread: tuple[str, ...] = ()
     tell: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     swept: tuple[str, ...] = ()
     refused: tuple[Refusal, ...] = ()
+    jobs: Mapping[str, Any] = field(default_factory=dict)  # by seat: its job steps (`stage_job_tick.run`), or None
 
 
 FactsFor = Callable[[str, TeamFlow, Mapping[str, Any]], RepoFacts | None]
