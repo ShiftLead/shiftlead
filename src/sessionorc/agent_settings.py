@@ -395,7 +395,10 @@ class SettingsMixin:
             return {"at": None}
         login = None
         if not rule.get("profile"):  # a switched team's rule reads its login's account (§4.9d, TD-2065)
-            login = self._schedule_login(settings_mod.load(), team, rule)
+            doc = settings_mod.load()
+            if not teamstore.cut_over(doc) or not teamstore.switched(doc, team):
+                return {"at": None}  # before the cut-over a login's rule fires nothing (`_schedules`)
+            login = self._schedule_login(doc, team, rule)
             if login is None:
                 return {"at": None}
 

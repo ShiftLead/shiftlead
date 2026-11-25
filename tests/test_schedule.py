@@ -442,3 +442,25 @@ async def test_a_rule_whose_login_left_the_list_reads_the_first_and_a_metered_or
         await agent._schedules(now)
         assert "started" not in _rec_of(agent) and "schedule_fired" not in _rec_of(agent), order
         assert agent._schedule_starts("g", gone, now) == {"at": None}
+
+
+async def test_the_rules_own_login_is_read_where_it_is_in_the_list_and_a_started_team_is_left(agent, monkeypatch):
+    """The named login, not the first, while it is in the list; a reset on a started team leaves its mark as it was."""
+    await _switched(agent, monkeypatch, logins_=("claude-code:b", "claude-code:a"))
+    now = datetime.now(UTC)
+    _acct(agent, "claude-code:acct", now - timedelta(minutes=1))  # `a`'s account alone has a reading
+    since = {"since": _iso(now - timedelta(days=2)), "by": "person"}
+    agent._host_rec.setdefault("teams", {})["g"] = {"started": dict(since)}
+    await agent._schedules(now)
+    rec = _rec_of(agent)
+    assert rec["started"] == since and rec["schedule_fired"] == _iso(now - timedelta(minutes=1))
+
+
+async def test_a_login_rule_answers_no_next_reset_before_the_cut_over(agent, monkeypatch):
+    await _switched(agent, monkeypatch)
+    _acct(agent, "claude-code:acct", datetime.now(UTC) + timedelta(hours=1))
+    assert agent._schedule_starts("g", LOGIN_RULE, datetime.now(UTC))["at"]
+    doc = settings_mod.load()
+    doc.pop("cut_over")
+    settings_mod.save(doc)
+    assert agent._schedule_starts("g", LOGIN_RULE, datetime.now(UTC)) == {"at": None}
