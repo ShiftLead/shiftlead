@@ -177,6 +177,7 @@ class GrokAdapter:
     permission_channel = False  # a Grok hook cannot answer a prompt (§4.3 *No permission channel*)
     start_context = False  # no Grok hook hands the model context at the start (§4.3 `start_context`)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
+    skip_args = ALWAYS_APPROVE  # an unattended launch's own, which skip its prompts (§4.3 `skip_args`, TD-2071)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
     implements: frozenset[str] = frozenset(

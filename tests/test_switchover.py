@@ -565,3 +565,35 @@ def test_the_check_reads_the_director_where_the_org_has_one(home, tmp_path, caps
     assert "the director: lists claude-code:far, a login the home would not have" in out
     answers(home, {"hosts": {"h": {"logins": found}}, "director": {"model": "sonnet", "logins": ["claude-code:paul"]}})
     assert cli.main(["switch-over", "check"]) == 0, capsys.readouterr().out
+
+
+def test_a_director_list_whose_every_login_leaves_its_prompts_on_blocks():
+    on = switchover.Login("claude-code", Path("/b"), "asks", ["q"], ["k2"], models=["opus", "sonnet"], asks=True)
+    unread = switchover.Login("x", Path("/c"), "unread", ["r"], ["k3"], models=["opus", "sonnet"], asks=None)
+    made = [*HOME, on, unread]
+    row = {"model": "sonnet", "logins": ["claude-code:asks"]}
+    _, blockers = switchover.director({"director": row}, made, None, "p")
+    assert [b.what for b in blockers] == ["every login in its list leaves its prompts on (claude-code:asks)"]
+    for listed in (["claude-code:asks", "claude-code:paul"], ["x:unread"]):
+        assert switchover.director({"director": {**row, "logins": listed}}, made, None, "p")[1] == [], listed
+
+
+def test_a_login_leaves_its_prompts_on_where_its_unattended_args_lack_the_skip_args(tmp_path):
+    fake = Fake(tmp_path / "d")
+    fake.skip_args = ["--skip"]
+    profs = [
+        P("bare", tmp_path / "a"),
+        P("skips", tmp_path / "b", unattended_args=["--skip", "--x"]),
+        P("asks", tmp_path / "c", unattended_args=["--x"]),
+    ]
+    made, _ = run(tmp_path, profs, fakes={"claude-code": fake})
+    assert [(m.name, m.asks) for m in made] == [("bare", False), ("skips", False), ("asks", True)]
+    made, _ = run(tmp_path, profs)
+    assert {m.asks for m in made} == {None}, "an adapter naming no skip_args is not read"
+
+
+@pytest.mark.parametrize("adapter", [claude_code.ClaudeCodeAdapter(), gemini.GeminiAdapter(), grok.GrokAdapter()])
+def test_each_adapter_names_skip_args_and_a_login_lacking_them_asks(adapter):
+    assert adapter.skip_args and switchover._asks(adapter, []) is False
+    assert switchover._asks(adapter, list(adapter.skip_args)) is False
+    assert switchover._asks(adapter, ["--other"]) is True

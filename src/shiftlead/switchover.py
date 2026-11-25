@@ -20,7 +20,8 @@ login in the list offers.
 Where the org has a director, `director` reads the answers' `director:`, suggests its model and login (the set's
 prompts model, and the login made from the profile it launches on today), and blocks on §4.9e *Blockers*' director
 cases: no entry, an empty list, a login the home would not have, a model no login in its list offers.
-A director list whose every login leaves its prompts on, the work in flight, a container node's logins, writing the
+It blocks too on a director list whose every login leaves its prompts on: its `unattended_args` lack the adapter's
+`skip_args` (§4.9d *How each one runs*). The work in flight, a container node's logins, writing the
 answers file (`--answers`) and `--host` are later slices of TD-2071.
 """
 
@@ -64,6 +65,7 @@ class Login:
     pin: str | None = None
     match: str | None = None  # who the folder is signed in as, salted (§4.2b), None where it cannot be read
     models: list[str] = field(default_factory=list)  # the families its account offers, before the pin narrows them
+    asks: bool | None = None  # its `unattended_args` leave its prompts on; None where the adapter names no skip_args
 
     @property
     def key(self) -> str:
@@ -109,6 +111,16 @@ def _identity(adapter: Any, folder: Path, salt: bytes) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — a home whose record cannot be read has no identity to compare
         return {}
     return got if isinstance(got, dict) else {}
+
+
+def _asks(adapter: Any, args: Any) -> bool | None:
+    """Whether an unattended launch on `args` (a login's `unattended_args`) leaves its prompts on: they are given
+    and lack one of the adapter's `skip_args` (§4.3). None where the adapter names none, unread."""
+    skip = getattr(adapter, "skip_args", None)
+    if not isinstance(skip, (list, tuple)) or not skip:
+        return None
+    args = list(args or [])
+    return bool(args) and not all(a in args for a in skip)
 
 
 def _offer(adapter: Any, folder: Path, plan: Any) -> list[str]:
@@ -226,6 +238,7 @@ def host_logins(
                 pin,
                 match if isinstance(match, str) and match else None,
                 _offer(tools[tool], folder, ident.get("plan")),
+                _asks(tools[tool], settings.get("unattended_args")),
             )
         )
 
@@ -654,7 +667,8 @@ def director(
     profile: str | None,
 ) -> tuple[DirectorPlan | None, list[Blocker]]:
     """The answers' `director:` for an org that has a director, and §4.9e *Blockers*' director cases: no entry, a
-    model that is none, an empty list, a login the home would not have, a model no login in its list offers. The
+    model that is none, an empty list, a login the home would not have, a model no login in its list offers, a list
+    whose every login leaves its prompts on (§4.9d *How each one runs*: nothing above it would answer them). The
     director runs on the home, so its list is read against the home's logins alone. With no answers file, None and
     nothing: the file's own blocker says so."""
     if answers is None:
@@ -701,6 +715,15 @@ def director(
                 DIRECTOR,
                 f"no login in its list offers {plan.model}, its model",
                 "list a login that offers it, or give director.model another model",
+            )
+        )
+    asks = {lk: next(lg.asks for lg in made if lg.key == lk) for lk in known}
+    if known and all(asks.values()):
+        out.append(
+            Blocker(
+                DIRECTOR,
+                f"every login in its list leaves its prompts on ({', '.join(known)})",
+                "list a login whose unattended_args skip them, or give its profiles unattended_args that do",
             )
         )
     return plan, out

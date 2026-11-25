@@ -626,6 +626,7 @@ class ClaudeCodeAdapter:
     start_context_system = True  # that file is the system prompt's tail: a member's brief moves there (§4.3, TD-1669)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
+    skip_args = [SKIP_FLAG]  # an unattended launch's own, which skip its prompts (§4.3 `skip_args`, TD-2071)
     cadence_hook_line = CADENCE_HOOK_LINE  # the repo's own SessionStart is compared with it (§5 *The seams*)
     cadence_hook_lines_past = CADENCE_HOOK_LINES_PAST  # the earlier seeds a repo may still carry (TD-1023)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
