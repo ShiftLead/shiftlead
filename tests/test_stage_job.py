@@ -16,6 +16,7 @@ from shiftlead.stage_job import (
     cleared,
     closed,
     entries_work,
+    fork_sync,
     key_of,
     moved,
     new_job,
@@ -243,8 +244,45 @@ def test_a_red_and_a_filing_pr_ask_for_a_job() -> None:
     }
 
 
-def test_a_sync_lift_or_sweep_pr_is_no_job() -> None:
-    assert pr_objects([red(1, sync=True), red(2, lift=True), red(3, sweep=True)], {}, {}) == {}
+def test_a_sync_lift_and_sweep_pr_each_ask_for_a_job_on_their_own_stamp_and_kind() -> None:
+    orders = [
+        red(
+            1,
+            sync=True,
+            sync_since="2026-11-22T00:00:00Z",
+            red_since=None,
+            reason="src/x.py is not in the lock",
+            fork=False,
+        ),
+        red(2, lift=True, lift_since="2026-11-21T00:00:00Z", red_since=None, reason="kept off a lift"),
+        red(3, sweep=True, sweep_since="2026-11-20T00:00:00Z", red_since=None),
+    ]
+    assert pr_objects(orders, {}, {}) == {
+        "pr-1": PrObject("2026-11-22T00:00:00Z", "sync", "src/x.py is not in the lock"),
+        "pr-2": PrObject("2026-11-21T00:00:00Z", "lift"),
+        "pr-3": PrObject("2026-11-20T00:00:00Z", "sweep"),
+    }
+
+
+def test_a_forks_sync_asks_for_none_and_a_sync_row_with_no_fork_is_read_as_a_forks() -> None:
+    sync = {"sync": True, "sync_since": "2026-11-22T00:00:00Z", "red_since": None}
+    assert pr_objects([red(1, **sync, fork=True), red(2, **sync)], {}, {}) == {}
+    assert fork_sync({"sync": True}) and fork_sync({"sync": True, "fork": True})
+    assert not fork_sync({"sync": True, "fork": False}) and not fork_sync({"fork": True}), "a fork's red is no sync"
+
+
+def test_another_logins_sync_and_a_sync_draft_ask_for_a_job() -> None:
+    sync = {"sync": True, "sync_since": "2026-11-22T00:00:00Z", "red_since": None, "fork": False}
+    got = pr_objects([red(1, **sync, author="someone-else"), red(2, **sync, draft=True)], {}, {})
+    assert {k: o.kind for k, o in got.items()} == {"pr-1": "sync", "pr-2": "sync"}
+
+
+def test_a_lift_pr_whose_entry_is_pickable_is_still_the_jobs() -> None:
+    prs = [row(12, "lift/TD-2053/until-2026-11-24", filing_head="sha12")]
+    work = entries_work(["TD-2053"], {}, prs)
+    assert work == set()
+    lift = red(12, lift=True, lift_since="2026-11-24T00:00:00Z", red_since=None)
+    assert pr_objects([lift], {}, {}, work=work) == {"pr-12": PrObject("2026-11-24T00:00:00Z", "lift")}
 
 
 def test_a_pr_a_record_names_is_that_records() -> None:
