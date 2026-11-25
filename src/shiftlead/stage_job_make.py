@@ -26,10 +26,11 @@ PR_CLOSED = "its pull request was closed unmerged, and its line is still decided
 
 @dataclass(frozen=True)
 class JobReach:
-    """How a job's act reaches the world. `start(record, came)` starts the job's session and returns its address, or
-    None; `claim(holder, ref)` writes the holder's claim on the job's work order and returns why it was refused, or
-    None; `line(record, reason)` adds the home's plain board line naming the seat, the object and the reason and
-    returns its id, or None; `close_line(id)` closes that line; `end(holder)` ends a session."""
+    """How a job's act reaches the world. `start(record, came)` starts the job's session, or the session of the review
+    stage its record stands at, and returns its address, or None; `claim(holder, ref)` writes the holder's claim on the
+    job's work order and returns why it was refused, or None; `line(record, reason)` adds the home's plain board line
+    naming the seat, the object and the reason and returns its id, or None; `close_line(id)` closes that line;
+    `end(holder)` ends a session."""
 
     start: Callable[[Mapping[str, Any], str | None], str | None]
     claim: Callable[[str, str], str | None]
@@ -39,7 +40,8 @@ class JobReach:
 
 
 def _offer(store: StageStore, record: dict[str, Any], act: JobAct, reach: JobReach) -> Made:
-    """Offer and Offer again: a fresh session of the seat holds the job, with its claim, and the record says so. A
+    """Offer and Offer again: a fresh session (the seat's, or the review stage's the record stands at) holds the job,
+    with its claim, and the record says so. A
     session whose claim or record could not be written is named for the caller to end; the next pass offers afresh."""
     stage = record.get("stage")
     came = _came(record, str(stage))[0] if stage else None  # a job sent back by a review is told why
@@ -100,6 +102,10 @@ def make(
         found = store.job(key)
         if stage_job.choose(found, s) != act:
             return Made(False, "the record moved since it was read")
+        starts = act.name in ("offer", "offer-again") and act.case != "to-person"
+        fresh = found is not None and not found.get("closed_at") and s.job_stage is not None
+        if starts and fresh and act.review != (found.get("stage") not in (None, s.job_stage)):
+            return Made(False, "the record moved since it was read")  # a review's session, or the seat's
         if found is None or found.get("closed_at"):
             record = stage_job.new_job(seat, obj, team, opened_at)
             if record["id"] != key:

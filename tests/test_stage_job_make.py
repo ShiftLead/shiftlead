@@ -251,3 +251,17 @@ def test_an_object_gone_not_waiting_on_the_person_closes_no_line(store):
     put(store)
     w = World()
     assert make(store, JobAct("reconcile", "object-gone"), JobReading(live=False), w).made and w.closed == []
+
+
+def test_a_review_offer_on_a_record_moved_back_to_the_jobs_stage_is_refused(store):
+    put(store, stage="build")  # read at the review stage, moved back to the job's own stage under the lock
+    w = World()
+    got = make(store, JobAct("offer", "review"), JobReading(may_start=True, at_job_stage=False, job_stage="build"), w)
+    assert not got.made and "moved" in got.why and w.started == []
+
+
+def test_a_review_offer_on_a_record_still_at_its_review_stage_starts_that_session(store):
+    put(store, stage="review")
+    w = World()
+    got = make(store, JobAct("offer", "review"), JobReading(may_start=True, at_job_stage=False, job_stage="build"), w)
+    assert got.made and store.job(KEY)["holder"] == "s-1" and store.job(KEY)["stage"] == "review"

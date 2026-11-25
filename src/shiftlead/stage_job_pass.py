@@ -97,9 +97,11 @@ def _busy(record: Mapping[str, Any], f: JobFacts) -> bool:
 def _stage_known(record: Mapping[str, Any], doc: Mapping[str, Any]) -> bool:
     """Whether the record's stage is one a job stands at in its team's flow: the job's own, or a review stage. One
     that is no longer either (gone, or changed to another kind) reads as its stage gone."""
-    stage = record.get("stage")
-    if stage is None or stage == job_stage(doc):
+    stage, own = record.get("stage"), job_stage(doc)
+    if stage is None or stage == own:
         return True
+    if own is None:
+        return False  # no stage takes other entries, so no job's session could end: read as its stage gone
     return any(
         isinstance(st, Mapping) and flow3.key_of(st.get("name")) == stage and st.get("does") == "review"
         for st in doc.get("stages") or []
@@ -140,6 +142,7 @@ def reading_on(record: Mapping[str, Any] | None, key: str, f: JobFacts, *, seat_
         at_job_stage=record.get("stage") in (None, job_stage(doc or {})),
         stage_known=_stage_known(record, doc or {}),
         holder=holder,
+        job_stage=job_stage(doc or {}),
         **common,
     )
 

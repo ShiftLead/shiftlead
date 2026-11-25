@@ -66,6 +66,7 @@ class JobReading:
     at_job_stage: bool = True  # the record is at the job's own stage, or has not yet entered the flow; else a review's
     stage_known: bool = True  # the record's stage is in its team's flow, the job's own or a review stage
     holder: Holder | None = None
+    job_stage: str | None = None  # the key of the job's own stage in the record's flow, where it was read
     may_start: bool = False  # the team is started, inside its schedule and not held by the usage gate
     seat_busy: bool = False
 

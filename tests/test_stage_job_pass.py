@@ -134,6 +134,10 @@ def test_a_record_past_the_jobs_stage_or_on_a_stage_gone_reads_so():
     assert not gone.stage_known
     other = stage_job_pass.reading_on({**base, "stage": "polish"}, "k", facts(), seat_busy=False)
     assert not other.stage_known  # a stage a job never stands at reads as its stage gone: a fresh job session
+    assert at_review.job_stage == "build"
+    no_job = {"stages": [{"name": "review", "does": "review", "takes": "none"}]}
+    lone = stage_job_pass.reading_on({**base, "stage": "review"}, "k", facts(docs={"t": no_job}), seat_busy=False)
+    assert not lone.stage_known  # no stage takes other entries: no job's session could end
     assert stage_job_pass.reading_on({**base, "stage": "build"}, "k", facts(docs={}), seat_busy=False) is None
 
 
