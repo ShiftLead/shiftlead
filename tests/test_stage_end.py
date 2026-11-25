@@ -646,11 +646,22 @@ def test_stage_show_from_a_persons_shell_reads_the_named_entry_of_a_registered_r
     monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
     monkeypatch.setattr("sessionorc.agent._registered_checkout", lambda r: Path(r) if r == "/repo" else None)
     assert asyncio.run(_Agent().rpc_stage_show(entry="TD-7", repo="/repo")) == {"id": "TD-7"}
-    assert seen == {"root": "/repo", "tid": "TD-7"}
+    assert seen == {"root": "/repo", "tid": "TD-7", "closed": False}
     for kw in ({"entry": "TD-7", "repo": "/elsewhere"}, {"repo": "/repo"}):
         with pytest.raises(RpcError, match="registered repo"):
             asyncio.run(_Agent().rpc_stage_show(**kw))
     assert "stage_show" in identity.READS
+
+
+def test_stage_show_closed_reads_the_named_entrys_copies(monkeypatch):
+    seen = {}
+    body = SimpleNamespace(show=lambda **kw: seen.update(kw) or {"entry": kw["tid"], "closed": []})
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    monkeypatch.setattr("sessionorc.agent._registered_checkout", lambda r: Path(r))
+    got = asyncio.run(_Agent().rpc_stage_show(entry="TD-7", repo="/repo", closed=True))
+    assert got == {"entry": "TD-7", "closed": []} and seen["closed"] is True
+    with pytest.raises(RpcError, match="name the entry"):
+        asyncio.run(_Agent().rpc_stage_show(repo="/repo", closed=True))
 
 
 def test_a_stage_end_is_refused_offline_and_its_show_too():
@@ -997,3 +1008,17 @@ def test_a_retry_after_the_persons_answer_row_is_still_refused():
     store.record["history"].append({"from": "review", "outcome": "answer", "by": "paul", "to": "review"})
     with pytest.raises(Refused, match="not yours"):
         _end_run(store)
+
+
+def test_ao_stage_show_closed_names_the_entry_and_asks_for_its_copies(monkeypatch, capsys):
+    """`ao stage show --closed TD-n` (§4.7, TD-2160): the named entry's closed copies; with no entry it is refused."""
+    from shiftlead import cli
+
+    calls = []
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: calls.append((rpc, kw)) or {"entry": "TD-7", "closed": []})
+    monkeypatch.setenv("SHIFTLEAD_SESSION", ME)
+    assert cli.main(["stage", "show", "--closed", "td-7"]) == 0
+    assert calls == [("stage_show", {"id": ME, "entry": "TD-7", "closed": True})]
+    assert json.loads(capsys.readouterr().out) == {"entry": "TD-7", "closed": []}
+    assert cli.main(["stage", "show", "--closed"]) == 2 and len(calls) == 1
+    assert cli.main(["stage", "show"]) == 0 and calls[-1] == ("stage_show", {"id": ME, "entry": None})

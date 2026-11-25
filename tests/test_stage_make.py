@@ -3,6 +3,7 @@ on a real `shiftlead/state` branch in a scratch repo and its bare origin."""
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -75,6 +76,19 @@ def test_a_renumbered_entry_moves_its_record_in_one_commit(store):
     assert act_on(store, Reading(renumbered_to="TD-9")).made
     assert store.entry(TID) is None
     assert store.entry("TD-9")["id"] == "TD-9"
+
+
+def test_a_renumber_renames_its_copies_and_rewrites_their_id_in_the_same_commit(store):
+    put(store, closed_at="2026-10-01T00:00:00Z", stage="polish")
+    offer_it(store)  # one closed copy, and a live record
+    store.write({"closed/TD-9@2026-10-01.json": json.dumps({"id": "TD-9"})}, "an old TD-9's copy")
+    tip = store.tip()
+    assert act_on(store, Reading(renumbered_to="TD-9")).made
+    assert commits_since(store, tip) == 1
+    names = store._list(store.tip(), "closed")
+    assert names == ["closed/TD-9@2026-10-01-2.json", "closed/TD-9@2026-10-01.json"]
+    assert json.loads(store._read(store.tip(), "closed/TD-9@2026-10-01-2.json"))["id"] == "TD-9"
+    assert store.closed(TID) == []
 
 
 def test_a_renumber_onto_a_record_writes_nothing(store):
@@ -554,22 +568,61 @@ def test_a_second_loss_goes_to_the_person_with_the_stage_to_start_again(store):
     assert "Back to build — a session starts this stage again" in record["intent"]["answers"]
 
 
-def test_closed_records_leave_after_thirty_days_in_one_commit(store):
+def commits_since(store: StageStore, tip: str | None) -> int:
+    got = subprocess.run(
+        ["git", "-C", str(store.root), "rev-list", "--count", f"{tip}..{store.tip()}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return int(got.stdout.strip())
+
+
+def test_closed_records_move_to_their_copies_after_thirty_days_in_one_commit(store):
     now = datetime(2026, 11, 23, tzinfo=UTC)
     old = (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     young = (now - timedelta(days=29)).strftime("%Y-%m-%dT%H:%M:%SZ")
     for tid, closed in (("TD-1", old), ("TD-2", old), ("TD-3", young), ("TD-4", None)):
         store.put_entry({**new_record(tid, "f", "build"), "closed_at": closed}, "test")
     tip = store.tip()
+    before = {t: store._read(tip, f"entries/{t}.json") for t in ("TD-1", "TD-2")}
     assert sweep_closed(store, now) == ["TD-1", "TD-2"]
-    assert sorted(store.entries()) == ["TD-3", "TD-4"]
-    count = subprocess.run(
-        ["git", "-C", str(store.root), "rev-list", "--count", f"{tip}..{store.tip()}"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert count.stdout.strip() == "1"
+    assert sorted(store.entries()) == ["TD-3", "TD-4"], "the pass's reading ignores closed/"
+    assert commits_since(store, tip) == 1
+    day = old[:10]
+    for t in ("TD-1", "TD-2"):
+        assert store._read(store.tip(), f"closed/{t}@{day}.json") == before[t], "moved with its bytes unchanged"
+        assert [c["closed_at"] for c in store.closed(t)] == [old]
+
+
+def test_a_second_copy_on_one_day_takes_2_and_is_printed_after_the_first(store):
+    first, second = "2026-11-01T09:00:00Z", "2026-11-01T17:00:00Z"
+    put(store, closed_at=first, stage="polish")
+    offer_it(store)  # reopened: its first closing is copied
+    store.put_entry({**store.entry(TID), "closed_at": second}, "closed again")
+    offer_it(store)
+    names = store._list(store.tip(), "closed")
+    assert names == [f"closed/{TID}@2026-11-01-2.json", f"closed/{TID}@2026-11-01.json"]
+    assert [c["closed_at"] for c in store.closed(TID)] == [first, second]
+
+
+def test_stage_show_closed_prints_the_copies_by_closed_at(store):
+    from shiftlead.stage_end import show
+
+    store.write({f"closed/{TID}@2026-11-01.json": json.dumps({"id": TID, "closed_at": "2026-11-01T10:00:00Z"})}, "a")
+    store.write({f"closed/{TID}@2026-10-09.json": json.dumps({"id": TID, "closed_at": "2026-10-09T10:00:00Z"})}, "b")
+    got = show(root=str(store.root), tid=TID, closed=True)
+    assert got["entry"] == TID
+    assert [c["closed_at"] for c in got["closed"]] == ["2026-10-09T10:00:00Z", "2026-11-01T10:00:00Z"]
+    assert show(root=str(store.root), tid="TD-8", closed=True) == {"entry": "TD-8", "closed": []}
+    assert "refused" in show(root=str(store.root), tid="nope", closed=True)
+
+
+def test_copies_are_read_by_closed_at_never_by_name(store):
+    store.write({f"closed/{TID}@2026-11-01.json": json.dumps({"id": TID, "closed_at": "2026-11-01T10:00:00Z"})}, "a")
+    store.write({f"closed/{TID}@2026-10-09.json": json.dumps({"id": TID, "closed_at": "2026-10-09T10:00:00Z"})}, "b")
+    store.write({"closed/TD-70@2026-10-01.json": json.dumps({"id": "TD-70", "closed_at": "x"})}, "another entry")
+    assert [c["closed_at"] for c in store.closed(TID)] == ["2026-10-09T10:00:00Z", "2026-11-01T10:00:00Z"]
 
 
 def test_a_malformed_closed_date_does_not_stop_the_sweep(store):
@@ -672,6 +725,21 @@ def test_a_reopened_entry_is_offered_afresh_with_nothing_carried_over(store):
     assert record["closed_at"] is None and record["pr"] is None and record["offers"] == 1
 
 
+def test_a_reopen_copies_the_closed_record_in_the_commit_that_writes_the_fresh_one(store):
+    put(store, stage="polish", closed_at="2026-11-01T00:00:00Z", pr=3)
+    text = store._read(store.tip(), f"entries/{TID}.json")
+    tip = store.tip()
+    assert offer_it(store)[0].made
+    assert commits_since(store, tip) == 1
+    assert store._read(store.tip(), f"closed/{TID}@2026-11-01.json") == text
+    assert store.entry(TID)["closed_at"] is None
+
+
+def test_a_first_offer_copies_nothing(store):
+    assert offer_it(store)[0].made
+    assert store._list(store.tip(), "closed") == []
+
+
 def test_no_session_started_writes_nothing(store):
     got, _, claims = offer_it(store, holder=None)
     assert not got.made and got.end is None and claims == []
@@ -765,6 +833,16 @@ def test_an_offer_writes_its_hash_and_keeps_the_text_once_in_its_own_commit(stor
     got = offer(store, other, act, READY, FLOW, lambda *_a: "s8", lambda *_a: None, team="u", version=VERSION)
     assert got.made and writes[-1] == [f"entries/{other}.json"], "another team's offer of one text keeps no second"
     assert store.entry(other)["flow_hash"] == VERSION[1]
+
+
+def test_a_reopen_under_a_new_hash_writes_record_copy_and_text_in_one_commit(store, monkeypatch):
+    put(store, closed_at="2026-11-01T00:00:00Z")
+    writes: list[list[str]] = []
+    real = store.write
+    monkeypatch.setattr(store, "write", lambda changes, msg: writes.append(sorted(changes)) or real(changes, msg))
+    act = choose(store.entry(TID), READY)
+    assert offer(store, TID, act, READY, FLOW, lambda *_a: "s9", lambda *_a: None, team="t", version=VERSION).made
+    assert writes == [[f"closed/{TID}@2026-11-01.json", f"entries/{TID}.json", f"flows/versions/{VERSION[1]}.json"]]
 
 
 def test_an_offer_with_no_version_writes_a_null_hash_and_keeps_no_text(store):

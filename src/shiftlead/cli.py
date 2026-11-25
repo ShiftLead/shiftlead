@@ -1043,13 +1043,18 @@ def cmd_stage_end(args: argparse.Namespace) -> int:
 
 def cmd_stage_show(args: argparse.Namespace) -> int:
     """`ao stage show [TD-n]` (design §4.7, TD-2050): an entry's stage record, by default the one this session holds;
-    from a person's shell, the named entry of the registered repo this directory is in."""
+    from a person's shell, the named entry of the registered repo this directory is in. `--closed TD-n` prints the
+    entry's closed copies in the order of their `closed_at` (TD-2160)."""
     entry = str(args.entry).strip().upper() if args.entry else None
+    closed = bool(getattr(args, "closed", False))
+    if closed and not entry:
+        return fail(args, "name the entry whose closed copies to print: ao stage show --closed TD-n", 2)
+    more = {"closed": True} if closed else {}
     sid = getattr(args, "id", None) or os.environ.get("SHIFTLEAD_SESSION")
     if sid:
-        got = call_sync("stage_show", id=sid, entry=entry)
+        got = call_sync("stage_show", id=sid, entry=entry, **more)
     elif entry:
-        got = call_sync("stage_show", entry=entry, repo=_td_repo(None)[1])
+        got = call_sync("stage_show", entry=entry, repo=_td_repo(None)[1], **more)
     else:
         return fail(args, "outside a session, name the entry: ao stage show TD-n", 2)
     return emit(args, got, lambda: print(json.dumps(got, indent=1)))
@@ -6215,6 +6220,7 @@ def build_parser() -> argparse.ArgumentParser:
     q = ssub.add_parser("show", help="print an entry's stage record")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
     q.add_argument("entry", nargs="?", help="the entry (TD-n); in a session, by default the one it holds")
+    q.add_argument("--closed", action="store_true", help="print the entry's closed copies, in the order they closed")
     q.set_defaults(fn=cmd_stage_show)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
