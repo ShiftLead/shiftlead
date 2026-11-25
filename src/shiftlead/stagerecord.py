@@ -96,6 +96,7 @@ def new_record(
         "history": [],
         "intent": None,
         "closed_at": None,
+        "spent_before": {},
     }
 
 

@@ -706,3 +706,41 @@ def test_an_offer_whose_record_moved_starts_nothing(store):
     put(store, holder="other")
     got = offer(store, TID, act, READY, FLOW, lambda *_a: pytest.fail("started"), lambda *_a: None, team="t")
     assert not got.made and store.entry(TID)["holder"] == "other"
+
+
+SUMS = {"opus": {"input": 10, "output": 2, "turns": 3, "unweighed": 0, "figure": {"≈$": 0.4}}}
+
+
+def _offer_spent(store: StageStore, spent: Any, holder: str = "s9", refused: str | None = None) -> Any:
+    act = choose(store.entry(TID), READY)
+    return offer(store, TID, act, READY, FLOW, lambda *_a: holder, lambda *_a: refused, team="t", spent=spent)
+
+
+def test_an_offer_keeps_the_holders_sums_under_its_bare_id(store):
+    asked: list[str] = []
+    got = _offer_spent(store, lambda sid: asked.append(sid) or SUMS, holder="s9@node")
+    assert got.made and asked == ["s9"]
+    assert store.entry(TID)["spent_before"] == {"s9": SUMS}
+
+
+def test_an_offer_to_a_reused_id_replaces_its_value_and_keeps_the_others(store):
+    put(store, stage="build", spent_before={"s9": {"old": {}}, "s1": SUMS})
+    assert _offer_spent(store, lambda _sid: {}).made  # an id never seen reads as zero
+    assert store.entry(TID)["spent_before"] == {"s9": {}, "s1": SUMS}
+
+
+def _boom(_sid: str) -> Any:
+    raise OSError("no seat ledger")
+
+
+@pytest.mark.parametrize("spent", [None, _boom])
+def test_an_offer_with_no_reading_is_made_and_drops_the_ids_value(store, spent):
+    put(store, stage="build", spent_before={"s9": SUMS, "s1": SUMS})
+    assert _offer_spent(store, spent).made
+    record = store.entry(TID)
+    assert record["holder"] == "s9" and record["spent_before"] == {"s1": SUMS}
+
+
+def test_a_refused_claim_writes_no_sums(store):
+    got = _offer_spent(store, lambda _sid: SUMS, refused="held elsewhere")
+    assert not got.made and store.entry(TID) is None

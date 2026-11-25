@@ -20,7 +20,8 @@ end outside the lock. Nothing calls this yet.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
@@ -30,7 +31,9 @@ from shiftlead import flow3
 from shiftlead.stage_acts import Act, Reading, choose, closed_expired
 from shiftlead.stage_end import ARCHIVE, _apply, _stage_or_none, destination
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, _now, answer_move, new_record
+from shiftlead.stagerecord import StageStore, _now, answer_move, bare, new_record
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -452,11 +455,14 @@ def offer(
     claim: Callable[[str, str], str | None],
     *,
     team: str,
+    spent: Callable[[str], Any] | None = None,
 ) -> Made:
     """Act 5: a fresh session of the stage holds the entry, with its claim, and the record says so. `start` returns the
     holder's address or None; `claim` returns why it was refused or None. The lock is held throughout, so an entry is
     never offered twice. A session whose claim or record could not be written is named in `Made.end` for the caller to
-    end, and the next pass offers afresh. `team` is the team whose flow `doc` is, written on a new record."""
+    end, and the next pass offers afresh. `team` is the team whose flow `doc` is, written on a new record. `spent` reads
+    a session id's `models` sums, kept in the record's `spent_before` under the holder's bare id, so the row that ends
+    it counts only its own run (§4.9c *Each holder leaves a `run`*); none, or one that raises, drops the id's value."""
     with store.locked():
         record = store.entry(tid)
         if act.name != "offer" or choose(record, s) != act:
@@ -478,6 +484,7 @@ def offer(
         holder = start(key, Work(tid, branch, pr, came, answer, live_check=s.live_check))
         if holder is None:
             return Made(False, "no session was started")
+        sums = _spent_at_offer(spent, holder, tid)
         try:
             if refused := claim(holder, tid):
                 return Made(False, f"the claim was refused: {refused}", end=holder)
@@ -485,10 +492,28 @@ def offer(
                 record = {**new_record(tid, str(name), key, team=team, holder=holder), "branch": branch, "pr": pr}
             else:  # a count a loss left stands, so the next loss is the second
                 record.update(holder=holder, offers=max(int(record.get("offers") or 0), 1))
+            before = dict(record.get("spent_before") or {})
+            if sums is None:
+                before.pop(bare(holder), None)
+            else:
+                before[bare(holder)] = sums
+            record["spent_before"] = before
             store.put_entry(record, f"offered at {key} to {holder}")
         except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
             return Made(False, f"the offer did not finish: {e}", end=holder)
         return Made(True)
+
+
+def _spent_at_offer(spent: Callable[[str], Any] | None, holder: str, tid: str) -> Any:
+    """The holder's id's sums as the offer finds them, or None where there is no reader or it raised (logged)."""
+    if spent is None:
+        return None
+    try:
+        got = spent(bare(holder))
+    except Exception:
+        log.warning("%s: the spend reading at its offer failed; its run's models will be null", tid, exc_info=True)
+        return None
+    return got if isinstance(got, Mapping) else None
 
 
 def sweep_closed(store: StageStore, now: datetime | None = None) -> list[str]:

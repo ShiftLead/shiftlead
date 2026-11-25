@@ -54,6 +54,7 @@ class Reach:
     start: Callable[[str, Work], str | None]
     claim: Callable[[str, str], str | None]
     end: Callable[[str], None]
+    spent: Callable[[str], Any] | None = None  # a session id's `models` sums, for the offer's `spent_before` (§4.9c)
 
 
 def reach_for(
@@ -79,6 +80,7 @@ def reach_for(
         start=start,
         claim=lambda holder, tid: stage_start.claim(call, holder, tid),
         end=lambda holder: stage_start.end(call, holder),
+        spent=lambda sid: call("seats", record=sid)["models"],
     )
 
 
@@ -99,7 +101,7 @@ def _make(store: StageStore, act: Act, s: Reading, f: EntryFacts, reach: Reach) 
     if act == stage_merge.MERGING:
         return stage_merge.run(store, f.tid, act, s, doc, f.person, reach.gate, reach.land, f.now)
     if act.name == "offer":
-        return stage_make.offer(store, f.tid, act, s, doc, reach.start, reach.claim, team=f.team)
+        return stage_make.offer(store, f.tid, act, s, doc, reach.start, reach.claim, team=f.team, spent=reach.spent)
     return stage_make.make(store, f.tid, act, s, doc, f.person)
 
 
