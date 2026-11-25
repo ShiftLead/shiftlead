@@ -138,6 +138,67 @@ def test_a_team_on_a_node_is_offered_no_org_flow(monkeypatch):
     assert got["lean"]["cannot_run"].startswith("not followable: an org flow, and t runs on far")
 
 
+def _with_repo_flows(*names):
+    rows = [{"name": "lean", "place": "own", "doc": NEW, "text": "", "problems": []}]
+    rows += [{"name": n, "place": "repo", "repo": "shiftlead", "doc": NEW, "text": "", "problems": []} for n in names]
+    return lambda _roots: {"flows": rows}
+
+
+def test_a_node_teams_repo_flow_is_judged_by_what_the_nodes_checkout_holds(monkeypatch):
+    """§4.9c *An org flow or role is not usable by a team on a node*, §4.9d (TD-2062 slice 3): a repo flow the node's
+    checkout does not hold yet is not followable, by name; a node that did not answer reads unknown, never offered."""
+    monkeypatch.setattr(team_show.flow_save, "listing", _with_repo_flows("merged", "branch"))
+    doc = _doc(host="far")
+    assert team_show.node_flow_paths("t", doc, "home", ["/x/shiftlead"]) == {
+        "merged": ".shiftlead/flows/merged/flow.yml",
+        "branch": ".shiftlead/flows/branch/flow.yml",
+    }
+    assert team_show.node_flow_paths("t", _doc(), "home", ["/x/shiftlead"]) == {}, "a team here asks no node"
+
+    def pick(on_node):
+        return {c["name"]: c["cannot_run"] for c in team_show.choices("t", doc, {}, "home", ["/x"], on_node)}
+
+    held = pick({"merged": True, "branch": False})
+    assert (
+        held["merged"] is None and held["branch"] == "not followable: branch is not in far's checkout of shiftlead yet"
+    )
+    assert held["lean"].startswith("not followable: an org flow"), "an org flow is never a node team's"
+    assert pick("far did not answer: link down")["merged"] == "unknown: far did not answer: link down"
+    assert pick(None)["merged"] == team_show.NODE_REPO_FLOW, "not asked: not read, as the switch-over check says"
+
+
+def test_the_host_agent_asks_the_node_which_repo_flows_its_checkout_holds(agent):
+    body = SimpleNamespace(node_flow_paths=lambda *_a: {"merged": "m.yml", "branch": "b.yml"})
+    a = agent(SimpleNamespace())
+    asked = []
+
+    async def repos(host):
+        return {"host": host, "repos": ["/srv/other", "/srv/shiftlead"]}
+
+    class Mux:
+        async def request(self, method, **kw):
+            asked.append((method, kw["dir"], kw["paths"]))
+            return {"dir": kw["dir"], "files": {"m.yml": "name: merged\n", "b.yml": None}}
+
+    a.rpc_host_repos, a._node_mux = repos, lambda _host: Mux()
+    doc = _doc(host="far")
+    got = asyncio.run(a._on_node(body, "t", doc, "home", []))
+    assert got == {"merged": True, "branch": False} and asked == [("files", "/srv/shiftlead", ["m.yml", "b.yml"])]
+
+    async def none_here(host):
+        return {"host": host, "repos": ["/srv/other"]}
+
+    a.rpc_host_repos = none_here
+    assert asyncio.run(a._on_node(body, "t", doc, "home", [])) == "far registers no checkout of shiftlead"
+
+    async def away(host):
+        raise RpcError(f"{host} did not answer: the link dropped")
+
+    a.rpc_host_repos = away
+    assert asyncio.run(a._on_node(body, "t", doc, "home", [])) == "far did not answer: the link dropped"
+    assert asyncio.run(a._on_node(SimpleNamespace(node_flow_paths=HERE), "t", _doc(), "home", [])) is None
+
+
 # -- the preview and the push ---------------------------------------------------------------------------------------
 
 
@@ -270,6 +331,10 @@ def agent(tmp_path, monkeypatch):
     return make
 
 
+def HERE(*_a):  # a team here: no node is asked for its repo flows
+    return {}
+
+
 def _body(pushes, *, refuse=None, seen=None):
     def push(**kw):
         if seen is not None:
@@ -279,7 +344,7 @@ def _body(pushes, *, refuse=None, seen=None):
         pushes.append(kw["flow"])
         return ["build", "docs"]
 
-    return SimpleNamespace(switch_push=push)
+    return SimpleNamespace(switch_push=push, node_flow_paths=HERE)
 
 
 def test_switch_now_marks_pushes_writes_the_key_and_clears_the_mark(agent):
@@ -314,7 +379,7 @@ def test_a_switch_is_refused_while_another_is_under_way_and_over_a_newer_version
 
 def test_a_switch_waits_out_a_stage_pass_already_running(agent):
     order = []
-    a = agent(SimpleNamespace(switch_push=lambda **_kw: order.append("push") or ["build"]))
+    a = agent(SimpleNamespace(switch_push=lambda **_kw: order.append("push") or ["build"], node_flow_paths=HERE))
 
     async def go():
         async def pass_():
@@ -356,7 +421,7 @@ def test_the_preview_rpc_answers_the_pick_and_says_an_unread_branch(agent):
     def preview(**kw):
         raise OSError("origin away")
 
-    a = agent(SimpleNamespace(choices=lambda *a: [{"name": "lean"}], switch_preview=preview))
+    a = agent(SimpleNamespace(choices=lambda *a: [{"name": "lean"}], switch_preview=preview, node_flow_paths=HERE))
     got = asyncio.run(a.rpc_team_switch_preview(team="t"))
     assert got["choices"] == [{"name": "lean"}] and got["version"] == ts.version(settings_mod.load(), "t")
     with pytest.raises(RpcError, match="no preview of t's switch: origin away"):

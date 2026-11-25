@@ -50,6 +50,7 @@ from sessionorc.models import (
 
 BUILTINS_SECTION = "§4.9d *The built-in seats and their page*"
 SWITCH_SECTION = "§4.9d *The flow pick and a switch*"
+NODE_FLOWS_WAIT = 20.0  # how long the pick waits for a node to say which repo flows its checkout holds
 
 
 class SettingsMixin:
@@ -788,6 +789,30 @@ class SettingsMixin:
             with contextlib.suppress(Exception):
                 await asyncio.shield(task)
 
+    async def _on_node(self, body: Any, name: str, doc: dict[str, Any], here: str, roots: Any) -> Any:
+        """For a team on a node, which of its repo's flows the node's checkout holds, `{name: held}`, asked of the
+        node as a team start reads it (§4.9c *An org flow or role is not usable by a team on a node*, TD-2062): a
+        repo flow a branch there has not merged is not followable, by name. Where the node does not answer, why, in
+        words: the pick then reads each repo flow *unknown*, never followable. None for a team here, or none to ask."""
+        paths = await asyncio.to_thread(body.node_flow_paths, name, doc, here, roots)
+        if not paths:
+            return None
+        entry = doc["teams"][name]
+        host, repo = str(entry.get("host") or ""), str(entry.get("repo") or "")
+        try:
+            listed = (await asyncio.wait_for(self.rpc_host_repos(host), NODE_FLOWS_WAIT)).get("repos") or []
+            root = next((str(r) for r in listed if Path(str(r)).name == repo), None)
+            if root is None:
+                return f"{host} registers no checkout of {repo}"
+            got = await self._node_mux(host).request(
+                "files", timeout=NODE_FLOWS_WAIT, dir=root, paths=[*paths.values()]
+            )
+        except Exception as e:  # noqa: BLE001 — a node away, a link refused or a checkout refused: not read, said
+            why = str(e) or type(e).__name__
+            return why if why.startswith(host) else f"{host} did not answer: {why}"
+        files = (got if isinstance(got, dict) else {}).get("files") or {}
+        return {n: files.get(p) is not None for n, p in paths.items()}
+
     async def rpc_team_switch_preview(self, team: str = "", flow: str = "", caller: Any = None) -> dict[str, Any]:
         """The switch preview (§4.9d *The flow pick and a switch*, TD-2062), read only: each open stage record of the
         team and what a switch to `flow` does to it, from the function the switch's reconcile takes, and `refused`
@@ -799,7 +824,8 @@ class SettingsMixin:
         rows = await self._team_rows(doc, name)
         body = home_call(TEAM)
         here, roots = hosts.local_host().name, hosts.local_host().repos()
-        picks = await asyncio.to_thread(body.choices, name, doc, rows, here, roots)
+        on_node = await self._on_node(body, name, doc, here, roots)
+        picks = await asyncio.to_thread(body.choices, name, doc, rows, here, roots, on_node)
         if not flow:
             return {"team": name, "choices": picks, "version": teamstore.version(doc, name)}
         try:
@@ -812,6 +838,7 @@ class SettingsMixin:
                 here=here,
                 roots=roots,
                 live=self._team_live(name),
+                on_node=on_node,
             )
         except Exception as e:  # noqa: BLE001 — a state branch not read is no preview, said
             raise RpcError(f"no preview of {name}'s switch: {e}") from None
@@ -864,6 +891,8 @@ class SettingsMixin:
         mark. Once the push is made the key is written whatever has moved since, the version having been checked
         before the mark."""
         body = home_call(TEAM)
+        here, roots = hosts.local_host().name, hosts.local_host().repos()
+        on_node = await self._on_node(body, name, doc, here, roots) if check else None
         try:
             keys = await asyncio.to_thread(
                 body.switch_push,
@@ -871,9 +900,10 @@ class SettingsMixin:
                 flow=want,
                 doc=doc,
                 rows=rows,
-                here=hosts.local_host().name,
-                roots=hosts.local_host().repos(),
+                here=here,
+                roots=roots,
                 check=check,
+                on_node=on_node,
             )
         except Exception as e:  # noqa: BLE001 — a refused push, an unread branch or a flow it cannot run refuse alike
             raise RpcError(f"{name} was not switched to {want}: {e}") from None
