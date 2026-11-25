@@ -1434,6 +1434,30 @@ def test_the_switched_team_page_draws_from_team_show_and_a_press_is_team_set(wor
     assert sent == {"team": "solo", "at_once": {"gone": None}, "version": "v1"}
 
 
+def test_beside_the_path_draws_each_audits_next_clock(world, client, monkeypatch):
+    """§4.9d *The page*: the flow's audits each with its clock and when it next comes round (TD-2053)."""
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    audits = [
+        {"name": "Docs audit", "model": "opus", "every": "10 merged-pull-requests", "next": "4 to go", "now": {}},
+        {"name": "Test audit", "model": "opus", "every": "6 hours", "next": None, "now": {}},
+    ]
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead"}}
+        if method == "team_show":
+            return _switched_show(audits=audits)
+        if method == "tools":
+            return _switched_tools()
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/solo").text
+    assert 'every 10 merged-pull-requests · <span class="auditnext">4 to go</span> ·' in page
+    assert "every 6 hours · " in page and page.count('class="auditnext"') == 1  # none read: no next clock drawn
+
+
 def test_the_flow_pick_disables_a_flow_the_team_cannot_run_and_keeps_one_no_longer_offered():
     """§4.5a *Team page: the flow it runs* (TD-2062): every flow the team could be given, the one it runs selected."""
     fable = "cannot run here: no login offers fable"
