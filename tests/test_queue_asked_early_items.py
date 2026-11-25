@@ -108,8 +108,8 @@ def test_the_inbox_counts_leave_an_early_line_out():
     early = inbox_sections([], now=now, boards=[row], cards=idx, entries_open=_early(50, 51, 52, 53, 54))
     asked = inbox_sections([], now=now, boards=[row], cards=idx, entries_open=ENTRIES)
     assert [e.get("early") for e in early["needs"]] == [True], "still listed, so its card draws it"
-    assert (early["count"], early["queue_n"]) == (0, 0)
-    assert (asked["count"], asked["queue_n"]) == (1, 1)
+    assert (early["count"], early["queue_n"], early["overdue_n"]) == (0, 0, 0)
+    assert (asked["count"], asked["queue_n"], asked["overdue_n"]) == (1, 1, 1)
 
 
 @pytest.mark.unit

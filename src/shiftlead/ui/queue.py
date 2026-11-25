@@ -1165,12 +1165,13 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
                 out["read"].setdefault(sec if sec in READ_LINES else "fyi", []).append(m)
             else:
                 out[want].append(m)
+    early = sum(1 for m in out["answered"] if m.get("early"))
     out["n"] = {
         "decide": len(out["decide"]),
         "do": len(out["do"]),
         "read": sum(len(v) for v in out["read"].values()),
-        # the items asked early (TD-2172), on no pill: a Waiting card's edge reads them (`card_edge`)
-        "early": sum(1 for m in out["answered"] if m.get("early")),
+        # the items asked early (TD-2172), on no pill, where any: a Waiting card's edge reads them (`card_edge`)
+        **({"early": early} if early else {}),
     }
     return out
 
