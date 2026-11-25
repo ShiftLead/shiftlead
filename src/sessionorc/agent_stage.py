@@ -93,7 +93,7 @@ def rested_words(step: Any) -> str:
     act = getattr(step, "act", None)
     how = "went silent" if getattr(act, "case", "") == "silent" else "was lost"
     return (
-        f"The audit {step.audit} of team {step.team} lost its run twice (its session {how} again), so it waits for its "
+        f"The audit {step.audit} of team {step.team} lost its run twice (the second time, its session {how}), so it waits for its "
         "next clock, counted afresh from now. Nothing needs doing unless it keeps happening."
     )
 
