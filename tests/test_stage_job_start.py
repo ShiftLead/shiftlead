@@ -62,6 +62,29 @@ def test_a_job_starts_in_the_build_role_on_the_seats_model_its_lane_the_work_ord
     assert f"**{lane}**" in x.prompt
 
 
+def test_a_job_takes_its_host_grants_project_bound_ledger_venv_and_listing_from_its_role_and_repo(world, monkeypatch):
+    """TD-2168: the `Launch` fields a job takes from its role and its repo's config, as an entry stage's launch does."""
+    org, team, root = world
+    role = "  grinder: {grants: [control], context: {bound: 150k}}\n"
+    (root / ".shiftlead.yml").write_text(f"ledger: docs/work\nroles:\n{role}")
+    monkeypatch.setattr(teams, "_person", lambda *_a: ([], True))
+    monkeypatch.setattr(teams, "node_venv", lambda host, here: None if host == here else f"/venv/{host}")
+    venvs: list = []
+    resolve = stage_job_start.repoconfig.resolve_role
+
+    def spy(cfg, *a, **k):
+        venvs.append(cfg.venv)
+        return resolve(cfg, *a, **k)
+
+    monkeypatch.setattr(stage_job_start.repoconfig, "resolve_role", spy)
+    x = made(world, BOARD).launch
+    assert (x.host, x.grants, x.project, x.ledger, x.unlisted) == ("", ["control"], "r", "docs/work", True)
+    assert x.context_bound == 150_000
+    far = stage_job_start.launch(org, team, builtin("build-review"), BOARD, "sonnet", host="node", here="h").launch
+    assert far.host == "node", "a job on another host names it; on this one, none"
+    assert venvs == [None, "/venv/node"], "the brief is composed for the node's own venv"
+
+
 def test_the_outcomes_are_work_pushed_and_other_with_each_seats_own_check(world):
     board = made(world, BOARD).launch.prompt
     assert "closes the decided line" in board and "no entry is archived" in board
