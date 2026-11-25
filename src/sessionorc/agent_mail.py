@@ -1941,6 +1941,10 @@ class MailMixin:
             if sid == PERSON:
                 self.person_inbox.append(self._copy(entry))
                 self.person_store.save(self.person_inbox)
+                if me is not None and kind in ("ask", "steer"):
+                    # counted as it lands, since a read entry of mail is kept twelve hours (§4.9c *What a run
+                    # records, for comparing flows*, TD-2158): a stage row's `run.asks`
+                    me.person_asks += 1
                 continue
             r = records[sid]
             r.inbox.append(self._copy(entry))

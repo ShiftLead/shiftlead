@@ -198,6 +198,7 @@ HOME_OWNED = frozenset(
         "held_missed",
         "review",
         "context_bound",
+        "person_asks",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -1596,6 +1597,9 @@ class Session:
     # The seat's tool version its launch read (design §4.3 *An upgraded seat tool asks for the smoke*, TD-1650): the
     # adapter's `tool_version` at a create carrying `seat`, on the host it runs on; None where nothing was read
     tool_version: str | None = None
+    # The asks and steers this session sent the person (§4.9c *What a run records, for comparing flows*, TD-2158):
+    # counted by the home's message handler as each lands, a stage row's `run.asks`; the home's field
+    person_asks: int = 0
     # The bell stopped (design §4.10 *A ring is answered by a read, or the bell stops*, TD-347):
     # `{at, rings}` after `mail.DOORBELL_HELD` rings in a row each answered by a turn that read none of
     # its mail. The doorbell stays silent for it until it reads (`inbox`) or a person acts toward it.

@@ -544,6 +544,25 @@ def test_one_records_reading_sums_every_day_it_holds_keeps_units_apart_and_ranks
         seats.record_reading(ledger, "@h")
 
 
+def test_one_records_models_sum_each_model_over_every_day_its_figure_by_unit():
+    """TD-2158, §4.9c *What a run records, for comparing flows*: `record_reading`'s `models`, per model its tokens by
+    kind, turns, unweighed and a figure by unit, the day row's unit shared by every model in it; a run that moved
+    from a subscription to a metered login keeps `≈$` and `$` apart."""
+    sub = _day(1.25, turns=2, input=10, output=5, cache_read=3, cache_write=1)
+    sub["models"]["sub-only"] = {"input": 1, "output": 1, "turns": 1, "figure": 0.5, "unweighed": 1}
+    paid = _day(2.0, turns=3, metered=True, input=20)
+    paid_none = _day(0.0, turns=0, metered=True, input=7)  # metered but no turns: `≈$`, as `money` reads it
+    ledger = _ledger(d2026_11_01={"a": sub}, d2026_11_02={"a": paid}, d2026_11_03={"a": paid_none})
+    got = seats.record_reading(ledger, "a")["models"]
+    assert got == {
+        "m": {"input": 37, "output": 5, "cache_read": 3, "cache_write": 1, "turns": 5, "unweighed": 0,
+              "figure": {"≈$": 1.25, "$": 2.0}},
+        "sub-only": {"input": 1, "output": 1, "cache_read": 0, "cache_write": 0, "turns": 1, "unweighed": 1,
+                     "figure": {"≈$": 0.5}},
+    }  # fmt: skip
+    assert seats.record_reading(ledger, "gone")["models"] == {}
+
+
 def test_a_month_and_a_week_sum_their_days_and_a_week_starts_on_monday():
     ledger = _ledger(
         d2026_09_30={"a": _day(1.0)},

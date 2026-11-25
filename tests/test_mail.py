@@ -3042,3 +3042,23 @@ async def test_mail_the_person_reads_carries_a_subject_given_derived_or_its_ques
         assert agent.person_inbox[-1].subject == "The tick wound ao-grind down."
         for sid in (w, tl):
             await person.call("kill", id=sid)
+
+
+async def test_an_ask_or_steer_to_the_person_counts_on_the_senders_person_asks(agent, tmp_path):
+    """TD-2158, §4.9c *What a run records, for comparing flows*: the home counts `person_asks` on the sender's record
+    as each ask or steer to the person lands (a stage row's `run.asks`), and a note to the person does not. The
+    field is the home's (`HOME_OWNED`), so a node's mirror never sets it."""
+    from sessionorc.models import HOME_OWNED
+
+    assert "person_asks" in HOME_OWNED
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        asker, other = await mk("asker", unattended=True), await mk("other2", unattended=True)
+        async with LocalClient(caller=asker) as a:
+            await a.call("msg", to="person", text="fyi")
+            await a.call("msg", to=["person"], text="merge it?", kind="ask")
+            await a.call("msg", to="person", text="which?", kind="steer", default="A — I go with A")
+        assert agent.sessions[asker].person_asks == 2
+        assert agent.sessions[other].person_asks == 0
+        for sid in (asker, other):
+            await person.call("kill", id=sid)

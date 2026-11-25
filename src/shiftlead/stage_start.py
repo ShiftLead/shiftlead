@@ -84,8 +84,9 @@ class StageLaunch:
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments: a team session's, supervised, so the tick's nudge and context bound reach it
-        and the home never reads it as one the person started (`by_person`)."""
-        return self.launch.create_params(controllers)
+        and the home never reads it as one the person started (`by_person`); `stage`, so its create reads its tool's
+        version (§4.3, TD-2158)."""
+        return {**self.launch.create_params(controllers), "stage": True}
 
 
 def team_started(marks: Mapping[str, Any] | None, team: str) -> bool:
