@@ -1278,7 +1278,7 @@ def read_when(
                 "waits in the seat's mailbox: every team of its repo is stopped,"
                 " and the seat is filled at the next Start of one"
             )
-            return line + after + tail
+            return line + (" — Start a team of the repo to have it read" if person else after) + tail
         word = "wound down" if held.get("wound") else "stopped"
         by = "by you" if held.get("by") == "person" else "at its stop time"
         line = (

@@ -177,7 +177,7 @@ async def test_a_repo_s_seat_and_a_prompts_seat_under_a_director_read_their_own_
     assert held["repo"] is True
     line = mail.read_when(sweeper, "ask", datetime.now(UTC), held=held, person=True)
     assert line.startswith("waits in the seat's mailbox: every team of its repo is stopped")
-    assert "Start the team" in line
+    assert "Start a team of the repo to have it read" in line
     agent._host_rec["teams"]["a"] = STARTED
     prompts = _seat(agent, "prompts-repo", "prompts", trigger={"trigger": "prompt"})
     director = _seat(agent, "director", None, trigger={"trigger": "prompt"})
