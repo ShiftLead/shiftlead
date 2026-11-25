@@ -1781,7 +1781,7 @@ class Readings:
             + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
             + lanes_rows(teams, await self.team_lanes(teams, fleet), records=fleet)
             # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
-            + red_pr_rows(repos, fleet)
+            + red_pr_rows(repos, fleet, cut_over=await asyncio.to_thread(teamstore.first_shape_off))
             # §4.5a *Inbox row: fork's PR* (TD-1292): ready to precheck, in any repo; the line's host the home's
             + fork_pr_rows(repos, fleet, str(home.get("home") or hosts.home_name()))
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
@@ -2401,7 +2401,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += work_rows(
             work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")}, records=sessions
         )
-        promos += red_pr_rows(repos, sessions)  # …and a red PR of a repo no team services (§4.5a, TD-613)
+        # …and a red PR of a repo no team services, and after the cut-over a fork's sync (§4.5a, TD-613, TD-2165)
+        cut_over = False if agent_down else await asyncio.to_thread(teamstore.first_shape_off)
+        promos += red_pr_rows(repos, sessions, cut_over=cut_over)
         # …and a fork's PR ready to precheck, in any repo (§4.5a *Inbox row: fork's PR*, TD-1292)
         promos += fork_pr_rows(repos, sessions, str((info or {}).get("home") or hosts.home_name()))
         # …and an account whose CI never starts (§4.5a *Inbox row: CI not starting*, TD-687)
