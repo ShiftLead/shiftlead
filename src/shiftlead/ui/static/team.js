@@ -100,6 +100,84 @@
     }
     said.hidden = false;
   };
+  // the flow pick and the switch preview (§4.9d *The flow pick and a switch*, §4.5a *Team page: the switch preview*,
+  // TD-2062): a pick writes nothing; it reads what the switch would do, and **Switch now** is the switch itself
+  const pick = document.getElementById("teamflow");
+  const pane = document.getElementById("teamswitch");
+  if (pick && pane) {
+    const team = encodeURIComponent(box.dataset.team);
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const keep = () => { pick.value = pick.dataset.flow; pane.hidden = true; pane.replaceChildren(); };
+    const draw = (flow, r) => {
+      const from = pick.dataset.flow;
+      const head = el("div", "note");
+      head.append(el("b", "", `Switch ${box.dataset.team} from ${from} to ${flow}`));
+      const parts = [head];
+      const refused = r.ok ? r.got.refused : r.why;
+      if (refused) parts.push(el("div", "note warn", refused));
+      if (r.ok && !refused) {
+        const records = r.got.records || [];
+        if (!records.length) parts.push(el("div", "note", "No entry of this team is in a stage, so none is moved."));
+        else {
+          const list = el("ul", "teamswitchlist");
+          for (const x of records) {
+            const li = el("li", `teamswitchrow case-${x.case}`);
+            li.append(el("b", "", x.id), " ", el("span", "note mono", x.stage), " ", el("span", "", x.line));
+            list.append(li);
+          }
+          parts.push(list);
+        }
+        if (r.got.none_ended) parts.push(el("div", "note", "No session is ended."));
+        if ((r.got.drops || []).length) {
+          parts.push(el("div", "note", `The sessions-at-once numbers of ${r.got.drops.join(", ")} are dropped: ${flow} has no such stage.`));
+        }
+      }
+      const go = el("button", "btn sm", "Switch now");
+      go.type = "button";
+      go.disabled = Boolean(refused);
+      const no = el("button", "btn sm ghost", `Keep ${from}`);
+      no.type = "button";
+      no.addEventListener("click", keep);
+      go.addEventListener("click", async () => {
+        go.disabled = no.disabled = pick.disabled = true;  // one switch at a time: the pick waits for its answer
+        said.hidden = true;
+        try {
+          const done = await post(`/api/teams/${team}/switch`, { flow, version: box.dataset.version });
+          if (done.ok) return location.reload();
+          shout(said, done.why);
+        } catch (e) { shout(said, AWAY); }
+        go.disabled = no.disabled = pick.disabled = false;
+      });
+      const row = el("div", "row gap wrap");
+      row.append(go, no);
+      parts.push(row);
+      pane.replaceChildren(...parts);
+      pane.hidden = false;
+    };
+    pick.addEventListener("change", async () => {
+      const flow = pick.value;
+      if (flow === pick.dataset.flow) return keep();
+      pane.replaceChildren(el("div", "note", `Reading what a switch to ${flow} would do…`));
+      pane.hidden = false;
+      let r;
+      try {
+        const got = await fetch(`/api/teams/${team}/switch-preview?flow=${encodeURIComponent(flow)}`);
+        if (got.ok) r = { ok: true, got: await got.json() };
+        else {
+          let why = got.statusText;
+          try { why = (await got.json()).detail || why; } catch (e) { /* the status line stands */ }
+          r = { ok: false, why: `No preview, so it cannot be switched now: ${why}` };
+        }
+      } catch (e) { r = { ok: false, why: "The host agent did not answer, so there is no preview." }; }
+      if (pick.value === flow) draw(flow, r);  // a later pick's read wins
+    });
+  }
+
   const label = document.getElementById("teamlabel");
   if (label) label.addEventListener("click", () => {
     const now = prompt("The team's label (empty clears it)", label.dataset.label);

@@ -95,6 +95,8 @@ class Fleet:
                 if s["id"] == params["id"]:
                     s["state"] = "closed" if method == "kill" else "idle"
             return None
+        if method == "team_switch_preview":  # the flow pick (§4.9d, TD-2062): none offered unless a test says
+            return {"team": params["team"], "choices": [], "version": "v1"}
         raise AssertionError(method)
 
     def creates(self) -> list[dict]:
@@ -1430,6 +1432,66 @@ def test_the_switched_team_page_draws_from_team_show_and_a_press_is_team_set(wor
     assert r.status_code == 200
     sent = next(p for m, p in fleet.calls if m == "team_set")
     assert sent == {"team": "solo", "at_once": {"gone": None}, "version": "v1"}
+
+
+def test_the_flow_pick_disables_a_flow_the_team_cannot_run_and_keeps_one_no_longer_offered():
+    """§4.5a *Team page: the flow it runs* (TD-2062): every flow the team could be given, the one it runs selected."""
+    fable = "cannot run here: no login offers fable"
+    pick = {"choices": [{"name": "build", "current": True}, {"name": "pricey", "cannot_run": fable}]}
+    got = setmod.flow_pick(pick, "build")
+    assert (
+        got["choices"]
+        == [
+            {"name": "build", "current": True, "cannot_run": None},
+            {"name": "pricey", "current": False, "cannot_run": fable},
+        ]
+        and got["choices_unread"] is None
+    )
+    gone = setmod.flow_pick({"choices": [{"name": "lean"}]}, "build")["choices"][0]
+    assert gone["name"] == "build" and gone["current"] and "no flow of that name" in gone["cannot_run"]
+    none = setmod.flow_pick({"choices": [{"name": "lean"}]}, None)["choices"][0]
+    assert none == {"name": "", "current": True, "cannot_run": "it runs no flow yet"}, "never the first flow, selected"
+    unread = setmod.flow_pick(SimpleNamespace(detail="origin away"), "build")
+    assert unread == {"choices": [], "choices_unread": "origin away"}
+
+
+def test_the_switched_team_page_draws_the_flow_pick_and_sends_the_preview_and_switch_now(world, client, monkeypatch):
+    """§4.5a *Team page: the flow it runs*, *the switch preview* (TD-2062): the pick from `team_switch_preview` with no
+    flow; a pick reads the preview with its flow; **Switch now** is `team_switch {team, flow, version}` alone."""
+    _tmp_path, fleet = world
+    plain = fleet.handle
+    fable = "cannot run here: no login offers fable"
+    picks = [{"name": "build", "current": True}, {"name": "lean"}, {"name": "pricey", "cannot_run": fable}]
+
+    def handle(method, params):
+        if method == "settings":
+            return {"teams": {}, "labels": {}, "switched_teams": {"solo": "shiftlead"}}
+        if method == "team_show":
+            return _switched_show()
+        if method == "tools":
+            return _switched_tools()
+        if method in ("team_switch_preview", "team_switch"):
+            fleet.calls.append((method, params))
+            if method == "team_switch":
+                return {"team": "solo", "change": "solo switched to lean", "version": "v2"}
+            return {"team": "solo", "choices": picks, "records": [], "none_ended": True, "drops": [], "refused": None}
+        return plain(method, params)
+
+    monkeypatch.setattr(fleet, "handle", handle)
+    page = client.get("/teams/solo").text
+    assert 'id="teamflow"' in page and 'id="teamswitch"' in page
+    assert '<option value="build" selected>build</option>' in page
+    assert '<option value="lean">lean</option>' in page
+    assert f'value="pricey" disabled title="{fable}">pricey · {fable}</option>' in page
+    assert client.get("/api/teams/solo/switch-preview", params={"flow": "lean"}).json()["none_ended"] is True
+    r = client.post("/api/teams/solo/switch", json={"flow": "lean", "version": "v1", "ignored": 1})
+    assert r.status_code == 200 and r.json()["change"] == "solo switched to lean"
+    sent = [(m, p) for m, p in fleet.calls if m.startswith("team_switch")]
+    assert sent == [
+        ("team_switch_preview", {"team": "solo"}),
+        ("team_switch_preview", {"team": "solo", "flow": "lean"}),
+        ("team_switch", {"team": "solo", "flow": "lean", "version": "v1"}),
+    ]
 
 
 def test_a_switched_teams_page_draws_its_running_rows_and_saves_them(world, client, monkeypatch):

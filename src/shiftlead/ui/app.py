@@ -5548,6 +5548,19 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         keys = ("label", "logins", "at_once", "most", "clear", "version")
         return await call("team_set", team=name, **{k: body[k] for k in keys if k in body})
 
+    @app.get("/api/teams/{name}/switch-preview")
+    async def team_switch_preview(name: str, flow: str = ""):
+        """§4.5a *Team page: the switch preview* (TD-2062): what a switch to `flow` does to each of the team's open
+        stage records, read only (`team_switch_preview`); with no flow, the pick alone."""
+        return await call("team_switch_preview", team=name, **({"flow": flow} if flow else {}))
+
+    @app.post("/api/teams/{name}/switch")
+    async def team_switch(name: str, request: Request):
+        """§4.5a *Team page: the switch preview*: **Switch now** (TD-2062), `team_switch {team, flow, version}`, the
+        person's own act, at the version the page was drawn at."""
+        body = await body_of(request)
+        return await call("team_switch", team=name, **{k: body[k] for k in ("flow", "version") if k in body})
+
     @app.post("/api/teams/new")
     async def team_new(request: Request):
         """§4.5a *Team page: + New team* (TD-2063): `{name, label?, repo, host, flow}`, the person's own act."""
@@ -5661,11 +5674,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(404, f"no team {team!r}: the org defines {', '.join(tabs) or 'none'}")
         switched = None
         if team in held:  # the head, logins and numbers from the one read `ao team show` prints (§4.9d)
-            show, tools = await asyncio.gather(read("team_show", team=team), read("tools"))
+            show, tools, pick = await asyncio.gather(
+                read("team_show", team=team), read("tools"), read("team_switch_preview", team=team)
+            )
             if isinstance(show, HTTPException):
                 notes = [*notes, f"the team could not be read: {show.detail}"]
             else:
                 switched = setmod.switched_team(show, None if isinstance(tools, HTTPException) else tools)
+                switched.update(setmod.flow_pick(pick, switched["flow"]))
                 rule = ((got.get("teams") or {}).get(team) or {}).get("schedule")
                 switched["schedule"] = setmod.switched_schedule(rule, switched)
         # the tabs' cannot-run dots (§4.9d *The page*), the cheap read `ao org` makes; one unread draws no dot
