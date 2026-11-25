@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, ledgerboard, naming
@@ -702,6 +703,22 @@ def by_permit(
         return False
     target = records.get(str(params.get("id", "")))
     return not (has_control(me.capabilities) and target is not None and str(caller) in controllers(target))
+
+
+def permit_repo_refusal(records: Mapping[str, Session], caller: Any, params: Mapping[str, Any]) -> str | None:
+    """A repo's prompts seat's `permit` reaches its own repo's records alone (design §4.9d *The prompts seat answers a
+    permission prompt where the org has no director*, TD-2065): the refusal of its `decide` on a record whose repo is
+    another, *not your repo's*, or None. The repo is read by its checkout's directory name, as the Org block names one,
+    so the seat's record and the target's agree across hosts; a target with no repo is no repo's of its own."""
+    me = records.get(str(caller))
+    if me is None or me.builtin != "prompts":
+        return None
+    target = records.get(str(params.get("id", "")))
+    mine = Path(str(me.repo)).name if me.repo else ""
+    theirs = Path(str(target.repo)).name if target is not None and target.repo else ""
+    if mine and theirs == mine:
+        return None
+    return f"{caller} cannot decide {params.get('id')}: not your repo's — a prompts seat answers {mine or 'its repo'}'s"
 
 
 def act_gate(

@@ -203,6 +203,58 @@ def test_a_first_shape_sweep_seat_is_not_the_repos_sweeper(world):
     assert stage_seats.write_sweepers(home, org, {"t": {}}, graph, STARTED, "h", ON) == ["ao-r-sweeper-r"]
 
 
+def test_the_prompts_seats_launch_is_the_repos_record_in_the_directors_role_naming_its_repo(world):
+    org, team, root = world
+    x = stage_seats.prompts_launch(org, team, host="h", here="h")
+    assert (x.name, x.role, x.team, x.dir, x.lane, x.grants) == ("prompts-r", "director", "", root, [], ["permit"])
+    assert "**director seat**" in x.prompt, "the director seat's brief"
+    assert "r's prompts seat" in x.prompt and str(root) in x.prompt and "{org}" not in x.prompt
+    assert "The org's checkouts" not in x.prompt, "its repo stands where the director's Org block goes"
+    p = stage_seats.create_params(x, builtin="prompts")
+    assert p["seat"] == {"trigger": "prompt"}
+    assert (p["held"], p["builtin"], p["team"], p["worktree"], p["controllers"]) == (
+        True,
+        "prompts",
+        "",
+        "prompts-r",
+        [],
+    )
+    assert (p["unattended"], p["supervised"]) == (True, True)
+
+
+def test_a_repo_with_a_started_team_gets_one_prompts_record_while_the_org_has_no_director(world):
+    org, _team, _ = world
+    org.director = None
+    org.teams["u"] = SimpleNamespace(name="u", repo="r", members=[])
+    marks = {**STARTED, "u": STARTED["t"]}
+    home = Home()
+    got = stage_seats.write_prompts(home, org, {"t": {"host": "node"}, "u": {}}, {}, marks, "h")
+    assert got == ["ao-r-prompts-r"] and len(home.created) == 1, "one record for the repo, never one per team"
+    assert home.created[0]["host"] == "node" and home.created[0]["builtin"] == "prompts"
+    graph = {"ao-r-prompts-r": record(id="ao-r-prompts-r", name="prompts-r", team="", builtin="prompts")}
+    assert stage_seats.write_prompts(home, org, {"t": {}, "u": {}}, graph, marks, "h") == []
+    assert len(home.created) == 1, "the record stands, so the next pass writes no second"
+
+
+def test_no_prompts_record_where_the_org_has_a_director_or_no_team_is_started(world):
+    org, _team, _ = world
+    home = Home()
+    org.director = None
+    assert stage_seats.write_prompts(home, org, {"t": {}}, {}, {}, "h") == []
+    org.director = SimpleNamespace(name="director")
+    assert stage_seats.write_prompts(home, org, {"t": {}}, {}, STARTED, "h") == []
+    assert stage_seats.write_prompts(home, None, {"t": {}}, {}, STARTED, "h") == []
+    assert home.created == []
+
+
+def test_the_directors_record_is_never_the_repos_prompts_seat(world):
+    org, _team, _ = world
+    org.director = None
+    graph = {"d": record(id="d", name="prompts-r", team="", seat={"trigger": "prompt"})}
+    assert stage_seats.prompts_of(graph, "r") is None
+    assert stage_seats.write_prompts(Home(), org, {"t": {}}, graph, STARTED, "h") == ["ao-r-prompts-r"]
+
+
 @pytest.mark.integration
 async def test_the_home_takes_the_record_held_built_in_and_due_on_a_question(agent, world):
     """The `create` the pass sends: a closed record marked `builtin: techlead` that tags, filled when an ask waits."""

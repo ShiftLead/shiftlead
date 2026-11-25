@@ -4457,9 +4457,12 @@ class TickMixin:
         member and the prompt's own id (`prompt`: its `tool_use_id`, else its text). An interactive record's
         prompt is the person's alone, as is one only its terminal answers."""
         causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        # a repo's prompts seat reads the unattended sessions of its repo alone (§4.9d, TD-2065), by checkout name
+        mine = (Path(str(s.repo)).name if s.repo else "") if s.builtin == "prompts" else None
         for r in records:
             if (
                 r is not s
+                and (mine is None or (bool(mine) and bool(r.repo) and Path(str(r.repo)).name == mine))
                 and r.supervised
                 and r.unattended
                 and not r.superseded_by
@@ -4662,6 +4665,8 @@ class TickMixin:
         while its team is started and on while that team's unattended sessions finish; a repo's seat (the sweeper, the
         prompts seat) while any of the repo's teams is started, the prompts seat also on while a session of one of
         them finishes. A seat is counted as no team's finishing session."""
+        if s.builtin == "prompts" and any(self._is_director(r) for r in records if r is not s):
+            return {"at": "", "by": "director", "team": ""}  # a director added to the org answers instead (§4.9d)
         if self._builtin_runs(s, self._started_teams()):
             return None
         serves = {s.team} if s.team else self._repo_teams(str(s.repo or ""))

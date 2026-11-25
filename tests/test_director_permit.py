@@ -120,3 +120,22 @@ async def test_the_director_decides_an_unattended_prompt_with_a_reason_and_tells
         async with LocalClient(caller=lead) as lc:
             with pytest.raises(AgentError, match="holding permit"):
                 await lc.call("create", name="x", dir=str(tmp_path / "w"), adapter="shell", capabilities=["permit"])
+
+
+def test_a_prompts_seat_s_permit_reaches_its_own_repo_alone():
+    """§4.9d (TD-2065): an allow or deny from a `builtin: prompts` record on another repo's record is refused, *not
+    your repo's*; the director's, with no `builtin`, reaches any repo's."""
+    recs = {
+        "p": _rec("p", grants=["permit"]),
+        "d": _rec("d", grants=["permit"]),
+        "mine": _rec("mine"),
+        "theirs": _rec("theirs"),
+        "none": _rec("none"),
+    }
+    recs["p"].builtin, recs["p"].repo = "prompts", "/home/k/r"
+    recs["mine"].repo, recs["theirs"].repo = "/node/k/r", "/home/k/other"
+    assert mail.by_permit(recs, "p", {"id": "theirs"}) is True, "the grant alone passes; the repo is the next test"
+    assert mail.permit_repo_refusal(recs, "p", {"id": "mine"}) is None, "the same repo by its checkout's name"
+    assert "not your repo's" in mail.permit_repo_refusal(recs, "p", {"id": "theirs"})
+    assert "not your repo's" in mail.permit_repo_refusal(recs, "p", {"id": "none"})
+    assert mail.permit_repo_refusal(recs, "d", {"id": "theirs"}) is None

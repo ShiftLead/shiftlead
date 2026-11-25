@@ -256,6 +256,11 @@ def run(
             log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
     except Exception:  # noqa: BLE001 — the sweeper's record failing is a log line and never the teams' pass
         log.exception("the sweeper record of %s could not be written", root)
+    try:  # the repo's built-in prompts seat, written where none stands while the org has no director (§4.9d)
+        if wrote := stage_seats.write_prompts(call, org(), teams, graph, host_teams, local):
+            log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
+    except Exception:  # noqa: BLE001 — the prompts seat's record failing is a log line and never the teams' pass
+        log.exception("the prompts seat record of %s could not be written", root)
     if orders is None or pr_orders is None:
         return got
     try:

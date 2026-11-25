@@ -337,8 +337,8 @@ def test_the_pass_writes_a_started_teams_tech_lead_and_its_repos_sweeper_through
     root: Path, tmp_path: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """After the audits, the pass writes the built-in tech lead of a started team and, while the sweep switch is on,
-    its repo's sweeper, each through the `call` the home gives it; the switch is read only while a team is started
-    (§4.9d *How each one runs*, TD-2065)."""
+    its repo's sweeper, and, the org having no director, its repo's prompts seat, each through the `call` the home
+    gives it; the switch is read only while a team is started (§4.9d *How each one runs*, TD-2065)."""
     from types import SimpleNamespace
 
     from shiftlead import org as orgmod
@@ -375,7 +375,7 @@ def test_the_pass_writes_a_started_teams_tech_lead_and_its_repos_sweeper_through
     started = {"t": {"started": {"since": "2026-11-25T00:00:00Z", "by": "person"}}}
     a_pass(root, Kept(), host_teams=started, call=call)
     made = [(p["builtin"], p["name"]) for m, p in calls if m == "create"]
-    assert made == [("techlead", "techlead-t"), ("sweeper", "sweeper-r")]
+    assert made == [("techlead", "techlead-t"), ("sweeper", "sweeper-r"), ("prompts", "prompts-r")]
     assert [m for m, _ in calls].count("sweep_switch") == 1
     calls.clear()
     a_pass(root, Kept(), host_teams=None, call=call)
