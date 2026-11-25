@@ -461,9 +461,9 @@ def test_where_the_org_has_a_director_the_prompts_seat_is_not_read():
 def test_an_empty_list_blocks_only_on_a_home_with_a_team():
     assert [b.what for b in builtins(logins=[])[1]] == ["its login list is empty"]
     assert builtins(logins=[], plans=())[1] == []
-    assert [b.what for b in builtins(logins="claude-code:paul")[1]][0] == (
+    assert [b.what for b in builtins(logins="claude-code:paul")[1]] == [
         "builtins.default.logins is not a list of <tool>:<name>"
-    )
+    ], "one blocker, not two"
 
 
 def test_a_login_the_home_lacks_blocks_unless_a_team_runs_on_an_ssh_node():
@@ -472,7 +472,9 @@ def test_a_login_the_home_lacks_blocks_unless_a_team_runs_on_an_ssh_node():
     assert [b.what for b in builtins(models, lacks)[1]] == ["lists claude-code:far, a login h would not have"]
     far = switchover.TeamPlan("away", "r", "far")
     got, blockers = builtins(models, lacks, plans=("grind", far), nodes={"far": {}})
-    assert blockers == [] and got.note == "not checked: claude-code:far, taken as names on far"
+    assert blockers == [] and got.note == "not checked: claude-code:far, taken as names on far, nor the seats' models"
+    _, blockers = builtins(None, lacks, plans=("grind", far), nodes={"far": {}})
+    assert blockers == [], "the sweeper's haiku may be offered by the unread login"
     _, blockers = builtins(models, lacks, plans=("grind", far), nodes={"far": {"container": True}})
     assert [b.what for b in blockers] == ["lists claude-code:far, a login h would not have"], "a container's is"
 

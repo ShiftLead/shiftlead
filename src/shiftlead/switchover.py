@@ -575,7 +575,7 @@ def builtin_set(
     elif listed is not None:
         out.append(Blocker(SET, "builtins.default.logins is not a list of <tool>:<name>", "mend it"))
     if not plan.logins:
-        if plans:
+        if plans and (listed is None or listed == []):  # a list that is not one is its own blocker
             out.append(Blocker(SET, "its login list is empty", "list a login in builtins.default.logins"))
         return plan, out
     rows = {lg.key: {"models": lg.models, "pin": lg.pin} for lg in made}
@@ -588,7 +588,8 @@ def builtin_set(
     )
     elsewhere = [lk for lk in plan.logins if lk not in rows]
     if ssh and elsewhere:
-        plan.note = f"not checked: {', '.join(elsewhere)}, taken as names on {', '.join(ssh)}"
+        plan.note = f"not checked: {', '.join(elsewhere)}, taken as names on {', '.join(ssh)}, nor the seats' models"
+        return plan, out  # what an unread login offers is not known here, so no seat's model is judged
     else:
         out += [
             Blocker(SET, f"lists {lk}, a login {here} would not have", "take it out of builtins.default.logins")
