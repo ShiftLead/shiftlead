@@ -870,6 +870,17 @@ def test_a_flow_lacks_a_fact_checker_and_an_unmatched_auditor_but_never_the_sets
     assert switchover.lacking(SimpleNamespace(), AUDITED) == [], "a team with no seats lacks nothing"
 
 
+def test_an_auditors_brief_file_decides_its_match_and_a_longer_word_matches_a_shorter_brief():
+    team = SimpleNamespace(
+        seats=[
+            Seat("auditor", "grind-checker", "docs/briefs/tests-audit.md"),  # its name matches no audit; its brief does
+            Seat("auditor", "docs-audit", "docs/briefs/security-audit.md"),  # its name matches; its brief does not
+            Seat("auditor", "testsuite-audit"),  # `testsuite` is begun by the audit's brief `tests`
+        ]
+    )
+    assert switchover.lacking(team, AUDITED) == ["docs-audit (auditor)"]
+
+
 def test_the_check_lists_beside_a_team_the_seats_its_picked_flow_lacks():
     team = SimpleNamespace(repo="r", host="", seats=[Seat("fact-checker", "fc-grok")])
     plans, blockers = plan(Org(grind=team), pick())
@@ -919,12 +930,14 @@ def test_first_shape_asks_are_open_asks_to_a_teams_member_or_seat_alone():
     own.inbox = [Ask("m-7", "ao-o")]
     twin = Rec("t")
     twin.inbox = [Ask("m-1", "ao-m"), Ask("m-8", "ao-t", passed_up=True, passes=[{"to": "ao-director"}])]
+    twin.inbox.append(Ask("m-9", "ao-t", passed_up=True, passes=[{"to": PERSON}]))  # the person's to answer now
     got = switchover.first_shape_asks({r.id: r for r in (member, seat, loose, own, twin)})
     assert [(a.id, a.to) for a in got] == [("m-1", "ao-m"), ("m-8", "ao-t")], "once per id; the director's counts"
     got = got[:1]
     assert [(a.id, a.to, a.sender, a.subject) for a in got] == [("m-1", "ao-m", "ao-x", "which way?")]
     assert switchover.ask_lines(got)[1] == "  m-1 to ao-m from ao-x (2026-11-24T10:00:00Z): which way?"
     assert switchover.ask_lines([])[1:] == ["  none"]
+    assert [a.to for a in switchover.first_shape_asks({"a key": member})] == ["ao-m"], "named by its record's id"
 
 
 def test_the_check_prints_the_open_asks_to_the_first_shape_and_makes_no_sessions_directory(home, tmp_path, capsys):
