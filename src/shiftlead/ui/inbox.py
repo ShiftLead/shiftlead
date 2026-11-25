@@ -50,7 +50,7 @@ from sessionorc.models import (
 )
 from sessionorc.work import manager_of, wound_down
 from shiftlead import review as review_mod
-from shiftlead import teamrun
+from shiftlead import stage_job, teamrun
 
 from . import render as rendermod
 from . import uiconf
@@ -805,7 +805,10 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
 
 
 def red_pr_rows(
-    repos: Mapping[str, Any] | None, records: Collection[Mapping[str, Any]], now: datetime | None = None
+    repos: Mapping[str, Any] | None,
+    records: Collection[Mapping[str, Any]],
+    now: datetime | None = None,
+    cut_over: bool = False,
 ) -> list[dict[str, Any]]:
     """design §4.5a **Inbox row: red PR** (§4.4 *A red PR nobody holds is a work order*, TD-613): one
     row per `pr:<n>` order of a repo **no team services** (`teamrun.serviced`) — a serviced repo's
@@ -821,7 +824,10 @@ def red_pr_rows(
     <author>*, aged from `sweep_since`, the row marked `sweep` so it stays on the Inbox tab (`queue.item_home`). An
     unserved repo's rows are its `person_pr_orders`, the gate sweep's lift and sweep orders, whatever
     `teamrun.serviced` says (§5 *The seams*). A filing PR's order draws none (§4.4 *A filing PR nobody holds is a
-    work order*, TD-1811): the PR is the person's, its Review row *nobody's*."""
+    work order*, TD-1811): the PR is the person's, its Review row *nobody's*. After the cut-over (`cut_over`, the
+    caller's `teamstore.first_shape_off()`) a fork's sync order, which no job takes (`stage_job.fork_sync`, the
+    trigger's own predicate: a sync row with no `fork` read as a fork's), has the row in a serviced repo too, and
+    every other order of a serviced repo still none (§4.9c *Two of the five are not seats today*, TD-2164, TD-2165)."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for root, r in sorted((repos or {}).items()):
@@ -830,7 +836,10 @@ def red_pr_rows(
         if seams_mod.unserved(r):
             orders = teamrun.person_pr_orders(r)  # the gate sweep's PRs are the person's there (TD-1854)
         elif teamrun.serviced(str(r.get("root") or root), records):
-            continue
+            if not cut_over:
+                continue
+            # after the cut-over a fork's sync is the person's, since no job takes it (TD-2165)
+            orders = [e for e in teamrun.pr_orders(r) if stage_job.fork_sync(e)]
         else:
             orders = teamrun.pr_orders(r)
         repo = str(r.get("name") or Path(str(root)).name)

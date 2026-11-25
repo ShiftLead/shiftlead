@@ -134,6 +134,28 @@ def test_a_sync_prs_row_says_sync_and_its_reason_green_or_red():
     assert red_pr_rows({root: reading(root, orders=[sync])}, [rec("g1", root)], now()) == []  # serviced: a lane's
 
 
+def test_after_the_cut_over_a_forks_sync_draws_the_row_in_a_serviced_repo():
+    """TD-2165, §4.5a *Inbox row: red PR*, §4.9c *Two of the five are not seats today*: after the cut-over no job
+    takes a fork's sync, so it has the row in a serviced repo too; a sync row with no `fork` is read as a fork's,
+    and every other order of a serviced repo still draws none."""
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    since = _iso(now())
+    fork = order(1801, checks="green", failing=[], red_since=None, sync=True, sync_since=since, reason="a fork's head", fork=True)  # fmt: skip
+    bare = order(1802, checks="green", failing=[], red_since=None, sync=True, sync_since=since, reason="no fork key")  # fmt: skip
+    ours = order(1803, checks="green", failing=[], red_since=None, sync=True, sync_since=since, reason="ours", fork=False)  # fmt: skip
+    red = order(1804)
+    r = {root: reading(root, orders=[fork, bare, ours, red])}
+    lane = [rec("g1", root)]
+    got = red_pr_rows(r, lane, now(), cut_over=True)
+    assert [x["pr"] for x in got] == [1801, 1802]  # a non-fork sync and a red PR are a job's
+    assert got[0]["text"] == "samscrape #1801 · sync · a fork's head · eye" and got[0]["sid"] == "red_pr:samscrape:1801"
+    assert red_pr_rows(r, lane, now()) == []  # before the cut-over a serviced repo's orders are a lane's, a fork's too
+    # a repo nothing services keeps today's rows, every order, cut over or not
+    assert [x["pr"] for x in red_pr_rows(r, [], now(), cut_over=True)] == [1801, 1802, 1803, 1804]
+
+
 @pytest.mark.parametrize("checks", ["green", "pending"])
 def test_a_lift_prs_row_says_lift_its_gate_and_its_age(checks):
     """TD-1578, §4.5a *Inbox row: red PR*: a live check's lift PR is an order whatever its checks (§4.4 *A PR the
@@ -201,6 +223,20 @@ def test_the_inbox_draws_the_row_with_open_and_snooze_and_counts_it(tmp_path, mo
     assert 'data-sid="red_pr:samscrape:802" data-row="red_pr" data-when="1w"' in html
     assert 'href="https://x/802" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>' in html
     assert c.get("/api/person/inbox").json()["needs"] == 1
+
+
+def test_after_the_cut_over_the_inbox_draws_a_forks_sync_in_a_serviced_repo(tmp_path, monkeypatch):
+    """TD-2165: the Inbox page and its count read the cut-over, so a fork's sync in a serviced repo is the person's."""
+    from sessionorc import teamstore
+
+    root = str(tmp_path / "samscrape")
+    fork = order(1801, checks="green", failing=[], red_since=None, sync=True, sync_since=_iso(now()), reason="a fork's head", fork=True)  # fmt: skip
+    c = client(monkeypatch, tmp_path, fake({root: reading(root, orders=[fork, order(802)])}, [rec("g1", root)]))
+    assert "samscrape #1801" not in c.get("/inbox").text  # before the cut-over: a lane's
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
+    html = c.get("/inbox").text
+    assert "samscrape #1801 · sync · a fork&#39;s head · eye" in html and "samscrape #802" not in html
+    assert 'data-sid="red_pr:samscrape:1801" data-row="red_pr"' in html
 
 
 # -- a draft is no work order (design §4.4, TD-745) -------------------------------------------------------
