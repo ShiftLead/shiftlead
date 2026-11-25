@@ -241,6 +241,7 @@ def repo_facts(
     merging: Collection[str] = (),
     started: bool = False,
     within_size: bool = False,
+    named: Callable[[str], Mapping[str, Any] | None] | None = None,
 ) -> RepoFacts | None:
     """`team`'s `RepoFacts` from what the pass read once. `prs` is the repo's pull request reading and `read_one` reads
     one by its number, asked for each open record's pull request the reading lacks; `records` are only for which those
@@ -278,6 +279,7 @@ def repo_facts(
         open_asks=seen.open_asks,
         merging=merging,
         was=flow.was,
+        named=named,
         may_start=started and not over_line(host_teams, team),
         within_size=within_size,
     )

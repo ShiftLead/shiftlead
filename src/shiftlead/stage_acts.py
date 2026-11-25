@@ -114,6 +114,28 @@ def _lifted(record: Mapping[str, Any], s: Reading) -> str | None:
     return None if asked and s.lifted_for != asked.get("nonce") else s.lifted
 
 
+def off_flow(record: Mapping[str, Any]) -> str:
+    """Reconcile's case for a record whose stage its flow no longer has (§4.9c, §4.9d *The flow pick and a switch*): one
+    that has made no move enters again by the flow's way in, any other goes to the person."""
+    return "re-enter" if not record.get("moves") else "stage-gone"
+
+
+SwitchCase = Literal["merging", "waits", "stays", "re-enters", "to-person"]
+SWITCH_CASES: dict[str, SwitchCase] = {"re-enter": "re-enters", "stage-gone": "to-person"}
+
+
+def switch_case(record: Mapping[str, Any], stage_known: bool) -> SwitchCase:
+    """What a team's switch does to one open record (§4.9d *The flow pick and a switch*), the preview's line and the
+    reconcile's case alike: `stage_known` is `stage_read.flow_on`'s reading of it against the new flow, with the flow it
+    was written under. A merge under way and a question to the person are left as they are."""
+    waits = record.get("waits")
+    if waits == "merging":
+        return "merging"
+    if waits == "person":
+        return "waits"
+    return "stays" if stage_known else SWITCH_CASES[off_flow(record)]
+
+
 def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
     waits = record.get("waits")
     if waits == "merging" and s.merge_running:  # the home's own merge closes the record itself
@@ -139,7 +161,7 @@ def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
         return "team-moved"
     if waits != "person":
         if not s.stage_known:
-            return "re-enter" if not record.get("moves") else "stage-gone"
+            return off_flow(record)
         if not s.flow_current:
             return "rewrite-flow"
         if s.gate and waits is None:

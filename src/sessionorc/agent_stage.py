@@ -33,13 +33,24 @@ STAGE_CALL_WAIT = ACT_TIMEOUT * 4  # a pass's call on the home's loop: a create 
 STAGE_POOL = 4  # the pass's own threads, apart from `to_thread`'s pool, which the RPCs it waits on use
 
 
-def stage_teams(doc: Mapping[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+def switching(host_teams: Mapping[str, Any] | None, team: str) -> str | None:
+    """The flow a team's switch is under way to, from the home's `host` record (§4.9d *The flow pick and a switch*), or
+    None."""
+    rec = (host_teams or {}).get(team)
+    value = rec.get("switching") if isinstance(rec, Mapping) else None
+    return str(value) if value else None
+
+
+def stage_teams(
+    doc: Mapping[str, Any], host_teams: Mapping[str, Any] | None = None
+) -> dict[str, dict[str, dict[str, Any]]]:
     """The switched teams of `settings.yml` by the registered checkout's name their `repo` holds (§4.9d *Before and
-    after the cut-over*): `{repo: {team: its entry}}`, each entry a copy for the pass's thread."""
+    after the cut-over*): `{repo: {team: its entry}}`, each entry a copy for the pass's thread. A team whose switch is
+    under way is left out until it is made, so no pass writes the old flow's copy back over the new."""
     teams = doc.get("teams")
     out: dict[str, dict[str, dict[str, Any]]] = {}
     for team, entry in teams.items() if isinstance(teams, Mapping) else ():
-        if isinstance(team, str) and teamstore.switched(doc, team):
+        if isinstance(team, str) and teamstore.switched(doc, team) and not switching(host_teams, team):
             out.setdefault(str(entry["repo"]).strip(), {})[team] = copy.deepcopy(dict(entry))
     return out
 
@@ -192,14 +203,14 @@ class StageMixin:
         the nodes whose snapshot has arrived, every node's checkouts of the repo and the `host` record's teams."""
         try:
             doc = await asyncio.to_thread(settings_mod.read)
-            by_repo = stage_teams(doc) if doc is not None else {}
+            host_teams = copy.deepcopy(self._host_rec.get("teams") or {})  # type: ignore[attr-defined]
+            by_repo = stage_teams(doc, host_teams) if doc is not None else {}
             if not by_repo:
                 return
             calls = home_call(TICK)
             roots = await asyncio.to_thread(lambda: hosts.local_host().repos())
             graph = copy.deepcopy(self._graph())  # type: ignore[attr-defined]
             snapshotted = frozenset(self._intent_sent)  # type: ignore[attr-defined]
-            host_teams = copy.deepcopy(self._host_rec.get("teams") or {})  # type: ignore[attr-defined]
             kept: dict[str, Any] = self.__dict__.setdefault("_stage_kept", {})
             call = self._stage_call(asyncio.get_running_loop())
             jobs = []

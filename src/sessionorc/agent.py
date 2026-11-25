@@ -1204,6 +1204,11 @@ class HostAgent(
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
         if self.mode == "home":
             await self._migrate_scale()  # td-max's one-time `max: off` (§4.9, TD-1545)
+            # a team's flow switch a restart cut off (§4.9d, TD-2062), in the background: its push waits on the forge,
+            # and the stage pass leaves the team alone while it is marked
+            finishing = asyncio.create_task(self._finish_switches())
+            self._bg.add(finishing)
+            finishing.add_done_callback(self._bg.discard)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
         log.info("listening on %s", sock)

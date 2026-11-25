@@ -17,6 +17,8 @@ import yaml
 from sessionorc import builtinstore, logins, teamstore
 from shiftlead import flow3, flow_save, repoconfig
 from shiftlead import org as orgmod
+from shiftlead.stage_acts import switch_case
+from shiftlead.stage_read import flow_on
 from shiftlead.stagerecord import StageStore, StateError
 
 RUNNING_KEYS = ("schedule", "until", "reserve", "balance", "on_work")
@@ -321,3 +323,179 @@ def call(
             except UNREADABLE as again:
                 unread = f"{unread}; the flow could not be read: {again}"
     return {**view(team, doc, rows, head, here, flow_doc, records, director=director), "unread": unread}
+
+
+# -- the flow pick and a switch (§4.9d *The flow pick and a switch*, TD-2062) ---------------------------------------
+
+NODE_REPO_FLOW = "unknown: a node's checkout is not read here yet"
+SWITCH_LINES = {
+    "stays": "stays in {stage}, and its session carries on",
+    "to-person": "its stage is gone: it comes to you, its branch and pull request kept",
+    "re-enters": "its stage is gone and it has made no move: it enters again by {flow}'s way in, its pull request kept",
+    "waits": "still waits on you",
+    "merging": "merging, not touched",
+}
+ENDED = "; its session is ended, and what it had not pushed is lost"
+
+
+def _offered(team: str, doc: Mapping[str, Any], roots: Iterable[str | Path]) -> list[Mapping[str, Any]]:
+    """The format-3 flows a team could be given: the package's, the org's, and its own repo's."""
+    repo = str(doc["teams"][team]["repo"])
+    rows = flow_save.listing(roots)["flows"]
+    return [r for r in rows if r["doc"] is not None and (r["place"] != "repo" or r.get("repo") == repo)]
+
+
+def _cannot(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], rows: Mapping[str, Any], here: str) -> Any:
+    """Why `team` cannot run the flow of `row`, *cannot run here: …*, or None."""
+    if row["problems"]:
+        return f"cannot run here: {row['problems'][0]}"
+    node = str(entry.get("host") or here)
+    if node != here:
+        if row["place"] == "own":
+            return f"not followable: an org flow, and {team} runs on {node} — define it in the repo"
+        if row["place"] == "repo":
+            return NODE_REPO_FLOW
+        return None  # a package flow rides the wheel; a node's logins are not read here
+    doc = row["doc"]
+    models = list(
+        dict.fromkeys(str(x["model"]) for x in (*_maps(doc.get("stages")), *_maps(doc.get("audits"))) if x.get("model"))
+    )
+    why = teamstore.cannot_run(team, str(row["name"]), models, [str(x) for x in entry.get("logins") or ()], rows)
+    return f"cannot run here: {why}" if why else None
+
+
+def choices(
+    team: str, doc: Mapping[str, Any], rows: Mapping[str, Mapping[str, Any]], here: str, roots: Iterable[str | Path]
+) -> list[dict[str, Any]]:
+    """The flow pick (§4.9d): every flow the team could be given, each it cannot run with its reason, `current` the
+    one it runs. One reading, which the switch is refused by too."""
+    where = [Path(r).expanduser() for r in roots]
+    entry = doc["teams"][team]
+    return [
+        {
+            "name": r["name"],
+            "place": r["place"],
+            "current": r["name"] == entry.get("flow"),
+            "cannot_run": _cannot(team, r, entry, rows, here),
+        }
+        for r in _offered(team, doc, where)
+    ]
+
+
+def _keys(flow_doc: Mapping[str, Any]) -> list[str]:
+    return [flow3.key_of(s.get("name")) for s in _maps(flow_doc.get("stages"))]
+
+
+def _picked(
+    team: str, flow: str, doc: Mapping[str, Any], rows: Any, here: str, where: list[Path], check: bool = True
+) -> Mapping[str, Any]:
+    """The flow row a switch to `flow` would run, refused (ValueError) where the team cannot run it; with `check`
+    False, only where there is no such flow, for a switch a restart finishes, which was checked when it was pressed."""
+    entry = doc["teams"][team]
+    row = next((r for r in _offered(team, doc, where) if r["name"] == flow), None)
+    if row is None:
+        raise ValueError(f"there is no flow named {flow} that {team} could be given")
+    if flow == entry.get("flow"):
+        raise ValueError(f"{team} already runs {flow}")
+    why = _cannot(team, row, entry, rows, here) if check else None
+    if why:
+        raise ValueError(f"{team} cannot be switched to {flow}: {why}")
+    return row
+
+
+def switch_lines(
+    records: Iterable[Mapping[str, Any]], team: str, new: Mapping[str, Any], old: Any, live: Iterable[str]
+) -> list[dict[str, Any]]:
+    """What a switch to `new` does to each of the team's open records, from `old`, the flow they were written under
+    where it reads: the line the preview draws and the case the tick's reconcile then takes, one function for both
+    (`stage_acts.switch_case` over `stage_read.flow_on`). A session is said to be ended only where it is live."""
+    alive = set(live)
+    was = old if isinstance(old, Mapping) else None
+    out = []
+    for r in _open(records, team):
+        known = flow_on(r, new, was).stage_known
+        case = switch_case(r, known)
+        holder = r.get("holder")
+        ends = case in ("to-person", "re-enters") and bool(holder) and str(holder) in alive
+        words = SWITCH_LINES[case].format(stage=r.get("stage"), flow=new.get("name"))
+        out.append(
+            {
+                "id": r.get("id"),
+                "stage": r.get("stage"),
+                "holder": holder,
+                "case": case,
+                "ends": ends,
+                "pr": r.get("pr"),
+                "line": f"{words}{ENDED if ends else ''}",
+            }
+        )
+    return out
+
+
+def switch_preview(
+    *,
+    team: str,
+    flow: str,
+    doc: Mapping[str, Any],
+    rows: Mapping[str, Mapping[str, Any]],
+    here: str,
+    roots: Iterable[str | Path],
+    live: Iterable[str] = (),
+) -> dict[str, Any]:
+    """The switch preview (§4.9d): every open record of the team and what a switch to `flow` does to it, and the
+    sessions-at-once numbers it drops. `refused` says why the team cannot run it, and Switch now is then disabled. A
+    state branch that cannot be read is no preview: a record not read is never read as no record."""
+    where = [Path(r).expanduser() for r in roots]
+    if not teamstore.switched(doc, team):
+        raise ValueError(f"no switched team {team!r}")
+    entry = doc["teams"][team]
+    out: dict[str, Any] = {
+        "team": team,
+        "flow": flow,
+        "from": entry.get("flow"),
+        "version": teamstore.version(doc, team),
+    }
+    try:
+        row = _picked(team, flow, doc, rows, here, where)
+    except ValueError as e:
+        return {**out, "refused": str(e), "records": [], "drops": [], "none_ended": True}
+    root = _root(str(entry["repo"]), where)
+    if root is None:
+        raise StateError(f"{entry['repo']} is not a registered checkout here")
+    store = StageStore(root)
+    old = _flow_doc(team, str(entry.get("flow") or ""), store, where)
+    lines = switch_lines(store.entries().values(), team, row["doc"], old, live)
+    keys = set(_keys(row["doc"]))
+    numbers = entry.get("at_once") if isinstance(entry.get("at_once"), Mapping) else {}
+    return {
+        **out,
+        "refused": None,
+        "records": lines,
+        "drops": sorted(k for k in numbers if k not in keys),
+        "none_ended": not any(x["ends"] for x in lines),
+    }
+
+
+def switch_push(
+    *,
+    team: str,
+    flow: str,
+    doc: Mapping[str, Any],
+    rows: Mapping[str, Mapping[str, Any]],
+    here: str,
+    roots: Iterable[str | Path],
+    check: bool = True,
+) -> list[str]:
+    """A switch's commit point (§4.9d): the team's copy of `flow` pushed to the state branch, unless the copy already
+    is it (a switch a restart finishes). Its stage keys, for the numbers kept. Raises where the team cannot run the
+    flow (ValueError) and where the branch is not written (`StateError`, a refused push `StateRefused`)."""
+    where = [Path(r).expanduser() for r in roots]
+    row = _picked(team, flow, doc, rows, here, where, check)
+    root = _root(str(doc["teams"][team]["repo"]), where)
+    if root is None:
+        raise StateError(f"{doc['teams'][team]['repo']} is not a registered checkout here")
+    store = StageStore(root)
+    with store.locked():
+        if store.flow(team) != row["text"]:
+            store.put_flow(team, row["text"])
+    return _keys(row["doc"])

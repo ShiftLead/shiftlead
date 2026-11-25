@@ -178,7 +178,8 @@ class TeamFlow(NamedTuple):
     problems: tuple[str, ...] = ()
 
 
-def _flow_doc(text: str | None) -> Mapping[str, Any] | None:
+def flow_doc_of(text: str | None) -> Mapping[str, Any] | None:
+    """A flow's text as its document, or None where it is empty or does not read as a mapping."""
     if not text:
         return None
     try:
@@ -193,11 +194,11 @@ def team_flow(current: str | None, problems: Collection[str], kept: str | None) 
     `current` is the team's flow as read now (None: unreadable), `problems` its check's, and `kept` the team's copy on
     the state branch. A passing flow runs and is to replace the copy; any other runs the copy, with the problems to
     tell the person. None: neither can run, so the team's entries have no reading this pass."""
-    doc = None if problems else _flow_doc(current)
+    doc = None if problems else flow_doc_of(current)
     if doc is not None:
         same = current == kept
-        return TeamFlow(doc, None if same else _flow_doc(kept), None if same else current)
-    last = _flow_doc(kept)
+        return TeamFlow(doc, None if same else flow_doc_of(kept), None if same else current)
+    last = flow_doc_of(kept)
     if last is None:
         return None
     return TeamFlow(last, problems=tuple(problems) or ("the flow could not be read",))
@@ -333,6 +334,7 @@ class RepoFacts:
     was: Mapping[str, Any] | None = None
     may_start: bool = False
     within_size: bool = False
+    named: Callable[[str], Mapping[str, Any] | None] | None = None  # another flow's doc by its name, for a switch
 
 
 def _files_for(repo: RepoFacts, live: Mapping[str, Any] | None) -> tuple[str | None, list[str] | None]:
@@ -351,6 +353,20 @@ def _row_of(entries: Iterable[dict[str, Any]], tid: str) -> dict[str, Any] | Non
         if not e.get("work_order") and TD_ID.fullmatch(str(e.get("id"))) and ledgerboard._num(str(e["id"])) == n:
             return e
     return None
+
+
+def _written_under(repo: RepoFacts, name: Any) -> Mapping[str, Any] | None:
+    """The flow a record was written under, where the pass can read it: the team's replaced copy where it bears the
+    record's flow name, else, after a switch, the flow of that name as found now (§4.9d *The flow pick and a switch*),
+    so a stage whose key the new flow keeps under another kind still reads as gone. None: the record is on the flow
+    that runs, or its flow is no longer found, and a key the flow has reads as known."""
+    if not isinstance(name, str) or not name:
+        return None
+    if repo.was is not None and repo.was.get("name") == name:
+        return repo.was
+    if repo.named is None or name == repo.doc.get("name"):
+        return None
+    return repo.named(name)
 
 
 def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> EntryFacts | None:
@@ -383,7 +399,7 @@ def facts_on(repo: RepoFacts, tid: str, record: Mapping[str, Any] | None) -> Ent
         rows=repo.rows,
         held=repo.held or (),
         branches=repo.branches,
-        was=repo.was if repo.was is not None and repo.was.get("name") == written_under else None,
+        was=_written_under(repo, written_under),
         session=repo.sessions.get(holder) if holder and repo.sessions is not None else None,
         open_ask=bool(holder) and holder in repo.open_asks,
         read_at=read_at,
