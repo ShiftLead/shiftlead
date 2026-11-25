@@ -53,6 +53,20 @@ def line_text(record: Mapping[str, Any], reason: str) -> str:
     return f"The built-in seat for {seat} stopped on {lane}: {reason}. Close this line to have it offered again."
 
 
+def home_line(
+    root: Path, today: Callable[[], str] = lambda: date.today().isoformat()
+) -> Callable[[Mapping[str, Any], str], str | None]:
+    """The writer of the home's plain board line for a job sent to the person (`board.add`): it returns the line's
+    eight hex digits, the form a job keeps its `person_line` in, or None."""
+
+    def line(record: Mapping[str, Any], reason: str) -> str | None:
+        got = board.add(root, line_text(record, reason), today())
+        key = str(got.get("key") or "")
+        return key[len(workorders.PREFIX) :] if key.startswith(workorders.PREFIX) else None
+
+    return line
+
+
 def reach_for(
     call: Callable[..., Any],
     org: Callable[[], orgmod.Org | None],
@@ -84,18 +98,13 @@ def reach_for(
         made = stage_start.start(call, read, teamdef, got)
         return stage_start.holder_of(got, made) if made else None
 
-    def line(record: Mapping[str, Any], reason: str) -> str | None:
-        got = board.add(root, line_text(record, reason), today())
-        key = str(got.get("key") or "")
-        return key[len(workorders.PREFIX) :] if key.startswith(workorders.PREFIX) else None
-
     def close_line(line_id: str) -> None:
         board.write_back(root, None, "", "done", key=f"{workorders.PREFIX}{line_id}", why="its job's object is gone")
 
     return JobReach(
         start=start,
         claim=lambda holder, ref: stage_start.claim(call, holder, ref),
-        line=line,
+        line=home_line(root, today),
         close_line=close_line,
         end=lambda holder: stage_start.end(call, holder, "its job record no longer names it"),
     )

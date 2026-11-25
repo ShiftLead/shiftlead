@@ -4,7 +4,8 @@ verdict is on the stage record*, *One holder ends a stage*, *Where an outcome go
 The host agent calls `call` through the `shiftlead.home_calls` entry point, since `sessionorc` never imports this
 package. One repo's calls run one at a time: the store's lock is held from the record's read to its write. Each
 outcome's fact is read here, from the session's worktree and the forge, never taken from the session. Nothing calls
-this until a stage's session exists (TD-2051's offer); an audit's outcomes are TD-2053's.
+this until a stage's session exists (TD-2051's offer); an audit's outcomes are TD-2053's, and a job's are
+`stage_job_end`'s.
 """
 
 from __future__ import annotations
@@ -397,7 +398,10 @@ def call(
     seen: dict[str, Any] | None = None,
 ) -> dict:
     """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`. `seen` is a
-    node session's worktree as its node read it; `root` is then the home's checkout of that repo."""
+    node session's worktree as its node read it; `root` is then the home's checkout of that repo. `tid` is the entry the
+    session holds, or a job's work order reference (`board:<8 hex>`, `pr:<n>`), whose outcomes `stage_job_end` takes."""
+    from shiftlead import stage_job_end, stage_job_tick  # stage_job_end imports this module
+
     store = StageStore(root)
     try:
         text = store.flow(team) if team else None
@@ -407,6 +411,19 @@ def call(
             doc = repoconfig.parse_yaml(text)
         except yaml.YAMLError:  # a stored flow edited by hand into bad YAML is a refusal, not a failed call (TD-2150)
             return {"refused": f"team {team}'s flow on the state branch cannot be read"}
+        facts = ForgeFacts(directory) if seen is None else NodeFacts(root, seen)
+        if stage_job_end.is_ref(tid):  # a built-in seat's job session holds its work order, not an entry (TD-2053)
+            return stage_job_end.end_job(
+                store,
+                tid,
+                caller,
+                outcome,
+                reason,
+                doc,
+                facts,
+                stage_job_tick.home_line(Path(root)),
+                board=stage_job_end.board_dir(root),
+            )
         return end(
             store,
             tid,
@@ -414,7 +431,7 @@ def call(
             outcome,
             reason,
             doc,
-            ForgeFacts(directory) if seen is None else NodeFacts(root, seen),
+            facts,
             _person_of(Path(root)),
         )
     except (Refused, StateError) as e:
