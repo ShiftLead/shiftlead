@@ -764,6 +764,7 @@ class SettingsMixin:
         """The home's `host` record's `teams.<team>.switching` set to `flow`, or cleared (§4.9d *A switch is recorded
         before it is made*), saved before the caller goes on."""
         teams = self._host_rec.setdefault("teams", {})
+        before = copy.deepcopy(teams.get(name))
         rec = teams.setdefault(name, {})
         if flow is None:
             rec.pop("switching", None)
@@ -771,7 +772,14 @@ class SettingsMixin:
                 teams.pop(name, None)
         else:
             rec["switching"] = flow
-        self.host_store.save(self._host_rec)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:  # the record in memory is put back, so it never says what the file does not
+            if before is None:
+                teams.pop(name, None)
+            else:
+                teams[name] = before
+            raise
 
     async def _stage_quiet(self) -> None:
         """Wait out a stage pass already running (TD-2051's), which read the team before its switch was marked."""
@@ -824,9 +832,10 @@ class SettingsMixin:
             teamstore.switch(copy.deepcopy(doc), name, want, version, ())  # its refusals first, on a copy
         except teamstore.TeamError as e:
             raise RpcError(str(e)) from None
+        rows = await self._team_rows(doc, name)
+        # no await between the check and the mark, so two presses at once cannot both pass it
         if (under := switching(self._host_rec.get("teams"), name)) is not None:
             raise RpcError(f"{name} is already switching to {under}")
-        rows = await self._team_rows(doc, name)
         try:
             self._mark_switching(name, want)
         except OSError as e:
@@ -835,8 +844,16 @@ class SettingsMixin:
             await self._stage_quiet()
             words = await self._switch_finish(name, want, doc, rows, check=True)
         except BaseException:
-            with contextlib.suppress(OSError):
+            try:
                 self._mark_switching(name, None)
+            except OSError:
+                log.error(
+                    "team %s's refused switch to %s is still marked in the home's record on disk: a restart would"
+                    " finish it; clear teams.%s.switching in host.json by hand",
+                    name,
+                    want,
+                    name,
+                )
             raise
         return {"team": name, "change": words, "version": teamstore.version(settings_mod.load(), name)}
 

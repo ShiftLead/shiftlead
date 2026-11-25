@@ -189,13 +189,13 @@ def test_the_preview_of_a_flow_the_team_cannot_run_is_refused(on_store):
 def test_the_push_writes_the_copy_once_and_answers_the_new_keys(on_store):
     store, roots = on_store
     args = {"team": "t", "flow": "lean", "doc": _doc(), "rows": ROWS, "here": "home", "roots": roots}
-    assert team_show.switch_push(**args) == ["build", "docs"]
+    assert team_show.switch_push(**args) == ["build"], "docs is kept as a key but changes kind"
     assert store.puts == [("t", "name: lean\n")]
     team_show.switch_push(**args)
     assert len(store.puts) == 1, "a copy that already is the new flow's is not pushed again"
     with pytest.raises(ValueError, match="no login in its list offers fable"):
         team_show.switch_push(**{**args, "flow": "pricey"})
-    assert team_show.switch_push(**{**args, "flow": "pricey", "check": False}) == ["build", "docs"]
+    assert team_show.switch_push(**{**args, "flow": "pricey", "check": False}) == ["build"]
 
 
 # -- the settings write ---------------------------------------------------------------------------------------------
@@ -367,3 +367,37 @@ def test_a_live_session_of_the_team_is_named_in_every_form_a_holder_takes(agent)
     live = [SimpleNamespace(id="ao-t-1", team="t", state="working"), SimpleNamespace(id="x", team="u", state="working")]
     a = agent(SimpleNamespace(), live)
     assert set(a._team_live("t")) == {"ao-t-1", "ao-t-1@home"}
+
+
+def test_a_mark_the_disk_refuses_is_not_kept_in_memory(agent):
+    a = agent(_body([]))
+    a._host_rec = {"teams": {"t": {"started": {"since": "x"}}}}
+
+    def full(_rec):
+        raise OSError("disk full")
+
+    a.host_store = SimpleNamespace(save=full)
+    with pytest.raises(RpcError, match="record could not be written"):
+        asyncio.run(a.rpc_team_switch(team="t", flow="lean", version=ts.version(settings_mod.load(), "t")))
+    assert a._host_rec["teams"] == {"t": {"started": {"since": "x"}}}, "the team is not left skipped by the pass"
+
+
+def test_two_presses_at_once_make_one_switch(agent):
+    pushes = []
+    a = agent(_body(pushes))
+
+    async def go():
+        v = ts.version(settings_mod.load(), "t")
+        return await asyncio.gather(
+            a.rpc_team_switch(team="t", flow="lean", version=v),
+            a.rpc_team_switch(team="t", flow="lean", version=v),
+            return_exceptions=True,
+        )
+
+    got = asyncio.run(go())
+    assert pushes == ["lean"] and sum(isinstance(g, RpcError) for g in got) == 1
+
+
+def test_a_number_is_kept_only_for_a_stage_of_the_same_key_and_kind():
+    assert team_show._keys(NEW, OLD) == ["build"], "docs is a review now, not a build: its number goes"
+    assert team_show._keys(NEW, None) == ["build", "docs"]

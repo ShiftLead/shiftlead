@@ -382,8 +382,19 @@ def choices(
     ]
 
 
-def _keys(flow_doc: Mapping[str, Any]) -> list[str]:
-    return [flow3.key_of(s.get("name")) for s in _maps(flow_doc.get("stages"))]
+def _keys(flow_doc: Mapping[str, Any], old: Any = None) -> list[str]:
+    """The new flow's stage keys whose sessions-at-once number a switch keeps: each the old flow has under the same
+    kind, or does not have at all (§4.9d: a stage is kept by its key and kind)."""
+    was = (
+        {flow3.key_of(s.get("name")): s.get("does") for s in _maps(old.get("stages"))}
+        if isinstance(old, Mapping)
+        else {}
+    )
+    return [
+        k
+        for s in _maps(flow_doc.get("stages"))
+        if (k := flow3.key_of(s.get("name"))) not in was or was[k] == s.get("does")
+    ]
 
 
 def _picked(
@@ -465,7 +476,7 @@ def switch_preview(
     store = StageStore(root)
     old = _flow_doc(team, str(entry.get("flow") or ""), store, where)
     lines = switch_lines(store.entries().values(), team, row["doc"], old, live)
-    keys = set(_keys(row["doc"]))
+    keys = set(_keys(row["doc"], old))
     numbers = entry.get("at_once") if isinstance(entry.get("at_once"), Mapping) else {}
     return {
         **out,
@@ -495,7 +506,8 @@ def switch_push(
     if root is None:
         raise StateError(f"{doc['teams'][team]['repo']} is not a registered checkout here")
     store = StageStore(root)
+    old = _flow_doc(team, str(doc["teams"][team].get("flow") or ""), store, where)
     with store.locked():
         if store.flow(team) != row["text"]:
             store.put_flow(team, row["text"])
-    return _keys(row["doc"])
+    return _keys(row["doc"], old)
