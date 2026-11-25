@@ -69,6 +69,30 @@ async def test_a_wound_down_team_s_tech_lead_answers_while_a_session_finishes(ag
     assert agent._builtin_hold(lead, [lead, finishing]) == {"at": "2026-12-01T10:00:00Z", "by": "person", "team": "a"}
 
 
+def _decoy(agent, case: str) -> Session:
+    """A live record of team a that is no finishing session of it: each case fails one clause of the reading."""
+    s = _member(agent, f"decoy-{case}", "a")
+    if case == "superseded":
+        s.superseded_by = "ao-t-elsewhere"
+    elif case == "attended":
+        s.unattended = False
+    elif case == "first-shape seat":
+        s.seat = {"trigger": "asks"}
+    elif case == "built-in record":
+        s.builtin = "sweeper"
+    return s
+
+
+@pytest.mark.parametrize("case", ["superseded", "attended", "first-shape seat", "built-in record"])
+async def test_no_seat_superseded_or_attended_record_keeps_a_wound_down_tech_lead_on(agent, case):
+    await _cut(agent, a=_stopped())
+    lead = _seat(agent, "techlead-a", "techlead", team="a")
+    lead.state = "working"  # a live lead is never its own team's finishing session
+    assert agent._builtin_hold(lead, [lead]) == {"at": "2026-12-01T10:00:00Z", "by": "person", "team": "a"}
+    decoy = _decoy(agent, case)
+    assert agent._builtin_hold(lead, [lead, decoy]) == {"at": "2026-12-01T10:00:00Z", "by": "person", "team": "a"}
+
+
 async def test_another_team_s_session_keeps_no_tech_lead_running(agent):
     await _cut(agent, a=_stopped("until"), b=STARTED)
     lead = _seat(agent, "techlead-a", "techlead", team="a")
