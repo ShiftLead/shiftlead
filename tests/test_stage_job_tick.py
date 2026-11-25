@@ -194,3 +194,66 @@ def test_a_job_waiting_merging_is_merged_after_the_seats_pass(store):
     assert landed == [(4, "f" * 40)] and "pr-4" not in made, "a job waiting on its merge is offered no session"
     assert got["unheld-pull-requests"][-1].act == stage_job_tick.MERGING
     assert a_run(store, [], rows=rows)["unheld-pull-requests"] is not None and len(landed) == 1, "no gate, no merge"
+
+
+def a_merging_job(store: StageStore, team: str = "t") -> dict[str, Any]:
+    record = {
+        **stage_job.new_job("unheld-pull-requests", 4, team, "2026-11-20T00:00:00Z"),
+        "pr": 4,
+        "stage": "build",
+        "waits": "merging",
+        "merging": {"head": "f" * 40, "stage": "build", "outcome": "work-pushed"},
+    }
+    store.put_job(record, "test: merging")
+    return record
+
+
+def a_gate_land(gated: list[tuple[int, str]], landed: list[tuple[int, str]]) -> tuple[Any, Any]:
+    def gate(pr: int, head: str) -> dict[str, Any]:
+        gated.append((pr, head))
+        return {"verdict": "pass", "failed": []}
+
+    return gate, lambda pr, head: landed.append((pr, head))
+
+
+@pytest.mark.parametrize("state", ["merged", "closed"])
+def test_a_job_whose_pull_request_is_no_longer_open_is_merged_by_nothing(store, state):
+    a_merging_job(store)
+    gated: list[tuple[int, str]] = []
+    landed: list[tuple[int, str]] = []
+    rows = [{"number": 4, "state": state, "head": "f" * 40}]
+    got = stage_job_tick.merges(store, rows, {"t": FLOW}, a_gate_land(gated, landed), reach([]))
+    assert gated == [] and landed == [], f"a {state} pull request's head is not the job's to merge"
+    assert [s.act for s in got["unheld-pull-requests"]] == [stage_job_tick.MERGING], "the job is read as unread"
+
+
+def test_a_job_whose_teams_flow_is_not_read_is_left_unmerged(store):
+    a_merging_job(store, team="t")
+    gated: list[tuple[int, str]] = []
+    landed: list[tuple[int, str]] = []
+    rows = [{"number": 4, "state": "open", "head": "f" * 40}]
+    got = a_run(store, [], rows=rows, docs={"other": FLOW}, gate_land=a_gate_land(gated, landed))
+    assert gated == [] and landed == [], "a job whose team's flow is not read this pass is left as it is"
+    assert stage_job_tick.MERGING not in [s.act for s in got["unheld-pull-requests"] or ()]
+    assert store.job(stage_job.key_of("unheld-pull-requests", 4))["waits"] == "merging"
+
+
+def test_a_seat_whose_pass_failed_gets_no_merge_steps(store, monkeypatch):
+    from shiftlead import stage_job_pass
+
+    a_merging_job(store)
+    real = stage_job_pass.seat_pass
+
+    def seat_pass(store_, seat, *a: Any, **k: Any) -> Any:
+        if seat == "unheld-pull-requests":
+            raise RuntimeError("this seat's pass failed")
+        return real(store_, seat, *a, **k)
+
+    monkeypatch.setattr(stage_job_pass, "seat_pass", seat_pass)
+    gated: list[tuple[int, str]] = []
+    landed: list[tuple[int, str]] = []
+    rows = [{"number": 4, "state": "open", "head": "f" * 40}]
+    got = a_run(store, [], rows=rows, gate_land=a_gate_land(gated, landed))
+    assert landed == [(4, "f" * 40)], "the merge still runs"
+    assert got["unheld-pull-requests"] is None, "a seat whose pass failed stays None, its merge steps not added"
+    assert got["board-answers"] is not None

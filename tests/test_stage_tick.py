@@ -234,3 +234,44 @@ def test_a_job_whose_object_is_gone_is_closed_by_the_tick(root: Path, quiet: lis
     got = a_pass(root, Kept(), orders=[], pr_orders=[], boards={"boards": []})
     assert got.jobs["board-answers"][0].act.case == "object-gone"
     assert StageStore(root).job("board-1a2b3c4d")["closed_at"]
+
+
+@pytest.mark.integration
+def test_a_merging_job_is_landed_through_the_repos_gate_and_land(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from shiftlead import stage_job
+
+    made: list[str] = []
+    gated: list[tuple[int, str]] = []
+    landed: list[tuple[int, str]] = []
+
+    def gate(pr: int, head: str) -> dict[str, Any]:
+        gated.append((pr, head))
+        return {"verdict": "pass", "failed": []}
+
+    def gate_and_land(where: Any) -> tuple[Any, Any]:
+        made.append(str(where))
+        return gate, lambda pr, head: landed.append((pr, head))
+
+    monkeypatch.setattr(stage_end, "_person_of", lambda _root: "paul")
+    monkeypatch.setattr(stage_merge, "gate_and_land", gate_and_land)
+    record = {
+        **stage_job.new_job("unheld-pull-requests", 4, "t", "2026-11-20T00:00:00Z"),
+        "pr": 4,
+        "stage": "build",
+        "waits": "merging",
+        "merging": {"head": "f" * 40, "stage": "build", "outcome": "work-pushed"},
+    }
+    StageStore(root).put_job(record, "test: merging")
+    real = stage_tick.stage_pass.repo_pass  # the teams' pass over no team, so it makes no gate and land of its own
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_pass", lambda s, st, _flows, *a, **k: real(s, st, {}, *a, **k))
+    kept = Kept()
+    a_pass(
+        root,
+        kept,
+        orders=[],
+        pr_orders=[],
+        boards={"boards": []},
+        prs={"open": [{"number": 4, "state": "open", "head": "f" * 40}], "recent": []},
+    )
+    assert made == [str(root)] and kept.gate_land is not None, "the pass makes the repo's gate and land once"
+    assert gated == [(4, "f" * 40)] and landed == [(4, "f" * 40)], "the job is landed through that gate and land"
