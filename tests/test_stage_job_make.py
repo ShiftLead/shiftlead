@@ -41,6 +41,8 @@ class World:
         self.claims: list[tuple[str, str]] = []
         self.lines: list[tuple[str, str]] = []
         self.closed: list[str] = []
+        self.ended: list[str] = []
+        self.end_fails = False
 
     def reach(self) -> stage_job_make.JobReach:
         def start(record, came):
@@ -55,7 +57,12 @@ class World:
             self.lines.append((record["id"], reason))
             return self.line_id
 
-        return stage_job_make.JobReach(start, claim, line, self.closed.append)
+        def end(holder):
+            if self.end_fails:
+                raise RuntimeError("no answer")
+            self.ended.append(holder)
+
+        return stage_job_make.JobReach(start, claim, line, self.closed.append, end)
 
 
 GO = JobReading(may_start=True)
@@ -118,7 +125,7 @@ def test_a_lost_job_is_offered_again_once_and_the_lost_session_named_to_end(stor
     assert act == JobAct("offer-again", "lost")
     w = World(holder="s-2")
     got = make(store, act, s, w)
-    assert got.made and got.end == "s-0"
+    assert got.made and got.end is None and w.ended == ["s-0"]
     assert (store.job(KEY)["holder"], store.job(KEY)["offers"]) == ("s-2", 2)
     assert w.started[0][0]["holder"] is None
 
@@ -186,3 +193,41 @@ def test_a_stage_gone_starts_again_on_its_own_team_never_the_person(store):
     r = store.job(KEY)
     assert got.made and got.end == "s-4" and (r["team"], r["stage"], r["waits"]) == ("t", None, None)
     assert not w.lines
+
+
+def test_a_silent_holder_is_ended_before_another_session_starts(store):
+    put(store, holder="s-0", offers=1)
+    s = JobReading(may_start=True, holder=Holder(lease_lapsed=True))
+    act = stage_job.choose(store.job(KEY), s)
+    assert act is not None and act.name == "offer-again"
+    w = World()
+    w.end_fails = True
+    got = make(store, act, s, w)
+    assert not got.made and not w.started and store.job(KEY)["holder"] == "s-0"
+
+
+def test_offer_again_with_no_session_started_keeps_the_count_for_the_next_pass(store):
+    put(store, holder="s-0", offers=1)
+    s = JobReading(may_start=True, holder=Holder(ended=True))
+    got = make(store, JobAct("offer-again", "lost"), s, World(holder=None))
+    assert not got.made and got.end is None and store.job(KEY)["offers"] == 1
+
+
+def test_a_start_that_raises_is_that_jobs_failure(store):
+    w = World()
+
+    def boom(_r, _c):
+        raise RuntimeError("tmux")
+
+    reach = w.reach()
+    reach = stage_job_make.JobReach(boom, reach.claim, reach.line, reach.close_line, reach.end)
+    got = stage_job_make.make(
+        store, KEY, JobAct("offer", "new"), GO, reach, seat="board-answers", obj="1a2b3c4d", team="t", opened_at="x"
+    )
+    assert not got.made and "tmux" in got.why and store.job(KEY) is None
+
+
+def test_an_object_gone_not_waiting_on_the_person_closes_no_line(store):
+    put(store)
+    w = World()
+    assert make(store, JobAct("reconcile", "object-gone"), JobReading(live=False), w).made and w.closed == []

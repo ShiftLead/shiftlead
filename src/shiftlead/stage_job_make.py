@@ -28,12 +28,13 @@ class JobReach:
     """How a job's act reaches the world. `start(record, came)` starts the job's session and returns its address, or
     None; `claim(holder, ref)` writes the holder's claim on the job's work order and returns why it was refused, or
     None; `line(record, reason)` adds the home's plain board line naming the seat, the object and the reason and
-    returns its id, or None; `close_line(id)` closes that line."""
+    returns its id, or None; `close_line(id)` closes that line; `end(holder)` ends a session."""
 
     start: Callable[[Mapping[str, Any], str | None], str | None]
     claim: Callable[[str, str], str | None]
     line: Callable[[Mapping[str, Any], str], str | None]
     close_line: Callable[[str], None]
+    end: Callable[[str], None]
 
 
 def _offer(store: StageStore, record: dict[str, Any], act: JobAct, reach: JobReach) -> Made:
@@ -41,7 +42,10 @@ def _offer(store: StageStore, record: dict[str, Any], act: JobAct, reach: JobRea
     session whose claim or record could not be written is named for the caller to end; the next pass offers afresh."""
     stage = record.get("stage")
     came = _came(record, str(stage))[0] if stage else None  # a job sent back by a review is told why
-    holder = reach.start(record, came)
+    try:
+        holder = reach.start(record, came)
+    except Exception as e:  # noqa: BLE001 — one job's failure is that job's
+        return Made(False, f"the session could not be started: {e}")
     if holder is None:
         return Made(False, "no session was started")
     try:
@@ -55,7 +59,10 @@ def _offer(store: StageStore, record: dict[str, Any], act: JobAct, reach: JobRea
 
 def _to_person(store: StageStore, record: dict[str, Any], reason: str, reach: JobReach) -> Made:
     """The job waits on the person: the home's plain line written first, its id kept on the record."""
-    line = reach.line(record, reason)
+    try:
+        line = reach.line(record, reason)
+    except Exception as e:  # noqa: BLE001 — one job's failure is that job's; the next pass writes it
+        return Made(False, f"the home's board line could not be written: {e}")
     if not line:
         return Made(False, "the home's board line could not be written")
     store.put_job(stage_job.to_person(record, line), f"to the person: {reason}")
@@ -66,7 +73,10 @@ def _gone(store: StageStore, record: dict[str, Any], reach: JobReach) -> Made:
     """The object is gone: the home's own line closed where the job waited on the person, then the record."""
     line = record.get("person_line")
     if record.get("waits") == "person" and line:
-        reach.close_line(str(line))
+        try:
+            reach.close_line(str(line))
+        except Exception as e:  # noqa: BLE001 — the record stays open, so the next pass closes the line again
+            return Made(False, f"the home's line could not be closed: {e}")
     store.put_job(stage_job.closed(record), "closed: its object is gone")
     return Made(True)
 
@@ -101,7 +111,13 @@ def make(
         elif act.name == "offer-again" and act.case == "to-person":
             got = _to_person(store, record, LOST_TWICE, reach)
         elif act.name == "offer-again":
+            try:  # a silent holder may still run: it is ended before another takes the job (§4.9d)
+                reach.end(str(held))
+            except Exception as e:  # noqa: BLE001 — nothing is started beside it; the next pass tries again
+                return Made(False, f"the silent session could not be ended: {e}")
             got = _offer(store, {**record, "holder": None}, act, reach)
+            if got.made:
+                return got  # the old holder is ended already
         elif act.case == "object-gone":
             got = _gone(store, record, reach)
         elif act.case == "pr-closed":
