@@ -16,7 +16,7 @@ from importlib.metadata import entry_points
 from pathlib import PurePath
 from typing import Any
 
-from sessionorc import hosts, naming, teamstore, workorders
+from sessionorc import hosts, naming, seams, teamstore, workorders
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import ACT_TIMEOUT, RpcError, log
 from sessionorc.agent_ids import origin_key
@@ -58,6 +58,27 @@ def stage_teams(
         if isinstance(team, str) and teamstore.switched(doc, team) and not switching(host_teams, team):
             out.setdefault(str(entry["repo"]).strip(), {})[team] = copy.deepcopy(dict(entry))
     return out
+
+
+def job_readings(reading: Mapping[str, Any]) -> dict[str, Any]:
+    """What the built-in seats' jobs read of a repo reading (§4.9c *Two of the five are not seats today*): its work
+    orders (the board's open decided lines), its pull request orders and its boards, as copies for the pass's thread,
+    the keys `shiftlead.stage_tick.run` takes. None of them where any cannot be judged by: an unserved repo (§5 *The
+    seams*), whose lanes read no order, or a reading of the orders, the boards or the pull requests that is missing
+    or failed (a board read that failed keeps its last good copy beside its `error`, and is still refused), since a
+    job whose object the pass cannot see would read as gone and be closed. A reading with no `pr_orders` at all has
+    none: the tick writes that key only once its orders differ from none."""
+    if seams.unserved(reading):
+        return {}
+    wos, bds, prs = reading.get("work_orders"), reading.get("boards"), reading.get("prs")
+    pos = reading.get("pr_orders", {})  # a repo never red has no key
+    if not all(isinstance(x, Mapping) and "error" not in x for x in (wos, pos, bds, prs)):
+        return {}
+
+    def orders(got: Mapping[str, Any]) -> list[dict[str, Any]]:
+        return [copy.deepcopy(dict(o)) for o in got.get("orders") or () if isinstance(o, Mapping) and o.get("id")]
+
+    return {"orders": orders(wos), "pr_orders": orders(pos), "boards": copy.deepcopy(bds)}
 
 
 def _named(path: Any, name: str) -> bool:
@@ -227,7 +248,8 @@ class StageMixin:
         """One pass over every repo with switched teams, each in a thread of its own (`shiftlead.stage_tick.run`, whose
         gate can take as long as the cadence check). What only the home holds is read here, on the loop, and handed
         over as copies: the repo facts of `_refresh_repos`' last reading (a repo not read yet waits for it), the graph,
-        the nodes whose snapshot has arrived, every node's checkouts of the repo and the `host` record's teams."""
+        the nodes whose snapshot has arrived, every node's checkouts of the repo and the `host` record's teams, and what
+        the built-in seats' jobs read of it (`job_readings`)."""
         try:
             doc = await asyncio.to_thread(settings_mod.read)
             host_teams = copy.deepcopy(self._host_rec.get("teams") or {})  # type: ignore[attr-defined]
@@ -263,6 +285,7 @@ class StageMixin:
                     "local": self.host,  # type: ignore[attr-defined]
                     "call": call,
                     "kept": kept.setdefault(root, calls.Kept()),
+                    **job_readings(reading),
                 }
                 jobs.append(self._stage_repo(calls, root, args))
             await asyncio.gather(*jobs)
