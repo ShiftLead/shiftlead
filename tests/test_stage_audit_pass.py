@@ -155,9 +155,50 @@ def test_a_lost_run_is_offered_again_on_its_base_and_its_old_holder_is_ended(sto
     w = World(head="c0ffee")
     got = one(store, facts(), w)  # s-9 has no record: ended, so lost
     assert (got.act.name, got.act.case) == ("offer-again", "lost") and got.made.made
-    assert w.started == [("t", "docs", "beef", "lost")] and w.ended == ["s-9"]
+    assert w.started == [("t", "docs", "beef", "lost")] and w.ended == []  # gone: nothing to end
     run = store.audit("t", "docs")
     assert (run["holder"], run["base"], run["offers"]) == ("s-1", "beef", 2)
+
+
+def test_a_lapsed_lease_whose_session_still_runs_is_ended_before_the_run_is_offered_again(store):
+    store.put_audit("t", "docs", stage_audit.started("s-9", "beef", NOW - timedelta(hours=14)))
+    s9 = session("s-9")
+    s9.progress = [ProgressEntry(ref=LEASE, at=stamp(NOW - timedelta(hours=13)))]
+    w = World()
+    order = []
+    base = w.reach()
+    reach = AuditReach(
+        lambda *a: order.append("start") or base.start(*a),
+        base.claim,
+        lambda h: order.append(f"end {h}"),
+        base.head,
+        base.merged_since,
+    )
+    (got,) = stage_audit_pass.audit_pass(store, facts(sessions={"s-9": s9}), reach)
+    assert (got.act.name, got.act.case) == ("offer-again", "lost") and got.made.made
+    assert order == ["end s-9", "start"] and store.audit("t", "docs")["holder"] == "s-1"
+
+
+def test_a_run_whose_holder_moved_since_it_was_read_is_not_written(store):
+    store.put_audit("t", "docs", stage_audit.started("s-9", "beef", NOW - timedelta(hours=1)))
+    f, w = facts(), World()
+    s = stage_audit_pass.reading_on(
+        "t", "docs", store.audit("t", "docs"), stage_audit.clock("10 merged-pull-requests"), f, w.reach()
+    )
+    act = stage_audit.choose(store.audit("t", "docs"), stage_audit.clock("10 merged-pull-requests"), s, NOW)
+    store.put_audit("t", "docs", stage_audit.started("s-8", "beef", NOW - timedelta(hours=1)))
+    got = stage_audit_pass.make(
+        store, "t", "docs", stage_audit.clock("10 merged-pull-requests"), act, s, f, w.reach(), was="s-9"
+    )
+    assert not got.made and w.started == [] and store.audit("t", "docs")["holder"] == "s-8"
+
+
+def test_a_rest_whose_head_is_not_read_ends_nothing(store):
+    run = {**stage_audit.started("s-9", "beef", NOW - timedelta(hours=5)), "offers": 2}
+    store.put_audit("t", "docs", run)
+    w = World(head=None)
+    got = one(store, facts(sessions={"s-9": session("s-9", idle=timedelta(hours=3))}), w)
+    assert got.act.name == "rest" and not got.made.made and w.ended == []
 
 
 def test_a_silent_holder_is_ended_before_the_run_is_offered_again(store):
@@ -174,7 +215,7 @@ def test_lost_a_second_time_the_run_rests_from_the_head_and_the_person_is_told(s
     w = World(head="c0ffee")
     got = one(store, facts(), w)
     assert (got.act.name, got.act.case) == ("rest", "lost") and got.made.made and got.tell
-    assert w.started == [] and w.ended == ["s-9"]
+    assert w.started == [] and w.ended == []
     rested = store.audit("t", "docs")
     assert rested["holder"] is None and rested["base"] == "c0ffee" and rested["ended"]["outcome"] == "lost"
     assert rested["started_at"] == stamp(NOW)
@@ -233,9 +274,11 @@ def test_the_count_is_the_first_parent_commits_after_the_base_and_an_unreached_b
 # -- the tick --------------------------------------------------------------------------------------------------------
 
 
-def test_the_tick_runs_no_audit_while_no_team_is_started(store, root):
+def test_the_tick_runs_no_audit_while_no_team_is_started(store, root, monkeypatch):
+    org = type("Org", (), {"teams": {"t": object()}})()
+    monkeypatch.setattr(stage_tick, "_docs", lambda *_: pytest.fail("no team started reads no flow"))
     got = stage_tick._audits(
-        store, root, "origin/main", {"t": {"flow": "x"}}, {}, None, "here", lambda **_: {}, lambda: None, NOW
+        store, root, "origin/main", {"t": {"flow": "x"}}, {}, None, "here", lambda **_: {}, lambda: org, NOW
     )
     assert got == ()
 

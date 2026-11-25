@@ -7,11 +7,14 @@ keyed by the team and the audit's key), reads its holder as an entry's is (`stag
 
 - **start**: a fresh session of the audit (`AuditReach.start`) holds the run, with its claim on the lease, and the
   record is written as the run starts (`stage_audit.started`), its base the default branch's head then;
-- **offer-again**: a lost, silent or stopped run is offered once more; a silent holder is ended first, and the run's
-  start and base stand (`stage_audit.again`);
-- **rest**: lost again, the run ends as `lost` with its clock afresh from now and the head (`stage_audit.rested`); a
-  silent holder is ended. The person is told with one note, which is the caller's: a step whose act is `rest` and
-  whose write was made says so (`AuditStep.tell`), as `RepoPass.tell` does of a flow.
+- **offer-again**: a lost, silent or stopped run is offered once more, its start and base standing
+  (`stage_audit.again`);
+- **rest**: lost again, the run ends as `lost` with its clock afresh from now and the head (`stage_audit.rested`).
+
+A holder still running (silent, or its lease lapsed) is ended before either, since a run's session always takes the
+same name (`stage_audit_start.name_of`); one already gone is not ended again. At a rest the person is told with one
+note, which is the caller's: a step whose act is `rest` and whose write was made says so (`AuditStep.tell`), as
+`RepoPass.tell` does of a flow.
 
 What reaches the world is an `AuditReach`, so one audit's failure is that audit's. The pull requests merged since a
 base are counted as the default branch's first-parent commits after it (`merged_since`): each squash or merge of a
@@ -181,31 +184,33 @@ def make(
     s: AuditReading,
     f: AuditFacts,
     reach: AuditReach,
+    *,
+    was: str = "",
 ) -> Made:
-    """Write `act` on the audit `key` of `team`, if a fresh read under the lock still chooses it."""
+    """Write `act` on the audit `key` of `team`, if a fresh read under the lock still chooses it and names the holder
+    `was` that `s` read. A holder still running (silent, or its lease lapsed) is ended before anything starts, since
+    the run's session takes the same name; one already gone is not ended again."""
     with store.locked():
         run = store.audit(team, key)
-        if stage_audit.choose(run, every, s, f.now) != act:
-            return Made(False, "the run record moved since it was read")
         held = str(run.get("holder") or "") if run else ""
-        if held and act.case == "silent":
-            try:  # a silent holder may still run: it is ended before another takes the run (§4.9c, act 4)
-                reach.end(held)
-            except Exception as e:  # noqa: BLE001 — nothing is started beside it; the next pass tries again
-                return Made(False, f"the silent session could not be ended: {e}")
-        if act.name == "rest":
+        if held != was or stage_audit.choose(run, every, s, f.now) != act:
+            return Made(False, "the run record moved since it was read")
+        base = None
+        if act.name == "rest":  # read before a holder is ended, so a head not read ends nothing
             base = reach.head()
             if not base:
                 return Made(False, "the default branch's head could not be read")
-            store.put_audit(team, key, stage_audit.rested(run or {}, act, base, f.now))
-            got = Made(True)
-        elif act.name in ("start", "offer-again"):
-            got = _offer(store, team, key, None if act.name == "start" else run, act, f, reach)
-        else:
-            return Made(False, f"{act.name} is no audit's act")
-        if got.made and held and act.case != "silent" and got.end is None:
-            return Made(True, got.why, end=held)  # a lapsed lease's session may still run: the act took the run from it
-        return got
+        if held and s.holder is not None and not s.holder.ended:
+            try:  # a holder may still run: it is ended before another takes the run (§4.9c, act 4)
+                reach.end(held)
+            except Exception as e:  # noqa: BLE001 — nothing is started beside it; the next pass tries again
+                return Made(False, f"the session holding the run could not be ended: {e}")
+        if act.name == "rest":
+            store.put_audit(team, key, stage_audit.rested(run or {}, act, str(base), f.now))
+            return Made(True)
+        if act.name in ("start", "offer-again"):
+            return _offer(store, team, key, None if act.name == "start" else run, act, f, reach)
+        return Made(False, f"{act.name} is no audit's act")
 
 
 def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, reach: AuditReach) -> AuditStep:
@@ -224,7 +229,7 @@ def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, 
     if act is None:
         return AuditStep(team, key)
     try:
-        made = make(store, team, key, every, act, s, f, reach)
+        made = make(store, team, key, every, act, s, f, reach, was=str((run or {}).get("holder") or ""))
     except Exception as e:  # noqa: BLE001 — one audit's failure must not stop the pass over the others
         log.exception("the audit act %s %s on %s/%s failed", act.name, act.case, team, key)
         return AuditStep(team, key, act=act, made=Made(False, f"the act failed: {e}"))
