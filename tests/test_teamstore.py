@@ -268,12 +268,17 @@ def test_after_the_cut_over_a_switched_teams_head_reads_its_started_mark(agent):
     from sessionorc.models import Session
 
     live = Session(id="ao-x-s", name="s", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
-    agent._graph = lambda: {live.id: live}
+    live.unattended = True
+    mine = Session(id="ao-x-p", name="p", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
+    gone = Session(id="ao-x-g", name="g", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
+    gone.unattended, gone.superseded_by = True, "ao-x-s"
+    agent._graph = lambda: {r.id: r for r in (live, mine, gone)}  # a person's own and a superseded one: not counted
     doc = settings_mod.load()
     cut = doc.pop("cut_over")
-    agent._host_rec = {"teams": {"a": {"started": {"since": "t", "by": "person"}}}}
-    assert agent._team_head("a", doc)["word"] != "running", "before the cut-over the mark is not read"
+    agent._host_rec = {"teams": {"a": {"stopped": {"at": "t", "by": "person"}}}}
+    assert agent._team_head("a", doc)["word"] == "running", "before the cut-over the mark is not read"
     doc["cut_over"] = cut
+    agent._host_rec = {"teams": {"a": {"started": {"since": "t", "by": "person"}}}}
     assert agent._team_head("a", doc) == {"word": "running", "sessions": 1, "by": None}
     agent._host_rec = {"teams": {"a": {"stopped": {"at": "t", "by": "person"}}}}
     assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 1, "by": "person", "finishing": 1}
