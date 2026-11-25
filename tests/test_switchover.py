@@ -593,7 +593,7 @@ def test_a_login_leaves_its_prompts_on_where_its_unattended_args_lack_the_skip_a
 
 
 @pytest.mark.parametrize("adapter", [claude_code.ClaudeCodeAdapter(), gemini.GeminiAdapter(), grok.GrokAdapter()])
-def test_each_adapter_skips_with_the_args_its_launch_adds(adapter):
+def test_each_adapter_names_skip_args_and_a_login_lacking_them_asks(adapter):
     assert adapter.skip_args and switchover._asks(adapter, []) is False
     assert switchover._asks(adapter, list(adapter.skip_args)) is False
     assert switchover._asks(adapter, ["--other"]) is True
