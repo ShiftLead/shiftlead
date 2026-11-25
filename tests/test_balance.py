@@ -360,14 +360,18 @@ async def test_a_member_of_a_team_over_its_line_is_refused_a_new_claim(agent, tm
 
 
 async def test_a_stage_session_claims_the_one_entry_its_lane_names_over_the_line(agent, tmp_path):
-    """Design §4.9d *Holds new work* (TD-2065): an entry already in a stage carries on while its team is over a line,
-    so the claim of the session the home started for it, its lane that one entry, passes; any other entry, and the
-    same entry from a member whose lane is wider, is refused."""
+    """Design §4.9d *Holds new work* (TD-2065): after the cut-over an entry already in a stage carries on while its
+    team is over a line, so the claim of the session the home started for it, its lane that one entry, passes; any
+    other entry, the same entry from a member whose lane is wider, and any claim before the cut-over (the
+    first shape's rule, §6 *Balance*) is refused."""
     await park_ticks(agent)
     async with LocalClient() as person:
         g = await _member(person, tmp_path, "g1", unattended=True)
         agent.sessions[g].lane = ["TD-900"]
         _mark(agent)
+        with pytest.raises(AgentError, match="over its line"):
+            await person.call("progress", id=g, ref="TD-900", status="claimed")  # before the cut-over: held
+        agent._first_shape_off = True
         await person.call("progress", id=g, ref="TD-900", status="claimed")
         assert any(e.ref == "TD-900" and e.status == "claimed" for e in agent.sessions[g].progress)
         with pytest.raises(AgentError, match="over its line"):

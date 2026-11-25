@@ -5171,9 +5171,9 @@ class HostAgent(
         """The words refusing `s` a new claim on `ref` — or, with `ref` None, its `none` — while its
         team is over its line; None when it passes. A renewal (a claim `s` already holds on `ref`, its
         branch's derived one included: the work is in hand),
-        a pull request as the reference, and a claim on the one entry the session's lane names (a stage's session, its
-        entry already in a stage, which carries on through it: §4.9d *Holds new work*) pass: finishing one is what
-        brings the count down. A refusal
+        a pull request as the reference, and after the cut-over a stage's session's claim on the one entry its lane
+        names (its entry already in a stage, which carries on through it: §4.9d *Holds new work*) pass: finishing one
+        is what brings the count down. A refusal
         of the session's own word is kept on the record (`balance_refused`) so the clearing can ring
         it; one of another's write on its record (a person's `--id`) is not, since the member never
         tried and has nothing to be rung about."""
@@ -5185,7 +5185,9 @@ class HostAgent(
                 return None
             if any(e.ref == ref and e.status == "claimed" for e in s.progress):  # declared or from its branch
                 return None
-            if s.lane == [ref]:  # the home offers a stage session no new entry while the line holds (TD-2065)
+            # after the cut-over a stage's session carries its one entry on: the home offers it no new one while the
+            # line holds (TD-2065); before it, a member whose lane is one entry is held by the first shape's rule
+            if self._first_shape_off and self._holds_stage(s) and s.lane == [ref]:
                 return None
         if self._is_self(s, caller):
             s.balance_refused = {"at": now_iso(), "ref": ref}
