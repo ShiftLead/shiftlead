@@ -14,7 +14,7 @@ import pytest
 
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.models import Session
-from shiftlead import stage_fetch, stage_pass, stage_start
+from shiftlead import stage_fetch, stage_pass, stage_size, stage_start
 from shiftlead.stage_acts import Act
 from shiftlead.stage_fetch import LedgerRead, RepoFacts, SessionsRead
 from shiftlead.stage_make import Made
@@ -721,3 +721,69 @@ def test_a_team_pass_with_no_reading_keeps_its_refusal_runs(store, read_as_given
     assert state.spells[("t", "TD-7")].told
     gone = stage_pass.repo_pass(store, state, {"u": (GOOD, [])}, teams.facts, no_sessions(), teams.reach, local="h")
     assert gone.refused == () and state.spells == {}, "a team gone from the repo's flows takes its runs with it"
+
+
+# -- the team's numbers (TD-2065, §4.9d *Sessions at once*) ---------------------------------------------------------
+
+
+def limited(store: StageStore, limits: stage_size.Limits, *entries: dict[str, Any]) -> RepoFacts:
+    return replace(repo_facts(store, *entries), limits=limits)
+
+
+def as_offered(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each entry's facts may start a session and read as outside the team's size, so only the room lets one in."""
+    monkeypatch.setattr(stage_pass, "facts_on", lambda _repo, tid, _record: replace(offerable(tid), within_size=False))
+
+
+def test_a_stage_never_holds_more_sessions_than_its_number(store, monkeypatch):
+    as_offered(monkeypatch)
+    world = World()
+    rows = (row("TD-1"), row("TD-2"), row("TD-3"))
+    got = stage_pass.team_pass(
+        store, limited(store, stage_size.Limits({"build": 2}), *rows), no_sessions(), world.reach, local="home"
+    )
+    assert [(s.tid, s.act.name if s.act else None) for s in got.steps] == [
+        ("TD-1", "offer"),
+        ("TD-2", "offer"),
+        ("TD-3", None),
+    ]
+    again = stage_pass.team_pass(
+        store, limited(store, stage_size.Limits({"build": 2}), *rows), no_sessions(), world.reach, local="home"
+    )
+    assert all(s.act is None or s.act.name != "offer" for s in again.steps)
+
+
+def test_a_stage_with_no_number_runs_one_and_a_held_record_counts(store, monkeypatch):
+    as_offered(monkeypatch)
+    put(store, holder="s1")  # TD-7 held in build
+    world = World()
+    got = stage_pass.team_pass(
+        store, limited(store, stage_size.Limits(), row("TD-1")), no_sessions(), world.reach, local="home"
+    )
+    assert [s.act for s in got.steps if s.tid == "TD-1"] == [None]
+    assert store.entry("TD-1") is None
+
+
+def test_the_team_limit_counts_its_audits_and_holds_back_a_stage_with_room(store, monkeypatch):
+    as_offered(monkeypatch)
+    store.put_audit("t", "docs", {"holder": "a1", "base": "b0"})
+    doc = {**FLOW, "audits": [{"name": "docs", "model": "m", "every": "6 hours"}]}
+    world = World()
+    facts_ = replace(limited(store, stage_size.Limits({"build": 3}, 2), row("TD-1"), row("TD-2")), doc=doc)
+    got = stage_pass.team_pass(store, facts_, no_sessions(), world.reach, local="home")
+    assert [(s.tid, s.act.name if s.act else None) for s in got.steps] == [("TD-1", "offer"), ("TD-2", None)]
+
+
+def test_an_offer_that_fails_takes_no_room(store, monkeypatch):
+    as_offered(monkeypatch)
+    world = World(started=None)
+    got = stage_pass.team_pass(
+        store, limited(store, stage_size.Limits(), row("TD-1"), row("TD-2")), no_sessions(), world.reach, local="home"
+    )
+    assert [s.act.name for s in got.steps] == ["offer", "offer"] and not any(s.made.made for s in got.steps)
+
+
+def test_without_numbers_the_reading_s_own_within_size_stands(store, monkeypatch):
+    as_offered(monkeypatch)
+    got = stage_pass.team_pass(store, repo_facts(store, row("TD-1")), no_sessions(), World().reach, local="home")
+    assert [s.act for s in got.steps] == [None]

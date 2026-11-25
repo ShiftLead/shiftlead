@@ -14,14 +14,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Collection, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from sessionorc import ledgerboard
 from shiftlead import org as orgmod
-from shiftlead import stage_make, stage_merge, stage_start
+from shiftlead import stage_make, stage_merge, stage_size, stage_start
 from shiftlead.stage_acts import Act, Reading, choose
 from shiftlead.stage_fetch import (
     TD_ID,
@@ -103,11 +103,29 @@ def _make(store: StageStore, act: Act, s: Reading, f: EntryFacts, reach: Reach) 
     return stage_make.make(store, f.tid, act, s, doc, f.person)
 
 
-def step(store: StageStore, record: Mapping[str, Any] | None, f: EntryFacts, reach: Reach) -> Step:
-    """Take `f.tid`'s one act this pass, if it has one."""
+def offer_stage(record: Mapping[str, Any] | None, s: Reading, doc: Mapping[str, Any]) -> str | None:
+    """The stage an offer of the entry would start a session in: an open record's own, else the way in for its kind."""
+    if record is not None and not record.get("closed_at"):
+        return str(record.get("stage"))
+    return stage_make._way_in(dict(doc), s.design)
+
+
+def step(
+    store: StageStore,
+    record: Mapping[str, Any] | None,
+    f: EntryFacts,
+    reach: Reach,
+    room: stage_size.Room | None = None,
+) -> Step:
+    """Take `f.tid`'s one act this pass, if it has one. With `room`, whether an offer is within the team's size is read
+    from it for the stage the offer would start in, and an offer made is taken from it (§4.9d *Sessions at once*)."""
     s = reading_on(record, f)
     if s is None:
         return Step(f.tid, read=False)
+    at = None
+    if room is not None:
+        at = offer_stage(record, s, f.doc)
+        s = replace(s, within_size=room.stage_fits(at))
     act = choose(record, s)
     if act is None:
         return Step(f.tid)
@@ -116,6 +134,8 @@ def step(store: StageStore, record: Mapping[str, Any] | None, f: EntryFacts, rea
     except Exception as e:  # noqa: BLE001 — one entry's failure must not stop the pass over the others
         log.exception("the stage act %s %s on %s failed", act.name, act.case, f.tid)
         return Step(f.tid, act=act, made=Made(False, f"the act failed: {e}"))
+    if room is not None and at is not None and act.name == "offer" and made.made:
+        room.take_stage(at)
     if not made.end:
         return Step(f.tid, act=act, made=made)
     try:
@@ -170,7 +190,8 @@ def team_pass(
     cannot read as stranded; the records are read under the store's lock. `put` is the flow text to store as the team's
     copy, written only now that the records written under the old copy have been read. An entry a stranded session
     names with no open record is left for a later pass, since that session still holds the stage's name; an open
-    record's acts go on beside it."""
+    record's acts go on beside it. With `repo.limits`, the team's room is counted from the records and its audits' runs
+    as read here, and each offer the pass makes is taken from it."""
     try:
         with store.locked():
             records = {k: r for k, r in store.entries().items() if isinstance(r, dict)}
@@ -192,6 +213,7 @@ def team_pass(
             log.exception("the flow copy of team %s could not be stored", repo.team)
             return TeamPass(seen=found.seen, unended=tuple(unended), flow_unstored=True, read=False)
     waiting = {ledgerboard._num(str(read.sessions[a].lane[0])) for a in found.seen}
+    room = stage_size.room(store, repo.limits, records, repo.team, repo.doc) if repo.limits is not None else None
     steps = []
     for tid in targets(records, repo.entries, repo.team):
         record = records.get(tid)
@@ -199,7 +221,7 @@ def team_pass(
             continue
         try:
             f = facts_on(repo, tid, record)
-            steps.append(step(store, record, f, reach) if f is not None else Step(tid, read=False))
+            steps.append(step(store, record, f, reach, room) if f is not None else Step(tid, read=False))
         except Exception:  # noqa: BLE001 — a failed read is no reading of this entry and never stops the pass
             log.exception("reading the stage entry %s failed", tid)
             steps.append(Step(tid, read=False))
@@ -242,13 +264,15 @@ def repo_facts(
     started: bool = False,
     within_size: bool = False,
     named: Callable[[str], Mapping[str, Any] | None] | None = None,
+    limits: stage_size.Limits | None = None,
 ) -> RepoFacts | None:
     """`team`'s `RepoFacts` from what the pass read once. `prs` is the repo's pull request reading and `read_one` reads
     one by its number, asked for each open record's pull request the reading lacks; `records` are only for which those
     are. `sessions` must name as read only the nodes whose link has delivered its snapshot since it came up, and
     `checkouts` every node's checkouts of the repo, since a node left out is read as holding nothing. A team over its
     line on open pull requests may not start a session, since the offer's claim would be refused. None: the pull
-    requests could not be read, so no entry of the team can be told from one whose work is in flight."""
+    requests could not be read, so no entry of the team can be told from one whose work is in flight. `limits` are the
+    team's numbers, from which each offer's room is counted; without them `within_size` is taken as given."""
     wanted = sorted(
         {
             r["pr"]
@@ -282,6 +306,7 @@ def repo_facts(
         named=named,
         may_start=started and not over_line(host_teams, team),
         within_size=within_size,
+        limits=limits,
     )
 
 

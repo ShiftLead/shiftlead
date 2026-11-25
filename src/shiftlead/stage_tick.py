@@ -35,6 +35,7 @@ from shiftlead import (
     stage_job_tick,
     stage_merge,
     stage_pass,
+    stage_size,
     stage_start,
 )
 from shiftlead import org as orgmod
@@ -218,6 +219,7 @@ def run(
             branches=branches,
             started=stage_start.team_started(host_teams, team),
             named=named,
+            limits=stage_size.limits(teams.get(team)),
         )
 
     held: list[orgmod.Org | None] = []
@@ -405,6 +407,7 @@ def _audits(
         started=tuple(started),
         docs=docs,
         may_start=True,
+        limits={t: stage_size.limits(teams.get(t)) for t in started},
     )
     return stage_audit_pass.audit_pass(store, f, reach)
 

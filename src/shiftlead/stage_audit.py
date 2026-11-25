@@ -63,6 +63,7 @@ class AuditReading:
     holder: Holder | None = None
     merged_since: int | None = None
     may_start: bool = False  # the team is started, inside its schedule and not held by the usage gate
+    within_size: bool = True  # the team has room under its limit for one more session (§4.9d *Sessions at once*)
 
 
 @dataclass(frozen=True)
@@ -140,7 +141,7 @@ def choose(run: Mapping[str, Any] | None, every: Clock | None, s: AuditReading, 
     if every is None:
         return None  # a clock the flow check would refuse starts nothing
     if run is None:
-        return AuditAct("start", "first") if s.may_start else None  # due at once: its first run sets the base
+        return AuditAct("start", "first") if s.may_start and s.within_size else None  # due at once: sets the base
     if run.get("holder"):
         h = s.holder  # None: the holder was not read, so the run waits for a pass that reads it
         if h is None or not s.may_start or not (h.lost or h.silent or h.ended_by_stop):
@@ -150,7 +151,7 @@ def choose(run: Mapping[str, Any] | None, every: Clock | None, s: AuditReading, 
         if int(run.get("offers") or 0) >= SECOND_LOSS:
             return AuditAct("rest", "lost" if h.lost else "silent")
         return AuditAct("offer-again", "lost" if h.lost else "silent")
-    if not holds_lease(run, s) and s.may_start and due(run, every, s, now):
+    if not holds_lease(run, s) and s.may_start and s.within_size and due(run, every, s, now):
         return AuditAct("start")
     return None
 

@@ -33,6 +33,7 @@ from shiftlead.stage_read import (
     renumbered_on,
     rows_for,
 )
+from shiftlead.stage_size import Limits
 
 TD_ID = re.compile(r"TD-[0-9]+")
 
@@ -311,7 +312,9 @@ class RepoFacts:
     sessions were read this pass, so a node nobody reached is never read as its session gone. `open_asks` are the
     addresses with an open ask of their own, `merging` the entries whose merge is in flight, and `was` the flow the
     team's records were written under, read before its copy is replaced. `held` is `held_read`'s, None where it could
-    not be known. `may_start` and `within_size` are TD-2065's.
+    not be known. `may_start` is whether the team may start a session; `limits` its numbers (§4.9d *Sessions at once*),
+    from which the pass works out each entry's `within_size`, and None where the caller gives none, so `within_size`
+    is taken as given.
     """
 
     root: Path | str
@@ -334,6 +337,7 @@ class RepoFacts:
     was: Mapping[str, Any] | None = None
     may_start: bool = False
     within_size: bool = False
+    limits: Limits | None = None
     named: Callable[[str], Mapping[str, Any] | None] | None = None  # another flow's doc by its name, for a switch
 
 

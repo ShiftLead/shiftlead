@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from sessionorc import paths
-from shiftlead import flow3, stage_end, stage_merge, stage_tick
+from shiftlead import flow3, stage_end, stage_merge, stage_size, stage_tick
 from shiftlead.stage_tick import Kept, flow_now, run
 from shiftlead.stagerecord import StageStore
 
@@ -195,6 +195,21 @@ def test_each_teams_facts_read_its_own_started_mark(
     marks = {"t": {"started": {"since": "x", "by": "person"}}, "u": {"stopped": {"at": "x", "by": "person"}}}
     a_pass(root, Kept(), teams=three, host_teams=marks)
     assert given == {"t": True, "u": False, "v": False}
+
+
+@pytest.mark.unit
+def test_each_teams_facts_carry_its_own_numbers(root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A team's numbers reach its facts, so the pass counts each offer against them (§4.9d *Sessions at once*,
+    TD-2065): one stage's number and the team limit, and a team that sets neither."""
+    given: dict[str, Any] = {}
+
+    def facts(*_a: Any, **kw: Any) -> None:
+        given[kw["team"]] = kw["limits"]
+        return None
+
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_facts", facts)
+    a_pass(root, Kept(), teams={"t": {**TEAM, "at_once": {"build": 3}, "most": 4}, "u": TEAM})
+    assert given == {"t": stage_size.Limits({"build": 3}, 4), "u": stage_size.Limits()}
 
 
 @pytest.mark.unit
