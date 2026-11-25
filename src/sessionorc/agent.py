@@ -1763,8 +1763,13 @@ class HostAgent(
         draft: str = "",
         succeeds: str | None = None,
         scratch: str | None = None,
+        stage: bool = False,
     ) -> dict[str, Any]:
-        """`scratch` (design §4.6 *A session's scratch*, TD-1944): the old run's scratch directory, which a
+        """`stage` (design §4.3, §4.9c *What a run records, for comparing flows*, TD-2158): the launch is a stage's
+        session, whose create reads its tool's version as a seat's does, for its rows' `run.tool_version`; the
+        upgrade check still reads only seats' records.
+
+        `scratch` (design §4.6 *A session's scratch*, TD-1944): the old run's scratch directory, which a
         restart hands the create so the new run keeps it, as a Resume of the name's own conversation keeps its
         record's; kept only where it lies under this host's `shiftlead-<uid>/` and its `owner.json` names the
         record and this home (or it is gone, and is made again), else a new one is made. Never a session's own
@@ -2038,11 +2043,11 @@ class HostAgent(
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
-            # a seat's launch reads its tool's version, once, before the name is taken (§4.3 *An upgraded seat tool
-            # asks for the smoke*, TD-1650): off the loop, bounded by the adapter's read; an override's binary is
-            # not the adapter's, and a launch that is no seat's reads nothing
+            # a seat's launch, and a stage's session's, reads its tool's version, once, before the name is taken (§4.3
+            # *An upgraded seat tool asks for the smoke*, TD-1650, TD-2158): off the loop, bounded by the adapter's
+            # read; an override's binary is not the adapter's, and a launch that is neither reads nothing
             tool_version = None
-            if seat and not argv and (read := getattr(ad, "tool_version", None)):
+            if (seat or stage) and not argv and (read := getattr(ad, "tool_version", None)):
                 try:
                     tool_version = await asyncio.to_thread(read, {**os.environ, **spec.env})
                 except Exception as e:  # noqa: BLE001 — the launch goes on whatever the read does

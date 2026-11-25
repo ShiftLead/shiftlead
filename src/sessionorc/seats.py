@@ -563,13 +563,15 @@ def record_reading(ledger: dict[str, Any], record: str) -> dict[str, Any]:
     turns and tokens by kind summed over its models, *unweighed* tokens apart, as `whole` and per day;
     `money`, the figure by unit, a subscription's `≈$` and a metered profile's `$` apart and never summed;
     `refs`, each reference's figure and turns, most spent first (`between` is `whole`'s, not a ref's);
-    and `first_day`, the oldest day holding a row for it (None where none does). `record` is an id or an
-    address (`id@host`): the ledger keys a row by the bare id."""
+    `first_day`, the oldest day holding a row for it (None where none does); and `models` (`_add_models`), per
+    model its sums over every day, the one reading of a record's sums a stage row's `run.models` is taken from
+    (§4.9c *What a run records, for comparing flows*, TD-2158). `record` is an id or an address (`id@host`): the
+    ledger keys a row by the bare id."""
     rid = str(record or "").split("@", 1)[0]
     if not rid:
         raise ValueError("a seats record is a record's id")
     whole, money = _blank(), {}
-    days, refs = [], {}
+    days, refs, models = [], {}, {}
     for d in sorted(ledger.get("days") or {}):
         rows = (ledger.get("days") or {}).get(d)
         row = rows.get(rid) if isinstance(rows, dict) else None
@@ -580,6 +582,7 @@ def record_reading(ledger: dict[str, Any], record: str) -> dict[str, Any]:
         _add_row(whole, row)
         unit = _unit(acc)
         money[unit] = round(money.get(unit, 0.0) + acc["figure"], 4)
+        _add_models(models, row, unit)
         days.append({"day": d, **_rounded(acc)})
         for ref, r in (row.get("refs") or {}).items():
             if ref == BETWEEN or not isinstance(r, dict):
@@ -595,7 +598,26 @@ def record_reading(ledger: dict[str, Any], record: str) -> dict[str, Any]:
         "money": money,
         "days": days,
         "refs": [r | {"figure": round(r["figure"], 4)} for r in ranked],
+        "models": {m: v | {"figure": _round_units(v["figure"])} for m, v in sorted(models.items())},
     }
+
+
+def _round_units(figure: dict[str, float]) -> dict[str, float]:
+    return {u: round(f, 4) for u, f in figure.items()}
+
+
+def _add_models(into: dict[str, dict[str, Any]], row: dict[str, Any], unit: str) -> None:
+    """A day row's models into `into`: per model its tokens by kind (`KINDS`), `turns`, `unweighed`, and `figure` a
+    map of unit to figure, the day's unit (`_unit` of the whole row: `$` where the row is `metered` and has turns,
+    else `≈$`) shared by every model of the row, so a subscription's and a metered profile's are kept apart, never
+    summed (§4.4 *A sum across profiles*; §4.9c *What a run records, for comparing flows*, TD-2158)."""
+    for name, m in (row.get("models") or {}).items():
+        if not isinstance(m, dict):
+            continue
+        acc = into.setdefault(str(name), {**dict.fromkeys(KINDS, 0), "turns": 0, "unweighed": 0, "figure": {}})
+        for k in (*KINDS, "turns", "unweighed"):
+            acc[k] += int(m.get(k) or 0)
+        acc["figure"][unit] = acc["figure"].get(unit, 0.0) + float(m.get("figure") or 0.0)
 
 
 def _series(

@@ -142,6 +142,20 @@ async def test_a_seats_extra_reads_and_a_worker_lines_extra_and_a_plain_launch_r
     assert len(seen) == 1, "the seat's extra alone read"
 
 
+async def test_a_stages_session_reads_its_tools_version_and_draws_no_upgrade_check(agent, tmp_path, versioned):
+    """TD-2158, §4.3: a create carrying `stage` (a stage's session, `StageLaunch.create_params`) reads its tool's
+    version as a seat's does, for its rows' `run.tool_version`; the upgrade check reads only seats' records."""
+    from shiftlead import stage_start, teams
+
+    seen, _ = versioned
+    async with LocalClient() as person:
+        sid = (await person.call("create", **_params(tmp_path, "build-td-1", stage=True)))["id"]
+    assert agent.sessions[sid].tool_version == "3.4.5 (stub)" and len(seen) == 1
+    assert agent.sessions[sid].seat is None, "no seat: the upgrade check's records carry `seat`"
+    launch = teams.Launch(name="build-td-1", role="build", home="r", dir=tmp_path, team="t", project="p")
+    assert stage_start.StageLaunch(launch, "m").create_params([])["stage"] is True
+
+
 async def test_an_argv_override_reads_nothing(agent, tmp_path, versioned):
     seen, _ = versioned
     async with LocalClient() as person:
