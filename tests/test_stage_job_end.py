@@ -479,3 +479,21 @@ def test_a_pull_request_jobs_outcomes_name_closed_unmerged_and_a_board_jobs_do_n
         _end(_pr_job(), "not-needed", "x", ref="pr:41")
     with pytest.raises(Refused, match="its outcomes are work-pushed, other$"):
         _end(Store(_record()), "not-needed", "x")
+
+
+@pytest.mark.parametrize(
+    ("said", "line"),
+    [
+        ("the job is closed", "TD-9: closed-unmerged → closed (the job is closed)"),
+        (None, "TD-9: closed-unmerged → closed (already taken)"),
+    ],
+)
+def test_a_repeated_stage_end_prints_the_home_s_own_words(monkeypatch, capsys, said, line):
+    """`ao stage end`'s repeat prints the home's `said` where it gives one, else *already taken* (§4.7, TD-2213)."""
+    from shiftlead import cli
+
+    got = {"entry": "TD-9", "outcome": "closed-unmerged", "went": "closed", "repeat": True}
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {**got, **({"said": said} if said else {})})
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-r-job")
+    assert cli.main(["stage", "end", "closed-unmerged", "--reason", "closed"]) == 0
+    assert capsys.readouterr().out.strip() == line
