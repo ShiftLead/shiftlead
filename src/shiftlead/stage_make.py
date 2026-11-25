@@ -395,6 +395,24 @@ def make(store: StageStore, tid: str, act: Act, s: Reading, doc: dict[str, Any],
         return replace(got, end=held) if got.made and held and not record.get("holder") else got
 
 
+def _came(record: dict[str, Any], key: str) -> tuple[str | None, str | None]:
+    """What a fresh session at `key` is told of how the entry got there: the reason of the last move the history
+    records, where that move was into `key` (a refused merge names its failing row), and the person's own words. Where
+    the person's answer made that move, the reason is the one of the move before it, which raised their question."""
+    steps = [h for h in record.get("history") or [] if isinstance(h, dict)]
+    words = record.get("answer")
+    answer = str(words).strip() if isinstance(words, str) and words.strip() else None
+    if not steps or steps[-1].get("to") != key:
+        return None, answer
+    last = steps[-1]
+    if last.get("outcome") == "answer":
+        if len(steps) < 2:
+            return None, answer
+        last = steps[-2]
+    why = str(last.get("reason") or "").strip()
+    return (f"{why} (`{last.get('outcome')}` at `{last.get('from')}`)" if why else None), answer
+
+
 def offer(
     store: StageStore,
     tid: str,
@@ -427,7 +445,8 @@ def offer(
             key, branch, pr = str(record["stage"]), record.get("branch"), record.get("pr")
         if key is None or not name:
             return Made(False, "the flow has no stage that takes this entry")
-        holder = start(key, Work(tid, branch, pr))
+        came, answer = _came(record, key) if record is not None and not first else (None, None)
+        holder = start(key, Work(tid, branch, pr, came, answer))
         if holder is None:
             return Made(False, "no session was started")
         try:

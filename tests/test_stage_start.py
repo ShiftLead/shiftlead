@@ -101,6 +101,15 @@ def test_a_later_stage_is_told_the_branch_and_pull_request_on_its_record(world):
     assert "It has no branch yet" in made(world, builtin("build-review"), "build").launch.prompt
 
 
+def test_a_session_is_told_the_move_that_brought_it_and_the_persons_words(world):
+    work = stage_start.Work("TD-7", came="the merge gate failed on ci (`refused` at `review`)", answer="mend it")
+    text = made(world, builtin("build-review"), "build", work).launch.prompt
+    assert "a move whose reason was: the merge gate failed on ci" in text
+    assert "in their own words: mend it" in text
+    plain = made(world, builtin("build-review"), "build").launch.prompt
+    assert "a move whose reason was" not in plain and "in their own words" not in plain
+
+
 def test_a_brief_a_stage_names_that_cannot_be_read_stops_the_launch(world):
     doc = builtin("build")
     doc["stages"][0]["brief"] = "gone"

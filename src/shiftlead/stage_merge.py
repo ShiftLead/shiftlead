@@ -10,7 +10,9 @@ A row only a person can cure sends the entry to the person with *Try the merge a
 leaves the record `merging`, tried again on later passes for an hour, and then goes to the person, spending no limit.
 
 `gate_and_land` makes the two for a repo: the gate's own script on the pull request, then cadence step 5's merge, signed
-`Merged-by: shiftlead-home`. Nothing calls this yet.
+`Merged-by: shiftlead-home`; the tick's stage pass (`stage_tick`) holds one pair per repo. Every row the gate writes is
+sorted as one a session can cure (`SESSION_ROWS`) or one only a person can (`PERSON_ROWS`), and a failed row in neither,
+one a later pin adds, is read as the person's, since a limit spent on a cause no session can cure helps nobody.
 """
 
 from __future__ import annotations
@@ -29,6 +31,11 @@ from shiftlead.stagerecord import StageStore
 
 NO_READING_FOR = timedelta(hours=1)
 PERSON_ROWS = frozenset({"reach", "person"})  # the gate's rows only a person can cure
+# The gate's rows a session can cure: the pull request itself, its review, checks, base, ledger and board, the gates
+# and sources rows on the ledger, the branch's worktree and push, and the repo's deploy check on its head.
+SESSION_ROWS = frozenset(
+    {"pr", "review", "ci", "base", "ledger", "board", "gates", "sources", "worktree", "pushed", "deploy"}
+)
 MERGING = Act("reconcile", "merging")
 MERGED_BY = "shiftlead-home"  # the squash's `Merged-by:` on a flow's merge, with no model since the home runs none
 _STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -196,7 +203,7 @@ def run(
     if verdict == "fail":
         failed = [str(row) for row in (got or {}).get("failed") or []]
         rows = ", ".join(failed) or "a row"
-        if PERSON_ROWS.intersection(failed):
+        if not failed or not SESSION_ROWS.issuperset(failed):  # a person's row, or one no list sorts
             with store.locked():
                 record = _current(store, tid, head)
                 if record is None:
