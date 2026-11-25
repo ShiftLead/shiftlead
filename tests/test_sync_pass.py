@@ -498,7 +498,8 @@ async def test_before_the_cut_over_the_jobs_are_not_read(agent, gh, monkeypatch)
 @pytest.mark.integration
 async def test_a_merge_re_reads_the_jobs_reading_the_pass_kept(agent, gh, monkeypatch):
     agent._first_shape_off = True
-    _job_prs(monkeypatch, frozenset())
+    other = frozenset({4242})  # another PR's job: not this one's, so the merge goes on
+    _job_prs(monkeypatch, other)
     _reading(agent, _pr())
     held = []
     real = agent._sync_held_by
@@ -509,4 +510,5 @@ async def test_a_merge_re_reads_the_jobs_reading_the_pass_kept(agent, gh, monkey
 
     monkeypatch.setattr(agent, "_sync_held_by", spy)
     await agent._sync_pass()
-    assert len(held) >= 2 and all(j == frozenset() for j in held)  # the candidates' test and the merge's re-check
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+    assert len(held) >= 2 and all(j == other for j in held)  # the candidates' test and the merge's re-check
