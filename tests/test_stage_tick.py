@@ -330,3 +330,53 @@ def test_the_jobs_reach_is_given_each_teams_flow_place_and_directory(
         "m": ("repo", mine),
         "n": ("package", None),
     }
+
+
+@pytest.mark.unit
+def test_the_pass_writes_a_started_teams_tech_lead_and_its_repos_sweeper_through_the_homes_call(
+    root: Path, tmp_path: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the audits, the pass writes the built-in tech lead of a started team and, while the sweep switch is on,
+    its repo's sweeper, each through the `call` the home gives it; the switch is read only while a team is started
+    (§4.9d *How each one runs*, TD-2065)."""
+    from types import SimpleNamespace
+
+    from shiftlead import org as orgmod
+    from shiftlead import teams
+
+    seat = tmp_path / "seat"
+    seat.mkdir()
+    (seat / "rules.md").write_text("THE REPO RULES\n")
+    (seat / ".shiftlead.yml").write_text("roles: {techlead: {brief: rules.md}, sweeper: {brief: rules.md}}\n")
+    team = SimpleNamespace(name="t", repo="r", members=[])
+    org = SimpleNamespace(
+        checkout=lambda _repo, _host: str(seat),
+        roles={},
+        project_of=lambda repo: repo,
+        checkouts={"r": str(seat)},
+        teams={"t": team},
+    )
+    monkeypatch.setattr(orgmod, "load", lambda: org)
+    monkeypatch.setattr(teams, "_person", lambda *_a: ([], False))
+    real = stage_tick.stage_pass.repo_pass  # the teams' pass over no flow, so it starts no stage
+    monkeypatch.setattr(stage_tick.stage_pass, "repo_pass", lambda s, st, _flows, *a, **k: real(s, st, {}, *a, **k))
+    monkeypatch.setattr(stage_tick, "_audits", lambda *_a: ())
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def call(method: str, **params: Any) -> Any:
+        calls.append((method, params))
+        if method == "sweep_switch":
+            return {"on": True, "every": "7d", "off": []}
+        if method == "name_check":
+            return {"verdict": "free"}
+        assert method == "create", method
+        return {"id": f"ao-r-{params['name']}"}
+
+    started = {"t": {"started": {"since": "2026-11-25T00:00:00Z", "by": "person"}}}
+    a_pass(root, Kept(), host_teams=started, call=call)
+    made = [(p["builtin"], p["name"]) for m, p in calls if m == "create"]
+    assert made == [("techlead", "techlead-t"), ("sweeper", "sweeper-r")]
+    assert [m for m, _ in calls].count("sweep_switch") == 1
+    calls.clear()
+    a_pass(root, Kept(), host_teams=None, call=call)
+    assert calls == [], "a team not started writes no seat and reads no sweep switch"
