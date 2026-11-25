@@ -232,7 +232,9 @@ def write_techleads(
         entry = teams_cfg.get(team) or {}
         host = str(entry.get("host") or local)
         launch = partial(techlead_launch, org, teamdef, host=host, here=local)
-        if got := _write_or_move(call, techlead_of(graph, team), host, local, launch, TECHLEAD, f"team {team}"):
+        if got := _write_or_move(
+            call, _currents(graph, TECHLEAD, team=team), host, local, launch, TECHLEAD, f"team {team}"
+        ):
             made.append(got)
     return made
 
@@ -260,7 +262,9 @@ def write_sweepers(
             continue
         teamdef, host = org.teams[team], str((teams_cfg.get(team) or {}).get("host") or local)
         launch = partial(sweeper_launch, org, teamdef, every, host=host, here=local)
-        if got := _write_or_move(call, sweeper_of(graph, repo), host, local, launch, SWEEPER, f"repo {repo}"):
+        if got := _write_or_move(
+            call, _currents(graph, SWEEPER, name=sweeper_name(repo)), host, local, launch, SWEEPER, f"repo {repo}"
+        ):
             made.append(got)
     return made
 
@@ -282,7 +286,9 @@ def write_prompts(
     for repo, team in sorted(_first_started(org, teams_cfg, host_teams).items()):
         teamdef, host = org.teams[team], str((teams_cfg.get(team) or {}).get("host") or local)
         launch = partial(prompts_launch, org, teamdef, host=host, here=local)
-        if got := _write_or_move(call, prompts_of(graph, repo), host, local, launch, PROMPTS, f"repo {repo}"):
+        if got := _write_or_move(
+            call, _currents(graph, PROMPTS, name=prompts_name(repo)), host, local, launch, PROMPTS, f"repo {repo}"
+        ):
             made.append(got)
     return made
 
@@ -341,9 +347,18 @@ def _first_started(
     return first
 
 
+def _currents(graph: Mapping[str, Session], key: str, *, team: str = "", name: str = "") -> list[Session]:
+    """Every record of one built-in seat superseded by none: two only while a move is half made (`_write_or_move`)."""
+    return [
+        s
+        for s in graph.values()
+        if s.builtin == key and not s.superseded_by and (s.team == team if team else s.name == name)
+    ]
+
+
 def _write_or_move(
     call: Callable[..., Any],
-    current: Session | None,
+    currents: list[Session],
     host: str,
     local: str,
     launch: Callable[[], teams.Launch],
@@ -353,22 +368,40 @@ def _write_or_move(
     """Write the seat's record where none stands, or move the current one where *Where a seat's session launches* now
     gives another host (§4.9d *How each one runs*): the record written on `host`, then the old one marked superseded
     by it with its mail moved (`seat_moved`). The host is read again only while the record is ended and not suspended,
-    since a seat's live session finishes where it runs; otherwise, and on the host it stands on, nothing is done.
+    since a seat's live session finishes where it runs; otherwise nothing is done. Where a record already stands on
+    `host` beside an ended one elsewhere — a move whose `seat_moved` failed — only `seat_moved` is asked again.
     Returns the id written, "" where nothing was."""
-    if current is None:
+    if not currents:
         return _write(call, launch, key, of)
-    if (current.host or local) == host or current.state not in ("exited", "closed") or current.suspended:
+
+    def at(s: Session) -> str:
+        return s.host or local
+
+    def address(s: Session) -> str:
+        return s.id if at(s) == local else f"{s.id}@{at(s)}"
+
+    away = [s for s in currents if at(s) != host and s.state in ("exited", "closed") and not s.suspended]
+    if here := [s for s in currents if at(s) == host]:
+        for s in away:
+            _moved(call, address(s), address(here[0]), of, key, host)
+        return ""
+    if not away:
         return ""
     got = _write(call, launch, key, of, keep=False)
-    if not got:
-        return ""
-    old = current.id if (current.host or local) == local else f"{current.id}@{current.host}"
-    new = got if host == local or "@" in got else f"{got}@{host}"
+    if got:
+        new = got if host == local or "@" in got else f"{got}@{host}"
+        for s in away:
+            _moved(call, address(s), new, of, key, host)
+    return got
+
+
+def _moved(call: Callable[..., Any], old: str, new: str, of: str, key: str, host: str) -> None:
+    """Ask the home to mark `old` superseded by `new` and move its mail; a refusal is a log line, and the next pass,
+    reading both records still current, asks again."""
     try:
         call("seat_moved", old=old, new=new)
-    except Exception:  # noqa: BLE001 — a log line; the next pass, reading the old record still current, tries again
+    except Exception:  # noqa: BLE001 — a log line; the next pass asks again
         log.exception("%s: its %s record moved to %s, but %s was not marked superseded", of, key, host, old)
-    return got
 
 
 def _write(

@@ -443,6 +443,19 @@ def test_a_refused_move_is_a_log_line(world, caplog):
     assert "was not marked superseded" in caplog.text
 
 
+def test_a_half_made_move_asks_seat_moved_again_and_writes_nothing(world):
+    """A move whose `seat_moved` failed leaves two current records; whichever the graph lists first, the next pass asks
+    only `seat_moved` again, old to new (#4617's review)."""
+    org, _team, _ = world
+    old = record(builtin="techlead", state="closed", host="h")
+    new = record(builtin="techlead", state="closed", host="node")
+    for graph in ({"ao-r-techlead-t@node": new, "ao-r-techlead-t": old}, {"ao-r-techlead-t": old, "x@node": new}):
+        home = Mover()
+        assert stage_seats.write_techleads(home, org, {"t": {"host": "node"}}, graph, STARTED, "h") == []
+        assert home.created == []
+        assert home.moved == [{"old": "ao-r-techlead-t", "new": "ao-r-techlead-t@node"}]
+
+
 @pytest.mark.integration
 async def test_the_home_marks_the_old_record_superseded_and_moves_its_mail(agent):
     from sessionorc.agent import RpcError
