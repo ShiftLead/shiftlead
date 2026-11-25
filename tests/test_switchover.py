@@ -953,7 +953,8 @@ def Node(root: Path, profiles: str | None) -> SimpleNamespace:  # noqa: N802
 def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directory_on_the_home(tmp_path):
     root = tmp_path / "nodes" / "cm"
     signed = {(root / "profiles" / "p").resolve(): "who"}
-    nodes = {"cm": Node(root, "profiles:\n  p: {config_dir: /shiftlead/profiles/p}\n  bare: {}\n")}
+    text = "profiles:\n  p: {config_dir: /shiftlead/profiles/p}\n  bare: {}\n  out: {config_dir: /elsewhere/x}\n"
+    nodes = {"cm": Node(root, text + "  up: {config_dir: /shiftlead/../x}\n")}
     seen: list[Path] = []
 
     class Spy(Fake):
@@ -965,7 +966,9 @@ def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directo
         None, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path / "d", signed)
     )
     assert [(m.name, m.folder, m.match) for m in made["cm"]] == [("p", Path("/shiftlead/profiles/p"), "who")]
-    assert seen == [root / "profiles" / "p"], "read where the folder is on the home; the bare profile makes none"
+    assert seen == [root / "profiles" / "p"], (
+        "read where the folder is on the home; a bare profile, one elsewhere or one climbing out makes none"
+    )
     assert made["cm"][0].found == "claude-code:/shiftlead/profiles/p" and blockers == []
     named, blockers = switchover.node_logins({"hosts": {}}, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path))
     assert [b.what for b in blockers] == ["claude-code:/shiftlead/profiles/p has no name in the answers"]
@@ -1017,3 +1020,21 @@ def test_the_report_prints_each_container_nodes_logins_after_the_homes():
         "  claude-code:p  /shiftlead/profiles/p  from p",
         "empty: logins the move would make, a container node",
     ]
+
+
+def test_the_check_and_its_answers_read_a_container_nodes_logins(home, tmp_path, capsys, monkeypatch):
+    from sessionorc import containers
+
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    team = {"repo": "r", "host": "cm", "manager": {"role": "person"}, "members": [{"role": "grinder", "profile": "q"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    node = Node(home / "nodes" / "cm", "profiles:\n  q: {config_dir: /shiftlead/profiles/q}\n")
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": node})
+    monkeypatch.setattr(cli.hosts, "nodes", lambda: {"cm": {"container": {"devcontainer": "/x"}}})
+    cli.main(["switch-over", "check", "--answers"])
+    out = capsys.readouterr().out
+    assert "cm: logins the move would make, a container node\n  claude-code:q  /shiftlead/profiles/q  from q" in out
+    doc = yaml.safe_load((home / "switch-over" / "answers.yml").read_text())
+    assert doc["hosts"]["cm"] == {"logins": {"claude-code:/shiftlead/profiles/q": {"name": "q"}}}
+    assert doc["teams"]["grind"]["logins"] == ["claude-code:q"]
+    assert "a login cm would not have" not in out and "has no name in the answers" not in out

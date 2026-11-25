@@ -160,7 +160,7 @@ def host_logins(
     (`env` empty unless given), so the check does not change with the shell it is run from. `outside`, for a
     container node read from the home, gives where each of its folders is on the home (None: not here): a folder is
     then kept as the node writes it, read there, and a profile with no `config_dir` (the container's own default
-    home) makes no login."""
+    home) and one whose folder is not here make no login."""
     env = {} if env is None else env
     salt = salt if salt is not None else os.urandom(32)
     names = names or {}
@@ -182,7 +182,7 @@ def host_logins(
         default = getattr(adapter, "default_home", None)
         try:
             if outside is not None:
-                if p.config_dir is None:
+                if p.config_dir is None or outside(Path(p.config_dir)) is None:
                     continue
                 folder, by_default = Path(p.config_dir), False
             elif p.config_dir is not None:
@@ -275,8 +275,9 @@ def node_logins(
     """Each container node's logins, from its own `profiles.yml` under the home's `nodes/<name>/home/` (§4.9e *The
     window* step 2: the home moves it, and the answers' `hosts:` holds its folders beside the home's), named by
     `hosts.<node>.logins`, with the blockers `host_logins` and `unnamed` give it. A folder under `/shiftlead` is read
-    at the node's directory on the home. A node with no profiles file makes no login; one whose file cannot be read
-    is a blocker. `nodes` is `containers.container_nodes()`'s, by name."""
+    at the node's directory on the home; one elsewhere, or climbing out of it, makes no login. A node with no
+    profiles file makes no login; one whose file cannot be read is a blocker.
+    `nodes` is `containers.container_nodes()`'s, by name."""
     from sessionorc import containers
     from shiftlead import profiles as profiles_mod
 
@@ -298,7 +299,9 @@ def node_logins(
 
         def outside(folder: Path, root: Path = root) -> Path | None:
             inside = Path(containers.INSIDE)
-            return root / folder.relative_to(inside) if folder.is_relative_to(inside) else None
+            if not folder.is_relative_to(inside) or ".." in folder.relative_to(inside).parts:
+                return None
+            return root / folder.relative_to(inside)
 
         made, more = host_logins(
             name, profs, names=names_of(answers, name), salt=salt, adapter_of=adapter_of, outside=outside
