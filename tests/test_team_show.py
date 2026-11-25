@@ -296,4 +296,5 @@ def test_an_audit_whose_record_cannot_be_read_has_no_next_clock(tmp_path):
 
     assert team_show.audit_rounds("t", FLOW, SimpleNamespace(audit=boom), tmp_path, NOW) == {}
     assert team_show.audit_rounds("t", FLOW, None, tmp_path, NOW) == {}
+    assert team_show.audit_rounds("t", FLOW, SimpleNamespace(audit=lambda team, key: [1]), tmp_path, NOW) == {}
     assert team_show.audit_rounds("t", None, SimpleNamespace(audit=boom), tmp_path, NOW) == {}

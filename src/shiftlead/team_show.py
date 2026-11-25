@@ -309,6 +309,8 @@ def audit_rounds(
             run = store.audit(team, key)
         except UNREADABLE:
             continue
+        if run is not None and not isinstance(run, Mapping):
+            continue  # a hand-edited record that is no object: unread, never the page's failure
         merged = None
         if every is not None and every.unit == "merged-pull-requests" and run and run.get("base"):
             if count is None:
