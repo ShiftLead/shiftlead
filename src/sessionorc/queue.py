@@ -1497,7 +1497,7 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
     # taking in its held builds', and each held build's design (§4.4 *A design's question is asked once*, TD-2026)
     held_by = held_map(open_, boards, linked)
     resolve = item_resolver(rs.origins)
-    _stamp(open_, counted_work(open_, resolve, held_by))
+    _stamp(open_, counted_work(open_, resolve, held_by), held_by)
     for b, d in held_by.items():
         open_[b]["held_by"] = d
     pressing = _pressing(open_, boards, linked)
@@ -1725,7 +1725,7 @@ def reading(
     # taking in its held builds' (§4.4 *A design's question is asked once, on the design*, TD-2026), so it is read
     # once the boards and `linked` are
     held_by = held_map(open_, boards, linked)
-    _stamp(open_, counted_work(open_, xref, held_by, today=now.astimezone(UTC).date().isoformat()))
+    _stamp(open_, counted_work(open_, xref, held_by, today=now.astimezone(UTC).date().isoformat()), held_by)
     for b, d in held_by.items():
         open_[b]["held_by"] = d  # the entry stamp, on every held build whatever its row's word (TD-2026)
     go = go_builds(held_by, open_)
@@ -1789,8 +1789,9 @@ def reading(
             if applying:
                 st, needs, answered = applying_words(applying), None, None  # the mark is no need of the person
             # *waiting, then yours* (TD-1926): a member that would otherwise need the person and whose question waits
-            # on open work; every word above keeps its place, and the row keeps its `needs`, marked
-            fact = list(e.get("open_work") or ())
+            # on an open part (the fact, TD-2172); every word above keeps its place, and the row keeps its `needs`,
+            # marked; *asked early* in its place on a member whose counted work is all waits (TD-2184)
+            fact = list(e.get("fact") or ())
             # a held build's word (§4.4 *A design's question is asked once, on the design*, TD-2026): in place of
             # *your decision*, a covering line's answer, a kept-waiting *waits until* and *waiting, then yours*;
             # yielding to *with you*, a press's mark, a hand-off and a mail answer about the build
@@ -1801,14 +1802,17 @@ def reading(
             if held_word:
                 st, answered = f"waits on {design.rpartition('#')[2]}'s question", None
             then_yours = fact if fact and needs and not mine and not answered and not held_word else None
+            early = str(e.get("early") or "") if needs and not mine and not answered and not held_word else ""
             if then_yours:
                 st = "waiting, then yours"
+            elif early:
+                st = "asked early"  # its question drawn whole, its need marked as *waiting, then yours*'s (TD-2184)
             # **Lift the hold** in the row's ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): read on its own,
             # whichever answer's word the row draws; never on a *with you* row or under a press's mark
             lift = (
                 not mine
                 and not applying
-                and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
+                and not fact  # a member with the fact draws no Lift, whatever its word (TD-1926, TD-2172)
                 and not design  # a held build: its design's question lifts it (TD-2026)
                 # a design with held builds draws its lift as **Go now** from the row's `go_builds` (TD-2027)
                 and lift_here(
@@ -1847,6 +1851,8 @@ def reading(
                 "applying": applying,
                 "open_work": fact,  # the fact, whatever the word (TD-1926)
                 "then_yours": then_yours,  # the word's mark: its counted ids, a need no test of need reads
+                "early": bool(early),  # *asked early*'s mark, beside `then_yours` and never it (TD-2184)
+                "early_line": early,  # *once TD-n closes*, what its question waits on
                 "lift_here": bool(lift),
                 "go_builds": list(go.get(q) or ()),  # a design with a question's held builds (TD-2026)
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
@@ -1880,6 +1886,8 @@ def reading(
             "applying": None,
             "open_work": [],
             "then_yours": None,
+            "early": False,
+            "early_line": "",
             "lift_here": False,
             "go_builds": [],
             "page": "",
@@ -2103,17 +2111,34 @@ def counted_work(
     return Counted(with_held(base, held, entries, xref), merged, parts, gates)
 
 
-def _stamp(open_: Mapping[str, dict[str, Any]], counted: Counted) -> None:
+def _stamp(open_: Mapping[str, dict[str, Any]], counted: Counted, held: Mapping[str, str]) -> None:
     """Stamp `counted_work`'s reading on its members: `open_work`, `counted_work`, `open_parts` and `early_gates`
-    (TD-2172)."""
+    (TD-2172), and `asked`'s: `fact`, the counted ids of a member with the fact, and `early`, an early member's
+    `early_line` (TD-2184)."""
+    got = asked(counted, open_, held)
     for name, by in (
         ("open_work", counted.work),
         ("counted_work", counted.wide),
         ("open_parts", counted.parts),
         ("early_gates", counted.gates),
+        ("fact", got.fact),
+        ("early", got.early),
     ):
         for q, ids in by.items():
             open_[q][name] = ids
+    # an early member whose own `until` or `event` gate stands waits by its `waiting` mark, as a gate-only entry does
+    # (`settle.mark_waits`, which marks no gated entry), so a card of it alone is Waiting (TD-2172)
+    for q in got.early:
+        e = open_[q]
+        if q in counted.gates and not isinstance(e.get("waiting"), Mapping):
+            g = e.get("gates") if isinstance(e.get("gates"), Mapping) else {}
+            first = counted.gates[q][0]
+            if first.startswith("until "):
+                e["waiting"] = {"on": "until", "until": first.removeprefix("until "), "name": "", "why": ""}
+            else:
+                ev = next((x for x in g.get("events") or () if isinstance(x, Mapping)), {})
+                name, why = str(ev.get("name") or ""), str(ev.get("why") or "")
+                e["waiting"] = {"on": "event", "until": "", "name": name, "why": why}
 
 
 def has_fact(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -2124,6 +2149,66 @@ def has_fact(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]])
         return True
     e = entries.get(q) or {}
     return bool(counted.wide.get(q)) and str(e.get("owner") or "").lower() == PERSON
+
+
+def early_line(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]]) -> str:
+    """What an early member's question waits on (§4.4 *A question whose entry only waits is asked early*, TD-2172):
+    *once W closes*, W the first wait in one order — the counted ids in key order, then the member's own date or
+    event waits — named as its id (bare in the member's own repo), or, where it is the member's own gate or a gated
+    blocker whose only wait is its own date or event, as that wait (*once <date>*, *once its event lands*); where
+    more waits stand, *once W and k more close*. Empty where the member has no wait."""
+    repo = q.partition("#")[0]
+
+    def said(w: str) -> str:
+        if w.startswith("until "):
+            return w.removeprefix("until ")
+        return "its event lands" if w.startswith("event (") else w
+
+    waits: list[tuple[str, bool]] = []  # each wait's words, and whether they name an id
+    for w in counted.wide.get(q) or ():
+        own = counted.gates.get(w) or []
+        waits.append((said(own[0]), False) if own and not counted.wide.get(w) else (w.removeprefix(f"{repo}#"), True))
+    waits += [(said(g), False) for g in counted.gates.get(q) or ()]
+    if not waits:
+        return ""
+    (first, named), more = waits[0], len(waits) - 1
+    if more:
+        return f"once {first} and {more} more close"
+    return f"once {first} closes" if named else f"once {first}"
+
+
+class Asked(NamedTuple):
+    """How each `decision (paul)` member's question is asked (§4.4 *A question whose entry only waits is asked early*,
+    TD-2172): `fact`, the members with the fact (`has_fact`) and their counted ids, which the *waiting, then yours*
+    word, the withheld answers, no Lift and the stale refusal read; `early`, the members asked early and their
+    `early_line`. Each by `<repo>#TD-n`."""
+
+    fact: dict[str, list[str]]
+    early: dict[str, str]
+
+
+def asked(
+    counted: Counted,
+    entries: Mapping[str, Mapping[str, Any]],
+    held: Mapping[str, str],
+) -> Asked:
+    """Each member's `Asked` reading from `counted_work`'s `counted`: the fact where `has_fact` holds; asked early
+    where it has a wait (counted ids or its own date or event wait) and no fact, unless it is a held build (`held`,
+    `held_map`'s: its row reads *waits on TD-<design>'s question*), a design with a question (a design `held` names,
+    asked as any, its answer keeping work moving) or a gated `Owner: paul` entry (drawn as a need, as before)."""
+    designs = set(held.values())
+    fact: dict[str, list[str]] = {}
+    early: dict[str, str] = {}
+    for q in {*counted.wide, *counted.gates}:
+        if has_fact(q, counted, entries):
+            fact[q] = list(counted.wide.get(q) or ())
+            continue
+        e = entries.get(q) or {}
+        if q in held or q in designs or str(e.get("owner") or "").lower() == PERSON:
+            continue
+        if line := early_line(q, counted, entries):
+            early[q] = line
+    return Asked(fact, early)
 
 
 def _holder(rec: Any) -> dict[str, Any]:
@@ -2373,6 +2458,7 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         return "needs you"
     if any(
         r["needs"] and not r.get("with_you") and not r.get("answered") and not r.get("then_yours")
+        and not r.get("early")  # a question asked early is no need while its entry waits (TD-2184)
         and not r.get("held_by")  # a held build's word is no need (TD-2026)
         for r in rows
     ):  # fmt: skip
@@ -2381,7 +2467,7 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         return "stalled"
 
     def waits(e: Mapping[str, Any]) -> bool:
-        if e.get("open_work"):  # a held member whose question waits on counted open work (TD-1926)
+        if e.get("counted_work"):  # a held member whose question waits on counted open work (TD-1926, TD-2172)
             return True
         if e.get("waiting") or e.get("settling"):  # a live check's `event (live)` gate among them (TD-1452)
             return True
@@ -2402,9 +2488,10 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
 
 def _own(e: Mapping[str, Any]) -> bool:
     """The person's own member (§4.4 *Waiting*): `Blocked by: decision (paul)` — an `Owner: paul` alone holds
-    nothing (TD-1375) — with no counted open work: one with some waits as a member blocked by open ids does
-    (TD-1926), read from the stamped `open_work`, never from `parts_open`."""
-    return ledger_mod.decided_by(dict(e), PERSON) and not e.get("open_work")
+    nothing (TD-1375) — with no counted open work and not asked early: one with some, or asked early, waits as a
+    member blocked by open ids does (TD-1926, TD-2172), read from the stamped `counted_work` and `early`, never from
+    `parts_open`."""
+    return ledger_mod.decided_by(dict(e), PERSON) and not e.get("counted_work") and not e.get("early")
 
 
 def _wait(
@@ -2438,7 +2525,7 @@ def _wait(
         return bool(e.get("waiting") or e.get("settling")) or far(e)
 
     def counted(q: str) -> set[str]:  # a held member's counted open work (TD-1926), else its open ids and parts
-        return set(open_[q].get("open_work") or ()) or (blockers[q] | parts[q])
+        return set(open_[q].get("counted_work") or ()) or (blockers[q] | parts[q])
 
     if not rest or not all(of_its_own(q) or counted(q) - own for q in rest):
         return None

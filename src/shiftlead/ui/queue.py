@@ -761,13 +761,17 @@ def answered_case(e: Mapping[str, Any]) -> str:
     handed by Have a session do it, TD-1660), else `waiting` — *answered — waiting on <asker>*, the only one that draws
     **Answer…** and Start session and counts for the header where it draws its button; and after them `then_yours`
     (*waiting, then yours*, a held entry, a covering line or an `ask --lift` whose question waits on open work,
-    TD-1926), its bar **Open** alone; '' for a row none of them."""
+    TD-1926), its bar **Open** alone; and `early` (*asked early*, a held entry whose question only waits, TD-2172),
+    which draws a Decide item's whole bar under its press line and counts for the header as one; '' for a row none of
+    them."""
     if e.get("applying"):
         return "applying"
     a = e.get("answered")
     if not isinstance(a, Mapping) or not a:
         # *waiting, then yours* (TD-1926): after every other case, so a row with an earlier word keeps it
-        return "then_yours" if e.get("then_yours") else ""
+        if e.get("then_yours"):
+            return "then_yours"
+        return "early" if e.get("early") and e.get("row") == "ledger" else ""
     if a.get("until"):
         return "until"
     return "handed" if a.get("kind") == "handed" else "waiting"
@@ -957,6 +961,10 @@ def attach(
             # *waiting, then yours* (§4.5 screen 12 *A press is never left stranded*, TD-1926): a held entry, a line
             # covering one, or an `ask --lift` on one, whose question waits on open work — grey, never a Decide item
             return "answered", "", None
+        if e.get("row") == "ledger" and e.get("early") and want in WANTS:
+            # *asked early* (§4.5 screen 12 *A question asked early is no want while its entry waits*, TD-2172): in
+            # the grey section, counted on no pill, its whole Decide bar drawn (`answered_case` `early`)
+            return "answered", "", None
         return want, kind, None
 
     # a board line that names an entry is the question itself and is drawn instead of the entry's own block
@@ -1008,17 +1016,17 @@ def attach(
             e = {**e, "lift_reply": lift}
         if (
             e.get("row") == "ledger"
-            and (want in WANTS or (want == "answered" and answered_case(e) == "then_yours"))
+            and (want in WANTS or (want == "answered" and answered_case(e) in ("then_yours", "early")))
             and (str(e.get("on_row") or "") in strip_rows or covered_by(e, strip))
         ):
-            # only the entry's own question goes, its grey *waiting, then yours* too, the line standing in its place
-            # (TD-1926): *with you* and *answered* are no question to draw over
+            # only the entry's own question goes, its grey *waiting, then yours* and *asked early* too, the line
+            # standing in its place (TD-1926, TD-2172): *with you* and *answered* are no question to draw over
             return
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
         pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)
         # an item *answered — waiting on <asker>* draws one too (TD-1843), beside a holder as any item's (TD-1984);
         # it counts only where no other session holds its entry (`starts`, below)
-        waiting = want == "answered" and answered_case(e) == "waiting"
+        waiting = want == "answered" and answered_case(e) in ("waiting", "early")
         go = (
             start(card, ref, str(e.get("on_row") or ""))
             if start is not None and (want in (*WANTS, "with_you") or waiting) and not pr_row
@@ -1464,10 +1472,10 @@ def branch(r: Mapping[str, Any]) -> str:
         return "done"
     if r.get("held_by"):  # *waits on TD-n's question*, read before its `needs` (TD-2026)
         return "waiting"
-    if r.get("needs") and not (r.get("with_you") or r.get("answered") or r.get("then_yours")):
+    if r.get("needs") and not (r.get("with_you") or r.get("answered") or r.get("then_yours") or r.get("early")):
         return "needs"
-    if state.startswith("waits ") or state in ("waiting", "settling") or r.get("then_yours"):
-        return "waiting"
+    if state.startswith("waits ") or state in ("waiting", "settling") or r.get("then_yours") or r.get("early"):
+        return "waiting"  # *asked early* too: teal, its need no test reads (TD-2184)
     return "open"
 
 
@@ -1476,8 +1484,8 @@ def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
     word = (
         ""
-        # its own word: *waiting, then yours*, a held build's *waits on TD-n's question* (TD-2026)
-        if r.get("with_you") or r.get("answered") or r.get("then_yours") or r.get("held_by")
+        # its own word: *waiting, then yours*, *asked early* (TD-2184), a held build's *waits on TD-n's question*
+        if r.get("with_you") or r.get("answered") or r.get("then_yours") or r.get("early") or r.get("held_by")
         else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
     )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}

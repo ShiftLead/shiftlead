@@ -113,13 +113,14 @@ async def test_a_lift_on_a_held_build_alone_is_refused_after_its_gone_check(tmp_
 
 
 @pytest.mark.unit
-async def test_a_build_with_counted_open_work_refuses_the_whole_set(tmp_path, lifts):
-    """TD-1926's refusal read over the set: the design takes in its build's counted work, so the press is refused
-    whole, naming the work."""
+async def test_a_build_with_an_open_part_refuses_the_whole_set(tmp_path, lifts):
+    """TD-1926's refusal read over the set: the design takes in its build's counted work, and its build's open part
+    gives it the fact (TD-2172), so the press is refused whole, naming the work."""
     entries = [
         _entry(1, "the design", **HELD),
         _entry(2, "build a", Priority="High", Part_of="TD-001", Blocked_by="TD-004, decision (paul)"),
         _entry(4, "the build's blocker", Priority="High"),
+        _entry(5, "build a's round", Priority="High", Part_of="TD-002"),
     ]
     home, root = _home(tmp_path, entries, _rounds("TD-002"))
     with pytest.raises(RpcError, match="waits on TD-004: it is asked once that closes"):

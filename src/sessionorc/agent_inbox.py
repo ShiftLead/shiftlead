@@ -1426,9 +1426,10 @@ class InboxMixin:
     def _open_work(
         self,
     ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str], dict[str, str], dict[str, list[str]]]:
-        """The open entries of every reading the home holds by `<repo>#TD-n`, each `decision (paul)` member's counted
-        open work over them (`queue.open_work`, the one builder the Queue and the Inbox read, §4.4 *The card's
-        status*, TD-1926), the index a line's refs link through, and the `held_map` read with them (`{build:
+        """The open entries of every reading the home holds by `<repo>#TD-n`, the counted open work of each
+        `decision (paul)` member with the fact over them (`queue.counted_work` and `queue.asked`, the one builder the
+        Queue and the Inbox read, §4.4 *The card's status*, TD-1926; a member asked early has none here, TD-2172), the
+        index a line's refs link through, and the `held_map` read with them (`{build:
         design}`, TD-2026), which `_press_lift` and `_refuse_waiting` read (TD-2027), and each member's counted ids that
         are open parts (`queue.counted_work`'s `parts`, TD-2172)."""
         readings = {str(r.get("name") or Path(root).name): r for root, r in self._repos.items() if isinstance(r, dict)}
@@ -1445,13 +1446,14 @@ class InboxMixin:
         held = queue_mod.held_map(opens, boards, linked)
         resolve = queue_mod.item_resolver(origins)
         counted = queue_mod.counted_work(opens, resolve, held)
-        return opens, counted.work, linked, held, counted.parts
+        return opens, queue_mod.asked(counted, opens, held).fact, linked, held, counted.parts
 
     def _refuse_waiting(self, qids: Iterable[str], work: Mapping[str, list[str]] | None = None) -> None:
-        """A press on a member whose question still waits on counted open work is stale (§4.4 *The card's status*,
-        TD-1926): refused before anything is written, *TD-n waits on TD-m: it is asked once that closes*, TD-m the
-        member's first counted id (bare in the member's own repo). `work` is the counted work a caller already read
-        (`_press_lift`'s one reading, TD-2027), else read here."""
+        """A press on a member with the fact — its question still waits on an open part, or a gated `Owner: paul`
+        entry on any counted work — is stale (§4.4 *The card's status*, TD-1926, TD-2172; a member asked early is
+        pressed as any): refused before anything is written, *TD-n waits on TD-m: it is asked once that closes*,
+        TD-m the member's first counted id (bare in the member's own repo). `work` is the counted work of the members
+        with the fact a caller already read (`_press_lift`'s one reading, TD-2027), else read here."""
         if work is None:
             _, work, _, _, _ = self._open_work()
         for q in qids:

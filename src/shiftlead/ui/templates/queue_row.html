@@ -13,7 +13,7 @@
     *answered — waiting on <asker>*, the need words and a holderless *stalled* stay plain -#}
 {% macro state(r, words=False) %}{% set sw = state_words(r.state) if words else r.state %}{% set opens = r.holder and not r.archived and (r.with_you or (r.state or '').startswith(('with you in', 'held by')) or r.state == 'stalled' or r.restart_word) %}
 {%- if r.with_you or r.answered %}{% if r.with_you and opens %}<a class="qstate s-with" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="qstate s-with">{{ sw }}</span>{% endif %}
-{%- elif r.then_yours or r.held_by %}<span class="qstate s-waiting">{{ sw }}</span>{# *waiting, then yours*: teal, its need no test reads (TD-1926) #}
+{%- elif r.then_yours or r.early or r.held_by %}<span class="qstate s-waiting">{{ sw }}</span>{# *waiting, then yours* and *asked early*: teal, their need no test reads (TD-1926, TD-2184) #}
 {%- elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>
 {%- elif r.state %}{% set cls = "qstate s-" ~ ('restart' if r.restart_word else r.state.split(' ')[0] | replace('#', 'pr')) ~ (" done" if r.archived else "") %}
 {%- if opens %}<a class="{{ cls }}" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="{{ cls }}">{{ sw }}</span>{% endif %}{% endif %}{% endmacro %}
@@ -149,7 +149,7 @@
 {%- endmacro %}
 
 {% macro row(r, repo='', words=False, own='') %}
-  <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not (r.with_you or r.answered or r.then_yours or r.held_by) %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
+  <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not (r.with_you or r.answered or r.then_yours or r.early or r.held_by) %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ md(r.title, inline=True) if words else r.title }}{{ synopsis(r.synopsis, ' ') }}</span>
     <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r, words) }}{{ afters(r, words, own) }}{% if not (r.state or '').startswith(('held by', 'with you in')) and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>

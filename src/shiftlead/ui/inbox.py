@@ -3204,6 +3204,7 @@ def rail_rows(
         for e in rows
         if e.get("home") != "queue"  # drawn on its Queue card, not on this page (§4.5 screen 6 *Where a row is drawn*)
         and not e.get("then_yours")  # *waiting, then yours* stays in the list, counted nowhere (TD-1926)
+        and not e.get("early")  # and so does a question asked early (TD-2184)
         and not e.get("held_by")  # a held build is drawn nowhere in *Later* (TD-2026)
     ]
 
@@ -3408,7 +3409,10 @@ def ledger_for_you(
     # a design with a question takes in its held builds' work (§4.4 *A design's question is asked once*, TD-2026)
     held_of = queue_mod.held_map(opens, boards, linked)
     resolve = queue_mod.item_resolver(origins)
-    work = queue_mod.counted_work(opens, resolve, held_of, today=now.astimezone(UTC).date().isoformat()).work
+    counted = queue_mod.counted_work(opens, resolve, held_of, today=now.astimezone(UTC).date().isoformat())
+    # the fact and the early line of each member (§4.4 *A question whose entry only waits is asked early*, TD-2172)
+    how = queue_mod.asked(counted, opens, held_of)
+    work = how.fact
     go = queue_mod.go_builds(held_of, opens)  # each design with a question's held builds, its row's `go_builds`
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
@@ -3488,11 +3492,16 @@ def ledger_for_you(
             # undecided line asks its hold (case (d)); a session holding it clears nothing (*No holder test*)
             me_q = queue_mod.qid(name, str(e["id"]))
             fact = list(work.get(me_q) or ())
+            early_of = (
+                how.early.get(me_q, "")
+                if not got_q and applying is None and not any(not s.get("unattended") for s in holders)
+                else ""
+            )
             builds = list(go.get(me_q) or ())
             lift_item = bool(
                 not owner
                 and applying is None
-                and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
+                and not fact  # a member with the fact draws no Lift, whatever its word (TD-1926, TD-2172)
                 # a design with held builds draws it as **Go now** from `go_builds` (TD-2027)
                 and me_q not in held_of  # a held build: its design's question lifts it (TD-2026)
                 and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
@@ -3553,6 +3562,9 @@ def ledger_for_you(
                     "then_yours": fact
                     if fact and not got_q and applying is None and not any(not s.get("unattended") for s in holders)
                     else None,
+                    # *asked early* where no earlier word stands (TD-2184): its question drawn whole, counted nowhere
+                    "early": bool(early_of),
+                    "early_line": early_of,
                     # a press landing on it (§4.4 *A press is drawn as it lands*, TD-1508): no need of the person
                     "applying": applying,
                     "applying_words": queue_mod.applying_words(e["applying"])
@@ -3579,10 +3591,16 @@ def ledger_for_you(
                     default="",
                     answered=None,
                     then_yours=None,
+                    early=False,
+                    early_line="",
                     lift_item=False,
                 )
         groups.append(
-            {"repo": name, "rows": rows, "n": sum(1 for x in rows if not x.get("then_yours") and not x.get("held_by"))}
+            {
+                "repo": name,
+                "rows": rows,
+                "n": sum(1 for x in rows if not x.get("then_yours") and not x.get("early") and not x.get("held_by")),
+            }
         )
     # the open entries of every repo read, by `<repo>#TD-n`: what a board line covers is read through them
     # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
