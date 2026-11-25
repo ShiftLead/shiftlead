@@ -5525,12 +5525,14 @@ def cmd_decide(args: argparse.Namespace) -> int:
 def cmd_switch_over_check(args: argparse.Namespace) -> int:
     """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles and every
     blocker, nothing changed; exit 1 while a blocker to cure beforehand stands."""
+    import yaml
+
     from shiftlead import profiles as profiles_mod
     from shiftlead import switchover
 
     try:
         profs, _ = profiles_mod.load()
-    except (OSError, ValueError, TypeError, AttributeError) as e:
+    except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1
     from sessionorc import hosts

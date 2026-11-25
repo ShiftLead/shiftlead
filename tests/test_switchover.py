@@ -183,3 +183,28 @@ def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(tmp_path,
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {b}}}\n")
     assert cli.main(["switch-over", "check"]) == 0
     assert "no blockers" in capsys.readouterr().out
+
+
+def test_a_profiles_file_that_does_not_parse_is_reported_not_raised(capsys):
+    from sessionorc import paths
+
+    (paths.home() / "profiles.yml").write_text("profiles: [unclosed\n")
+    assert cli.main(["switch-over", "check"]) == 1
+    assert "cannot be read" in capsys.readouterr().err
+
+
+def test_an_adapter_whose_home_raises_makes_no_login(tmp_path):
+    class Broken(Fake):
+        def default_home(self, _env: Any) -> Path:
+            raise RuntimeError("no home")
+
+    made, _ = run(tmp_path, [P("p"), P("q", tmp_path / "q")], fakes={"claude-code": Broken(tmp_path)})
+    assert [m.name for m in made] == ["q"]
+
+
+def test_a_folder_under_a_symlinked_home_is_shown_from_tilde(tmp_path, monkeypatch):
+    real = tmp_path / "real"
+    (real / ".claude").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(real)
+    monkeypatch.setenv("HOME", str(tmp_path / "link"))
+    assert switchover.shown((tmp_path / "link" / ".claude").resolve()) == "~/.claude"

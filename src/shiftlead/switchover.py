@@ -58,11 +58,12 @@ class Login:
 
 def shown(path: Path) -> str:
     """A folder as the person reads it: under their home, from `~`."""
-    home = Path.home()
-    try:
-        return "~/" + str(path.relative_to(home)) if path != home else "~"
-    except ValueError:
-        return str(path)
+    for home in dict.fromkeys((Path.home(), Path.home().resolve())):
+        if path == home:
+            return "~"
+        if path.is_relative_to(home):
+            return "~/" + str(path.relative_to(home))
+    return str(path)
 
 
 def key_of(p: Profile) -> str:
@@ -101,9 +102,10 @@ def host_logins(
 ) -> tuple[list[Login], list[Blocker]]:
     """The logins the move would make on `host` from its `profiles`, in the order of each folder's first profile,
     and every blocker to cure beforehand. `names` is the answers' `hosts.<host>.logins.<found>.name`; a folder it
-    does not name takes its first profile's name. A `shell` profile, and one whose adapter is not registered, makes
-    no login."""
-    env = os.environ if env is None else env
+    does not name takes its first profile's name. A `shell` profile, one whose adapter is not registered, and one
+    whose folder cannot be read makes no login. The tool's default home is read with no environment of the caller's
+    (`env` empty unless given), so the check does not change with the shell it is run from."""
+    env = {} if env is None else env
     salt = salt if salt is not None else os.urandom(32)
     names = names or {}
     where = f"host {host}"
@@ -122,11 +124,14 @@ def host_logins(
             continue
         tools[p.adapter] = adapter
         default = getattr(adapter, "default_home", None)
-        if p.config_dir is not None:
-            folder, by_default = Path(p.config_dir).expanduser().resolve(), False
-        elif callable(default):
-            folder, by_default = Path(default(env)).expanduser().resolve(), True
-        else:
+        try:
+            if p.config_dir is not None:
+                folder, by_default = Path(p.config_dir).expanduser().resolve(), False
+            elif callable(default):
+                folder, by_default = Path(default(env)).expanduser().resolve(), True
+            else:
+                continue
+        except Exception:  # noqa: BLE001, S112 — a home that cannot be read (an adapter that raises) makes no login
             continue
         folders.setdefault((p.adapter, folder), []).append((p, by_default))
 
