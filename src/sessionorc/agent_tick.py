@@ -4429,9 +4429,12 @@ class TickMixin:
         """A director seat that stands (§4.9b *The director seat*, TD-642): the record whose seat's trigger is
         `prompt`, the director's alone, that rule 3 would fill — supervised, unattended, not superseded,
         suspended or sat out, and not refused a fill at the last pass (`unfillable`: its fill ceiling, a paused
-        profile, TD-1443). One that cannot be filled is passed by, as for a question passed up to it."""
+        profile, TD-1443). One that cannot be filled is passed by, as for a question passed up to it. A repo's prompts
+        seat is on `prompt` too, and is the record with `builtin: prompts`: the director is the one with no `builtin`
+        (§4.9d *How each one runs*, TD-2065)."""
         return (
             (r.seat or {}).get("trigger") == "prompt"
+            and not r.builtin
             and r.supervised
             and r.unattended
             and not r.superseded_by

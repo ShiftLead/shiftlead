@@ -201,3 +201,20 @@ async def test_a_prompt_under_another_keeps_its_own_fill(agent, tmp_path):
         assert agent.sessions[d] is second and [e["prompt"] for e in second.seat_filled] == ["toolu_a"]
         for sid in (w, d):
             await person.call("kill", id=sid)
+
+
+async def test_a_repos_prompts_seat_is_not_the_director(agent, tmp_path):
+    """§4.9d *How each one runs* (TD-2065): the director is the `prompt` record with no `builtin`; a prompts seat is
+    the one with `builtin: prompts`, so a question is never passed up to it as the director's and the manager's
+    `pending` cause does not stand aside for it."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        mgr = await _make(person, tmp_path, "mgr", prompt="brief", seat={"trigger": "team"})
+        w = await _make(person, tmp_path, "w", controllers=[mgr])
+        p = await _make(person, tmp_path, "prompts-r", prompt="brief", seat={"trigger": "prompt"}, builtin="prompts")
+        rm, rw, rp = agent.sessions[mgr], agent.sessions[w], agent.sessions[p]
+        _ask(rw)
+        assert rp.builtin == "prompts" and not agent._is_director(rp)
+        assert [c["by"] for c in agent._team_causes(rm, [rm, rw, rp])] == ["pending"], "no director stands"
+        for sid in (w, mgr, p):
+            await person.call("kill", id=sid)
