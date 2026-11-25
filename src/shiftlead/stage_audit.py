@@ -7,7 +7,10 @@ outcome, one of `OUTCOMES`, or `lost` for a run rested at its second loss.
 
 This module is pure, as `stage_acts` is: `choose` names the one act a pass takes on an audit, and `started`, `again`,
 `rested` and `finished` are the record each writes. It reads nothing and writes nothing; starting the session, writing
-the record and telling the person are later slices of TD-2053. An audit with no run record yet is not chosen here.
+the record and telling the person are later slices of TD-2053. An audit with no run record yet (its team's first start,
+or an audit just added) is due at once, so its first run sets the commit its count runs from. A run's lease is its
+holder's claim on `lease_ref`, renewed by claiming again (§4.9c, act 5) and read as lapsed as an entry's claim
+is (act 4).
 
 A run lost or silent is offered again once, as an entry's holder is (act 4); lost again, the audit **rests**: the run
 ends as `lost`, its clock runs afresh from the second loss (so a `merged-pull-requests` count already past its number
@@ -27,6 +30,12 @@ from shiftlead.stage_acts import SECOND_LOSS, Holder
 OUTCOMES = ("findings-filed", "nothing-found", "other")
 
 AuditActName = Literal["start", "offer-again", "rest"]
+LEASE_PREFIX = "audit:"
+
+
+def lease_ref(team: str, name: str) -> str:
+    """The reference an audit run's holder claims, its lease: `audit:<team>/<audit>`."""
+    return f"{LEASE_PREFIX}{team}/{name}"
 
 
 @dataclass(frozen=True)
@@ -95,8 +104,10 @@ def holds_lease(run: Mapping[str, Any], s: AuditReading) -> bool:
 
 def choose(run: Mapping[str, Any] | None, every: Clock | None, s: AuditReading, now: datetime) -> AuditAct | None:
     """The one act this pass takes on an audit whose last run is `run`, or None."""
-    if run is None or every is None:
-        return None  # an audit's first run, and one whose clock cannot be read, are not chosen here
+    if every is None:
+        return None  # a clock the flow check would refuse starts nothing
+    if run is None:
+        return AuditAct("start", "first") if s.may_start else None  # due at once: its first run sets the base
     if run.get("holder"):
         h = s.holder  # None: the holder was not read, so the run waits for a pass that reads it
         if h is None or not s.may_start or not (h.lost or h.silent or h.ended_by_stop):

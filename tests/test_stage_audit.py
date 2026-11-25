@@ -19,6 +19,7 @@ from shiftlead.stage_audit import (
     end_refusal,
     finished,
     holds_lease,
+    lease_ref,
     rested,
     started,
 )
@@ -153,9 +154,19 @@ def test_started_writes_a_fresh_run() -> None:
     assert r == {**want, "ended": None}
 
 
-def test_an_audit_with_no_run_or_no_clock_is_not_chosen_here() -> None:
-    assert choose(None, Clock(6, "hours"), AuditReading(**GO), NOW) is None
+def test_an_audit_with_no_run_yet_is_due_at_once_while_the_team_may_start() -> None:
+    for every in (Clock(6, "hours"), Clock(3, "merged-pull-requests"), Clock(7, "days")):
+        assert choose(None, every, AuditReading(**GO), NOW) == AuditAct("start", "first")
+        assert choose(None, every, AuditReading(), NOW) is None  # the team may not start
+
+
+def test_an_audit_with_no_clock_is_never_chosen() -> None:
+    assert choose(None, None, AuditReading(**GO), NOW) is None
     assert choose(done_run(), None, AuditReading(**GO), NOW) is None
+
+
+def test_a_runs_lease_is_a_claim_on_the_audits_own_reference() -> None:
+    assert lease_ref("core", "docs") == "audit:core/docs"
 
 
 @pytest.mark.parametrize(
