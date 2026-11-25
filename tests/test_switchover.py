@@ -1038,3 +1038,74 @@ def test_the_check_and_its_answers_read_a_container_nodes_logins(home, tmp_path,
     assert doc["hosts"]["cm"] == {"logins": {"claude-code:/shiftlead/profiles/q": {"name": "q"}}}
     assert doc["teams"]["grind"]["logins"] == ["claude-code:q"]
     assert "a login cm would not have" not in out and "has no name in the answers" not in out
+
+
+# -- `--host`: one ssh node's own part (§4.9e *The window* step 2) ----------------------------------------------------
+
+
+def test_check_host_answers_writes_this_hosts_part_alone_and_the_check_accepts_it(home, tmp_path, capsys):
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    (home / "org.yml").write_text("teams: [")  # a node reads no org: the check never asks for it
+    before = {f: f.read_bytes() for f in home.rglob("*") if f.is_file()}
+    assert cli.main(["switch-over", "check", "--host"]) == 1, "no answers file yet"
+    assert {f: f.read_bytes() for f in home.rglob("*") if f.is_file()} == before, "the home's files are untouched"
+    assert cli.main(["switch-over", "check", "--host", "--answers"]) == 0
+    out = capsys.readouterr().out
+    doc = yaml.safe_load((home / "switch-over" / "answers.yml").read_text())
+    assert doc == {
+        "hosts": {"h": {"logins": {f"claude-code:{switchover.shown((tmp_path / 'a').resolve())}": {"name": "p"}}}}
+    }
+    assert "teams the answers give" not in out and "work in flight" not in out and "the org" not in out
+    assert out.rstrip().endswith("no blockers")
+    answers(home, {"hosts": {"h": {"logins": {}}}})
+    assert cli.main(["switch-over", "check", "--host"]) == 1
+    assert "has no name in the answers" in capsys.readouterr().out
+
+
+# -- the Done when: a home shaped like today's ------------------------------------------------------------------
+
+
+def test_a_home_shaped_like_todays_is_checked_whole_and_its_files_left_as_they_are(home, tmp_path, capsys, monkeypatch):
+    from sessionorc import containers
+
+    on = {
+        "a": ["paul", "grind", "design"],
+        "b": ["fable"],
+        "c": ["sonnet", "audit"],
+        "d": ["cm"],
+        "e": ["spare", "later"],
+    }
+    lines = [f"  {p}: {{config_dir: {tmp_path / f}, account: {ps[0]}}}" for f, ps in on.items() for p in ps]
+    lines.append(f"  reader: {{adapter: gemini, config_dir: {tmp_path / 'g'}}}")
+    (home / "profiles.yml").write_text("default: paul\nprofiles:\n" + "\n".join(lines) + "\n")
+
+    def team(repo: str, profile: str, host: str = "") -> dict:
+        got = {"repo": repo, "manager": {"role": "person"}, "flows": ["td"]}
+        got["members"] = [{"role": "grinder", "count": 2, "profile": profile}]
+        return {**got, "host": host} if host else got
+
+    teams = {f"t{i}": team(f"r{i}", p) for i, p in enumerate(("paul", "grind", "fable", "sonnet", "audit"), 1)}
+    teams["far"] = team("rcm", "q", "cm")
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": teams}))
+    node = Node(home / "nodes" / "cm", "profiles:\n  q: {config_dir: /shiftlead/profiles/q}\n")
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": node})
+    monkeypatch.setattr(cli.hosts, "nodes", lambda: {"cm": {"container": {"devcontainer": "/x"}}})
+    reading = {"name": "r1", "ledger": {"entries": [Entry("TD-1"), Entry("TD-2")]}, "prs": {"open": [Pr(10, "td1-x")]}}
+    (home / "repos.json").write_text(json.dumps({"/nowhere/r1": reading}))
+    before = {f: f.read_bytes() for f in home.rglob("*") if f.is_file()}
+    assert cli.main(["switch-over", "check"]) == 1, "no answers file: a blocker to cure beforehand"
+    assert {f: f.read_bytes() for f in home.rglob("*") if f.is_file()} == before, "the check changes nothing"
+    capsys.readouterr()
+    assert cli.main(["switch-over", "check", "--answers"]) == 0
+    out = capsys.readouterr().out
+    home_logins = out.split("h: logins the move would make\n")[1].split("cm: logins")[0].splitlines()
+    assert [ln.split()[0] for ln in home_logins] == [
+        "claude-code:paul", "claude-code:fable", "claude-code:sonnet", "claude-code:cm", "claude-code:spare",
+        "gemini:reader",
+    ], "ten profiles on six folders make six logins, each named for its folder's first profile"  # fmt: skip
+    assert "cm: logins the move would make, a container node\n  claude-code:q  /shiftlead/profiles/q  from q" in out
+    assert sum(1 for ln in out.splitlines() if ln.startswith("  t") or ln.startswith("  far")) >= 6
+    for name in ("t1", "t2", "t3", "t4", "t5", "far"):
+        assert f"  {name}: " in out and "flow design-wise" in out.split(f"  {name}: ")[1].splitlines()[0]
+    assert "    taken up with its pull request: TD-1 #10 (td1-x)" in out
+    assert "no blockers" in out

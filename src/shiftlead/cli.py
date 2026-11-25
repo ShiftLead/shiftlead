@@ -5535,7 +5535,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles, named by the
     answers file, each team with what the answers give it, and every blocker, nothing changed; exit 1 while a blocker
     to cure beforehand stands. `--answers` first writes the answers file where there is none, the seats each team's
-    suggested flow lacks in its head."""
+    suggested flow lacks in its head. `--host` is one ssh node's own part (§4.9e *The window* step 2): this host's
+    logins and their blockers alone, and `--answers` with it writes a file holding this host's `hosts:` part alone."""
     import yaml
 
     from shiftlead import profiles as profiles_mod
@@ -5547,6 +5548,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1
     host = hosts.local_host().name
+    if args.host:
+        return _switch_over_check_host(args, host, profs)
     org, org_error = None, None
     try:
         org, notes = _org_notes("ao switch-over check")
@@ -5603,6 +5606,29 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         asks = switchover.first_shape_asks(switchover.stored_records())
     lines = switchover.report(host, made, blockers, plans, builtins, director, flights, asks, node_made=node_made)
     print("\n".join(lines))
+    return 1 if any(not b.day for b in blockers) else 0
+
+
+def _switch_over_check_host(args: argparse.Namespace, host: str, profs: Any) -> int:
+    """`ao switch-over check --host` (§4.9e *The window* step 2): this host's logins from its profiles, named by its
+    own answers file, and their blockers; no team, set, director or work in flight, which are the home's."""
+    from shiftlead import switchover
+
+    if args.answers:
+        path = switchover.answers_file()
+        at = switchover.shown(path)
+        made, _ = switchover.host_logins(host, profs)
+        doc = {"hosts": {host: {"logins": {lg.found: {"name": lg.name} for lg in made}}}}
+        try:
+            wrote = switchover.write_answers(doc)
+        except OSError as e:
+            print(f"ao switch-over check: {at} cannot be written: {e}", file=sys.stderr)
+            return 1
+        print(f"{'wrote' if wrote else 'left as it is'} {at}", file=sys.stderr)
+    answers, blockers = switchover.read_answers()
+    made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
+    blockers += more + switchover.unnamed(host, made, answers)
+    print("\n".join(switchover.report(host, made, blockers)))
     return 1 if any(not b.day for b in blockers) else 0
 
 
@@ -6898,6 +6924,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument(
         "--answers", action="store_true", help="first write the answers file where there is none, with what it suggests"
     )
+    q.add_argument("--host", action="store_true", help="this host's own part alone, as on an ssh node")
     q.set_defaults(fn=cmd_switch_over_check)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
