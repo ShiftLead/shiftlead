@@ -131,3 +131,9 @@ async def test_a_repo_s_sweeper_record_is_the_repo_s_while_a_team_is_started(age
     assert agent._sweep_idle(sweeper, [sweeper]) == ""
     agent._host_rec["teams"]["b"] = _stopped()
     assert agent._sweep_idle(sweeper, [sweeper]) == "other"
+
+
+async def test_an_odd_team_mark_holds_without_a_crash(agent):
+    await _cut(agent, a="started", b=_stopped(at="2026-12-01T08:00:00Z"))
+    seat = _seat(agent, "sweeper-repo", "sweeper", trigger={"trigger": "swept"})
+    assert agent._builtin_hold(seat, [seat]) == {"at": "2026-12-01T08:00:00Z", "by": "person", "team": ""}

@@ -4676,7 +4676,8 @@ class TickMixin:
         ):
             return None  # a wound-down team's session finishing: its question is still answered
         marks = self._host_rec.get("teams") if isinstance(self._host_rec.get("teams"), dict) else {}
-        stops = [st for t in serves if isinstance(st := (marks.get(t) or {}).get("stopped"), dict)]
+        recs = [m for t in serves if isinstance(m := marks.get(t), dict)]
+        stops = [st for m in recs if isinstance(st := m.get("stopped"), dict)]
         last = max(stops, key=lambda st: str(st.get("at") or ""), default={})
         return {"at": str(last.get("at") or ""), "by": str(last.get("by") or "other"), "team": s.team or ""}
 
