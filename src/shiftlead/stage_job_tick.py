@@ -10,8 +10,8 @@ agent, its claim on the job's work order, and the home's plain board line (`boar
 Once both seats have passed, each job that waits `merging` has its merge made (`stage_job_merge.run`), with the
 repo's one gate and land the teams' pass keeps.
 
-Nothing starts a session yet: `stage_start.team_started` is false until TD-2065, so no team is started and no job is
-offered.
+A job is offered only while a team of the repo is started (`stage_start.team_started`, the home's started mark,
+TD-2065), and no team is marked before the cut-over.
 """
 
 from __future__ import annotations

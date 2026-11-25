@@ -1572,7 +1572,8 @@ class HostAgent(
         each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
         §6 rule 8), which is what draws the Inbox's team start row and the card's note; each team's
         balance mark (`balance: {<team>: mark}`, §6 *Balance*), every one, a mark with no `repo` included,
-        which no checkout's `repos` reading carries (TD-330); and what
+        which no checkout's `repos` reading carries (TD-330); each team's started mark and the stop beside it
+        (`team_marks: {<team>: {started?, stopped?}}`, §4.9d *Started is a mark the home keeps*); and what
         each live session waits on (`waiting: {<sender>: [{id, ref, bound}]}`, `work.waiting_of`
         over the person inbox, §4.9a *Waiting is read, never declared*, TD-274) — references and
         bounds, never the questions' text — which a session's `ao team status` cannot read for
@@ -1619,6 +1620,12 @@ class HostAgent(
                 team: dict(rec["balance"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())
                 if isinstance(rec, dict) and isinstance(rec.get("balance"), dict)
+            }
+            # each team's started mark and who stopped it (§4.9d *Started is a mark the home keeps*, TD-2065)
+            out["team_marks"] = {
+                team: {k: dict(rec[k]) for k in ("started", "stopped") if isinstance(rec.get(k), dict)}
+                for team, rec in sorted((self._host_rec.get("teams") or {}).items())
+                if isinstance(rec, dict) and any(isinstance(rec.get(k), dict) for k in ("started", "stopped"))
             }
         else:
             out["link"] = dict(self.home_link)

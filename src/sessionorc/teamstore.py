@@ -205,6 +205,44 @@ def delete(doc: dict[str, Any], team: str, sent: str | None) -> str:
     return f"{team} deleted"
 
 
+STARTED_BY = ("person", "schedule")  # who sets the started mark (§4.9d *Started is a mark the home keeps*)
+STOPPED_BY = ("person", "until")  # who clears it: Wind down, or the stop time
+
+
+def started(host_teams: Mapping[str, Any] | None, team: str) -> bool:
+    """Whether the team is started: the home's `host` record's `teams.<team>.started` (§4.9d *Started is a mark the
+    home keeps*). Every *while the team is started* after the cut-over reads this and nothing else."""
+    rec = (host_teams or {}).get(team)
+    return isinstance(rec, Mapping) and isinstance(rec.get("started"), Mapping)
+
+
+def mark_started(host_teams: dict[str, Any], team: str, by: str, at: str) -> bool:
+    """**Start**'s write, in place: `started: {since, by}` set and `stopped` deleted, the person's Start or the
+    schedule's alike. False, and nothing written, where the team is already started."""
+    if by not in STARTED_BY:
+        raise ValueError(f"a team is started by {' or '.join(STARTED_BY)}, not {by!r}")
+    rec = host_teams.setdefault(team, {})
+    if isinstance(rec.get("started"), Mapping):
+        return False
+    rec.pop("stopped", None)
+    rec["started"] = {"since": at, "by": by}
+    return True
+
+
+def mark_stopped(host_teams: dict[str, Any], team: str, by: str, at: str) -> bool:
+    """**Wind down**'s write and the stop time's, in place: the mark cleared and `stopped: {at, by}` written beside it.
+    Only a set mark is cleared, so a stop on a team that is not started writes nothing and never overwrites a stop the
+    person made (§6 *Team stop time*): False then."""
+    if by not in STOPPED_BY:
+        raise ValueError(f"a team is stopped by {' or '.join(STOPPED_BY)}, not {by!r}")
+    rec = host_teams.get(team)
+    if not isinstance(rec, dict) or not isinstance(rec.get("started"), Mapping):
+        return False
+    del rec["started"]
+    rec["stopped"] = {"at": at, "by": by}
+    return True
+
+
 def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[str]:
     """Each switched team on `flow` with its `at_once` keys renamed, in place (§4.9c *A switch or a rename re-keys the
     records*): the teams changed. Renames are applied at once, so a swap of two names holds, and a renamed stage's

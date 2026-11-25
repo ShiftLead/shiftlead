@@ -559,3 +559,17 @@ async def test_the_clearing_rings_a_nodes_refused_member_through_its_record_at_t
         assert json.loads((paths.remote_dir("laptop") / "ao-x-w.json").read_text()).get("balance_refused") is None
     finally:
         agent.remote.pop("laptop", None)
+
+
+async def test_a_teams_started_mark_is_set_cleared_and_served_on_the_host_read(agent):
+    """`team_mark` from the person, then the `host` read's `team_marks` (§4.9d *Started is a mark the home keeps*,
+    TD-2065): kept in the home's `host` record beside the balance mark, the stop beside it once wound down."""
+    await park_ticks(agent)
+    settings_mod.save({"cut_over": "2026-12-01", "teams": {"db": {"repo": "shiftlead", "host": agent.host}}})
+    async with LocalClient() as person:
+        assert (await person.call("team_mark", team="db", started=True))["change"] == "db started"
+        marks = (await person.call("host"))["team_marks"]
+        assert marks["db"]["started"]["by"] == "person" and "stopped" not in marks["db"]
+        assert json.loads(paths.host_file().read_text())["teams"]["db"]["started"] == marks["db"]["started"]
+        await person.call("team_mark", team="db", started=False)
+        assert set((await person.call("host"))["team_marks"]["db"]) == {"stopped"}

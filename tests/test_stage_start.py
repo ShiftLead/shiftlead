@@ -154,7 +154,28 @@ def test_nothing_starts_while_the_team_is_not_started(world):
     calls = []
     got = made(world, builtin("build"), "build")
     assert stage_start.start(lambda *a, **k: calls.append((a, k)) or {}, org, team, got) is None
-    assert calls == []
+    assert calls == [(("host",), {})], "only the home's marks are read"
+
+
+def test_a_start_reads_the_teams_mark_from_the_home_just_before_the_create(world):
+    """The mark is the home's `host` read's `team_marks` (§4.9d *Started is a mark the home keeps*, TD-2065): a team
+    stopped by the person, or another team started, starts nothing; this team's mark creates the session."""
+    org, team, _ = world
+    got = made(world, builtin("build"), "build")
+    for marks, want in (
+        ({team.name: {"stopped": {"at": "t", "by": "person"}}}, None),
+        ({"other": {"started": {"since": "t", "by": "person"}}}, None),
+        ({team.name: {"started": {"since": "t", "by": "person"}}}, {"id": "new"}),
+    ):
+        calls: list[str] = []
+        answers = {"host": {"team_marks": marks}, "name_check": {"verdict": "free"}}
+
+        def call(method, _calls=calls, _answers=answers, **kw):
+            _calls.append(method)
+            return _answers.get(method, {"id": "new"})
+
+        assert stage_start.start(call, org, team, got) == want
+        assert calls == (["host", "name_check", "create"] if want else ["host"])
 
 
 def test_a_started_team_creates_it_supervised_unless_the_name_is_held(world, monkeypatch):
@@ -168,7 +189,8 @@ def test_a_started_team_creates_it_supervised_unless_the_name_is_held(world, mon
         return {"verdict": "free"} if method == "name_check" else {"id": "new"}
 
     assert stage_start.start(call, org, team, got) == {"id": "new"}
-    assert calls[1][1]["supervised"] is True and calls[1][1]["lane"] == ["TD-7"]
+    assert [m for m, _ in calls] == ["host", "name_check", "create"]
+    assert calls[2][1]["supervised"] is True and calls[2][1]["lane"] == ["TD-7"]
     assert stage_start.start(lambda *_a, **_k: {"verdict": "live"}, org, team, got) is None
 
 
@@ -189,7 +211,7 @@ def test_the_name_is_checked_on_the_node_the_session_lands_on(world, monkeypatch
         return {"verdict": "free"}
 
     stage_start.start(call, org, team, got)
-    assert seen == [("name_check", "node"), ("create", "node")]
+    assert seen == [("host", None), ("name_check", "node"), ("create", "node")]
 
 
 @pytest.mark.parametrize("head", ["---\r\nkind: build\r\n---\r\n", "--- \nkind: build\n---\n"])

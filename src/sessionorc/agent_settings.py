@@ -703,11 +703,45 @@ class SettingsMixin:
         await self._team_store_saved(before, doc)
         return {"team": name, "change": words, "version": teamstore.version(doc, str(name))}
 
+    async def rpc_team_mark(self, team: str = "", started: Any = None, caller: Any = None) -> dict[str, Any]:
+        """**Start** and **Wind down** of a switched team (§4.9d *Started is a mark the home keeps*, *Start and Wind
+        down*; §4.7 `ao team start|stop`, TD-2065): a person's own act, refused before the cut-over and for a team
+        that is not switched. `started` true sets the mark and deletes `stopped`; false clears it and writes
+        `stopped: {at, by: person}`. Neither starts nor ends a session: the stage pass reads the mark. A Start on a
+        started team, or a Wind down on one that is not, writes nothing and says so."""
+        agent_common.person_only(caller, "start or wind down a team", "§4.9d *Start and Wind down*", self._graph())
+        name = str(team or "")
+        if not isinstance(started, bool):
+            raise RpcError("team_mark takes started: true (Start) or false (Wind down)")
+        doc = settings_mod.load()
+        if not teamstore.cut_over(doc):
+            raise RpcError(teamstore.BEFORE)
+        if not teamstore.switched(doc, name):
+            raise RpcError(f"no switched team {name!r}")
+        teams = self._host_rec.setdefault("teams", {})
+        before = copy.deepcopy(teams.get(name))
+        mark = teamstore.mark_started if started else teamstore.mark_stopped
+        if not mark(teams, name, "person", now_iso()):
+            if before is None:
+                teams.pop(name, None)
+            return {"team": name, "started": started, "change": f"{name} is {'already' if started else 'not'} started"}
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:  # the record in memory is put back, so it never says what the file does not
+            if before is None:
+                teams.pop(name, None)
+            else:
+                teams[name] = before
+            raise
+        await self._push_changes()
+        log.info("team %s %s by the person", name, "started" if started else "wound down")
+        return {"team": name, "started": started, "change": f"{name} {'started' if started else 'wound down'}"}
+
     async def rpc_team_delete(self, team: str = "", version: str | None = None, caller: Any = None) -> dict[str, Any]:
         """**Delete** (§4.9d *Delete*, §4.5a, TD-2063): a person's own act, version-checked, refused before the
-        cut-over, while any session of the team is live and while it has open stage records, naming them. The state
-        branch's copy goes first, so a failed removal leaves the team whole and a new team of this name never inherits
-        an old flow. Until TD-2065 writes the started mark, a started team is one with a live session."""
+        cut-over, while the team is started (the home's started mark), while any session of the team is live and
+        while it has open stage records, naming them. The state branch's copy goes first, so a failed removal leaves
+        the team whole and a new team of this name never inherits an old flow."""
         agent_common.person_only(caller, "delete a team", "§4.9d *Delete*", self._graph())
         name = str(team or "")
         checked = settings_mod.load()
@@ -715,6 +749,8 @@ class SettingsMixin:
             teamstore.delete(copy.deepcopy(checked), name, version)
         except teamstore.TeamError as e:
             raise RpcError(str(e)) from None
+        if teamstore.started(self._host_rec.get("teams"), name):
+            raise RpcError(f"{name} is started: wind it down first")
         repo = str(checked["teams"][name]["repo"])
         live = sorted(r.id for r in self._graph().values() if r.team == name and r.state not in work_mod.DEAD)
         if live:

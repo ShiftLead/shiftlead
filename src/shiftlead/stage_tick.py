@@ -11,8 +11,8 @@ Given the repo reading's work orders, pull request orders and boards, `run` then
 over their jobs (`stage_job_tick`, TD-2053); the home hands them over in a later slice. Last, it takes act 6 over the
 started teams' audits (`stage_audit_pass`, TD-2053), a rested run's note to the person being the caller's.
 
-Nothing starts a session yet: `stage_start.team_started` is false until TD-2065, so no offer is made, and a team is
-read only after the cut-over, when the caller passes it.
+A session starts only for a started team (`stage_start.team_started`, the home's started mark in the `host` record's
+teams, TD-2065), and a team is read only after the cut-over, when the caller passes it.
 """
 
 from __future__ import annotations
@@ -216,7 +216,7 @@ def run(
             host_teams=host_teams,
             protected=protected,
             branches=branches,
-            started=False,  # stage_start.team_started, false until TD-2065 writes the started mark
+            started=stage_start.team_started(host_teams, team),
             named=named,
         )
 
@@ -237,7 +237,9 @@ def run(
     store = StageStore(root)
     got = stage_pass.repo_pass(store, kept.state, flows, facts, sessions, reach, local=local, now=now)
     try:
-        got = dataclasses.replace(got, audits=_audits(store, root, ref, teams, flows, sessions, local, call, org, now))
+        got = dataclasses.replace(
+            got, audits=_audits(store, root, ref, teams, flows, sessions, local, call, org, now, host_teams)
+        )
     except Exception:  # noqa: BLE001 — the audits' pass failing is a log line and never the teams' pass
         log.exception("the audit pass of %s failed", root)
     if orders is None or pr_orders is None:
@@ -262,6 +264,7 @@ def run(
             org,
             now,
             gate_land=kept.gate_land,
+            host_teams=host_teams,
         )
         return dataclasses.replace(got, jobs=jobs)
     except Exception:  # noqa: BLE001 — the jobs' pass failing is a log line and never the teams' pass
@@ -287,6 +290,7 @@ def _jobs(
     now: datetime,
     *,
     gate_land: tuple[stage_merge.Gate, stage_merge.Land],
+    host_teams: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The jobs' pass, once the teams' pass is done: each team's flow as its records read it, the last good copy
     while it fails (`team_flow`), and the rows, with each open board answer's own pull request read by its number.
@@ -299,7 +303,7 @@ def _jobs(
         return {}
     read = org()
     started = sorted(
-        t for t in teams if read is not None and t in read.teams and stage_start.team_started(read, read.teams[t])
+        t for t in teams if read is not None and t in read.teams and stage_start.team_started(host_teams, t)
     )
     repo = next((str(e["repo"]) for e in teams.values() if e.get("repo")), root.name)
     hosts = {t: str(e.get("host") or "") for t, e in teams.items()}
@@ -348,13 +352,14 @@ def _audits(
     call: Callable[..., Any],
     org: Callable[[], orgmod.Org | None],
     now: datetime,
+    host_teams: Mapping[str, Any] | None = None,
 ) -> tuple[stage_audit_pass.AuditStep, ...]:
     """Act 6 over the started teams' audits. A run's session launches on its team's host from the flow in force, its
     own brief read from the flow's directory as `_reach` reads a stage's; the head and the count are read at `ref`. No
     team started reads nothing, not even a team's flow."""
     read = org()
     started = sorted(
-        t for t in teams if read is not None and t in read.teams and stage_start.team_started(read, read.teams[t])
+        t for t in teams if read is not None and t in read.teams and stage_start.team_started(host_teams, t)
     )
     if not started:
         return ()

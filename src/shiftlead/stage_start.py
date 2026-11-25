@@ -2,17 +2,19 @@
 one model, one fresh session*, *What a stage's session is told*; §4.8 *Under a format-3 flow*; TD-2049).
 
 Its opening prompt is, in order: the mechanics, how the stage is ended, the repo's rules, and the stage's brief with
-its `also`. Nothing calls `start` until the tick's offer (TD-2051), and `team_started` is false until TD-2065 fills it,
-so no such session starts before the cut-over. The stage's model is carried on `StageLaunch`; launching on it, on a
-login, is TD-2068's.
+its `also`. `start` creates one only while its team is started, the home's started mark read just before the
+create (TD-2065), and no team is marked before the cut-over. The stage's model is carried on `StageLaunch`; launching
+on it, on a login, is TD-2068's.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sessionorc import teamstore
 from sessionorc.client import AgentError, AgentUnavailable
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
@@ -86,9 +88,10 @@ class StageLaunch:
         return self.launch.create_params(controllers)
 
 
-def team_started(_org: orgmod.Org, _team: orgmod.TeamDef) -> bool:
-    """Whether the team is started: false until TD-2065 writes the started mark, so nothing starts before it."""
-    return False
+def team_started(marks: Mapping[str, Any] | None, team: str) -> bool:
+    """Whether the team is started, from the home's team marks (the `host` record's `teams`, or the `host` read's
+    `team_marks`): its started mark and nothing else (§4.9d *Started is a mark the home keeps*)."""
+    return teamstore.started(marks, team)
 
 
 def stage_of(doc: dict[str, Any], key: str) -> dict[str, Any]:
@@ -240,8 +243,9 @@ def launch(
 
 
 def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) -> dict[str, Any] | None:
-    """Create the stage's session, or None: the team is not started, or a live session holds the name."""
-    if not team_started(org, team):
+    """Create the stage's session, or None: the team is not started, or a live session holds the name. The started
+    mark is read from the home just before the create, so a Wind down during the pass starts nothing after it."""
+    if not team_started((call("host") or {}).get("team_marks"), team.name):
         return None
     x = got.launch
     on = {"host": x.host} if x.host else {}
