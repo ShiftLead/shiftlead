@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from shiftlead.stage_acts import SECOND_LOSS, Holder
+from shiftlead.stagerecord import JOB_KEY
 
 SEATS = ("board-answers", "unheld-pull-requests")
 
@@ -29,10 +30,16 @@ JobActName = Literal["reconcile", "offer", "offer-again"]
 def key_of(seat: str, obj: str | int) -> str:
     """A job's key: `board-<item id>` for a decided board line, `pr-<number>` for a pull request nobody holds."""
     if seat == "board-answers":
-        return f"board-{obj}"
-    if seat == "unheld-pull-requests":
-        return f"pr-{int(obj)}"
-    raise ValueError(f"a job's seat is one of {SEATS}, not {seat!r}")
+        key = f"board-{obj}"
+    elif seat == "unheld-pull-requests":
+        key = f"pr-{int(obj)}"
+    else:
+        raise ValueError(f"a job's seat is one of {SEATS}, not {seat!r}")
+    if not JOB_KEY.fullmatch(key):
+        raise ValueError(
+            f"{obj!r} is no {seat} object: a board item's id is eight hex digits, a pull request's a number"
+        )
+    return key
 
 
 @dataclass(frozen=True)
@@ -98,11 +105,10 @@ def _reconcile(record: Mapping[str, Any], s: JobReading) -> str | None:
         return "person-cleared" if s.person_line == "closed" else None
     if waits == "merging":
         return None  # the home's own merge closes the record itself
-    if not record.get("holder"):
-        if not s.team_started and s.first_started and s.first_started != record.get("team"):
-            return "team-moved"
-        if not s.stage_known:
-            return "stage-gone"  # as team-moved: a fresh job session, never the person
+    if not s.stage_known:
+        return "stage-gone"  # as team-moved, its holder ended first: a fresh job session, never the person
+    if not record.get("holder") and not s.team_started and s.first_started and s.first_started != record.get("team"):
+        return "team-moved"
     return None
 
 
@@ -134,14 +140,20 @@ def choose(record: Mapping[str, Any] | None, s: JobReading) -> JobAct | None:
     return JobAct("offer") if s.may_start and not s.seat_busy else None
 
 
-def order(records: Iterable[Mapping[str, Any]], objects: Mapping[str, str]) -> list[str]:
-    """The keys of one seat's jobs that want a session, in the order they are offered: records already begun (open,
-    no holder, waiting on nothing) before objects with no open record, each oldest first. `objects` maps the key of
-    each object the seat's trigger names to when it asked (an ISO time)."""
-    begun = [r for r in records if not r.get("closed_at") and not r.get("holder") and not r.get("waits")]
-    keys = {str(r["id"]) for r in begun}
+def order(records: Iterable[Mapping[str, Any]], objects: Mapping[str, str], job_stage: str | None) -> list[str]:
+    """The keys of one seat's jobs that want a job session, in the order they are offered: records already begun
+    (open, no holder, waiting on nothing, and at the job's own stage `job_stage` or not yet in the flow) before objects
+    with no open record, each oldest first. `objects` maps the key of each object the seat's trigger names to when it
+    asked (an ISO time); one with an open record is that record's, never a new job."""
+    records = list(records)
+    open_keys = {str(r["id"]) for r in records if not r.get("closed_at")}
+    begun = [
+        r
+        for r in records
+        if not r.get("closed_at") and not r.get("holder") and not r.get("waits") and r.get("stage") in (None, job_stage)
+    ]
     first = sorted(begun, key=lambda r: (str(r.get("entered_at") or ""), str(r["id"])))
-    rest = sorted(((at, k) for k, at in objects.items() if k not in keys), key=lambda p: (str(p[0]), p[1]))
+    rest = sorted(((at, k) for k, at in objects.items() if k not in open_keys), key=lambda p: (str(p[0]), p[1]))
     return [str(r["id"]) for r in first] + [k for _at, k in rest]
 
 

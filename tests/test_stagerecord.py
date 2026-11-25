@@ -102,6 +102,8 @@ def test_jobs_are_kept_by_key_apart_from_entries(repo):
     assert store.entries() == {} and store.job("pr-1") is None
     store.put_job({"id": "pr-4490", "seat": "unheld-pull-requests", "waits": None}, "a new job")  # over the old one
     assert store.job("pr-4490")["waits"] is None
+    store.write({"jobs/notes.json": "{}\n"}, "a stray file")
+    assert set(store.jobs()) == {"board-9099da3b", "pr-4490"}
     for bad in ("TD-7", "board-XYZ", "pr-0", "../pr-1"):
         with pytest.raises(ValueError):
             store.put_job({"id": bad, "waits": None}, "x")
@@ -318,12 +320,13 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
     assert users == [
         "flow_save.py",
         "stage_end.py",
+        "stage_job.py",
         "stage_make.py",
         "stage_merge.py",
         "stage_pass.py",
         "stage_tick.py",
         "team_show.py",
-    ]  # the last only reads
+    ]  # stage_job takes only the job key's pattern, and team_show only reads
 
 
 def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):

@@ -39,8 +39,9 @@ def named(act: JobAct | None) -> tuple[str, str] | None:
 def test_keys() -> None:
     assert key_of("board-answers", "9099da3b") == "board-9099da3b"
     assert key_of("unheld-pull-requests", 4490) == "pr-4490"
-    with pytest.raises(ValueError):
-        key_of("sweeper", 1)
+    for seat, bad in (("sweeper", 1), ("board-answers", "xyz"), ("board-answers", "../a"), ("unheld-pull-requests", 0)):
+        with pytest.raises(ValueError):
+            key_of(seat, bad)
 
 
 @pytest.mark.parametrize(
@@ -76,6 +77,9 @@ def test_offer(record: dict[str, Any] | None, reading: JobReading, want: tuple[s
         (held(), JobReading(team_started=False, first_started="ao-two"), None),
         (job(stage="review"), JobReading(stage_known=False, **GO), "stage-gone"),
         (job(waits="merging"), JobReading(team_started=False, first_started="ao-two"), None),
+        (held(stage="review"), JobReading(stage_known=False, at_job_stage=False), "stage-gone"),
+        (held(pr=12), JobReading(own_pr="merged"), None),
+        (job(waits="merging", pr=12), JobReading(own_pr="closed"), "pr-closed"),
     ],
 )
 def test_reconcile(record: dict[str, Any], reading: JobReading, want: str | None) -> None:
@@ -115,13 +119,20 @@ def test_order_puts_begun_jobs_first_then_new_objects_oldest_first() -> None:
         held(obj="0000000c"),
         job(obj="0000000d", waits="person"),
         job(obj="0000000e", closed_at="2026-11-24T00:00:00Z"),
+        job(obj="00000010", stage="review", entered_at="2026-11-25T00:00:00Z"),  # in the flow: an entry's acts
     ]
     objects = {
         "board-0000000f": "2026-11-25T00:30:00Z",
         "board-0000000e": "2026-11-25T00:10:00Z",
         "board-0000000a": "2026-11-20T00:00:00Z",
+        "board-0000000c": "2026-11-19T00:00:00Z",  # held: that record's, never a new job
+        "board-0000000d": "2026-11-19T00:00:00Z",  # waiting on the person
+        "board-00000010": "2026-11-19T00:00:00Z",
     }
-    assert order(begun, objects) == ["board-0000000a", "board-0000000b", "board-0000000e", "board-0000000f"]
+    want = ["board-0000000a", "board-0000000b", "board-0000000e", "board-0000000f"]
+    assert order(begun, objects, "build") == want
+    back = job(obj="00000011", stage="build", entered_at="2026-11-25T02:30:00Z")  # sent back to the job's stage
+    assert order([*begun, back], objects, "build") == [*want[:1], "board-00000011", *want[1:]]
 
 
 def test_writes() -> None:

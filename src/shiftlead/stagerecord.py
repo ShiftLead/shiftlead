@@ -43,7 +43,7 @@ OTHER = "Something else: <what>"
 OTHER_ANSWER = f"{OTHER} — a session takes your words back to the stage that asked"
 
 _ID = re.compile(r"TD-\d+")
-_JOB = re.compile(r"board-[0-9a-f]{8}|pr-[1-9]\d{0,6}")  # a built-in seat's job (§4.9d *How each one runs*)
+JOB_KEY = re.compile(r"board-[0-9a-f]{8}|pr-[1-9]\d{0,6}")  # a built-in seat's job (§4.9d *How each one runs*)
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _LOCKS: dict[str, threading.RLock] = {}  # re-entrant: a caller holds it from a record's read to its write
 _LOCKS_GUARD = threading.Lock()
@@ -277,7 +277,7 @@ class StageStore:
 
     @staticmethod
     def _job_path(key: str) -> str:
-        if not _JOB.fullmatch(key):
+        if not JOB_KEY.fullmatch(key):
             raise ValueError(f"a job's key is board-<item id> or pr-<number>, not {key!r}")
         return f"jobs/{key}.json"
 
@@ -290,7 +290,7 @@ class StageStore:
         tip = self.tip()
         out: dict[str, dict[str, Any]] = {}
         for path in self._list(tip, "jobs"):
-            if (text := self._read(tip, path)) and _JOB.fullmatch(Path(path).stem):
+            if (text := self._read(tip, path)) and JOB_KEY.fullmatch(Path(path).stem):
                 out[Path(path).stem] = json.loads(text)
         return out
 
