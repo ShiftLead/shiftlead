@@ -65,11 +65,13 @@ def job_readings(reading: Mapping[str, Any]) -> dict[str, Any]:
     orders (the board's open decided lines), its pull request orders and its boards, as copies for the pass's thread,
     the keys `shiftlead.stage_tick.run` takes. None of them where any cannot be judged by: an unserved repo (§5 *The
     seams*), whose lanes read no order, or a reading of the orders, the boards or the pull requests that is missing
-    or failed, since a job whose object the pass cannot see would read as gone and be closed."""
+    or failed (a board read that failed keeps its last good copy beside its `error`, and is still refused), since a
+    job whose object the pass cannot see would read as gone and be closed. A reading with no `pr_orders` at all has
+    none: the tick writes that key only once its orders differ from none."""
     if seams.unserved(reading):
         return {}
-    wos, pos, bds = reading.get("work_orders"), reading.get("pr_orders"), reading.get("boards")
-    prs = reading.get("prs")
+    wos, bds, prs = reading.get("work_orders"), reading.get("boards"), reading.get("prs")
+    pos = reading.get("pr_orders", {})  # a repo never red has no key
     if not all(isinstance(x, Mapping) and "error" not in x for x in (wos, pos, bds, prs)):
         return {}
 

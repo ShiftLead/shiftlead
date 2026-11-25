@@ -303,7 +303,7 @@ def test_the_jobs_readings_are_handed_over_as_copies(body: list[dict[str, Any]])
     "spoil",
     [
         lambda r: r.pop("work_orders"),
-        lambda r: r.pop("pr_orders"),
+        lambda r: r.update(work_orders=None),
         lambda r: r.pop("boards"),
         lambda r: r.update(boards={"error": "unreadable"}),
         lambda r: r.update(work_orders={"error": "unreadable"}),
@@ -313,7 +313,7 @@ def test_the_jobs_readings_are_handed_over_as_copies(body: list[dict[str, Any]])
     ],
     ids=[
         "no-orders",
-        "no-pr-orders",
+        "orders-none",
         "no-boards",
         "boards-error",
         "orders-error",
@@ -331,3 +331,10 @@ def test_no_job_reading_is_handed_over_where_one_cannot_be_judged_by(spoil: Any)
 def test_a_served_repos_readings_are_its_jobs() -> None:
     reading = {**_jobs_reading(), "seams": {"serve": {"ok": True, "lacks": []}}}
     assert set(agent_stage.job_readings(reading)) == {"orders", "pr_orders", "boards"}
+
+
+def test_a_repo_never_red_has_no_pr_orders_and_still_its_jobs() -> None:
+    reading = _jobs_reading()
+    reading.pop("pr_orders")
+    got = agent_stage.job_readings(reading)
+    assert got["pr_orders"] == [] and got["orders"] == [{"id": "board:0123abcd", "kind": "decided"}]
