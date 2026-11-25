@@ -1103,6 +1103,10 @@ def test_check_host_answers_writes_this_hosts_part_alone_and_the_check_accepts_i
     }
     assert "teams the answers give" not in out and "work in flight" not in out and "the org" not in out
     assert out.rstrip().endswith("no blockers")
+    found = f"claude-code:{switchover.shown((tmp_path / 'a').resolve())}"
+    answers(home, {"hosts": {"h": {"logins": {found: {"name": "other"}}}}})
+    assert cli.main(["switch-over", "check", "--host"]) == 0
+    assert "  claude-code:other  " in capsys.readouterr().out, "the login takes the name its answers give"
     answers(home, {"hosts": {"h": {"logins": {}}}})
     assert cli.main(["switch-over", "check", "--host"]) == 1
     assert "has no name in the answers" in capsys.readouterr().out
