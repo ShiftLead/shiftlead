@@ -160,6 +160,15 @@ def test_a_review_stages_session_on_a_job_is_that_stages_on_its_model_holding_th
     assert "work-pushed" not in x.prompt.split("The outcomes")[-1].split("\n\n")[0]
 
 
+def test_a_review_session_on_a_job_is_told_the_jobs_branch_or_that_it_has_none(world):
+    told = reviewed(world, {**PR, "stage": "review", "branch": "td-x", "pr": 42}).launch.prompt
+    assert "Its record already carries branch `td-x` and pull request #42:" in told
+    bare = reviewed(world, {**PR, "stage": "review", "pr": 42}).launch.prompt
+    assert "Its record already carries pull request #42:" in bare and "branch `" not in bare
+    none = reviewed(world, {**BOARD, "stage": "review"}).launch.prompt
+    assert "already carries" not in none and "no branch yet" not in none, "a reviewer is never told to branch off"
+
+
 def test_a_review_sessions_name_is_neither_an_entrys_stage_session_nor_a_job_session():
     record = {**BOARD, "stage": "review"}
     name = stage_job_start.review_name(record)
