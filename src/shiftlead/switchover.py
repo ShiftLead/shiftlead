@@ -807,8 +807,8 @@ RENAMED = {"td": "design-wise"}
 
 def _profiles_ran_on(org: Any, team: Any, here: str, default: str | None) -> list[str]:
     """The profiles `team`'s members and seats run on today, the members' first: the start's own reading
-    (`teams.plan`, the role's precedence), else, where it cannot be read here, each line's own `profile` and then the
-    profiles file's default."""
+    (`teams.plan`, the role's precedence), else, where the start cannot be read here (a checkout this host lacks),
+    an approximation: each line's own `profile`, then the profiles file's default, a role's `profile:` not read."""
     from shiftlead import teams as teamsmod
 
     try:
@@ -823,7 +823,8 @@ def _profiles_ran_on(org: Any, team: Any, here: str, default: str | None) -> lis
 
 
 def _build_role(team: Any) -> str:
-    """The role of the stage that builds in the flow the team runs today (the stage named `build`), else `grinder`."""
+    """The role of the stage that builds in the flow the team runs today (the stage named `build`), else `grinder`.
+    A flow of the repo's own is not read here (no checkout is), so it too gives `grinder`."""
     from shiftlead import flowdefs
     from shiftlead import teams as teamsmod
 
@@ -884,9 +885,12 @@ def suggest(
             if first is None:
                 first = listed
         pick["logins"] = listed
-        builders = sum(m.size if m.size is not None else m.count for m in team.members if m.role == _build_role(team))
+        builds = _build_role(team)
+        builders = sum(m.size if m.size is not None else m.count for m in team.members if m.role == builds)
         stages = row["doc"].get("stages") if row is not None and isinstance(row.get("doc"), Mapping) else None
-        takes = next((s for s in stages or () if isinstance(s, Mapping) and s.get("takes") == "other"), None)
+        # the stage that takes ready-to-build entries: `takes: other`, else `any` (§4.9d)
+        staged = [s for s in stages or () if isinstance(s, Mapping)]
+        takes = next((s for want_ in ("other", "any") for s in staged if s.get("takes") == want_), None)
         if takes is not None and builders >= 1:
             pick["at_once"] = {flow3.key_of(takes.get("name")): builders}
         profile = _under(schedules, name, "schedule").get("profile")
@@ -904,13 +908,19 @@ def suggest(
 
 
 def write_answers(doc: Mapping[str, Any], path: Path | None = None) -> bool:
-    """Write `doc` as the answers file where there is none; False, and nothing written, where there is one."""
+    """Write `doc` as the answers file where there is none; False, and nothing written, where there is one (a
+    dangling link included). The file is linked into place, so one written meanwhile is never replaced."""
     path = path or answers_file()
-    if path.exists():
+    if path.exists() or path.is_symlink():
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     head = "# written by ao switch-over check --answers (design §4.9e The answers file): read it, change it, check\n"
-    tmp = path.with_suffix(".yml.tmp")
-    tmp.write_text(head + yaml.safe_dump(dict(doc), sort_keys=False, allow_unicode=True), encoding="utf-8")
-    os.replace(tmp, path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(head + yaml.safe_dump(dict(doc), sort_keys=False, allow_unicode=True), encoding="utf-8")
+        os.link(tmp, path)
+    except FileExistsError:
+        return False
+    finally:
+        tmp.unlink(missing_ok=True)
     return True

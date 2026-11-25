@@ -679,3 +679,56 @@ def test_check_answers_writes_a_file_the_check_accepts_and_leaves_one_that_is_th
     assert cli.main(["switch-over", "check", "--answers"]) == 1
     captured = capsys.readouterr()
     assert "left as it is" in captured.err and path.read_text() == "teams: {}\n"
+
+
+def test_answers_give_at_once_to_a_stage_that_takes_any_where_none_takes_other():
+    org = SimpleNamespace(teams={"grind": Def(flows=("build",), members=(Line(size=3),))}, unlanded={}, director=None)
+    any_flow = {"stages": [{"name": "Build", "takes": "any"}, {"name": "Review"}]}
+    got = switchover.suggest(
+        org, "h", [], [], default=None, offered=lambda _r: [{"name": "build", "doc": any_flow}], ran_on=lambda _t: []
+    )
+    assert got["teams"]["grind"]["at_once"] == {"build": 3}
+
+
+def test_answers_fall_back_to_each_lines_profile_where_the_start_cannot_be_read(monkeypatch):
+    from shiftlead import teams as teamsmod
+
+    def refuse(*_a: Any, **_k: Any) -> Any:
+        raise teamsmod.TeamError("no checkout")
+
+    monkeypatch.setattr(teamsmod, "plan", refuse)
+    seat = SimpleNamespace(profile="fc")
+    team = SimpleNamespace(members=[SimpleNamespace(profile=None)], techlead=seat, seats=[SimpleNamespace(profile="p")])
+    team.name = "grind"
+    assert switchover._profiles_ran_on(SimpleNamespace(), team, "h", "p") == ["p", "fc"], "members first, once each"
+
+
+def test_write_answers_leaves_a_file_or_a_dangling_link_that_is_there_and_no_temporary(tmp_path):
+    path = tmp_path / "so" / "answers.yml"
+    assert switchover.write_answers({"teams": {}}, path) is True
+    assert yaml.safe_load(path.read_text()) == {"teams": {}}
+    assert switchover.write_answers({"hosts": {}}, path) is False and "teams" in path.read_text()
+    link = tmp_path / "so" / "other.yml"
+    link.symlink_to(tmp_path / "nowhere")
+    assert switchover.write_answers({}, link) is False and not (tmp_path / "nowhere").exists()
+    assert sorted(p.name for p in path.parent.iterdir()) == ["answers.yml", "other.yml"]
+
+
+def test_check_answers_writes_nothing_where_the_org_cannot_be_read(home, tmp_path, capsys):
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    (home / "org.yml").write_text("teams: [not, a, mapping\n")
+    assert cli.main(["switch-over", "check", "--answers"]) == 1
+    assert "no answers written" in capsys.readouterr().err
+    assert not (home / "switch-over" / "answers.yml").exists()
+
+
+def test_check_answers_for_an_org_with_a_director_writes_one_the_check_accepts(home, tmp_path, capsys):
+    a = tmp_path / "a"
+    (home / "profiles.yml").write_text(f"default: p\nprofiles:\n  p: {{config_dir: {a}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder"}], "flows": ["td"]}
+    (home / "org.yml").write_text(yaml.safe_dump({"director": {}, "teams": {"grind": team}}))
+    assert cli.main(["switch-over", "check", "--answers"]) == 0, capsys.readouterr().out
+    doc = yaml.safe_load((home / "switch-over" / "answers.yml").read_text())
+    assert doc["director"] == {"model": "sonnet", "logins": ["claude-code:p"]}
+    assert "prompts" not in doc["builtins"]["default"]["models"]
+    assert "no blockers" in capsys.readouterr().out

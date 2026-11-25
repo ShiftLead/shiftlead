@@ -5546,8 +5546,11 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         for note in notes:
             print(note, file=sys.stderr)
     if args.answers:  # §4.9e: written where there is none, filled with what the home can suggest, then checked
-        at = switchover.shown(switchover.answers_file())
-        if org is None:
+        path = switchover.answers_file()
+        at = switchover.shown(path)
+        if path.exists() or path.is_symlink():
+            print(f"left as it is {at}", file=sys.stderr)
+        elif org is None:
             print(f"ao switch-over check: no answers written, the org cannot be read: {org_error}", file=sys.stderr)
         else:
             from sessionorc import settings as settings_mod
@@ -5561,7 +5564,11 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
                 default=default,
                 schedules=settings_mod.teams(settings_mod.load()),
             )
-            wrote = switchover.write_answers(doc)
+            try:
+                wrote = switchover.write_answers(doc)
+            except OSError as e:
+                print(f"ao switch-over check: {at} cannot be written: {e}", file=sys.stderr)
+                return 1
             print(f"{'wrote' if wrote else 'left as it is'} {at}", file=sys.stderr)
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
