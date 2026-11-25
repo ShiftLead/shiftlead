@@ -380,8 +380,8 @@ def test_the_pass_asks_the_home_nothing_where_its_snapshot_reads_as_the_key_want
 class Mover(Home):
     """The home's calls with `seat_moved` recorded too."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, verdict: str = "free") -> None:
+        super().__init__(verdict)
         self.moved: list[dict] = []
 
     def __call__(self, method: str, **params):
@@ -393,7 +393,7 @@ class Mover(Home):
 
 def test_an_ended_tech_lead_record_whose_host_changed_is_written_there_and_the_old_one_moved(world):
     org, _team, _ = world
-    home = Mover()
+    home = Mover("supersede")  # the new host's name rule would keep the mail: the move's own `keep=False` refuses it
     graph = {"ao-r-techlead-t": record(builtin="techlead", state="closed", host="h")}
     assert stage_seats.write_techleads(home, org, {"t": {"host": "node"}}, graph, STARTED, "h") == ["ao-r-techlead-t"]
     assert home.created[0]["host"] == "node"
@@ -427,6 +427,16 @@ def test_a_repo_seat_moves_with_its_first_started_team(world):
     rec = record(id="ao-r-sweeper-r", name="sweeper-r", team="", builtin="sweeper", state="closed", host="h")
     assert stage_seats.write_sweepers(home, org, {"t": {"host": "node"}}, {rec.id: rec}, STARTED, "h", ON)
     assert home.moved == [{"old": "ao-r-sweeper-r", "new": "ao-r-sweeper-r@node"}]
+
+
+def test_a_prompts_seat_moves_with_its_repo_s_first_started_team(world):
+    org, _team, _ = world
+    org.director = None
+    home = Mover()
+    rec = record(id="ao-r-prompts-r", name="prompts-r", team="", builtin="prompts", state="exited", host="h")
+    assert stage_seats.write_prompts(home, org, {"t": {"host": "node"}}, {rec.id: rec}, STARTED, "h") == [rec.id]
+    assert home.created[0]["host"] == "node" and home.created[0]["builtin"] == "prompts"
+    assert home.moved == [{"old": "ao-r-prompts-r", "new": "ao-r-prompts-r@node"}]
 
 
 def test_a_refused_move_is_a_log_line(world, caplog):
