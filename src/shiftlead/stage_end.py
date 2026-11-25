@@ -248,10 +248,36 @@ def destination(stage: dict[str, Any], outcome: str) -> dict[str, Any]:
     return got
 
 
-def _review_body(stage: dict[str, Any], caller: str, verdict: str, head: str, files: tuple[str, ...], why: str) -> str:
-    """The `cadence-review:` comment the gate's review row reads (§4.9c *The gate's review row needs no new input*)."""
+REVIEW_VERDICTS = ("ship", "changes-wanted")
+
+
+def counts(outcome: str, findings: int | None, blocking: int | None) -> tuple[int, int] | None:
+    """A review's `(n, m)`, its findings and those it would not ship with, from `--findings` and `--blocking` (§4.9c
+    *A review counts its findings*), or None for an outcome that takes neither; `Refused` where they do not hold."""
+    if blocking is not None and findings is None:
+        raise Refused("--blocking needs --findings: give every finding's count, then those you would not ship with")
+    if outcome not in REVIEW_VERDICTS:
+        if findings is not None:
+            raise Refused(f"--findings and --blocking are a review's, given with ship or changes-wanted: not {outcome}")
+        return None
+    n, m = int(findings or 0), int(blocking or 0)
+    if n < 0 or m < 0:
+        raise Refused("--findings and --blocking are counts, 0 or more")
+    if m > n:
+        raise Refused(f"--blocking {m} is more than --findings {n}: those you would not ship with are among them")
+    if outcome == "changes-wanted" and m < 1:
+        raise Refused("changes-wanted needs --findings and --blocking, at least 1 you would not ship with")
+    if outcome == "ship" and m > 0:
+        raise Refused(f"ship with --blocking {m}: a finding you would not ship with is changes-wanted")
+    return n, m
+
+
+def _review_body(
+    stage: dict[str, Any], caller: str, verdict: str, head: str, files: tuple[str, ...], why: str, count: int
+) -> str:
+    """The `cadence-review:` comment the gate's review row reads (§4.9c *The gate's review row needs no new input*):
+    `count` is the review's `--findings`."""
     what = "docs" if files and all(f.startswith("docs/") or f.endswith(".md") for f in files) else "code"
-    count = 0 if verdict == "SHIP" else 1
     lines = [f"cadence-review: {verdict} · {stage['model']} · {what} · {count} findings", "", f"Read at {head}."]
     if why:
         lines += ["", why]
@@ -431,8 +457,10 @@ def _apply(
     person: str,
     by: str,
     run: dict[str, Any] | None = None,
+    findings: tuple[int, int] | None = None,
 ) -> str:
-    """Write the move: returns where the entry went. `run` is what the row keeps of the holder's run (§4.9c)."""
+    """Write the move: returns where the entry went. `run` is what the row keeps of the holder's run, `findings` a
+    review's counts (§4.9c)."""
     to, count = where["to"], f"{key}:{outcome}"
     record["holder"] = None
     record["answer"] = None
@@ -455,6 +483,8 @@ def _apply(
     row: dict[str, Any] = {"from": key, "outcome": outcome, "reason": reason, "by": by, "to": went, "head": head}
     if blocked is not None:
         row["blocked"] = blocked  # kept on the row, since an answer clears the record's (§4.9c)
+    if findings is not None:
+        row["findings"] = {"all": findings[0], "blocking": findings[1]}
     if run is not None:
         row["run"] = run
     record.setdefault("history", []).append({**row, "at": _now()})
@@ -482,10 +512,12 @@ def end(
     *,
     session: Mapping[str, Any] | None = None,
     spent: Callable[[], Any] | None = None,
+    review_counts: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Check `outcome` and write its move: `{entry, outcome, went, repeat}`, or `Refused` with nothing written.
     `session` is the calling session record's fields (`stagerecord.SESSION_FIELDS`), `spent` reads its id's `models`
-    sums for the row's `run` (§4.9c); a reading that raises, or none, leaves the row's `models` null."""
+    sums for the row's `run` (§4.9c); a reading that raises, or none, leaves the row's `models` null.
+    `review_counts` is a review's `(n, m)` as `counts` read them, (0, 0) where none was given."""
     if outcome == CLOSED_UNMERGED:
         raise Refused(PR_JOB_ALONE)
     said = " ".join((reason or "").split())
@@ -510,6 +542,7 @@ def end(
             raise Refused(f"{outcome} needs --reason")
         where = destination(stage, outcome)
         head: str | None = None
+        found: tuple[int, int] | None = None  # a review's counts, on its row alone
         if outcome == "work-pushed":
             pr = _check_pushed(record, stage, where, doc, facts)
             record["branch"], record["pr"], head = pr.branch, pr.number, pr.head
@@ -519,13 +552,14 @@ def end(
         elif outcome in ("ship", "changes-wanted"):
             pr, head = _check_read(record, facts, ship=outcome == "ship")
             verdict = "SHIP" if outcome == "ship" else "BLOCK"
-            facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said))
+            found = review_counts or (0, 0)
+            facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said, found[0]))
             record.setdefault("verdicts", {})[key] = {"head": head, "stage": key, "outcome": outcome}
         # the merge of this pull request alone closes the record with its entry open (§4.9c *A merge the person takes
         # over*): kept through a refused merge and a wait on the person, cleared by any other outcome taken
         record["check_waits"] = record["pr"] if outcome == CHECK_WAITS else None
         run = run_of(record, caller, session, _reading(spent, tid))
-        went = _apply(store, record, doc, stage, key, outcome, said, where, head, person, caller, run)
+        went = _apply(store, record, doc, stage, key, outcome, said, where, head, person, caller, run, found)
     return {"entry": tid, "outcome": outcome, "went": went, "repeat": False}
 
 
@@ -585,17 +619,21 @@ def call(
     seen: dict[str, Any] | None = None,
     session: Mapping[str, Any] | None = None,
     spent: Callable[[], Any] | None = None,
+    findings: int | None = None,
+    blocking: int | None = None,
 ) -> dict:
     """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`. `seen` is a
     node session's worktree as its node read it; `root` is then the home's checkout of that repo. `tid` is the entry the
     session holds, a job's work order reference (`board:<8 hex>`, `pr:<n>`), whose outcomes `stage_job_end` takes, or
     an audit run's lease (`audit:<team>/<audit>`), whose outcomes `stage_audit_end` takes. `session` and `spent` are the
     caller's record fields and the reader of its spend, for an entry's row's `run` alone (§4.9c): an audit's and a job's
-    rows carry none."""
+    rows carry none. `findings` and `blocking` are a review's counts (§4.9c *A review counts its findings*), checked
+    here before any route, so an entry's, a job's and an audit's call refuse them alike."""
     from shiftlead import stage_audit_end, stage_job_end, stage_job_tick  # each imports this module
 
     store = StageStore(root)
     try:
+        found = counts(outcome, findings, blocking)
         if stage_audit_end.is_ref(tid):  # an audit run's session holds the run's lease, not an entry (TD-2053)
             return stage_audit_end.end_audit(
                 store,
@@ -626,6 +664,7 @@ def call(
                 facts,
                 stage_job_tick.home_line(Path(root)),
                 board=stage_job_end.board_dir(root),
+                review_counts=found,
             )
         return end(
             store,
@@ -639,6 +678,7 @@ def call(
             Records.of(root),
             session=session,
             spent=spent,
+            review_counts=found,
         )
     except (Refused, StateError) as e:
         return {"refused": str(e)}

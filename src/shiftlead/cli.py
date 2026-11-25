@@ -1023,12 +1023,20 @@ def cmd_flow_check(args: argparse.Namespace) -> int:
 
 
 def cmd_stage_end(args: argparse.Namespace) -> int:
-    """`ao stage end <outcome> [--reason "…"]` (design §4.7, §4.9c, TD-2050): a call to the home, which checks the
-    outcome's fact. A refusal or an unreachable home is exit 1, and the session carries on or tries again."""
+    """`ao stage end <outcome> [--reason "…"] [--findings <n> [--blocking <m>]]` (design §4.7, §4.9c, TD-2050,
+    TD-2159): a call to the home, which checks the outcome's fact and a review's counts. A refusal or an unreachable
+    home is exit 1, and the session carries on or tries again."""
     sid = _own_session(args)
     if sid is None:
         return 2
-    got = call_sync("stage_end", id=sid, outcome=args.outcome, reason=args.reason or "")
+    got = call_sync(
+        "stage_end",
+        id=sid,
+        outcome=args.outcome,
+        reason=args.reason or "",
+        findings=args.findings,
+        blocking=args.blocking,
+    )
     again = f" ({got.get('said') or 'already taken'})" if got.get("repeat") else ""
     return emit(args, got, lambda: print(f"{got['entry']}: {got['outcome']} → {got['went']}{again}"))
 
@@ -6195,6 +6203,14 @@ def build_parser() -> argparse.ArgumentParser:
         "request you closed unmerged",
     )
     q.add_argument("--reason", help="why: needed by every outcome but work-pushed and ship")
+    q.add_argument(
+        "--findings", type=int, help="a review's count of every finding it raised, with ship or changes-wanted"
+    )
+    q.add_argument(
+        "--blocking",
+        type=int,
+        help="of those, the ones you would not ship with: at least 1 with changes-wanted, 0 with ship",
+    )
     q.set_defaults(fn=cmd_stage_end)
     q = ssub.add_parser("show", help="print an entry's stage record")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")

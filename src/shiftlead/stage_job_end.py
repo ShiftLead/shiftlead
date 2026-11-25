@@ -166,11 +166,14 @@ def end_job(
     line: Callable[[Mapping[str, Any], str], str | None],
     *,
     board: str = BOARD_DIR,
+    review_counts: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Check a job session's `outcome` and write its move: `{entry, outcome, went, repeat}`, `entry` the job's
     reference, or `Refused` with nothing written. `line(record, reason)` writes the home's plain board line for a job
     sent to the person and returns its id; `board` is the board's directory (`board_dir`). The line is written before
-    the record, so a record that then fails to be written leaves a line the retry writes again."""
+    the record, so a record that then fails to be written leaves a line the retry writes again.
+    `review_counts` is a review stage's `(n, m)` (`stage_end.counts`): `n` is posted on its comment, and no row of a
+    job's record carries it."""
     key = key_of_ref(ref)
     if outcome == CLOSED_UNMERGED and not ref.startswith(workorders.PR_PREFIX):
         raise Refused(PR_JOB_ALONE)
@@ -213,7 +216,8 @@ def end_job(
         elif outcome in ("ship", "changes-wanted"):
             pr, head = _check_read(record, facts, ship=outcome == "ship")
             verdict = "SHIP" if outcome == "ship" else "BLOCK"
-            facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said))
+            n = (review_counts or (0, 0))[0]
+            facts.post_review(pr.number, _review_body(stage, caller, verdict, head, pr.files, said, n))
             record.setdefault("verdicts", {})[at] = {"head": head, "stage": at, "outcome": outcome}
         if outcome != flow3.OTHER:
             where = destination(stage, outcome)

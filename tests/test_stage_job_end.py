@@ -101,8 +101,9 @@ class Lines:
         return self.give
 
 
-def _end(store, outcome="work-pushed", reason="", facts=None, doc=None, ref=f"board:{ITEM}", lines=None):
-    return end_job(store, ref, ME, outcome, reason, doc or flow(), facts or Fake(_pr()), lines or Lines())
+def _end(store, outcome="work-pushed", reason="", facts=None, doc=None, ref=f"board:{ITEM}", lines=None, counts=None):
+    got = Fake(_pr()) if facts is None else facts
+    return end_job(store, ref, ME, outcome, reason, doc or flow(), got, lines or Lines(), review_counts=counts)
 
 
 def test_a_job_reference_is_its_key():
@@ -246,7 +247,7 @@ def _reviewed(**kw) -> dict:
 
 def test_a_review_stages_ship_on_a_job_waits_merging_and_posts_its_review():
     store, facts = Store(_reviewed()), Fake(_pr())
-    got = _end(store, "ship", facts=facts)
+    got = _end(store, "ship", facts=facts, counts=(2, 0))
     assert got == {"entry": f"board:{ITEM}", "outcome": "ship", "went": "merge", "repeat": False}
     r = store.record
     assert (r["stage"], r["holder"], r["waits"]) == ("review", None, "merging")
@@ -254,7 +255,7 @@ def test_a_review_stages_ship_on_a_job_waits_merging_and_posts_its_review():
     assert r["verdicts"] == {"review": {"head": HEAD, "stage": "review", "outcome": "ship"}}
     assert r["counts"] == {"build:work-pushed": 1} and r["moves"] == 1, "a move to merge is never counted"
     number, body = facts.posted
-    assert number == 41 and body.startswith("cadence-review: SHIP · sonnet · code · 0 findings")
+    assert number == 41 and body.startswith("cadence-review: SHIP · sonnet · code · 2 findings")
     step = r["history"][-1]
     assert (step["from"], step["outcome"], step["to"], step["head"]) == ("review", "ship", "merge", HEAD)
     assert "run" not in step and "findings" not in step, "a job's rows carry no run and no findings"
@@ -286,11 +287,14 @@ def test_changes_wanted_sends_the_job_back_to_a_fresh_job_session_told_the_revie
     store, facts = Store(_reviewed()), Fake(_pr())
     with pytest.raises(Refused, match="changes-wanted needs --reason"):
         _end(store, "changes-wanted", facts=facts)
-    assert _end(store, "changes-wanted", "the test misses the closed line", facts=facts)["went"] == "build"
+    assert (
+        _end(store, "changes-wanted", "the test misses the closed line", facts=facts, counts=(3, 1))["went"] == "build"
+    )
     r = store.record
     assert (r["stage"], r["holder"], r["offers"], r["waits"]) == ("build", None, 0, None)
     assert r["counts"] == {"build:work-pushed": 1, "review:changes-wanted": 1} and r["moves"] == 2
-    assert facts.posted[1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
+    assert facts.posted[1].startswith("cadence-review: BLOCK · sonnet · code · 3 findings")
+    assert "findings" not in r["history"][-1], "a job's rows carry no findings"
     assert stage_job.choose(r, stage_job.JobReading(may_start=True)) == stage_job.JobAct("offer")
     came, _answer = stage_make._came(r, "build")
     assert came == "the test misses the closed line (`changes-wanted` at `review`)"
@@ -298,7 +302,9 @@ def test_changes_wanted_sends_the_job_back_to_a_fresh_job_session_told_the_revie
 
 def test_changes_wanted_on_a_job_is_taken_when_the_head_moved_since_it_was_read():
     store, facts = Store(_reviewed()), Fake(_pr(), read="d" * 40)
-    assert _end(store, "changes-wanted", "the test misses the closed line", facts=facts)["went"] == "build"
+    assert (
+        _end(store, "changes-wanted", "the test misses the closed line", facts=facts, counts=(1, 1))["went"] == "build"
+    )
     assert facts.posted[1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
     assert store.record["verdicts"]["review"]["head"] == "d" * 40, "the verdict names the head the review read"
 
@@ -352,8 +358,9 @@ def test_the_call_routes_a_job_reference_to_the_job_end(monkeypatch, tmp_path):
         def flow(self, team):
             return "format: 3\nname: t\nstages: []\n"
 
-    def fake_end_job(store, ref, caller, outcome, reason, doc, facts, line, *, board):
+    def fake_end_job(store, ref, caller, outcome, reason, doc, facts, line, *, board, review_counts):
         seen.update(ref=ref, caller=caller, outcome=outcome, doc=doc, line=callable(line), board=board)
+        seen.update(review_counts=review_counts)
         return {"entry": ref, "outcome": outcome, "went": "review", "repeat": False}
 
     monkeypatch.setattr(stage_end, "StageStore", FakeStore)
@@ -375,6 +382,7 @@ def test_the_call_routes_a_job_reference_to_the_job_end(monkeypatch, tmp_path):
         "doc": {"format": 3, "name": "t", "stages": []},
         "line": True,
         "board": "docs/user_attention",
+        "review_counts": None,
     }
 
 
