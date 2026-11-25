@@ -943,6 +943,8 @@ class Flight:
     unknown: list[tuple[str, str]] = field(default_factory=list)  # (entry, why): its PR's files not read at its head
     nobodys: list[tuple[str, str]] = field(default_factory=list)  # (branch, why)
     unread: str | None = None
+    branches_unread: bool = False  # origin's branches could not be read, so no pushed branch is named
+    at: str | None = None  # when the home read the repo's pull requests
 
 
 def in_flight(
@@ -953,8 +955,9 @@ def in_flight(
 ) -> list[Flight]:
     """Each repo of `org`'s teams, from the home's last repo reading (`readings`, `repos.json` by checkout), with what
     `stage_work.entry_work` — the Offer act's own function — gives each entry a team's lane may pick, every session
-    the window ends taken as gone (no pull request is held). A branch holding two entries' ids is nobody's work, and a
-    pushed branch that holds an entry's id with no open pull request is read by nothing (`branches_of`, origin's
+    the window ends taken as gone (no pull request is held). A branch of a pull request that may be work
+    (`stage_work.may_be_work`) holding two entries' ids is nobody's work, and a pushed branch holding the id of an
+    entry of the reading, with no open pull request of the repo's own, is read by nothing (`branches_of`, origin's
     branches by `git ls-remote`; None, not read). A person's own session's hold is not read here."""
     from shiftlead import stage_fetch, stage_read, stage_work
 
@@ -971,12 +974,16 @@ def in_flight(
                              (None, None))  # fmt: skip
         prs = reading.get("prs") if reading is not None else None
         if not isinstance(prs, Mapping) or "error" in prs or not isinstance(prs.get("open"), list):
+            error = prs.get("error") if isinstance(prs, Mapping) else None
             flight.unread = (
                 "the home has not read its pull requests"
                 if reading is None or prs is None
-                else (f"its pull requests could not be read: {prs.get('error') if isinstance(prs, Mapping) else prs}")
+                else f"its pull requests could not be read: {error}"
+                if error
+                else "its pull request reading holds no open list"
             )
             continue
+        flight.at = str(prs["at"]) if prs.get("at") else None
         rows = [r for r in prs["open"] if isinstance(r, Mapping)]
         entries = (reading.get("ledger") or {}).get("entries") or []
         for e in entries:
@@ -992,15 +999,16 @@ def in_flight(
                 flight.unknown.append((tid, work.why))
         for r in rows:
             ids = stage_work.branch_ids(r.get("branch"))
-            if len(ids) > 1 and r.get("state") == "open" and not r.get("fork"):
+            if len(ids) > 1 and stage_work.may_be_work(r):
                 flight.nobodys.append((str(r["branch"]), f"#{r.get('number')} holds {', '.join(sorted(ids))}"))
         pushed = branches_of(root) if root is not None and Path(root).is_dir() else None
         if pushed is None:
-            flight.nobodys.append(("", "origin's branches could not be read"))
+            flight.branches_unread = True
             continue
-        with_pr = {str(r.get("branch")) for r in rows}
+        known = {str(e.get("id")) for e in entries if e.get("id")}
+        with_pr = {str(r.get("branch")) for r in rows if not r.get("fork")}
         for b in sorted(pushed - with_pr):
-            ids = stage_work.branch_ids(b)
+            ids = stage_work.branch_ids(b) & known
             if ids:
                 flight.nobodys.append((b, f"holds {', '.join(sorted(ids))} and has no open pull request"))
     return out
@@ -1014,12 +1022,14 @@ def flight_lines(flights: Iterable[Flight]) -> list[str]:
         if f.unread is not None:
             lines.append(f"  {f.repo}: not read — {f.unread}")
             continue
-        lines.append(f"  {f.repo}:")
+        lines.append(f"  {f.repo}:{f' (its pull requests read {f.at})' if f.at else ''}")
         lines += [f"    taken up with its pull request: {tid} #{n} ({b})" for tid, n, b in f.taken]
         lines += [f"    waits, offered to nobody: {tid} — {why}" for tid, why in f.waits]
         lines += [f"    not yet known: {tid} — {why}" for tid, why in f.unknown]
-        lines += [f"    nothing will read: {b + ' — ' if b else ''}{why}" for b, why in f.nobodys]
-        if not (f.taken or f.waits or f.unknown or f.nobodys):
+        lines += [f"    nothing will read: {b} — {why}" for b, why in f.nobodys]
+        if f.branches_unread:
+            lines.append("    origin's branches could not be read, so no pushed branch is named")
+        if not (f.taken or f.waits or f.unknown or f.nobodys or f.branches_unread):
             lines.append("    nothing in flight: every pickable entry is offered afresh")
     if not flights:
         lines.append("  none: the org defines no team")

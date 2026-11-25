@@ -751,7 +751,8 @@ def Pr(n: int, branch: str, *, filing: bool | None = False, **kw: Any) -> dict: 
 
 
 def test_in_flight_lists_the_entries_taken_up_those_that_wait_and_branches_nothing_reads(tmp_path):
-    entries = [Entry("TD-1"), Entry("TD-2"), Entry("TD-3"), Entry("TD-4", owner="paul"), Entry("TD-6")]
+    blocked = Entry("TD-5", pickable="no", for_page="blocked")
+    entries = [Entry("TD-1"), Entry("TD-2"), Entry("TD-3"), Entry("TD-4", owner="paul"), blocked, Entry("TD-6")]
     prs = [
         Pr(10, "td1-x"),
         Pr(11, "td2-y", draft=True),
@@ -791,7 +792,11 @@ def test_in_flight_says_a_repo_not_read_and_reads_no_branch_of_a_checkout_that_i
     }
     r, s = switchover.in_flight(readings, org, branches_of=lambda _root: pytest.fail("not read"))
     assert r.unread == "the home has not read its pull requests"
-    assert s.nobodys == [("", "origin's branches could not be read")]
+    assert s.branches_unread and s.nobodys == []
+    readings["/y"] = {"name": "r", "prs": {"at": "t"}}
+    assert switchover.in_flight(readings, org, branches_of=lambda _r: None)[0].unread == (
+        "its pull request reading holds no open list"
+    )
     readings["/y"] = {"name": "r", "prs": {"error": "gh failed"}}
     r, _ = switchover.in_flight(readings, org, branches_of=lambda _root: frozenset())
     assert r.unread == "its pull requests could not be read: gh failed"
@@ -808,3 +813,25 @@ def test_the_check_prints_the_work_in_flight_from_the_homes_repo_reading(home, t
     out = capsys.readouterr().out
     assert "work in flight, as the home will take it up after the window" in out
     assert "    taken up with its pull request: TD-1 #10 (td1-x)" in out
+
+
+def test_in_flight_names_no_filing_fork_sync_or_sweep_branch_and_no_branch_of_an_entry_not_in_the_reading(tmp_path):
+    entries = [Entry("TD-1"), Entry("TD-2"), Entry("TD-7")]
+    prs = [
+        Pr(20, "td1-td2-filing", filing=True),
+        Pr(21, "td1-td2-fork", fork=True),
+        Pr(22, "td1-td2-sync", sync=True),
+        Pr(23, "lift/TD-1/until-2026-12-01"),
+        Pr(24, "td7-fork-named", fork=True),
+        Pr(25, "td1-old"),
+        Pr(26, "td1-new"),
+    ]
+    readings = {str(tmp_path): {"name": "r", "ledger": {"entries": entries}, "prs": {"open": prs, "at": "t0"}}}
+    org = SimpleNamespace(teams={"grind": SimpleNamespace(repo="r")}, unlanded={})
+    pushed = frozenset({"td7-fork-named", "td999-archived", "td1-old", "td1-new"})
+    (f,) = switchover.in_flight(readings, org, branches_of=lambda _r: pushed)
+    assert f.taken == [("TD-1", 26, "td1-new")], "the newest of two matches"
+    assert f.nobodys == [("td7-fork-named", "holds TD-7 and has no open pull request")], (
+        "a fork's branch hides no origin branch; an id no entry of the reading has is not named"
+    )
+    assert switchover.flight_lines([f])[1] == "  r: (its pull requests read t0)"
