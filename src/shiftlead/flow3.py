@@ -65,6 +65,11 @@ class Checked:
         return not self.problems
 
 
+KEY_MAX = 20
+"""A stage key's length where a flow is saved (§4.9c rule 7): its session's name `<key>-<id>` fits `naming.slug`'s 32
+for an entry id of up to 11 characters."""
+
+
 def key_of(name: Any) -> str:
     """A stage's key: its name in lower case with spaces as hyphens (§4.9c *A stage's key is its name*)."""
     return str(name).strip().lower().replace(" ", "-")
@@ -146,9 +151,12 @@ def check(
     flow_dir: Path | None = None,
     repo_root: Path | str | None = None,
     read: Reader | None = None,
+    saving: bool = False,
 ) -> Checked:
     """§4.9c's check of a parsed `flow.yml`. `place` is `package`, `org`, `repo` or `file` (rule 10's brief lookup);
-    `repo_root`, where given, is the repo the flow is checked against (a `merge` destination needs its gate)."""
+    `repo_root`, where given, is the repo the flow is checked against (a `merge` destination needs its gate).
+    `saving` is true where the flow is saved (the page's save and its preview, `ao flow check`), never on a read: it
+    alone names a stage key past `KEY_MAX` (rule 7), so a flow saved before that rule keeps running."""
     out = Checked()
     bad, info = out.problems, out.info
     reader = read or _read
@@ -173,6 +181,13 @@ def check(
     for st in stages.values():
         for o in (*OUTCOMES[st["kind"]], OTHER):
             _move(st, o, st["outs"].get(o, "person"), stages, audits, bad)
+    if saving:
+        for key, st in stages.items():
+            if len(key) > KEY_MAX:
+                bad.append(
+                    f"{st['name']}: its key `{key}` is {len(key)} characters, more than {KEY_MAX}, so its session's "
+                    "name would be cut: rename the stage (rule 7)"
+                )
     _loops(stages, bad)
     _reach(stages, takes, bad, info)
     if repo_root is not None and any(st["merges"] for st in stages.values()) and not cadence.holds(repo_root):
@@ -483,13 +498,14 @@ def check_text(
     flow_dir: Path | None = None,
     repo_root: Path | str | None = None,
     read: Reader | None = None,
+    saving: bool = False,
 ) -> Checked:
     """`check` over a file's text; text that is no YAML is the one problem."""
     try:
         doc = repoconfig.parse_yaml(text)
     except yaml.YAMLError as e:
         return Checked(problems=[f"the file is not valid YAML: {e}"])
-    got = check(doc, place=place, flow_dir=flow_dir, repo_root=repo_root, read=read)
+    got = check(doc, place=place, flow_dir=flow_dir, repo_root=repo_root, read=read, saving=saving)
     if flow_dir is not None and place in ("org", "repo") and flow_dir.name in BUILTIN:
         got.problems.append(f"{flow_dir.name} is a built-in flow's name: define your own under another name")
     return got
@@ -514,7 +530,7 @@ def check_file(path: Path | str, *, repo: Path | str | None = None) -> Checked:
     if text is None:
         return Checked(problems=[f"{p}: cannot be read"])
     place, root = place_of(p)
-    return check_text(text, place=place, flow_dir=p.resolve().parent, repo_root=repo or root)
+    return check_text(text, place=place, flow_dir=p.resolve().parent, repo_root=repo or root, saving=True)
 
 
 def builtins() -> list[dict[str, Any]]:
