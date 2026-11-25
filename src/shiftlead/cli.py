@@ -1410,6 +1410,8 @@ def _team_show_prose(got: dict[str, Any]) -> None:
     count = f"{head['sessions']} of {head['most']}" if head.get("most") else str(head["sessions"])
     by = {"person": " by you", "until": " at its stop time"}.get(str(head.get("by") or ""), "")
     word = f"running · {count} session{'' if count == '1' else 's'}" if head["word"] == "running" else head["word"] + by
+    if head.get("finishing"):  # a wound-down team's sessions still ending (§4.9d *Start and Wind down*)
+        word += f" · {head['finishing']} finishing"
     title = f"{got['team']} ({got['label']})" if got.get("label") else got["team"]
     print(f"{title}: {word}")
     if got.get("repo"):

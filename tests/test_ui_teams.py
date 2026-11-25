@@ -1399,6 +1399,8 @@ def test_a_stopped_switched_team_says_who_stopped_it():
     for by, word in (("person", "Stopped by you"), ("until", "Stopped at its stop time"), (None, "Stopped")):
         head = {"word": "stopped", "sessions": 0, "by": by, "most": None}
         assert setmod.switched_team(_switched_show(head=head), {})["word"] == word
+    head = {"word": "stopped", "sessions": 2, "by": "person", "finishing": 2, "most": None}
+    assert setmod.switched_team(_switched_show(head=head), {})["word"] == "Stopped by you · 2 finishing"
 
 
 def test_a_team_only_the_settings_hold_gets_a_tab_in_the_repo_order():

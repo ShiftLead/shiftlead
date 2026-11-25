@@ -74,6 +74,12 @@ def test_a_finished_run_starts_on_its_clock_only_while_the_team_may_start() -> N
     assert choose(done_run(), Clock(8, "hours"), AuditReading(**GO), NOW) is None
 
 
+def test_a_due_run_waits_while_the_team_is_at_its_limit() -> None:
+    every = Clock(6, "hours")
+    assert choose(done_run(), every, AuditReading(within_size=False, **GO), NOW) is None, "no room under the limit"
+    assert choose(done_run(), every, AuditReading(within_size=True, **GO), NOW) == AuditAct("start")
+
+
 def test_a_run_that_holds_its_lease_is_never_started_again() -> None:
     live = AuditReading(holder=Holder(), merged_since=50, **GO)
     r = run()

@@ -343,6 +343,22 @@ def test_the_audits_share_what_is_left_under_the_limit_and_another_teams_session
     assert [(s.audit, s.act.name if s.act else None) for s in got] == [("docs", "start"), ("code", None)]
 
 
+def test_an_audit_whose_start_fails_takes_no_room_from_the_next(store):
+    w = World()
+    base = w.reach()
+
+    def start(team, key, came_base, came):
+        if key == "docs":
+            raise RuntimeError("the launch refused")
+        return base.start(team, key, came_base, came)
+
+    reach = AuditReach(start, base.claim, base.end, base.head, base.merged_since)
+    f = facts(docs={"t": two_audits()}, limits={"t": stage_audit_pass.Limits({}, 1)})
+    docs, code = stage_audit_pass.audit_pass(store, f, reach)
+    assert docs.act.name == "start" and not docs.made.made and "the launch refused" in docs.made.why
+    assert code.act.name == "start" and code.made.made and w.started == [("t", "code", "c0ffee", None)]
+
+
 def test_a_team_with_no_limit_starts_every_audit_whatever_its_stages_hold(store):
     held_stage(store, "TD-1")
     w = World()

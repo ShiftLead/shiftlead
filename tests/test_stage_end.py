@@ -195,6 +195,14 @@ def test_changes_wanted_needs_a_reason_and_posts_a_block():
     assert "the test is wrong" in facts.posted[0][1]
 
 
+def test_changes_wanted_is_taken_when_the_head_moved_since_it_was_read():
+    store = _store("review", branch="td7-thing", pr=9)
+    facts = Fake(_pr(), fetched="d" * 40)
+    assert _end(store, "changes-wanted", "the test is wrong", facts=facts)["went"] == "build", "only ship needs it"
+    assert facts.posted[0][1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
+    assert store.record["verdicts"]["review"]["head"] == "d" * 40, "the verdict names the head the review read"
+
+
 @pytest.mark.parametrize("outcome", ["not-needed", "design-needs-changing", "other"])
 def test_a_reasoned_outcome_needs_its_reason(outcome):
     with pytest.raises(Refused, match="needs --reason"):

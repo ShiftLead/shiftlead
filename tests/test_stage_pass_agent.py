@@ -273,6 +273,13 @@ def test_an_audit_that_rested_is_told_to_the_person_once_by_its_team(monkeypatch
     )
 
 
+def test_a_rested_audits_note_says_a_lost_session_was_lost() -> None:
+    lost = SimpleNamespace(team="build-r", audit="docs", act=SimpleNamespace(case="lost"), tell=True)
+    assert rested_words(lost).startswith(
+        "The audit docs of team build-r lost its run twice (the second time, its session was lost)"
+    ), "a lost session's wording, never a silent one's"
+
+
 def _jobs_reading() -> dict[str, Any]:
     return {
         "ledger": {"entries": [{"id": "TD-7"}]},
