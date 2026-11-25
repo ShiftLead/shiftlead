@@ -713,8 +713,9 @@ def flow_pick(pick: Any, flow: str | None) -> dict[str, Any]:
         }
         for c in pick.get("choices") or ()
     ]
-    if flow and not any(c["current"] for c in choices):  # the flow it runs, though no longer offered, stays drawn
-        choices.insert(0, {"name": flow, "current": True, "cannot_run": f"{NO_RUN} no flow of that name is found"})
+    if not any(c["current"] for c in choices):  # the flow it runs, though no longer offered, stays drawn; none, said
+        why = f"{NO_RUN} no flow of that name is found" if flow else "it runs no flow yet"
+        choices.insert(0, {"name": flow or "", "current": True, "cannot_run": why})
     return {"choices": choices, "choices_unread": None}
 
 

@@ -1449,6 +1449,8 @@ def test_the_flow_pick_disables_a_flow_the_team_cannot_run_and_keeps_one_no_long
     )
     gone = setmod.flow_pick({"choices": [{"name": "lean"}]}, "build")["choices"][0]
     assert gone["name"] == "build" and gone["current"] and "no flow of that name" in gone["cannot_run"]
+    none = setmod.flow_pick({"choices": [{"name": "lean"}]}, None)["choices"][0]
+    assert none == {"name": "", "current": True, "cannot_run": "it runs no flow yet"}, "never the first flow, selected"
     unread = setmod.flow_pick(SimpleNamespace(detail="origin away"), "build")
     assert unread == {"choices": [], "choices_unread": "origin away"}
 

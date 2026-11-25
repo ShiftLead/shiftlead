@@ -144,14 +144,14 @@
       no.type = "button";
       no.addEventListener("click", keep);
       go.addEventListener("click", async () => {
-        go.disabled = no.disabled = true;
+        go.disabled = no.disabled = pick.disabled = true;  // one switch at a time: the pick waits for its answer
         said.hidden = true;
         try {
           const done = await post(`/api/teams/${team}/switch`, { flow, version: box.dataset.version });
           if (done.ok) return location.reload();
           shout(said, done.why);
         } catch (e) { shout(said, AWAY); }
-        go.disabled = no.disabled = false;
+        go.disabled = no.disabled = pick.disabled = false;
       });
       const row = el("div", "row gap wrap");
       row.append(go, no);
