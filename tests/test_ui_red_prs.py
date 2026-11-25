@@ -240,6 +240,34 @@ def test_after_the_cut_over_the_inbox_draws_a_forks_sync_in_a_serviced_repo(tmp_
     assert c.get("/api/person/inbox").json()["needs"] == 1  # the count reads the same rows
 
 
+def test_after_the_cut_over_the_org_page_counts_a_forks_sync_in_a_serviced_repo(tmp_path, monkeypatch):
+    """TD-2214: the Org page's top bar reads the cut-over as the Inbox does, so its number counts a fork's sync in a
+    serviced repo only after the cut-over, and nothing while the host agent is down."""
+    import re
+
+    from fastapi import HTTPException
+
+    from sessionorc import teamstore
+
+    def needs(html: str) -> str:
+        return re.search(r'id="personneeds">([^<]*)</span>', html).group(1)
+
+    root = str(tmp_path / "samscrape")
+    fork = order(1801, checks="green", failing=[], red_since=None, sync=True, sync_since=_iso(now()), reason="a fork's head", fork=True)  # fmt: skip
+    Fake = fake({root: reading(root, orders=[fork, order(802)])}, [rec("g1", root)])
+    c = client(monkeypatch, tmp_path, Fake)
+    assert needs(c.get("/").text) == ""  # before the cut-over: a lane's, and #802 is serviced
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
+    assert needs(c.get("/").text) == "1" == str(c.get("/api/person/inbox").json()["needs"])
+
+    class Down(Fake):
+        async def call(self, method, **kw):
+            raise HTTPException(503, "the host agent is down")
+
+    down = client(monkeypatch, tmp_path, Down)
+    assert needs(down.get("/").text) == ""
+
+
 # -- a draft is no work order (design §4.4, TD-745) -------------------------------------------------------
 
 
