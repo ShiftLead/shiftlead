@@ -271,3 +271,63 @@ def test_an_audit_that_rested_is_told_to_the_person_once_by_its_team(monkeypatch
     assert rested_words(rested).startswith(
         "The audit docs of team build-r lost its run twice (the second time, its session went silent)"
     )
+
+
+def _jobs_reading() -> dict[str, Any]:
+    return {
+        "ledger": {"entries": [{"id": "TD-7"}]},
+        "prs": {"open": [], "recent": []},
+        "work_orders": {"orders": [{"id": "board:0123abcd", "kind": "decided"}, {"kind": "no id"}]},
+        "pr_orders": {"orders": [{"id": "pr:12", "kind": "red"}]},
+        "boards": {"boards": [{"items": [{"key": "board:0123abcd"}]}]},
+    }
+
+
+def test_the_jobs_readings_are_handed_over_as_copies(body: list[dict[str, Any]]) -> None:
+    agent = _Agent(roster=["/n/r"])
+    agent._repos["/c/r"] = _jobs_reading()
+    asyncio.run(agent._stage_pass())
+    got = body[0]
+    assert got["orders"] == [{"id": "board:0123abcd", "kind": "decided"}], "an order with no id is no job's"
+    assert got["pr_orders"] == [{"id": "pr:12", "kind": "red"}]
+    assert got["boards"] == agent._repos["/c/r"]["boards"] and got["boards"] is not agent._repos["/c/r"]["boards"]
+    assert got["orders"][0] is not agent._repos["/c/r"]["work_orders"]["orders"][0], "the thread gets copies"
+    import inspect
+
+    from shiftlead import stage_tick
+
+    inspect.signature(stage_tick.run).bind(**got)
+
+
+@pytest.mark.parametrize(
+    "spoil",
+    [
+        lambda r: r.pop("work_orders"),
+        lambda r: r.pop("pr_orders"),
+        lambda r: r.pop("boards"),
+        lambda r: r.update(boards={"error": "unreadable"}),
+        lambda r: r.update(work_orders={"error": "unreadable"}),
+        lambda r: r.update(pr_orders={"error": "unreadable"}),
+        lambda r: r.update(prs={"error": "gh failed"}),
+        lambda r: r.update(seams={"serve": {"ok": False, "lacks": [{"key": "gate", "words": "unserved: no gate"}]}}),
+    ],
+    ids=[
+        "no-orders",
+        "no-pr-orders",
+        "no-boards",
+        "boards-error",
+        "orders-error",
+        "pr-orders-error",
+        "prs-error",
+        "unserved",
+    ],
+)
+def test_no_job_reading_is_handed_over_where_one_cannot_be_judged_by(spoil: Any) -> None:
+    reading = _jobs_reading()
+    spoil(reading)
+    assert agent_stage.job_readings(reading) == {}, "the pass then passes over no job, closing none as gone"
+
+
+def test_a_served_repos_readings_are_its_jobs() -> None:
+    reading = {**_jobs_reading(), "seams": {"serve": {"ok": True, "lacks": []}}}
+    assert set(agent_stage.job_readings(reading)) == {"orders", "pr_orders", "boards"}
