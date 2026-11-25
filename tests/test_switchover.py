@@ -597,3 +597,85 @@ def test_each_adapter_names_skip_args_and_a_login_lacking_them_asks(adapter):
     assert adapter.skip_args and switchover._asks(adapter, []) is False
     assert switchover._asks(adapter, list(adapter.skip_args)) is False
     assert switchover._asks(adapter, ["--other"]) is True
+
+
+# -- the answers file `--answers` writes (§4.9e *The answers file*) ----------------------------------------------------
+
+
+def Line(role: str = "grinder", count: int = 1, size: int | None = None) -> SimpleNamespace:  # noqa: N802
+    return SimpleNamespace(role=role, count=count, size=size, profile=None)
+
+
+def Def(host: str = "", flows: tuple = ("td",), members: tuple = (), repo: str = "r") -> SimpleNamespace:  # noqa: N802
+    return SimpleNamespace(
+        repo=repo, host=host, flows=list(flows), flow="", members=list(members), techlead=None, seats=[]
+    )
+
+
+FLOW3 = {"stages": [{"name": "Design", "takes": "design-first"}, {"name": "Build", "takes": "other"}]}
+
+
+def suggest(org: Any, *, ran_on: Any = None, **kw: Any) -> dict:
+    made = [
+        switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"]),
+        switchover.Login("gemini", Path("/g"), "reader", ["fc"], ["k2"]),
+    ]
+    offered = lambda _repo: [{"name": "design-wise", "doc": FLOW3}, {"name": "build", "doc": {"stages": []}}]  # noqa: E731
+    return switchover.suggest(
+        org, "h", made, [], default="p", offered=offered, ran_on=ran_on or (lambda _t: ["p", "fc"]), **kw
+    )
+
+
+def test_answers_name_each_folder_and_give_a_team_its_renamed_flow_logins_and_builders():
+    org = SimpleNamespace(
+        teams={"grind": Def(members=(Line("designer"), Line(count=2), Line(size=3)))}, unlanded={}, director=None
+    )
+    got = suggest(org, schedules={"grind": {"schedule": {"profile": "p"}}})
+    assert got["hosts"] == {"h": {"logins": {"claude-code:/a": {"name": "paul"}, "gemini:/g": {"name": "reader"}}}}
+    assert got["teams"]["grind"] == {
+        "flow": "design-wise",
+        "logins": ["claude-code:paul", "gemini:reader"],
+        "at_once": {"build": 5},
+        "schedule_login": "claude-code:paul",
+    }, "td becomes design-wise; the builders' sizes summed, a size over a count; the schedule's profile's login"
+    assert got["builtins"]["default"]["logins"] == ["claude-code:paul", "gemini:reader"]
+    assert got["builtins"]["default"]["models"]["prompts"] == "sonnet" and "director" not in got
+
+
+def test_answers_suggest_no_flow_offered_none_and_no_logins_for_a_node_team():
+    org = SimpleNamespace(
+        teams={"far": Def(host="node", flows=("mine",)), "near": Def(flows=("build",), members=(Line(),))},
+        unlanded={"gone": "why"},
+        director=None,
+    )
+    got = suggest(org)
+    assert got["teams"]["far"] == {"logins": []}, "no format-3 flow of its name, and its node's logins not read"
+    assert got["teams"]["near"]["flow"] == "build" and "at_once" not in got["teams"]["near"], "a flow with no build"
+    assert got["builtins"]["default"]["logins"] == ["claude-code:paul", "gemini:reader"], "the first home team's"
+
+
+def test_answers_give_the_director_the_prompts_model_and_its_profiles_login_and_drop_the_prompts_seat():
+    org = SimpleNamespace(teams={}, unlanded={}, director=SimpleNamespace(profile="fc"))
+    got = suggest(org)
+    assert got["director"] == {"model": "sonnet", "logins": ["gemini:reader"]}
+    assert "prompts" not in got["builtins"]["default"]["models"] and got["builtins"]["default"]["logins"] == []
+    org.director.profile = None
+    assert suggest(org)["director"]["logins"] == ["claude-code:paul"], "the profiles file's default"
+
+
+def test_check_answers_writes_a_file_the_check_accepts_and_leaves_one_that_is_there(home, tmp_path, capsys):
+    a = tmp_path / "a"
+    (home / "profiles.yml").write_text(f"default: p\nprofiles:\n  p: {{config_dir: {a}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder", "count": 2}], "flows": ["td"]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    assert cli.main(["switch-over", "check", "--answers"]) == 0
+    captured = capsys.readouterr()
+    assert "wrote " in captured.err and "answers.yml" in captured.err
+    path = home / "switch-over" / "answers.yml"
+    doc = yaml.safe_load(path.read_text())
+    assert doc["teams"]["grind"] == {"flow": "design-wise", "logins": ["claude-code:p"], "at_once": {"build": 2}}
+    assert "no blockers" in captured.out
+    path.write_text("teams: {}\n")
+    assert cli.main(["switch-over", "check", "--answers"]) == 1
+    captured = capsys.readouterr()
+    assert "left as it is" in captured.err and path.read_text() == "teams: {}\n"
