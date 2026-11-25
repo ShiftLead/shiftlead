@@ -236,5 +236,7 @@ async def test_a_repos_prompts_seat_reads_its_own_repos_prompts_alone(agent, tmp
         records = [rp, rd, rm, rt]
         assert [c["member"] for c in agent._prompt_causes(rp, records)] == [mine]
         assert {c["member"] for c in agent._prompt_causes(rd, records)} == {mine, theirs}
+        rp.repo = None
+        assert agent._prompt_causes(rp, records) == [], "a prompts seat of no repo reads no repo's prompts"
         for sid in (p, d, mine, theirs):
             await person.call("kill", id=sid)

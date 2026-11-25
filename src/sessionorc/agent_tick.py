@@ -4458,11 +4458,11 @@ class TickMixin:
         prompt is the person's alone, as is one only its terminal answers."""
         causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
         # a repo's prompts seat reads the unattended sessions of its repo alone (§4.9d, TD-2065), by checkout name
-        mine = Path(str(s.repo)).name if s.builtin == "prompts" and s.repo else None
+        mine = (Path(str(s.repo)).name if s.repo else "") if s.builtin == "prompts" else None
         for r in records:
             if (
                 r is not s
-                and (mine is None or (bool(r.repo) and Path(str(r.repo)).name == mine))
+                and (mine is None or (bool(mine) and bool(r.repo) and Path(str(r.repo)).name == mine))
                 and r.supervised
                 and r.unattended
                 and not r.superseded_by
