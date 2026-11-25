@@ -555,6 +555,11 @@ class GeminiAdapter:
             "billing": SELECTED_BILLING.get(selected or ""),
         }
 
+    def model_family(self, model: str) -> str | None:
+        """The family a model id maps to through this adapter's table (§4.2b): what the switch-over pins a login to
+        where every profile on its folder names one model. None where the table has no such model."""
+        return model_family(model)
+
     def models(self, home: Path, plan: str | None) -> dict:
         """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` the family of the model the
         home's `.gemini/settings.json` names (`model.name`), None where it names none."""
