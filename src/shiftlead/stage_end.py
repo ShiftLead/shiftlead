@@ -421,14 +421,6 @@ def call(
 
     store = StageStore(root)
     try:
-        text = store.flow(team) if team else None
-        if text is None:
-            return {"refused": f"team {team} has no flow on the state branch"}
-        try:
-            doc = repoconfig.parse_yaml(text)
-        except yaml.YAMLError:  # a stored flow edited by hand into bad YAML is a refusal, not a failed call (TD-2150)
-            return {"refused": f"team {team}'s flow on the state branch cannot be read"}
-        facts = ForgeFacts(directory) if seen is None else NodeFacts(root, seen)
         if stage_audit_end.is_ref(tid):  # an audit run's session holds the run's lease, not an entry (TD-2053)
             return stage_audit_end.end_audit(
                 store,
@@ -440,6 +432,14 @@ def call(
                 given=lambda: _given(Path(root)),
                 line=lambda text: _home_line(Path(root), text),
             )
+        text = store.flow(team) if team else None
+        if text is None:
+            return {"refused": f"team {team} has no flow on the state branch"}
+        try:
+            doc = repoconfig.parse_yaml(text)
+        except yaml.YAMLError:  # a stored flow edited by hand into bad YAML is a refusal, not a failed call (TD-2150)
+            return {"refused": f"team {team}'s flow on the state branch cannot be read"}
+        facts = ForgeFacts(directory) if seen is None else NodeFacts(root, seen)
         if stage_job_end.is_ref(tid):  # a built-in seat's job session holds its work order, not an entry (TD-2053)
             return stage_job_end.end_job(
                 store,

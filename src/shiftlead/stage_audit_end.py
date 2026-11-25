@@ -56,15 +56,22 @@ def _at(value: Any) -> datetime | None:
         return None
 
 
+def _bare(address: str) -> str:
+    """A session's id with no `@<host>`: the id service records its caller as the call reached the home, which may
+    name a node's session bare where its holder is written `<id>@<node>`."""
+    return address.partition("@")[0]
+
+
 def filed_in_run(given: Iterable[Mapping[str, Any]], holder: str, started_at: Any) -> set[str]:
-    """The ids the home handed out to `holder` at or after `started_at`: the entries the run could have filed."""
+    """The ids the home handed out to `holder` (by its bare id) at or after `started_at`: the entries the run could
+    have filed."""
     start = _at(started_at)
     if start is None:
         return set()
-    out = set()
+    out, bare = set(), _bare(holder)
     for g in given:
         at = _at(g.get("at"))
-        if g.get("by") == holder and at is not None and at >= start and g.get("id"):
+        if _bare(str(g.get("by") or "")) == bare and at is not None and at >= start and g.get("id"):
             out.add(str(g["id"]))
     return out
 

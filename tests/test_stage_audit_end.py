@@ -251,3 +251,17 @@ def test_a_finished_run_is_due_again_on_its_clock_from_its_start():
     s = AuditReading(may_start=True)
     assert stage_audit.choose(store.record, every, s, NOW) is None
     assert stage_audit.choose(store.record, every, s, NOW + timedelta(hours=22)).name == "start"
+
+
+def test_a_node_holders_ids_are_matched_by_its_bare_id():
+    node = f"{ME}@box"
+    assert filed_in_run(given("TD-5", by=ME), node, START) == {"TD-5"}
+    assert filed_in_run(given("TD-5", by=node), ME, START) == {"TD-5"}
+    assert filed_in_run(given("TD-5", by="ao-repo-other@box"), node, START) == set()
+
+
+def test_a_repeated_other_writes_no_second_line():
+    store, lines = Store(run()), []
+    _end(store, "other", "stuck", lines=lines)
+    got = _end(store, "other", "stuck", lines=lines)
+    assert got["repeat"] and got["went"] == "person" and len(lines) == 1 and len(store.writes) == 1
