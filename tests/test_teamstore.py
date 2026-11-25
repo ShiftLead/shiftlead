@@ -272,7 +272,12 @@ def test_after_the_cut_over_a_switched_teams_head_reads_its_started_mark(agent):
     mine = Session(id="ao-x-p", name="p", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
     gone = Session(id="ao-x-g", name="g", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
     gone.unattended, gone.superseded_by = True, "ao-x-s"
-    agent._graph = lambda: {r.id: r for r in (live, mine, gone)}  # a person's own and a superseded one: not counted
+    lead = Session(id="ao-x-t", name="t", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
+    lead.unattended, lead.seat, lead.builtin = True, {"trigger": "asks", "tags": True}, "techlead"
+    seat = Session(id="ao-x-q", name="q", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
+    seat.unattended, seat.seat = True, {"trigger": "asks"}
+    # a person's own, a superseded one and a seat, built-in or not: none counted, live or finishing (§4.9d)
+    agent._graph = lambda: {r.id: r for r in (live, mine, gone, lead, seat)}
     doc = settings_mod.load()
     cut = doc.pop("cut_over")
     agent._host_rec = {"teams": {"a": {"stopped": {"at": "t", "by": "person"}}}}
@@ -283,7 +288,7 @@ def test_after_the_cut_over_a_switched_teams_head_reads_its_started_mark(agent):
     agent._host_rec = {"teams": {"a": {"stopped": {"at": "t", "by": "person"}}}}
     assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 1, "by": "person", "finishing": 1}
     live.state = "exited"
-    assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 0, "by": "person"}
+    assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 0, "by": "person"}, "a filled seat: none"
     agent._host_rec = {}
     assert agent._team_head("a", doc)["by"] is None, "never started: Stopped"
 
