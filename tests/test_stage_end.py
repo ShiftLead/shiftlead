@@ -538,3 +538,139 @@ def test_stage_show_reads_an_entrys_record_alone(monkeypatch):
     s.lane = ["audit:t/docs"]
     with pytest.raises(RpcError, match="holds no stage"):
         asyncio.run(_Agent(s).rpc_stage_show(ME))
+
+
+# `check-waits`: a live check's pull request that leaves its entry open behind a blocker (§4.9c *A live check under a
+# flow*, TD-2120)
+BASE_SHA = "main"
+LIVE = "## TD-7: A check\n\n**Priority:** Low\n**Kind:** live-check #40\n**Blocked by:** {blocked}\n\n**Why:** It.\n"
+DECIDE = (
+    "## Is it right?\n\n**Kind:** decide\n**Added:** 2026-11-20\n**Context:** TD-7 decision (paul)\n"
+    "**Due:** 2026-11-30\n**Answers:** Yes | Not yet\n**Lifts:** Yes\n"
+)
+ITEM = "2026-11-20-0123abcd.md"
+
+
+@dataclass
+class Checked(Fake):
+    """A forge with the entry's file on the default branch and at the pull request's head, and the board there."""
+
+    files: dict = field(default_factory=dict)  # (path, ref) -> text
+
+    def text_at(self, path, ref):
+        return self.files.get((path, ref))
+
+    def names_at(self, path, ref):
+        return [p.rpartition("/")[2] for (p, r) in self.files if r == ref and p.rpartition("/")[0] == path]
+
+
+def _waits(blocked="TD-8", *, base_kind="live-check #40", files=None, board=None, extra=None, **pr):
+    at = {
+        ("docs/ledger/TD-7.md", BASE_SHA): LIVE.format(blocked="").replace("live-check #40", base_kind),
+        ("docs/ledger/TD-7.md", HEAD): LIVE.format(blocked=blocked),
+        ("docs/ledger/TD-8.md", HEAD): "## TD-8: The fix\n\n**Priority:** Low\n\n**Why:** It.\n",
+    }
+    if board is not None:
+        at[(f"docs/user_attention/{ITEM}", HEAD)] = board
+    at.update(extra or {})
+    got = _pr(files=files or ("docs/ledger/TD-7.md", "docs/ledger/TD-8.md"), base=BASE_SHA, **pr)
+    return Checked(got, files=at)
+
+
+def test_check_waits_on_a_live_check_behind_an_open_entry_goes_to_merge_past_review_and_marks_the_record():
+    store = _store()
+    got = _end(store, "check-waits", "TD-8 says what is wrong", _waits())
+    assert got["went"] == "merge"
+    record = store.record
+    assert (record["waits"], record["check_waits"], record["pr"]) == ("merging", 9, 9)
+    assert record["merging"] == {"head": HEAD, "stage": "build", "outcome": "check-waits"}
+
+
+@pytest.mark.parametrize(
+    ("blocked", "board", "extra"),
+    [
+        ("until 2999-01-01", None, None),
+        (
+            "event (live-2)",
+            None,
+            {
+                ("docs/ledger/TD-7.md", HEAD): LIVE.format(blocked="event (live-2)")
+                + "\n**Event (live-2):** The build is live.\n"
+            },
+        ),
+        ("decision (paul)", DECIDE, None),
+    ],
+)
+def test_check_waits_takes_each_gate_that_holds(blocked, board, extra):
+    store = _store()
+    got = _end(store, "check-waits", "waits", _waits(blocked, board=board, extra=extra))
+    assert got["went"] == "merge" and store.record["check_waits"] == 9
+
+
+@pytest.mark.parametrize(
+    ("blocked", "board"),
+    [
+        ("TD-9", None),  # an id whose entry is archived: no file at the head
+        ("until 2000-01-01", None),  # a reached day
+        ("event (live-2)", None),  # an event with no section
+        ("decision (paul)", None),  # a decision with no board item
+        ("decision (paul)", DECIDE.replace("TD-7 decision", "TD-70 decision")),  # its item names another entry
+        ("", None),  # nothing added at all
+    ],
+)
+def test_check_waits_is_refused_where_the_head_adds_no_blocker_that_holds(blocked, board):
+    store = _store()
+    with pytest.raises(Refused, match="adds no blocker that holds"):
+        _end(store, "check-waits", "waits", _waits(blocked, board=board))
+    assert store.writes == 0
+
+
+def test_a_blocker_the_default_branch_already_holds_is_not_added():
+    facts = _waits("TD-8")
+    facts.files[("docs/ledger/TD-7.md", BASE_SHA)] = LIVE.format(blocked="TD-8")
+    with pytest.raises(Refused, match="adds no blocker that holds"):
+        _end(_store(), "check-waits", "waits", facts)
+
+
+@pytest.mark.parametrize(
+    ("over", "said"),
+    [
+        ({"base_kind": "build"}, "is not a live check"),
+        ({"files": ("docs/ledger/TD-7.md", "src/x.py")}, "changes src/x.py, outside the ledger and the board"),
+        ({"files": ("docs/ledger/archive/TD-7.md",)}, "archives TD-7: a check that holds ends with work-pushed"),
+        ({"precheck": False}, "precheck is not green"),
+    ],
+)
+def test_check_waits_is_refused_on_a_build_entry_an_archive_a_code_file_and_a_red_precheck(over, said):
+    store = _store()
+    with pytest.raises(Refused, match=said):
+        _end(store, "check-waits", "waits", _waits(**over))
+    assert store.writes == 0
+
+
+def test_check_waits_is_refused_on_a_pull_request_a_review_stage_gave_a_verdict():
+    store = _store(pr=9, branch="td7-thing", verdicts={"review": {"head": HEAD, "stage": "review", "outcome": "ship"}})
+    with pytest.raises(Refused, match="never merged past: end with other"):
+        _end(store, "check-waits", "waits", _waits())
+
+
+def test_check_waits_is_no_review_stages_outcome():
+    store = _store("review")
+    with pytest.raises(Refused, match="is not an outcome of a review stage"):
+        _end(store, "check-waits", "waits", _waits())
+
+
+def test_check_waits_needs_a_reason():
+    with pytest.raises(Refused, match="needs --reason"):
+        _end(_store(), "check-waits", "", _waits())
+
+
+def test_check_waits_is_a_fixed_move_back_to_its_stage_three_times_on_a_refused_merge():
+    build = FLOW["stages"][0]
+    assert stage_end.destination(build, "check-waits") == {"to": "merge", "refused": {"to": "build", "limit": 3}}
+
+
+def test_any_other_outcome_clears_the_check_waits_mark():
+    store = _store(check_waits=9)
+    _end(store, "other", "something else")
+    assert store.record["check_waits"] is None

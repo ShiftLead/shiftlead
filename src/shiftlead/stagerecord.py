@@ -384,10 +384,10 @@ class StageStore:
         is not touched: its caller clears the question once this returns."""
         return board.note_unapplied(self.root, tid, label, mark)
 
-    def clear_question(self, tid: str, person: str, nonce: str) -> dict[str, Any]:
-        """The pull request clearing the question this record set on an entry moved to another team (§4.9c). The record
-        is not touched: its caller closes it once this returns."""
-        return board.clear_question(self.root, tid, person, nonce)
+    def clear_question(self, tid: str, person: str, nonce: str, why: str = board.MOVED_WHY) -> dict[str, Any]:
+        """The pull request clearing the question this record set on its entry: one moved to another team, or a live
+        check's whose pull request merged (§4.9c). The record is not touched: its caller closes it once this returns."""
+        return board.clear_question(self.root, tid, person, nonce, why)
 
     def land_intent(self, tid: str) -> dict[str, Any]:
         """The second and third writes: the one pull request, then the record's wait. Run again after a crash it

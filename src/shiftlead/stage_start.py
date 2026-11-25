@@ -29,6 +29,34 @@ FACTS = {
     "design-needs-changing": "a reason is given",
     flow3.OTHER: "a reason is given; the last choice, when no other outcome fits",
 }
+CHECK_WAITS = "check-waits"  # a live check's fixed move to merge, written by no flow (§4.9c *A live check …*)
+CHECK_WAITS_FACT = (
+    "a reason is given; the entry is a live check; its branch is pushed, its pull request open and its precheck green; "
+    "the pull request changes only the ledger and the board and does not archive the entry; no review stage has given "
+    "it a verdict; and at its head the entry's `Blocked by` adds at least one blocker that holds: an open entry's id, "
+    "an `until` after today, an `event (<name>)` whose section is in the entry, or a `decision (<person>)` with its "
+    "open `decide` item on the board"
+)
+LIVE_CHECK = (
+    "\n**This entry is a live check** (`Kind: live-check`): this replaces any building the brief below asks for. You "
+    "write no code. You read the live copy and never press it: `ao status -v`, a record's fields, `ao promote status`, "
+    "a transcript, a headless GET of a page; a check that needs a press is made on a scratch home (design §4.9b *What "
+    "the grinder does*). A build you find not live takes a fresh `event` gate by §4.9b's naming rule (*A live check "
+    "waits on a gate*), and the check waits on it. A new entry takes its id from `ao td reserve` and is filed with "
+    "`ledger.py new --id TD-n`; a note, a gate and an archive are `ledger.py note`, `set` and `archive`; the board's "
+    "`decide` item is `board_edit.py add`; a look is `ao msg` (§4.10 *A look*). The check ends one of four ways, each "
+    "in a pull request of ledger and board files alone:\n"
+    "- **It holds**: what you read is written on the entry and the entry is archived; end with `work-pushed`.\n"
+    "- **It does not**: a new entry says what is wrong and the check is `Blocked by` it; end with `check-waits`.\n"
+    "- **It waits for an event nobody can cause**, its build not being live among them: what you read is noted and the "
+    "entry gains its `event` or `until` gate; end with `check-waits`.\n"
+    "- **It is the person's to judge**: send the look first; the entry gains `decision (<person>)`, its Ask naming the "
+    "look's mail id, with the board's `decide` item; end with `check-waits`.\n"
+    "`check-waits` goes to merge past any review stage, so before it run the cadence's fact-check of the pull request "
+    "(a fresh subagent on the cadence's review model) and post its `cadence-review:` comment. A pull request a review "
+    "stage has given a verdict is never merged past it: end that one with `other`. A later check of this entry starts "
+    "a new branch, its name holding the entry's id and not already on origin, and reads the entry's Log first."
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +70,7 @@ class Work:
     pr: int | None = None
     came: str | None = None
     answer: str | None = None
+    live_check: bool = False  # the entry's `Kind:` is `live-check`, as the offer read it from the ledger
 
 
 @dataclass(frozen=True)
@@ -123,7 +152,11 @@ def told(stage: dict[str, Any], key: str, work: Work, *, adds_review: bool) -> s
         "fact and refuses one the facts contradict, saying which, and you carry on. Every outcome but `work-pushed` "
         "and `ship` needs `--reason`. The outcomes, and what each is checked on:"
     )
+    check = work.live_check and kind in flow3.WRITES
     lines += [f"- `{o}`: {FACTS[o]}" for o in (*flow3.OUTCOMES[kind], flow3.OTHER)]
+    if check:
+        lines.append(f"- `{CHECK_WAITS}`: {CHECK_WAITS_FACT}")
+        lines.append(LIVE_CHECK)
     if adds_review:
         lines.append(
             "\n**Before `work-pushed`, run the cadence's independent review** of your work (a fresh subagent on the "

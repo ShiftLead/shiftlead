@@ -68,6 +68,7 @@ class Reading:
     head: str | None = None  # the open pull request's head, which a passed stage's move to merge carries
     renumbered_to: str | None = None
     design: bool = False
+    live_check: bool = False  # the entry's `Kind:` is `live-check` (§4.9c *A live check under a flow*)
     open_parts: int = 0
     had_parts: bool = False
     archive_open: bool = False  # the home's own pull request archiving this entry is open
@@ -136,6 +137,13 @@ def switch_case(record: Mapping[str, Any], stage_known: bool) -> SwitchCase:
     return "stays" if stage_known else SWITCH_CASES[off_flow(record)]
 
 
+def checked(record: Mapping[str, Any], s: Reading) -> bool:
+    """Whether the record's pull request merged and is the one its accepted `check-waits` marked (§4.9c *A merge the
+    person takes over*): by the home or by hand, whatever the record waited on."""
+    mark = record.get("check_waits")
+    return bool(mark) and s.pr_state == "merged" and record.get("pr") == mark
+
+
 def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
     waits = record.get("waits")
     if waits == "merging" and s.merge_running:  # the home's own merge closes the record itself
@@ -144,6 +152,8 @@ def _reconcile(record: Mapping[str, Any], s: Reading) -> str | None:
         return "renumbered"
     if s.entry == "archived":
         return "close"
+    if checked(record, s):  # a live check's merge closes its record with the entry open, ahead of any intent
+        return "check-merged"
     if record.get("intent"):
         return "land-intent"
     settled = False

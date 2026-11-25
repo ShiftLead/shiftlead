@@ -354,6 +354,62 @@ def _moved_waiting(store, **kw):
     return put(store, pr=4, branch="td7-work", waits="person", answers={OTHER: None}, asked={"nonce": "n1"}, **kw)
 
 
+CHECKED = Reading(pr_state="merged")
+
+
+def test_a_live_checks_merge_closes_its_record_with_no_carried_and_its_next_check_starts_fresh(store):
+    put(store, holder=None, pr=4, branch="td7-check", check_waits=4, waits="merging", merging={"head": "a" * 40})
+    got = act_on(store, CHECKED)
+    assert got.made
+    closed = store.entry(TID)
+    assert closed["closed_at"] and closed["carried"] is None and closed["waits"] is None and closed["merging"] is None
+    got, started, _ = offer_it(store, replace(READY, live_check=True, carried_open=True))
+    assert got.made and started == [("build", Work(TID, live_check=True))]  # a new branch: none carried over
+
+
+@pytest.mark.parametrize("where", ["asked", "intent"])
+def test_a_live_check_merged_by_hand_clears_the_homes_own_question_first(store, monkeypatch, where):
+    put(store, pr=4, check_waits=4, waits="person" if where == "asked" else None, **{where: {"nonce": "n1"}})
+    seen = []
+
+    def clear(tid, person, nonce, why):
+        seen.append((tid, person, nonce, why, store.entry(TID)["clearing"], store.entry(TID)["closed_at"]))
+        return {"commit": "abc"} if where == "asked" else {"nothing": True}  # an unlanded intent clears nothing
+
+    monkeypatch.setattr(store, "clear_question", clear)
+    assert act_on(store, replace(CHECKED, gate=where == "asked")).made
+    assert seen == [(TID, "paul", "n1", "its entry waits behind the blocker its live check merged", "n1", None)]
+    closed = store.entry(TID)
+    assert closed["closed_at"] and closed["clearing"] is None and closed["intent"] is None and closed["asked"] is None
+
+
+def test_a_live_check_whose_clear_is_refused_waits_for_the_next_pass(store, monkeypatch):
+    put(store, pr=4, check_waits=4, waits="person", asked={"nonce": "n1"})
+
+    def refused(*_a):
+        raise board.Refused("the forge is away")
+
+    monkeypatch.setattr(store, "clear_question", refused)
+    got = act_on(store, replace(CHECKED, gate=True))
+    assert not got.made and "the forge is away" in got.why
+    record = store.entry(TID)
+    assert record["clearing"] == "n1" and not record.get("closed_at")
+    monkeypatch.setattr(store, "clear_question", lambda *_a: {"nothing": True})  # a crash after the clear merged
+    assert act_on(store, CHECKED).made and store.entry(TID)["closed_at"]
+
+
+def test_a_live_check_with_no_question_of_the_homes_closes_at_once_and_clears_nothing(store, monkeypatch):
+    put(store, pr=4, check_waits=4, waits="person", asked=None)  # a decision the check's own pull request wrote
+    monkeypatch.setattr(store, "clear_question", lambda *_a: pytest.fail("not this record's question"))
+    assert act_on(store, replace(CHECKED, gate=True)).made and store.entry(TID)["closed_at"]
+
+
+def test_another_pull_requests_merge_does_not_act_on_the_mark(store):
+    put(store, pr=5, check_waits=4)
+    act = choose(store.entry(TID), CHECKED)
+    assert act is not None and act.case == "merged-entry-open"
+
+
 def test_a_moved_entry_closes_only_after_its_question_is_cleared(store, monkeypatch):
     _moved_waiting(store)
     seen = []
@@ -548,6 +604,11 @@ def test_a_first_offer_starts_the_way_in_claims_and_writes_the_record(store):
     record = store.entry(TID)
     assert (record["flow"], record["stage"], record["holder"], record["offers"]) == ("new-flow", "build", "s9", 1)
     assert record["team"] == "t"
+
+
+def test_a_first_offer_tells_the_session_a_live_check_is_one(store):
+    got, started, _ = offer_it(store, replace(READY, live_check=True))
+    assert got.made and started == [("build", Work(TID, live_check=True))]
 
 
 def test_a_first_offer_carries_the_pull_request_that_is_its_work(store):
