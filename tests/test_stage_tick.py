@@ -309,3 +309,24 @@ def test_a_merging_job_is_landed_through_the_repos_gate_and_land(root: Path, mon
     )
     assert made == [str(root)] and kept.gate_land is not None, "the pass makes the repo's gate and land once"
     assert gated == [(4, "f" * 40)] and landed == [(4, "f" * 40)], "the job is landed through that gate and land"
+
+
+@pytest.mark.integration
+def test_the_jobs_reach_is_given_each_teams_flow_place_and_directory(
+    root: Path, quiet: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A review stage on a job reads its brief from its team's own flow (TD-2192): the jobs' reach is handed, by
+    team, the place and directory its flow file is found in, and the package's where none is found."""
+    mine = root / flow3.REPO_DIR / "jobs-own"  # a name no other test writes in the shared home's org flows
+    mine.mkdir(parents=True)
+    (mine / flow3.FILE).write_text((flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8"))
+    given: list[dict[str, Any]] = []
+    monkeypatch.setattr(stage_tick.stage_job_tick, "reach_for", lambda *a, **k: given.append(k) or "reach")
+    monkeypatch.setattr(stage_tick.stage_job_tick, "run", lambda *a, **k: {})
+    teams = {"t": TEAM, "m": {**TEAM, "flow": "jobs-own"}, "n": {**TEAM, "flow": "nowhere"}}
+    a_pass(root, Kept(), teams=teams, orders=[], pr_orders=[], boards={"boards": []})
+    assert given[0]["flows_at"] == {
+        "t": ("package", flow3.PACKAGE_DIR / "build"),
+        "m": ("repo", mine),
+        "n": ("package", None),
+    }
