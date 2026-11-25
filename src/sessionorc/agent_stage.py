@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import re
 import time
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -15,7 +16,7 @@ from importlib.metadata import entry_points
 from pathlib import PurePath
 from typing import Any
 
-from sessionorc import hosts, naming, teamstore
+from sessionorc import hosts, naming, teamstore, workorders
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import ACT_TIMEOUT, RpcError, log
 from sessionorc.agent_ids import origin_key
@@ -30,6 +31,10 @@ TEAM = "team"
 TICK = "stage_tick"
 STAGE_EVERY = 60.0  # seconds between two stage passes at the home (§4.9c *The home acts only where no session will*)
 STAGE_CALL_WAIT = ACT_TIMEOUT * 4  # a pass's call on the home's loop: a create waits on its pane
+# a job's work order (`workorders.PREFIX`, `PR_PREFIX`) or an audit run's lease, as its session holds it
+HELD = re.compile(
+    rf"{re.escape(workorders.PREFIX)}[0-9a-f]{{8}}|{re.escape(workorders.PR_PREFIX)}[1-9]\d{{0,6}}|audit:[^/\s]+/[^/\s]+"
+)
 STAGE_POOL = 4  # the pass's own threads, apart from `to_thread`'s pool, which the RPCs it waits on use
 
 
@@ -100,18 +105,29 @@ def stage_calls() -> Any:
     return home_call(NAME)
 
 
+def held_ref(ref: str, *, jobs: bool = False) -> bool:
+    """Whether `ref` is what a stage's session holds: an entry; with `jobs`, also a built-in seat's job's work order
+    (`board:<8 hex>`, `pr:<n>`, §4.9d *How each one runs*) or an audit run's lease (`audit:<team>/<audit>`, §4.9c
+    *Audits start on a clock*), whose outcomes the body takes too (TD-2053)."""
+    if ref.startswith("TD-"):
+        return True
+    return jobs and bool(HELD.fullmatch(ref))
+
+
 class StageMixin:
-    def _stage_entry(self, s: Any) -> str:
-        """The one entry a stage's session holds: its lane is that entry (§4.8)."""
-        refs = [r for r in lane_refs(s.lane or []) if r.startswith("TD-")]
+    def _stage_entry(self, s: Any, *, jobs: bool = False) -> str:
+        """The one entry a stage's session holds: its lane is that entry (§4.8). With `jobs`, a job's work order or an
+        audit run's lease is held as well: `ao stage end` takes their outcomes, and `ao stage show` an entry's alone."""
+        refs = [r for r in lane_refs(s.lane or []) if held_ref(r, jobs=jobs)]
         if len(refs) != 1:
             raise RpcError("this session holds no stage: `ao stage end` is run by a stage's own session")
         return refs[0]
 
     @staticmethod
     def _holds_stage(s: Any) -> bool:
-        """Whether `s` is a stage's session: a team's, no seat, its lane one entry (§4.8)."""
-        refs = [r for r in lane_refs(s.lane or []) if r.startswith("TD-")]
+        """Whether `s` is a stage's, a job's or an audit's session: a team's, no seat, its lane one entry, one job's
+        work order or one audit run's lease (§4.8; §4.9e: each ends by `ao stage end`, never a restart)."""
+        refs = [r for r in lane_refs(s.lane or []) if held_ref(r, jobs=True)]
         return bool(s.team) and s.seat is None and not s.builtin and len(refs) == 1
 
     async def rpc_stage_end(self, id: str, outcome: str, reason: str = "", caller: Any = None) -> dict[str, Any]:
@@ -120,7 +136,7 @@ class StageMixin:
         s = self._find(id)  # type: ignore[attr-defined]
         if not self._is_self(s, caller):  # type: ignore[attr-defined]
             raise RpcError("this entry is not yours: a stage is ended by the session that holds it")
-        tid = self._stage_entry(s)
+        tid = self._stage_entry(s, jobs=True)
         calls = stage_calls()
         root, seen = await self._stage_place(s)
         address = self._address(s)  # type: ignore[attr-defined]

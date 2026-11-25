@@ -10,8 +10,8 @@ adds the home's one plain board line naming the audit and the run (`line_text`, 
 offers no answers, and closing it does nothing more. A call repeated by the session that ended the run is answered with
 where it went.
 
-`stage_end.call` routes an audit's reference here. The host agent's `stage_end` still takes only an entry's lane
-(sessionorc, a held path), so nothing reaches this yet; releasing the lease's claim is that half's too.
+`stage_end.call` routes an audit's reference here, and the host agent's `stage_end` takes an audit run's lease as a
+session's lane and releases its claim once the end is written (`sessionorc.agent_stage`).
 """
 
 from __future__ import annotations

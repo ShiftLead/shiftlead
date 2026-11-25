@@ -507,3 +507,34 @@ def test_the_forge_facts_read_one_open_pull_request_of_this_repo(monkeypatch):
     assert facts.pull_request("td7-thing", None).precheck is False
     monkeypatch.setattr(facts, "_gh", lambda *_a: "[]")
     assert facts.pull_request("td7-thing", None) is None
+
+
+@pytest.mark.parametrize("ref", ["board:1a2b3c4d", "pr:41", "audit:t/docs"])
+def test_a_jobs_or_an_audits_session_ends_with_the_reference_it_holds_and_its_claim_released(monkeypatch, ref):
+    got = {}
+    body = SimpleNamespace(call=lambda **kw: got.update(kw) or {"entry": ref, "went": "done"})
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: body)
+    s = _node_session()
+    s.lane = [ref]
+    s.progress = [SimpleNamespace(ref=ref, status="claimed")]
+    agent = _NodeAgent(s, NODE_READING)
+    asyncio.run(agent.rpc_stage_end(ME, "nothing-found", reason="looked", caller=f"{ME}@node"))
+    assert got["tid"] == ref and got["outcome"] == "nothing-found" and got["reason"] == "looked"
+    assert agent.reported == [(f"{ME}@node", {"ref": ref, "status": "done", "caller": f"{ME}@node"})]
+
+
+@pytest.mark.parametrize("lane", [["board:xyz"], ["pr:0"], ["audit:t"], ["#41"], ["board:1a2b3c4d", "TD-7"], []])
+def test_a_lane_holding_no_one_stage_job_or_audit_is_refused(monkeypatch, lane):
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: pytest.fail("the body was reached"))
+    s = _Session()
+    s.lane = lane
+    with pytest.raises(RpcError, match="holds no stage"):
+        asyncio.run(_Agent(s).rpc_stage_end(ME, "work-pushed", caller=ME))
+
+
+def test_stage_show_reads_an_entrys_record_alone(monkeypatch):
+    monkeypatch.setattr(agent_stage, "stage_calls", lambda: pytest.fail("the body was reached"))
+    s = _Session()
+    s.lane = ["audit:t/docs"]
+    with pytest.raises(RpcError, match="holds no stage"):
+        asyncio.run(_Agent(s).rpc_stage_show(ME))
