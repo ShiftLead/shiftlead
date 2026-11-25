@@ -8,7 +8,8 @@ itself (the ledger at origin's default branch, the protected files, each team's 
 takes `stage_pass.repo_pass`. What one repo's passes keep between them (`Kept`) is the caller's to hold.
 
 Given the repo reading's work orders, pull request orders and boards, `run` then takes the two built-in seats' passes
-over their jobs (`stage_job_tick`, TD-2053); the home hands them over in a later slice.
+over their jobs (`stage_job_tick`, TD-2053); the home hands them over in a later slice. Last, it takes act 6 over the
+started teams' audits (`stage_audit_pass`, TD-2053), a rested run's note to the person being the caller's.
 
 Nothing starts a session yet: `stage_start.team_started` is false until TD-2065, so no offer is made, and a team is
 read only after the cut-over, when the caller passes it.
@@ -26,7 +27,16 @@ from typing import Any
 
 from sessionorc import gitinfo, ledger, paths, reports
 from sessionorc.models import Session
-from shiftlead import flow3, stage_end, stage_job_tick, stage_merge, stage_pass, stage_start
+from shiftlead import (
+    flow3,
+    stage_audit_pass,
+    stage_audit_start,
+    stage_end,
+    stage_job_tick,
+    stage_merge,
+    stage_pass,
+    stage_start,
+)
 from shiftlead import org as orgmod
 from shiftlead.stage_fetch import (
     TeamFlow,
@@ -226,6 +236,10 @@ def run(
 
     store = StageStore(root)
     got = stage_pass.repo_pass(store, kept.state, flows, facts, sessions, reach, local=local, now=now)
+    try:
+        got = dataclasses.replace(got, audits=_audits(store, root, ref, teams, flows, sessions, local, call, org, now))
+    except Exception:  # noqa: BLE001 — the audits' pass failing is a log line and never the teams' pass
+        log.exception("the audit pass of %s failed", root)
     if orders is None or pr_orders is None:
         return got
     try:
@@ -273,11 +287,7 @@ def _jobs(
     while it fails (`team_flow`), and the rows, with each open board answer's own pull request read by its number.
     The repo's name, which picks its built-in set, is its teams' `repo`. A pull request reading that cannot be read
     passes over no job."""
-    docs: dict[str, Mapping[str, Any]] = {}
-    for team, (current, problems) in flows.items():
-        flow = team_flow(current, problems, store.flow(team))
-        if flow is not None:
-            docs[team] = flow.doc
+    docs = _docs(store, flows)
     wanted = sorted({r["pr"] for r in store.jobs().values() if isinstance(r.get("pr"), int) and not r.get("closed_at")})
     rows = rows_of(prs, wanted, lambda n: reports.pr_state_row(root, n))
     if rows is None:
@@ -305,6 +315,83 @@ def _jobs(
         docs=docs,
         may_start=bool(started),
     )
+
+
+def _docs(store: StageStore, flows: Mapping[str, tuple[str | None, tuple[str, ...]]]) -> dict[str, Mapping[str, Any]]:
+    """Each team's flow as its records read it: the last good copy while it fails its check (`team_flow`)."""
+    docs: dict[str, Mapping[str, Any]] = {}
+    for team, (current, problems) in flows.items():
+        flow = team_flow(current, problems, store.flow(team))
+        if flow is not None:
+            docs[team] = flow.doc
+    return docs
+
+
+def _audits(
+    store: StageStore,
+    root: Path,
+    ref: str,
+    teams: Mapping[str, Mapping[str, Any]],
+    flows: Mapping[str, tuple[str | None, tuple[str, ...]]],
+    sessions: Any,
+    local: str,
+    call: Callable[..., Any],
+    org: Callable[[], orgmod.Org | None],
+    now: datetime,
+) -> tuple[stage_audit_pass.AuditStep, ...]:
+    """Act 6 over the started teams' audits. A run's session launches on its team's host from the flow in force, its
+    own brief read from the flow's directory as `_reach` reads a stage's; the head and the count are read at `ref`. No
+    team started reads nothing, not even a team's flow."""
+    read = org()
+    started = sorted(
+        t for t in teams if read is not None and t in read.teams and stage_start.team_started(read, read.teams[t])
+    )
+    if not started:
+        return ()
+    docs = _docs(store, {t: flows[t] for t in started if t in flows})
+
+    def start(team: str, key: str, base: str | None, came: str | None) -> str | None:
+        got_org = org()
+        teamdef = got_org.teams.get(team) if got_org is not None else None
+        doc = docs.get(team)
+        if got_org is None or teamdef is None or doc is None:
+            return None
+        entry = teams.get(team) or {}
+        at = flow_file(root, str(entry.get("flow") or ""))
+        place, flow_dir = (at[1], at[0].parent) if at is not None else ("package", None)
+        got = stage_audit_start.launch(
+            got_org,
+            teamdef,
+            dict(doc),
+            key,
+            host=str(entry.get("host") or local),
+            here=local,
+            base=base,
+            came=came,
+            place=place,
+            flow_dir=flow_dir,
+        )
+        made = stage_start.start(call, got_org, teamdef, got)
+        return stage_start.holder_of(got, made) if made else None
+
+    reach = stage_audit_pass.AuditReach(
+        start=start,
+        claim=lambda holder, lease: stage_start.claim(call, holder, lease),
+        end=lambda holder: stage_start.end(call, holder, "its audit's run record no longer names it"),
+        head=stage_audit_pass.head_of(root, ref),
+        merged_since=stage_audit_pass.merged_since(root, ref),
+    )
+    seen = stage_pass.addressed(sessions, local)  # a holder may be written in the home's `id@<local>` form
+    f = stage_audit_pass.AuditFacts(
+        now=now,
+        sessions=seen.sessions,
+        read_nodes=seen.read_nodes,
+        open_asks=seen.open_asks,
+        started=tuple(started),
+        docs=docs,
+        may_start=True,
+    )
+    return stage_audit_pass.audit_pass(store, f, reach)
 
 
 def call(**kwargs: Any) -> RepoPass | None:
