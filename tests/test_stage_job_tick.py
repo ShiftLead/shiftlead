@@ -134,3 +134,22 @@ def test_the_reach_writes_and_closes_the_homes_line(monkeypatch, tmp_path):
     r.close_line("0000beef")
     assert calls == [("add", "2026-11-25"), ("done", "board:0000beef")]
     assert r.start(record, None) is None  # no org read: nothing starts
+
+
+def test_a_job_waiting_merging_is_merged_after_the_seats_pass(store):
+    record = {
+        **stage_job.new_job("unheld-pull-requests", 4, "t", "2026-11-20T00:00:00Z"),
+        "pr": 4,
+        "stage": "build",
+        "waits": "merging",
+        "merging": {"head": "f" * 40, "stage": "build", "outcome": "work-pushed"},
+    }
+    store.put_job(record, "test: merging")
+    landed: list[tuple[int, str]] = []
+    gate_land = (lambda pr, head: {"verdict": "pass", "failed": []}, lambda pr, head: landed.append((pr, head)))
+    made: list[str] = []
+    rows = [{"number": 4, "state": "open", "head": "f" * 40}]
+    got = a_run(store, made, rows=rows, gate_land=gate_land)
+    assert landed == [(4, "f" * 40)] and "pr-4" not in made, "a job waiting on its merge is offered no session"
+    assert got["unheld-pull-requests"][-1].act == stage_job_tick.MERGING
+    assert a_run(store, [], rows=rows)["unheld-pull-requests"] is not None and len(landed) == 1, "no gate, no merge"
