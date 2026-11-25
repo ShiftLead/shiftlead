@@ -327,7 +327,9 @@ class EntryFacts:
     `ledger` is `ledger_on`'s answer and `renumbered_to` `renumbered_on`'s. `text` is the entry's own file, `entry` its
     row in the repo's reading, `named` its `Team:` line and `teams` the repo's teams. `doc` is the team's copy of the
     flow and `was` the flow the record was written under. `rows` are the repo's pull requests, `held` is `held_on`'s
-    answer and `session` the holder's record. `may_start` and `within_size` are TD-2065's.
+    answer and `session` the holder's record. `may_start` is whether the team may start a session, `within_size`
+    whether the offer's stage and the team have room, and `holds_new` whether the team is over a Balance line, so only
+    an entry already in a stage is offered (§4.9d *Holds new work*).
     """
 
     tid: str
@@ -353,6 +355,7 @@ class EntryFacts:
     merge_running: bool = False
     may_start: bool = False
     within_size: bool = False
+    holds_new: bool = False
 
 
 def reading_on(record: Mapping[str, Any] | None, f: EntryFacts) -> Reading | None:
@@ -387,6 +390,7 @@ def reading_on(record: Mapping[str, Any] | None, f: EntryFacts) -> Reading | Non
         "lifted_for": answer.lifted_for,
         "may_start": f.may_start,
         "within_size": f.within_size,
+        "holds_new": f.holds_new,
     }
     if live is None:
         return Reading(

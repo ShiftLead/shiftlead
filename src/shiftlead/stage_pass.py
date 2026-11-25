@@ -270,9 +270,10 @@ def repo_facts(
     one by its number, asked for each open record's pull request the reading lacks; `records` are only for which those
     are. `sessions` must name as read only the nodes whose link has delivered its snapshot since it came up, and
     `checkouts` every node's checkouts of the repo, since a node left out is read as holding nothing. A team over its
-    line on open pull requests may not start a session, since the offer's claim would be refused. None: the pull
-    requests could not be read, so no entry of the team can be told from one whose work is in flight. `limits` are the
-    team's numbers, from which each offer's room is counted; without them `within_size` is taken as given."""
+    line on open pull requests is offered no new entry (`holds_new`); its entries already in a stage carry on. None:
+    the pull requests could not be read, so no entry of the team can be told from one whose work is in flight.
+    `limits` are the team's numbers, from which each offer's room is counted; without them `within_size` is taken as
+    given."""
     wanted = sorted(
         {
             r["pr"]
@@ -304,7 +305,8 @@ def repo_facts(
         merging=merging,
         was=flow.was,
         named=named,
-        may_start=started and not over_line(host_teams, team),
+        may_start=started,
+        holds_new=over_line(host_teams, team),
         within_size=within_size,
         limits=limits,
     )
