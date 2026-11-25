@@ -23,14 +23,13 @@ from typing import Any
 from sessionorc import workorders
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
-from shiftlead.stage_job import SEATS, key_of
+from shiftlead.stage_job import PR_KINDS, SEATS, key_of
 from shiftlead.stage_start import ROLE_OF, StageLaunch, Work
 from shiftlead.stage_start import launch as stage_launch
 
 JOB_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "job.md"
 JOB_BRIEFS = Path(__file__).resolve().parent / "briefs" / "job"
 KIND_MARK = "<!-- kind -->"  # where a pull request's brief takes its kind's section
-PR_KINDS = ("red", "filing", "sync", "lift", "sweep")  # a pull request's job's kinds, as its record keeps them
 SEAT_WORDS = {"board-answers": "board answers", "unheld-pull-requests": "pull requests nobody holds"}
 
 
@@ -66,7 +65,7 @@ def brief_of(seat: str, kind: str | None = None) -> str:
         return text
     kinds = (kind,) if kind else ("red", "filing")
     if any(k not in PR_KINDS for k in kinds):
-        raise ValueError(f"a pull request's job is of kind {', '.join(PR_KINDS)}, not {kind!r}")
+        raise ValueError(f"a pull request's job's kind is one of {', '.join(PR_KINDS)}, not {kind!r}")
     parts = [(JOB_BRIEFS / "pr" / f"{k}.md").read_text(encoding="utf-8").strip() for k in kinds]
     return text.replace(KIND_MARK, "\n\n".join(parts))
 
@@ -154,11 +153,11 @@ def launch(
     line = next((m for m in team.members if m.role == role.name), None)
     person, unlisted = teams._person(org, team.repo, role, here, where)
     stage = job_stage(doc)
-    under = repoconfig.UnderFlow(
-        told(record, team=team.name, adds_review=stage in flow3.independent_review(doc), came=came),
-        brief=brief_of(seat, record.get("kind") if seat == "unheld-pull-requests" else None),
-    )
     try:
+        under = repoconfig.UnderFlow(
+            told(record, team=team.name, adds_review=stage in flow3.independent_review(doc), came=came),
+            brief=brief_of(seat, record.get("kind") if seat == "unheld-pull-requests" else None),
+        )
         prompt, made = role.compose(
             [lane],
             read=read,
