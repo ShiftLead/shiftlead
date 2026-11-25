@@ -5525,7 +5525,7 @@ def cmd_decide(args: argparse.Namespace) -> int:
 def cmd_switch_over_check(args: argparse.Namespace) -> int:
     """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles, named by the
     answers file, each team with what the answers give it, and every blocker, nothing changed; exit 1 while a blocker
-    to cure beforehand stands."""
+    to cure beforehand stands. `--answers` first writes the answers file where there is none."""
     import yaml
 
     from shiftlead import profiles as profiles_mod
@@ -5537,17 +5537,46 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1
     host = hosts.local_host().name
+    org, org_error = None, None
+    try:
+        org, notes = _org_notes("ao switch-over check")
+    except (ValueError, OSError, yaml.YAMLError) as e:  # a node, or an org file that cannot be read
+        org_error = e
+    else:
+        for note in notes:
+            print(note, file=sys.stderr)
+    if args.answers:  # §4.9e: written where there is none, filled with what the home can suggest, then checked
+        path = switchover.answers_file()
+        at = switchover.shown(path)
+        if path.exists() or path.is_symlink():
+            print(f"left as it is {at}", file=sys.stderr)
+        elif org is None:
+            print(f"ao switch-over check: no answers written, the org cannot be read: {org_error}", file=sys.stderr)
+        else:
+            from sessionorc import settings as settings_mod
+
+            made, _ = switchover.host_logins(host, profs)
+            doc = switchover.suggest(
+                org,
+                host,
+                made,
+                hosts.local_host().repos(),
+                default=default,
+                schedules=settings_mod.teams(settings_mod.load()),
+            )
+            try:
+                wrote = switchover.write_answers(doc)
+            except OSError as e:
+                print(f"ao switch-over check: {at} cannot be written: {e}", file=sys.stderr)
+                return 1
+            print(f"{'wrote' if wrote else 'left as it is'} {at}", file=sys.stderr)
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
     plans, builtins, director = None, None, None
-    try:
-        org, notes = _org_notes("ao switch-over check")
-    except (ValueError, OSError, yaml.YAMLError) as e:  # a node, or an org file that cannot be read
-        blockers.append(switchover.Blocker("the org", str(e), "mend org.yml, or run the check on the home"))
+    if org is None:
+        blockers.append(switchover.Blocker("the org", str(org_error), "mend org.yml, or run the check on the home"))
     else:
-        for note in notes:
-            print(note, file=sys.stderr)
         plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos())
         builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
         blockers += more + sets
@@ -6847,6 +6876,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("switch-over", help="the one-time move from profiles and members to logins and flows (§4.9e)")
     so_sub = p.add_subparsers(dest="switch_action", required=True)
     q = so_sub.add_parser("check", help="print what the move would make and what stands in its way; changes nothing")
+    q.add_argument(
+        "--answers", action="store_true", help="first write the answers file where there is none, with what it suggests"
+    )
     q.set_defaults(fn=cmd_switch_over_check)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")

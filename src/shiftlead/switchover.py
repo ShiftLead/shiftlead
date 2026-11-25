@@ -21,8 +21,10 @@ Where the org has a director, `director` reads the answers' `director:`, suggest
 prompts model, and the login made from the profile it launches on today), and blocks on §4.9e *Blockers*' director
 cases: no entry, an empty list, a login the home would not have, a model no login in its list offers.
 It blocks too on a director list whose every login leaves its prompts on: its `unattended_args` lack the adapter's
-`skip_args` (§4.9d *How each one runs*). The work in flight, a container node's logins, writing the
-answers file (`--answers`) and `--host` are later slices of TD-2071.
+`skip_args` (§4.9d *How each one runs*).
+`suggest` and `write_answers` are `--answers`: the answers file written where there is none, with what §4.9e *The
+answers file* says the home can suggest. The seats a picked flow lacks, the open asks to a first-shape member or seat,
+the work in flight, a container node's logins and `--host` are later slices of TD-2071.
 """
 
 from __future__ import annotations
@@ -796,3 +798,129 @@ def report(
     if not blockers:
         lines.append("no blockers")
     return lines
+
+
+# What `--answers` suggests (§4.9e *The answers file*): `td` becomes `design-wise` (TD-2075); every other flow keeps
+# its name, where a format-3 flow of that name is offered.
+RENAMED = {"td": "design-wise"}
+
+
+def _profiles_ran_on(org: Any, team: Any, here: str, default: str | None) -> list[str]:
+    """The profiles `team`'s members and seats run on today, the members' first: the start's own reading
+    (`teams.plan`, the role's precedence), else, where the start cannot be read here (a checkout this host lacks),
+    an approximation: each line's own `profile`, then the profiles file's default, a role's `profile:` not read."""
+    from shiftlead import teams as teamsmod
+
+    try:
+        p = teamsmod.plan(org, team.name, here)
+    except Exception:  # noqa: BLE001 — a team the start would refuse is still suggested from its own lines
+        lines = [*team.members, *([team.techlead] if team.techlead is not None else []), *team.seats]
+        got = [x.profile or default for x in lines]
+    else:
+        seats = [*([p.techlead] if p.techlead is not None else []), *p.seats]
+        got = [x.profile or default for x in (*p.members, *seats)]
+    return list(dict.fromkeys(g for g in got if g))
+
+
+def _build_role(team: Any) -> str:
+    """The role of the stage that builds in the flow the team runs today (the stage named `build`), else `grinder`.
+    A flow of the repo's own is not read here (no checkout is), so it too gives `grinder`."""
+    from shiftlead import flowdefs
+    from shiftlead import teams as teamsmod
+
+    name = teamsmod.current_flow(team)
+    try:
+        flow = flowdefs.find(name) if name else None
+    except Exception:  # noqa: BLE001 — a flow that cannot be read names no build stage
+        flow = None
+    stage = next((s for s in (flow.stages if flow is not None else ()) if s.name.lower() == "build"), None)
+    return stage.role if stage is not None else "grinder"
+
+
+def suggest(
+    org: Any,
+    here: str,
+    made: Iterable[Login],
+    roots: Iterable[str | Path],
+    *,
+    default: str | None,
+    schedules: Mapping[str, Mapping[str, Any]] | None = None,
+    offered: Callable[[str], list[Mapping[str, Any]]] | None = None,
+    ran_on: Callable[[Any], list[str]] | None = None,
+) -> dict[str, Any]:
+    """The answers file `--answers` writes where there is none (§4.9e *The answers file*): each folder named for its
+    first profile; each team the format-3 flow of the name its flow has today (`design-wise` for `td`), the logins
+    made from the profiles its members and seats run on, the members' first, `at_once` for the stage that takes
+    ready-to-build entries the sum of today's builder lines' sizes, and a `schedule_login` where its schedule names a
+    profile; the set the package's models and the first home team's logins; the director, where `org` has one, the
+    package's prompts model and the login made from its profile. A team on a node is given no logins: its host's are
+    not read here. `schedules` is `settings.teams`' reading; `offered` and `ran_on` stand in for the home's readings."""
+    from shiftlead import flow3, team_show
+    from shiftlead import teams as teamsmod
+
+    made = list(made)
+    where_roots = list(roots)
+    offered = offered or (lambda repo: team_show.offered(repo, where_roots))
+    schedules = schedules or {}
+
+    def login_of(profile: str | None) -> str | None:
+        return next((lg.key for lg in made if profile is not None and profile in lg.profiles), None)
+
+    doc: dict[str, Any] = {"hosts": {here: {"logins": {lg.found: {"name": lg.name} for lg in made}}}, "teams": {}}
+    first: list[str] | None = None
+    for name, team in org.teams.items():
+        if name in getattr(org, "unlanded", {}):
+            continue
+        pick: dict[str, Any] = {}
+        today = teamsmod.current_flow(team)
+        want = RENAMED.get(today or "", today)
+        row = next((r for r in offered(team.repo) if want and r["name"] == want), None)
+        if row is not None:
+            pick["flow"] = want
+        on_home = not team.host or team.host == here
+        listed: list[str] = []
+        if on_home:
+            profs = ran_on(team) if ran_on is not None else _profiles_ran_on(org, team, here, default)
+            listed = list(dict.fromkeys(lk for p in profs if (lk := login_of(p)) is not None))
+            if first is None:
+                first = listed
+        pick["logins"] = listed
+        builds = _build_role(team)
+        builders = sum(m.size if m.size is not None else m.count for m in team.members if m.role == builds)
+        stages = row["doc"].get("stages") if row is not None and isinstance(row.get("doc"), Mapping) else None
+        # the stage that takes ready-to-build entries: `takes: other`, else `any` (§4.9d)
+        staged = [s for s in stages or () if isinstance(s, Mapping)]
+        takes = next((s for want_ in ("other", "any") for s in staged if s.get("takes") == want_), None)
+        if takes is not None and builders >= 1:
+            pick["at_once"] = {flow3.key_of(takes.get("name")): builders}
+        profile = _under(schedules, name, "schedule").get("profile")
+        if isinstance(profile, str) and (lk := login_of(profile)) is not None:
+            pick["schedule_login"] = lk
+        doc["teams"][name] = pick
+    seats = [k for k in builtinstore.SEAT_KEYS if not (org.director is not None and k == builtinstore.PROMPTS)]
+    doc["builtins"] = {
+        "default": {"models": {k: builtinstore.model({}, k) for k in seats}, "logins": list(first or [])}
+    }
+    if org.director is not None:
+        lk = login_of(org.director.profile or default)
+        doc["director"] = {"model": builtinstore.model({}, builtinstore.PROMPTS), "logins": [lk] if lk else []}
+    return doc
+
+
+def write_answers(doc: Mapping[str, Any], path: Path | None = None) -> bool:
+    """Write `doc` as the answers file where there is none; False, and nothing written, where there is one (a
+    dangling link included). The file is linked into place, so one written meanwhile is never replaced."""
+    path = path or answers_file()
+    if path.exists() or path.is_symlink():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    head = "# written by ao switch-over check --answers (design §4.9e The answers file): read it, change it, check\n"
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(head + yaml.safe_dump(dict(doc), sort_keys=False, allow_unicode=True), encoding="utf-8")
+        os.link(tmp, path)
+    except FileExistsError:
+        return False
+    finally:
+        tmp.unlink(missing_ok=True)
+    return True
