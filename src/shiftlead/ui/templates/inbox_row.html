@@ -652,6 +652,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {#- an `ask --lift` whose entry waits on open work (TD-1926, built by TD-1950): grey, its answers withheld -#}
 {%- set then = e.then_yours if whole and e.want == 'answered' else none %}
 {%- if not whole %}{{ answers(e) }}{% endif %}
+{%- if e.early and e.early_line and not then and section != 'snoozed' %}{{ early_says(e.early_line, whole) }}{% endif %}
 {%- if then %}{{ then_line(then, e.then_repo) }}{{ bar('', open_focus(e.from_open, e.from_name)) }}{% else %}
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · no bound — it waits until you answer it</span>{% endif %}
@@ -1265,6 +1266,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endfor %}
 </div>
 {%- endif %}
+{%- if e.early and e.early_line and not (e.then_yours or waits or e.decided) %}{{ early_says(e.early_line, whole) }}{% endif %}
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
 {%- if whole %}
@@ -1713,6 +1715,14 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
     session* tint, the item's only status sentence; `repo` the member's own, whose ids it draws bare -#}
 {% macro then_line(ids, repo) -%}
 <div class="qpress qp-idle qthen" role="status">{{ asked_once_words(ids, repo) }}.</div>
+{%- endmacro %}
+
+{#- *asked early* (§4.4 *A question whose entry only waits is asked early*, §4.5 screen 12 *A question asked early is no
+    want while its entry waits*; TD-2172, built by TD-2184): a line covering only early entries, or an `ask --lift` on
+    one — on a card its press line above its whole bar, elsewhere a line under its words -#}
+{% macro early_says(line, whole) -%}
+{%- if whole %}<div class="qpress qp-idle qearly" role="status">Asked early: your answer acts {{ line }}.</div>
+{%- else %}<div class="st qearly">Asked early: your answer acts {{ line }}</div>{% endif %}
 {%- endmacro %}
 
 {% macro press_line(e, app, ans) -%}

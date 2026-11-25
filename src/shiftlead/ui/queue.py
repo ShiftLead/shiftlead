@@ -101,6 +101,40 @@ def line_then_yours(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any
     return sorted(work, key=lambda w: _key_sort(work[w], w)) or None
 
 
+def line_early(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | None) -> str | None:
+    """An open, undecided `decide` line all of whose covered `decision (paul)` members are asked early (§4.4 *A
+    question whose entry only waits is asked early*, TD-2172): the first such member's `early_line` in key order, so
+    the line is drawn early in their place, its question whole and counted nowhere. None where any covered member has
+    the fact (`line_then_yours` reads it first) or none is early — a member asked as any makes the line a need."""
+    if e.get("row") != "board" or str(e.get("kind") or "").lower() != "decide" or e.get("decided") or not entries:
+        return None
+    members = [
+        q
+        for q in covered(e, entries)
+        if isinstance(entries.get(q), Mapping) and ledger_mod.decided_by(dict(entries[q]), PERSON)
+    ]
+    if not members or any((entries[q].get("open_work") or not entries[q].get("early_line")) for q in members):
+        return None
+    first = min(members, key=lambda q: _key_sort(str(entries[q].get("key") or ""), q))
+    return str(entries[first]["early_line"])
+
+
+def mail_early(
+    e: Mapping[str, Any], askers: Mapping[str, str] | None, entries: Mapping[str, Mapping[str, Any]] | None
+) -> str | None:
+    """An open `ask --lift` to the person whose entry (read as `mail_then_yours` reads it) is asked early (§4.4 *A
+    question whose entry only waits is asked early*, TD-2172): that entry's `early_line`, so the item is drawn whole
+    with it. None for any other item."""
+    if e.get("row") or e.get("kind") != "ask" or e.get("orphaned") or not e.get("lift") or not entries:
+        return None
+    if any(e.get(k) for k in ("closed_by", "closed_at", "closed_reason", "expired_at", "outcome", "owes")):
+        return None
+    repo = str(e.get("repo") or "").strip() or (askers or {}).get(str(e.get("id") or ""))
+    ref = first_ref(e.get("about"), f"{e.get('subject') or ''} {e.get('text') or ''}", repo)
+    x = (entries.get(ref) or {}) if ref else {}
+    return str(x["early_line"]) if x.get("early_line") and not x.get("open_work") else None
+
+
 def item_home(
     e: Mapping[str, Any],
     index: Mapping[str, tuple[str, str]] | None,
@@ -109,13 +143,16 @@ def item_home(
     entries: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """`_item_home`, and on an open undecided `decide` line covering a member with counted open work its
-    `then_yours` (`line_then_yours`, TD-1926)."""
+    `then_yours` (`line_then_yours`, TD-1926), or, on one covering only members asked early, or on an `ask --lift`
+    about one, its `early` mark and `early_line` (`line_early`, `mail_early`, TD-2172)."""
     home = _item_home(e, index, askers, needs, entries)
     if then := line_then_yours(e, entries):
         home = {**home, "then_yours": then}
     elif got := mail_then_yours(e, askers, entries):
         # its ids are bared in the entry's own repo, as the entry's row bares them (`asked_once_words`)
         home = {**home, "then_yours": got[1], "then_repo": got[0]}
+    elif early := line_early(e, entries) or mail_early(e, askers, entries):
+        home = {**home, "early": True, "early_line": early}
     return home
 
 
@@ -771,7 +808,7 @@ def answered_case(e: Mapping[str, Any]) -> str:
         # *waiting, then yours* (TD-1926): after every other case, so a row with an earlier word keeps it
         if e.get("then_yours"):
             return "then_yours"
-        return "early" if e.get("early") and e.get("row") == "ledger" else ""
+        return "early" if e.get("early") else ""
     if a.get("until"):
         return "until"
     return "handed" if a.get("kind") == "handed" else "waiting"
@@ -870,16 +907,26 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
 def asked_once(mine: Iterable[str], card: Mapping[str, Any] | None) -> list[str]:
     """*waits on me* as a Start session's prompt says it (§4.4 *The card's status*, TD-1926): an entry whose row
     reads *waiting, then yours* ends *— asked once TD-n closes*, TD-n its first counted id alone, so the session
-    reads that it waits; every other id as given."""
+    reads that it waits; one asked early ends *— asked early; it acts once TD-n closes*, its row's `early_line`
+    (TD-2172); every other id as given."""
     rows = [(card or {}).get("top"), *((card or {}).get("rows") or ())]
     then = {str(r["qid"]): r["then_yours"] for r in rows if isinstance(r, Mapping) and r.get("then_yours")}
     # a held build ends *— asked on TD-<design>'s question* (TD-2026)
     held = {str(r["qid"]): str(r["held_by"]) for r in rows if isinstance(r, Mapping) and r.get("held_by")}
+    # one asked early ends *— asked early; it acts once TD-n closes* (§4.4 *A question whose entry only waits is
+    # asked early*, TD-2172)
+    early = {
+        str(r["qid"]): str(r.get("early_line") or "")
+        for r in rows
+        if isinstance(r, Mapping) and r.get("early") and r.get("early_line")
+    }
     return [
         f"{m} — asked on {held[m].rpartition('#')[2]}'s question"
         if m in held
         else f"{m} — asked once {then[m][0]} closes"
         if m in then
+        else f"{m} — asked early; it acts {early[m]}"
+        if m in early
         else m
         for m in mine
     ]
@@ -961,9 +1008,10 @@ def attach(
             # *waiting, then yours* (§4.5 screen 12 *A press is never left stranded*, TD-1926): a held entry, a line
             # covering one, or an `ask --lift` on one, whose question waits on open work — grey, never a Decide item
             return "answered", "", None
-        if e.get("row") == "ledger" and e.get("early") and want in WANTS:
-            # *asked early* (§4.5 screen 12 *A question asked early is no want while its entry waits*, TD-2172): in
-            # the grey section, counted on no pill, its whole Decide bar drawn (`answered_case` `early`)
+        if e.get("early") and want in WANTS:
+            # *asked early* (§4.5 screen 12 *A question asked early is no want while its entry waits*, TD-2172): an
+            # entry, a line covering only such entries, or an `ask --lift` on one — in the grey section, counted on
+            # no pill, its whole Decide bar drawn (`answered_case` `early`)
             return "answered", "", None
         return want, kind, None
 
@@ -1055,6 +1103,8 @@ def attach(
                 # an *answered — waiting on <asker>* item counts where no other session holds its entry (TD-1843,
                 # TD-1984): its button is drawn beside a holder, its count is not
                 **({"starts": True} if waiting and go and not go.get("held") else {}),
+                # *asked early* (TD-2172): a Waiting card holding one draws its edge amber (`card_edge`)
+                **({"early": True} if want == "answered" and answered_case(e) == "early" else {}),
                 "on_row": e["on_row"],
                 # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
                 **({"design_pr": e["design_pr"]} if e.get("design_pr") else {}),
@@ -1119,6 +1169,8 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
         "decide": len(out["decide"]),
         "do": len(out["do"]),
         "read": sum(len(v) for v in out["read"].values()),
+        # the items asked early (TD-2172), on no pill: a Waiting card's edge reads them (`card_edge`)
+        "early": sum(1 for m in out["answered"] if m.get("early")),
     }
     return out
 
@@ -1454,10 +1506,11 @@ def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
 
 def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
     """A card's 4 px left edge (§4.5 screen 12 *A card*, TD-915), in this order: `needs` (amber) for any Decide or
-    Do item — or a *needs you* status, the same need read from the ledger — else `waiting` (teal) on a Waiting
-    card, else `working` (green) In progress, else `ended` (grey)."""
+    Do item — or a *needs you* status, the same need read from the ledger — or a Waiting card holding an item asked
+    early, which the person is in (§4.5 screen 12 *A question asked early is no want while its entry waits*,
+    TD-2172), else `waiting` (teal) on a Waiting card, else `working` (green) In progress, else `ended` (grey)."""
     n = wants.get("n") or {}
-    if n.get("decide") or n.get("do") or status == "needs you":
+    if n.get("decide") or n.get("do") or status == "needs you" or (group == "waiting" and n.get("early")):
         return "needs"
     return {"waiting": "waiting", "in_progress": "working"}.get(group, "ended")
 

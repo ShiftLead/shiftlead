@@ -1359,6 +1359,10 @@ a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
 .qpress { margin: 6px 0 2px; padding: 6px 10px; border-left: 3px solid var(--idle); background: var(--idle-bg); color: var(--idle-fg); font-size: var(--t-small); border-radius: 0 4px 4px 0; white-space: normal; }
 .qpress.qp-needs { border-left-color: var(--needs); background: var(--needs-bg); color: var(--needs-fg); }
 .qpress.qp-stalled { border-left-color: var(--stalled); background: var(--stalled-bg); color: var(--stalled-fg); }
+/* *asked early* (§4.5 screen 12 *A question asked early is no want while its entry waits*, TD-2172): its own left
+   edge amber on a Waiting card (it asks, and may be answered now), grey on any other */
+.qpress.qearly { border-left-color: var(--muted); }
+.qcard.g-waiting .qpress.qearly { border-left-color: var(--needs); }
 .qabar > .qanswers:not([hidden]) { display: contents; }
 .qabar .qrule { align-self: stretch; border-left: 1px solid var(--line); }
 .qabar .qrule:first-child { display: none; }
