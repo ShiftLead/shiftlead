@@ -9,7 +9,8 @@ This module is pure, as `stage_acts` is: `choose` names the one act a pass takes
 `rested` and `finished` are the record each writes. It reads nothing and writes nothing; starting the session, writing
 the record and telling the person are later slices of TD-2053. An audit with no run record yet (its team's first start,
 or an audit just added) is due at once, so its first run sets the commit its count runs from. A run's lease is its
-holder's claim on `lease_ref`, renewed by claiming again and read as lapsed as an entry's claim is (§4.9c, act 5).
+holder's claim on `lease_ref`, renewed by claiming again (§4.9c, act 5) and read as lapsed as an entry's claim
+is (act 4).
 
 A run lost or silent is offered again once, as an entry's holder is (act 4); lost again, the audit **rests**: the run
 ends as `lost`, its clock runs afresh from the second loss (so a `merged-pull-requests` count already past its number
