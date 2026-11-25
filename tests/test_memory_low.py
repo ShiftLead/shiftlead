@@ -560,3 +560,39 @@ async def test_a_walk_returning_past_its_bound_is_not_applied(agent, monkeypatch
     assert "ram" not in diskbook.memory_state(os.environ["SHIFTLEAD_HOME"]), "no low written from a late result"
     await agent._memory_pass()  # the next reading sees the half still turning and the walk done: a fresh walk
     await agent._walk_task
+
+
+@pytest.mark.integration
+async def test_a_half_that_turned_during_a_walk_is_walked_for_as_it_returns(agent, monkeypatch):
+    """TD-2152: a walk in flight for ram, swap turns before it returns; the walk's own return starts the next walk for
+    swap, with no further reading and no wait for `LEFT_EVERY`, and swap is written low with its holders."""
+    level = {"halves": {"ram": 0.05, "swap": 0.9}}
+    release = threading.Event()
+    walks: list[int] = []
+
+    def walk(*_a, **_k):
+        walks.append(1)
+        if len(walks) == 1:
+            release.wait(10)
+        return {"ram": HOLDERS, "swap": HOLDERS[:1], "cut": False}
+
+    monkeypatch.setattr(memory, "read_halves", lambda *a, **k: level["halves"])
+    monkeypatch.setattr(memory, "read_holders", walk)
+    try:
+        await agent._memory_pass()
+        await agent._memory_pass()  # ram turns: the first walk starts, for ram alone
+        first = agent._walk_task
+        assert first is not None and agent._walk_for == {"ram"}
+        level["halves"] = {"ram": 0.05, "swap": 0.05}
+        await agent._memory_pass()
+        await agent._memory_pass()  # swap turns while the walk runs: no second walk overlaps it
+        assert len(walks) == 1 and "swap" in agent._memory_watch.turning
+    finally:
+        release.set()
+    await first
+    second = agent._walk_task
+    assert second is not first, "the first walk's return started the next, for the half that turned during it"
+    await second
+    got = diskbook.memory_state(os.environ["SHIFTLEAD_HOME"])
+    assert len(walks) == 2 and got["swap"]["low"] is True and got["swap"]["holders"] == HOLDERS[:1]
+    assert got["ram"]["low"] is True
