@@ -577,6 +577,7 @@ class TickMixin:
         await self._setup_notes()
         await self._version_notes()  # the home's alone (§4.3, TD-1727)
         await self._team_stop_times(snapshot_at)
+        await self._team_stop_marks(snapshot_at)  # after the cut-over the stop time clears the mark (TD-2065)
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
@@ -890,6 +891,40 @@ class TickMixin:
                     log.warning("%s: the team's stop time did not reach %s: %s", s.id, s.host, e)
         if changed:
             await self._push_changes()
+
+    async def _team_stop_marks(self, now: datetime) -> None:
+        """Design §6 *Team stop time*, *After the cut-over* (§4.9d *Started is a mark the home keeps*, TD-2065): at a
+        switched team's stop time the home clears its started mark and writes `stopped: {at: <the instant>, by:
+        until}` beside it, so it starts nothing more for the team until a Start. Only a mark set before the instant is
+        cleared (`teamstore.stop_time_due`): one that passes on a team that is not started writes nothing, and a Start
+        after it is not stopped by it again. **At the home**, whose record it is; a team that is not switched, and any
+        team before the cut-over, is the first shape's (`_team_stop_times`)."""
+        if self.mode != "home":
+            return
+        try:
+            doc = settings_mod.load()
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' settings for a stop time failed")
+            return
+        if not teamstore.cut_over(doc):
+            return
+        marks = self._host_rec.get("teams")
+        stopped: list[str] = []
+        for team, conf in settings_mod.teams(doc).items():
+            until = conf.get("until")
+            if not until or not teamstore.switched(doc, team) or not teamstore.stop_time_due(marks, team, until, now):
+                continue
+            if teamstore.mark_stopped(self._host_rec.setdefault("teams", {}), team, "until", str(until)):
+                stopped.append(team)
+        if not stopped:
+            return
+        for team in stopped:
+            log.info("team %s reached its stop time: its started mark is cleared", team)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        await self._push_changes()
 
     async def _carry_controllers(self) -> None:
         """The node half of a rename's carry (design §4.9 *A member renamed or removed in the definition*,

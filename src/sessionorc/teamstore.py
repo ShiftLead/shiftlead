@@ -243,6 +243,24 @@ def mark_stopped(host_teams: dict[str, Any], team: str, by: str, at: str) -> boo
     return True
 
 
+def stop_time_due(host_teams: Mapping[str, Any] | None, team: str, until: Any, now: datetime) -> bool:
+    """Whether the team's stop time clears its started mark now (§6 *Team stop time*, *After the cut-over*): the
+    instant has passed and the mark was set before it. A stop time is one instant and spent once passed, so a Start
+    after it (the mark's `since` at or past the instant) is not stopped by it again, and a team that is not started
+    has nothing to clear. An instant or a `since` that does not parse clears nothing."""
+    rec = (host_teams or {}).get(team)
+    mark = rec.get("started") if isinstance(rec, Mapping) else None
+    if not isinstance(mark, Mapping):
+        return False
+    try:
+        inst = datetime.fromisoformat(str(until))
+        since = datetime.fromisoformat(str(mark.get("since")))
+    except (TypeError, ValueError):
+        return False
+    inst, since = (t if t.tzinfo else t.replace(tzinfo=UTC) for t in (inst, since))
+    return since < inst <= now
+
+
 def rekey(doc: dict[str, Any], flow: str, renames: Mapping[str, str]) -> list[str]:
     """Each switched team on `flow` with its `at_once` keys renamed, in place (§4.9c *A switch or a rename re-keys the
     records*): the teams changed. Renames are applied at once, so a swap of two names holds, and a renamed stage's
