@@ -378,6 +378,7 @@ def test_a_runs_spend_is_the_reading_less_its_offers_apart_by_unit():
         {"opus": _m(5, {"$": 0.6}, input=30)},  # the offer's unit is gone: a day's unit changed after it
         {"sonnet": _m(5, {"≈$": 0.6}, input=30)},  # the offer's model is gone
         None,  # no reading
+        {"opus": _m(5, {"≈$": "lots"}, input=30)},  # a value that is no number
     ],
 )
 def test_a_difference_below_zero_or_a_missing_model_or_unit_is_null(now):

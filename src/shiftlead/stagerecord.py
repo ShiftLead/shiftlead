@@ -440,6 +440,13 @@ def spend_since(now: Any, before: Any) -> dict[str, Any] | None:
     """`run.models` (§4.9c): per model `now` less `before`, each a reading of `seats.record_reading`'s `models`, each
     figure apart by unit and rounded to 4 places. None where either is not a reading, where a model, field or unit of
     `before` is absent from `now`, or where any difference is below zero: the run's spend unknown, never guessed."""
+    try:
+        return _since(now, before)
+    except (TypeError, ValueError):  # a stored value edited by hand into no number: unknown, never a failed end
+        return None
+
+
+def _since(now: Any, before: Any) -> dict[str, Any] | None:
     if not isinstance(now, Mapping) or not isinstance(before, Mapping):
         return None
     if any(name not in now for name in before):
