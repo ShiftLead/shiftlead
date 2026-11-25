@@ -247,6 +247,8 @@ def test_no_answers_file_a_bad_one_and_one_not_a_mapping_each_block(tmp_path):
     assert "not a mapping" in switchover.read_answers(tmp_path / "list.yml")[1][0].what
     (tmp_path / "teams.yml").write_text("teams: [a]\n")
     assert "teams" in switchover.read_answers(tmp_path / "teams.yml")[1][0].what
+    (tmp_path / "director.yml").write_text("director: [a]\n")
+    assert "director must each be a mapping" in switchover.read_answers(tmp_path / "director.yml")[1][0].what
     (tmp_path / "ok.yml").write_text("")
     assert switchover.read_answers(tmp_path / "ok.yml") == ({}, [])
 
@@ -318,6 +320,7 @@ def test_with_no_answers_file_a_team_is_listed_and_blocks_nothing_of_its_own():
         ({"teams": {}}, "has no flow in the answers"),
         (pick(logins=[]), "its login list is empty"),
         (pick(logins="claude-code:paul"), "not a list of <tool>:<name>"),
+        (pick(logins=["claude-code"]), "not a list of <tool>:<name>"),
         (pick(logins=["claude-code:gone"]), "lists claude-code:gone, a login h would not have"),
         (pick(flow="nope"), "its flow nope is no format-3 flow it could be given"),
         (pick(at_once={"build": 0}), "at_once is not whole numbers"),
