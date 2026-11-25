@@ -2,7 +2,8 @@
 
 An audit is no stage and takes no entry. Its file on the state branch (`StageStore.audit`, `audits/<team>/<name>.json`)
 carries its last run: `started_at`, the `holder` whose claim is the run's lease, the `base` commit that was the default
-branch's head when it started, `offers`, and `ended` (`{outcome, reason, at}`) once the run is over.
+branch's head when it started, `offers`, and `ended` (`{outcome, reason, at}`) once the run is over: its session's
+outcome, one of `OUTCOMES`, or `lost` for a run rested at its second loss.
 
 This module is pure, as `stage_acts` is: `choose` names the one act a pass takes on an audit, and `started`, `again`,
 `rested` and `finished` are the record each writes. It reads nothing and writes nothing; starting the session, writing
@@ -97,7 +98,7 @@ def choose(run: Mapping[str, Any] | None, every: Clock | None, s: AuditReading, 
     if run is None or every is None:
         return None  # an audit's first run, and one whose clock cannot be read, are not chosen here
     if run.get("holder"):
-        h = s.holder
+        h = s.holder  # None: the holder was not read, so the run waits for a pass that reads it
         if h is None or not s.may_start or not (h.lost or h.silent or h.ended_by_stop):
             return None
         if h.ended_by_stop:
@@ -105,7 +106,7 @@ def choose(run: Mapping[str, Any] | None, every: Clock | None, s: AuditReading, 
         if int(run.get("offers") or 0) >= SECOND_LOSS:
             return AuditAct("rest", "lost" if h.lost else "silent")
         return AuditAct("offer-again", "lost" if h.lost else "silent")
-    if s.may_start and due(run, every, s, now):
+    if not holds_lease(run, s) and s.may_start and due(run, every, s, now):
         return AuditAct("start")
     return None
 

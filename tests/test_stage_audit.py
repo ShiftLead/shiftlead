@@ -98,6 +98,31 @@ def test_a_lost_or_silent_run_is_offered_again(holder: Holder, want: AuditAct | 
     assert choose(run(), Clock(6, "hours"), AuditReading(holder=holder, **GO), NOW) == want
 
 
+@pytest.mark.parametrize(
+    ("holder", "want"),
+    [
+        (Holder(idle_for=SILENT_AFTER), AuditAct("rest", "silent")),
+        (Holder(ended=True, stopped=True), AuditAct("offer-again", "stopped", counted=False)),
+        (Holder(held=True, ended=True), None),
+        (Holder(person=True, ended=True), None),
+    ],
+)
+def test_at_a_second_offer(holder: Holder, want: AuditAct | None) -> None:
+    assert choose(run(offers=2), Clock(6, "hours"), AuditReading(holder=holder, **GO), NOW) == want
+    assert choose(run(offers=2), Clock(6, "hours"), AuditReading(holder=holder), NOW) is None
+
+
+def test_an_empty_holder_is_no_holder() -> None:
+    r = run(holder="")
+    assert not holds_lease(r, AuditReading())
+    assert choose(r, Clock(6, "hours"), AuditReading(**GO), NOW) == AuditAct("start")
+
+
+def test_again_on_a_record_with_no_offers() -> None:
+    r = {k: v for k, v in run().items() if k != "offers"}
+    assert again(r, "audit-docs-2", AuditAct("offer-again", "lost"))["offers"] == 1
+
+
 def test_offer_again_waits_while_the_team_may_not_start() -> None:
     assert choose(run(), Clock(6, "hours"), AuditReading(holder=Holder(ended=True)), NOW) is None
 
