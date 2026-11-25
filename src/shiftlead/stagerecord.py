@@ -330,7 +330,8 @@ class StageStore:
 
     def _copies(self, tip: str | None, tid: str) -> list[str]:
         self._entry_path(tid)  # an id that is not TD-n is refused here too
-        return [p for p in self._list(tip, CLOSED) if (m := _COPY.fullmatch(p)) and m["id"] == tid]
+        found = [(m["day"], int(m["n"] or 1), p) for p in self._list(tip, CLOSED) if (m := _COPY.fullmatch(p))]
+        return [p for _day, _n, p in sorted(found) if _COPY.fullmatch(p)["id"] == tid]  # a day's first, then its -2
 
     def copy_closed(self, tid: str, tip: str | None = None) -> dict[str, str]:
         """The change that copies the entry's closed record, its bytes unchanged, to its next free name: for a write

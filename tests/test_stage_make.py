@@ -91,6 +91,15 @@ def test_a_renumber_renames_its_copies_and_rewrites_their_id_in_the_same_commit(
     assert store.closed(TID) == []
 
 
+def test_a_renumber_keeps_a_days_copies_in_their_order(store):
+    for name, at in (("", "2026-10-01T01:00:00Z"), ("-2", "2026-10-01T02:00:00Z")):
+        store.write({f"closed/{TID}@2026-10-01{name}.json": json.dumps({"id": TID, "closed_at": at})}, "a copy")
+    put(store)
+    assert act_on(store, Reading(renumbered_to="TD-9")).made
+    first = json.loads(store._read(store.tip(), "closed/TD-9@2026-10-01.json"))
+    assert first == {"id": "TD-9", "closed_at": "2026-10-01T01:00:00Z"}
+
+
 def test_a_renumber_onto_a_record_writes_nothing(store):
     put(store)
     store.put_entry(new_record("TD-9", "f", "build"), "there")
