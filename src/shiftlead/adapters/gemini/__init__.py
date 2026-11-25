@@ -308,7 +308,7 @@ class GeminiAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
             *("find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"),
-            *("new_home", "make_home", "env_signin"),
+            *("model_family", "new_home", "make_home", "env_signin"),
         }
     )
 

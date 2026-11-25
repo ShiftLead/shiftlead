@@ -536,12 +536,16 @@ def test_models_offers_the_plans_families_or_every_family_unconfirmed(name, tmp_
 @pytest.mark.parametrize("name", AGENTS)
 def test_each_family_is_read_from_the_models_names_it_covers(name):
     """The adapter's table maps a model's name to its family (§4.2b `models`, the switch-over's pin): every family is
-    some name's, and a name the table does not cover is none."""
-    ad = _declares(name, "models")
+    some name's, and a name the table does not cover is none. The adapter's own `model_family`, which the switch-over
+    reads, answers as its module's table does (TD-2177)."""
+    ad = _declares(name, "model_family")
+    assert "models" in adapters.implements(ad), "model_family reads the table that models offers"
     mod = sys.modules[type(ad).__module__]
     assert mod.model_family("no-such-model") is None and mod.model_family(None) is None
+    assert ad.model_family("no-such-model") is None
     for family, model in NAMED_MODELS[name]:
         assert mod.model_family(model) == family, model
+        assert ad.model_family(model) == family, model
     assert {f for f, _ in NAMED_MODELS[name]} == set(mod.FAMILIES)
 
 

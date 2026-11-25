@@ -635,7 +635,7 @@ class ClaudeCodeAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
             *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            *("models", "new_home", "make_home"),
+            *("models", "model_family", "new_home", "make_home"),
         }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
