@@ -3047,9 +3047,9 @@ teams:
   is, and unlike a lease **`--force` does not pass it**: the line is the person's, and a session
   cannot move it. Not refused: a claim on a reference the claimer already holds (a renewal, its
   branch's derived claim included), a claim on a pull request (a PR number as the reference:
-  reading or finishing one is what brings the count down), a claim on the one entry the
-  member's lane names (a stage's session, whose entry is already in a stage and carries on through
-  it while the home offers the team no new entry, §4.9d *Holds new work*), `done`, `dropped` and `restart`, and
+  reading or finishing one is what brings the count down), a claim on the one entry a
+  member's lane names when its lane is that entry alone (a stage's session is one: its entry is already
+  in a stage and carries on through it while the home offers the team no new entry, §4.9d *Holds new work*), `done`, `dropped` and `restart`, and
   any claim by an interactive session, a person's own included (§9 invariant 5: policies leave
   those alone). **A refused member is not out of work**: `ao progress none` is refused to it while
   the mark stands, in the same words, so a team over its line idles and never winds down on it. A
