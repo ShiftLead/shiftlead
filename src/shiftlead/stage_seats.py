@@ -294,8 +294,7 @@ _DIRECTOR = threading.Lock()
 def _director_in(graph: Mapping[str, Session]) -> bool:
     """Whether the pass's snapshot holds a director record (`teamrun.is_director`'s reading, on a `Session`)."""
     return any(
-        (s.seat or {}).get("trigger") == orgmod.DIRECTOR_TRIGGER
-        and not (s.team or s.builtin or s.superseded_by)
+        (s.seat or {}).get("trigger") == orgmod.DIRECTOR_TRIGGER and not (s.team or s.builtin or s.superseded_by)
         for s in graph.values()
     )
 
