@@ -860,6 +860,13 @@ def test_a_brief_that_cannot_be_read_leaves_the_offer_made_with_no_hash(store, e
     assert store.entry(TID)["flow_hash"] is None and versions(store) == []
 
 
+def test_a_brief_that_cannot_be_encoded_leaves_the_offer_made_with_no_hash(store):
+    lone = [{"stage": "build", "text": "\ud83d"}]  # a lone surrogate, which YAML's escapes can make
+    f = facts(may_start=True, within_size=True, flow_text=GOOD)
+    got = step(store, put(store, holder=None), f, _hashing(World(), lambda _doc: lone))
+    assert got.made.made and store.entry(TID)["flow_hash"] is None and versions(store) == []
+
+
 @pytest.mark.parametrize(("briefs", "text"), [(None, GOOD), (lambda _doc: BRIEFS, None)])
 def test_no_briefs_reader_or_no_flow_text_offers_with_no_hash(store, briefs, text):
     got = step(

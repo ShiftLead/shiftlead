@@ -117,11 +117,10 @@ def _version(f: EntryFacts, doc: Mapping[str, Any], reach: Reach) -> tuple[str, 
     if reach.briefs is None or f.flow_text is None:
         return None
     try:
-        briefs = reach.briefs(doc)
-    except Exception:  # noqa: BLE001 — the checkout's, a brief's or a decode's error: the offer goes on unhashed
+        return flow_version(f.flow_text, reach.briefs(doc))
+    except Exception:  # noqa: BLE001 — the checkout's, a brief's, a decode's or an encode's error: offered unhashed
         log.warning("%s: the flow's briefs could not be read for its hash; flow_hash is null", f.tid, exc_info=True)
         return None
-    return flow_version(f.flow_text, briefs)
 
 
 def offer_stage(record: Mapping[str, Any] | None, s: Reading, doc: Mapping[str, Any]) -> str | None:
