@@ -349,9 +349,9 @@ def test_settings_reads_its_files_off_the_loops_thread(tmp_path, monkeypatch):
 
     load = ui.profiles_mod.load
 
-    def recorded():
+    def recorded(**kw):
         where["files"] = threading.get_ident()
-        return load()
+        return load(**kw)
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui.profiles_mod, "load", recorded)

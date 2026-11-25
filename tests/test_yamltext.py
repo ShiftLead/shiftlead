@@ -79,6 +79,8 @@ def test_every_home_file_reader_reads_a_file_nested_too_deeply_as_a_bad_file(tmp
     with pytest.raises(logins.LoginError, match="YAMLError"):
         logins.load(tmp_path)
     with pytest.raises(yaml.YAMLError):
+        profiles.load(tmp_path / "profiles.yml", with_logins=False)
+    with pytest.raises(logins.LoginError, match="YAMLError"):  # a switched host's reader reads its logins too
         profiles.load(tmp_path / "profiles.yml")
     with pytest.raises(yaml.YAMLError):
         org.load(tmp_path / "org.yml")
