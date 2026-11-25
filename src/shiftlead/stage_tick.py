@@ -261,6 +261,11 @@ def run(
             log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
     except Exception:  # noqa: BLE001 — the prompts seat's record failing is a log line and never the teams' pass
         log.exception("the prompts seat record of %s could not be written", root)
+    try:  # the org's director, written while `org.yml` has `director:` and removed once it has not (§4.9d)
+        if done := stage_seats.write_director(call, org(), graph):
+            log.info("the stage pass of %s: %s", root, "; ".join(done))
+    except Exception:  # noqa: BLE001 — the director's record failing is a log line and never the teams' pass
+        log.exception("the director record could not be written in the stage pass of %s", root)
     if orders is None or pr_orders is None:
         return got
     try:

@@ -17,6 +17,10 @@ The prompts seat's record is the repo's too: `prompts-<repo>`, written where a t
 has no director, with `seat: {trigger: prompt}`, no `team` and the director seat's `permit`, on the same host. Its brief
 is the package's director brief with the Org block's place naming the repo instead: it answers that repo's prompts.
 
+The director's record is the org's: where `org.yml` has `director:` and no record holds the seat, the home writes it
+exactly as a first-shape Start does (`teamrun.write_director`), held for rule 3's `prompt` fill whatever teams are
+started; once the key is gone it removes the director's records, as Forget does, when no session of them is live.
+
 Launching a fill on the built-in set's model and login is TD-2068's; a record moved to a new host is a later slice of
 TD-2065.
 """
@@ -24,6 +28,7 @@ TD-2065.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable, Mapping
 from functools import partial
 from pathlib import Path
@@ -32,7 +37,7 @@ from typing import Any
 from sessionorc import brief as brief_mod
 from sessionorc.models import Session
 from shiftlead import org as orgmod
-from shiftlead import repoconfig, stage_start, teams
+from shiftlead import repoconfig, stage_start, teamrun, teams
 
 log = logging.getLogger(__name__)
 
@@ -280,6 +285,48 @@ def write_prompts(
         if got := _write(call, partial(prompts_launch, org, teamdef, host=host, here=local), PROMPTS, f"repo {repo}"):
             made.append(got)
     return made
+
+
+# the repos' passes run in threads of their own and the director is the org's: one of them reads and writes it at a time
+_DIRECTOR = threading.Lock()
+
+
+def _director_in(graph: Mapping[str, Session]) -> bool:
+    """Whether the pass's snapshot holds a director record (`teamrun.is_director`'s reading, on a `Session`)."""
+    return any(
+        (s.seat or {}).get("trigger") == orgmod.DIRECTOR_TRIGGER and not (s.team or s.builtin or s.superseded_by)
+        for s in graph.values()
+    )
+
+
+def write_director(
+    call: Callable[..., Any], org: orgmod.Org | None, graph: Mapping[str, Session] | None = None
+) -> list[str]:
+    """The org's director record after the cut-over (§4.9d *How each one runs*): where `org.yml` has `director:` and no
+    record holds the seat, written as a first-shape Start writes it (`teamrun.write_director`); where the key is gone,
+    each director record removed as Forget removes one, a live one kept until its session ends. Reads the home's
+    records afresh (`list`), never the pass's snapshot, so two repos' passes write one record. Returns what was done,
+    for the log; an org not read changes nothing. Where the pass's `graph` already reads as the key wants (a director
+    record while the key is there, none once it is gone), nothing is asked of the home."""
+    if org is None:
+        return []
+    wanted = getattr(org, "director", None) is not None
+    if graph is not None and _director_in(graph) == wanted:
+        return []
+    with _DIRECTOR:
+        if wanted:
+            return teamrun.write_director(call, org)
+        gone = []
+        for r in call("list") or ():
+            if not teamrun.is_director(r) or r.get("state") not in ("exited", "closed"):
+                continue
+            try:
+                call("remove", id=r["id"])
+            except Exception as e:  # noqa: BLE001 — one not removed is a log line and the next pass's to try again
+                log.warning("the director record %s could not be removed: %s", r.get("id"), e)
+                continue
+            gone.append(f"{r.get('name') or r['id']}: removed, the org has no director")
+        return gone
 
 
 def _first_started(

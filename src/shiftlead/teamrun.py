@@ -216,13 +216,7 @@ def write_director(call: Call, org: orgmod.Org, caller: str | None = None) -> li
     if params is None:
         return []
     try:
-        held = any(
-            isinstance(r.get("seat"), Mapping)
-            and r["seat"].get("trigger") == params["seat"]["trigger"]
-            and not r.get("superseded_by")
-            for r in call("list")
-        )
-        if held:
+        if any(is_director(r) for r in call("list")):  # a repo's prompts seat is on `prompt` too, and is not it
             return []
         if caller is not None:  # a session's start: the create's attenuation would refuse `permit` (§4.8)
             return [f"{params['name']}: {DIRECTOR_BY_PERSON}"]
