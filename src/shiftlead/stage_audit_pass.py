@@ -26,17 +26,18 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Collection, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from sessionorc import gitinfo
 from sessionorc.models import Session
-from shiftlead import flow3, stage_audit
+from shiftlead import flow3, stage_audit, stage_size
 from shiftlead.stage_audit import AuditAct, AuditReading
 from shiftlead.stage_make import Made
 from shiftlead.stage_read import holder_on
+from shiftlead.stage_size import Limits, Room
 from shiftlead.stagerecord import StageStore, StateError
 
 log = logging.getLogger(__name__)
@@ -62,7 +63,8 @@ class AuditReach:
 class AuditFacts:
     """What the pass read for a repo's audits: the time, the sessions by address of the nodes in `read_nodes` and
     `open_asks` those with an open ask of their own (`stage_pass.addressed`), the repo's started teams and each one's
-    flow in force (`docs`), and whether a session may start (`may_start`)."""
+    flow in force (`docs`), whether a session may start (`may_start`), and each team's numbers (`limits`, §4.9d
+    *Sessions at once*): a team named there starts an audit only while it has room under its limit."""
 
     now: datetime
     sessions: Mapping[str, Session] = field(default_factory=dict)
@@ -71,6 +73,7 @@ class AuditFacts:
     started: Collection[str] = ()
     docs: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     may_start: bool = False
+    limits: Mapping[str, Limits] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -213,8 +216,18 @@ def make(
         return Made(False, f"{act.name} is no audit's act")
 
 
-def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, reach: AuditReach) -> AuditStep:
-    """Take the audit's one act this pass, if it has one."""
+def step(
+    store: StageStore,
+    team: str,
+    audit: Mapping[str, Any],
+    f: AuditFacts,
+    reach: AuditReach,
+    room: Room | None = None,
+    *,
+    counted: bool = True,
+) -> AuditStep:
+    """Take the audit's one act this pass, if it has one. With `room`, a start waits while the team has no room under
+    its limit, and one made is taken from it; `counted` False: the team's room could not be counted, so none starts."""
     key = flow3.key_of(audit.get("name"))
     every = stage_audit.clock(audit.get("every"))
     try:
@@ -225,6 +238,8 @@ def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, 
     s = reading_on(team, key, run, every, f, reach)
     if s is None or every is None:
         return AuditStep(team, key, read=s is not None)
+    if not counted or room is not None:
+        s = replace(s, within_size=counted and room is not None and room.audit_fits())
     act = stage_audit.choose(run, every, s, f.now)
     if act is None:
         return AuditStep(team, key)
@@ -233,6 +248,8 @@ def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, 
     except Exception as e:  # noqa: BLE001 — one audit's failure must not stop the pass over the others
         log.exception("the audit act %s %s on %s/%s failed", act.name, act.case, team, key)
         return AuditStep(team, key, act=act, made=Made(False, f"the act failed: {e}"))
+    if room is not None and act.name == "start" and made.made:
+        room.take_audit()
     if not made.end:
         return AuditStep(team, key, act=act, made=made)
     try:
@@ -245,10 +262,24 @@ def step(store: StageStore, team: str, audit: Mapping[str, Any], f: AuditFacts, 
 
 def audit_pass(store: StageStore, f: AuditFacts, reach: AuditReach) -> tuple[AuditStep, ...]:
     """One pass over the audits of each started team, by team and then in its flow's order. A team not started runs
-    no audit, and its runs' records are left as they stand."""
+    no audit, and its runs' records are left as they stand. A team in `f.limits` has its room counted from the stage
+    records as they stand after the stage pass, so its stages have gone first; records that cannot be read start
+    none of its audits."""
+    records: Mapping[str, Mapping[str, Any]] | None = None
+    if f.limits:
+        try:
+            records = {k: r for k, r in store.entries().items() if isinstance(r, Mapping)}
+        except Exception:  # noqa: BLE001 — no count is no room, and never the pass's failure
+            log.exception("the stage records could not be read for the audits' room")
     steps = []
     for team in sorted(f.started):
-        for audit in (f.docs.get(team) or {}).get("audits") or []:
+        doc = f.docs.get(team) or {}
+        room, counted = None, True
+        if team in f.limits:
+            counted = records is not None
+            if counted:
+                room = stage_size.room(store, f.limits[team], records or {}, team, doc)
+        for audit in doc.get("audits") or []:
             if isinstance(audit, Mapping) and audit.get("name"):
-                steps.append(step(store, team, audit, f, reach))
+                steps.append(step(store, team, audit, f, reach, room, counted=counted))
     return tuple(steps)

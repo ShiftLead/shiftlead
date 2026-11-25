@@ -312,3 +312,61 @@ def test_the_tick_starts_a_started_teams_audit_on_its_host_through_the_launch(st
     assert launched == [(org, teamdef, "docs", "n2", head, None)]
     assert ("progress", {"id": "s-1@n2", "ref": LEASE, "status": "claimed"}) in calls
     assert store.audit("t", "docs")["holder"] == "s-1@n2"
+
+
+# -- the team limit (TD-2065, §4.9d *Sessions at once*) -------------------------------------------------------------
+
+
+def held_stage(store: StageStore, tid: str, team: str = "t") -> None:
+    store.put_entry({"id": tid, "team": team, "stage": "build", "holder": f"h-{tid}"}, "test")
+
+
+def two_audits() -> dict:
+    doc = flow("6 hours")
+    return {**doc, "audits": [*doc["audits"], {"name": "code", "model": "m", "every": "6 hours"}]}
+
+
+def test_an_audit_waits_while_the_stages_fill_the_team_limit(store):
+    held_stage(store, "TD-1")
+    w = World()
+    got = one(store, facts(limits={"t": stage_audit_pass.Limits({}, 1)}), w)
+    assert got.act is None and w.started == []
+    assert one(store, facts(limits={"t": stage_audit_pass.Limits({}, 2)}), w).made.made
+
+
+def test_the_audits_share_what_is_left_under_the_limit_and_another_teams_sessions_do_not_count(store):
+    held_stage(store, "TD-1")
+    held_stage(store, "TD-2", team="u")
+    w = World()
+    f = facts(docs={"t": two_audits()}, limits={"t": stage_audit_pass.Limits({}, 2)})
+    got = stage_audit_pass.audit_pass(store, f, w.reach())
+    assert [(s.audit, s.act.name if s.act else None) for s in got] == [("docs", "start"), ("code", None)]
+
+
+def test_a_team_with_no_limit_starts_every_audit_whatever_its_stages_hold(store):
+    held_stage(store, "TD-1")
+    w = World()
+    f = facts(docs={"t": two_audits()}, limits={"t": stage_audit_pass.Limits()})
+    assert [s.act.name for s in stage_audit_pass.audit_pass(store, f, w.reach())] == ["start", "start"]
+
+
+def test_stage_records_that_cannot_be_read_start_no_audit_of_a_team_with_numbers(store, monkeypatch):
+    def boom():
+        raise ValueError("bad json")
+
+    monkeypatch.setattr(store, "entries", boom)
+    w = World()
+    assert one(store, facts(limits={"t": stage_audit_pass.Limits()}), w).act is None
+    assert one(store, facts(), w).made.made
+
+
+def test_the_tick_hands_the_audits_each_started_teams_numbers(store, root, monkeypatch):
+    org = type("Org", (), {"teams": {"t": object(), "u": object()}})()
+    seen: list[AuditFacts] = []
+    monkeypatch.setattr(stage_tick.stage_start, "team_started", lambda _o, t: t == "t")
+    monkeypatch.setattr(stage_tick, "_docs", lambda _s, _f: {"t": flow()})
+    monkeypatch.setattr(stage_tick.stage_audit_pass, "audit_pass", lambda _s, f, _r: seen.append(f) or ())
+    teams = {"t": {"flow": "x", "most": 3, "at_once": {"build": 2}}, "u": {"flow": "x", "most": 1}}
+    read = SessionsRead({}, frozenset(), frozenset())
+    stage_tick._audits(store, root, "HEAD", teams, {"t": ("", ()), "u": ("", ())}, read, "here", None, lambda: org, NOW)
+    assert [f.limits for f in seen] == [{"t": stage_audit_pass.Limits({"build": 2}, 3)}]
