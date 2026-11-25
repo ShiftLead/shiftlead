@@ -29,6 +29,7 @@ NAME = "stage"
 FLOW = "flow"
 TEAM = "team"
 TICK = "stage_tick"
+JOB_PRS = "job_prs"
 STAGE_EVERY = 60.0  # seconds between two stage passes at the home (§4.9c *The home acts only where no session will*)
 STAGE_CALL_WAIT = ACT_TIMEOUT * 4  # a pass's call on the home's loop: a create waits on its pane
 # a job's work order (`workorders.PREFIX`, `PR_PREFIX`) or an audit run's lease, as its session holds it

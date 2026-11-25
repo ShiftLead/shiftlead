@@ -145,7 +145,9 @@ async def test_the_composed_merge_runs_in_order_and_drops_the_dir(agent, gh, mon
     e, d = _handed(tmp_path)
     monkeypatch.setattr(sync, "compose", _composer(gh))
     held = []
-    monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr: held.append(len(gh["calls"])) and False)
+    monkeypatch.setattr(
+        agent, "_sync_held_by", lambda root, pr, jobs=frozenset(): held.append(len(gh["calls"])) and False
+    )
     got = await agent._sync_merge(ROOT, _pr(), e)
     assert got["verdict"] == "merged" and "gate_dir" not in got and not d.exists()
     assert _names(gh) == ["compose", "head", "merge"]
@@ -265,7 +267,7 @@ async def test_every_exit_of_the_merge_removes_the_dir_and_writes_no_gate_dir(ag
         monkeypatch.setattr(agent, "_sync_on", lambda: {"samscrape": False})
     if road.startswith("held"):
         calls = iter([road == "held-before", True])
-        monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr: next(calls))
+        monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr, jobs=frozenset(): next(calls))
     got = await agent._sync_merge(ROOT, _pr(), e)
     assert not d.exists() and "merge" not in _names(gh)
     assert got is None or "gate_dir" not in got
