@@ -2941,7 +2941,8 @@ class TickMixin:
         if self.mode != "home":
             return
         try:
-            conf = settings_mod.teams(settings_mod.load())
+            doc = settings_mod.load()
+            conf = settings_mod.teams(doc)
         except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
             log.exception("reading the teams' settings for a schedule failed")
             return
@@ -2959,9 +2960,11 @@ class TickMixin:
                 # worked on a copy and written back only when the pass ends, so a surprise mid-way loses no reset
                 rec = copy.deepcopy(before)
                 rule = (conf.get(team) or {}).get("schedule")
-                # a rule naming a login (a switched team's, §4.9d) has no firing until TD-2065 builds it
-                # …and after the cut-over no first-shape rule replays a team (§4.9e)
-                if not rule or not rule.get("profile") or self._first_shape_off:
+                if rule and not rule.get("profile") and self._first_shape_off and teamstore.switched(doc, team):
+                    # a switched team's rule names a login and sets the started mark (§6 *Schedule*, TD-2065)
+                    self._schedule_switched(team, rule, rec, doc, now)
+                # after the cut-over no first-shape rule replays a team (§4.9e), and before it no login's rule fires
+                elif not rule or not rule.get("profile") or self._first_shape_off:
                     rec.pop("schedule_next", None)  # cleared: nothing upcoming; `schedule_fired` stays, a fact
                 else:
                     await self._schedule_team(team, rule, rec, by_team.get(team) or [], now)
@@ -2994,14 +2997,56 @@ class TickMixin:
         for w in self._gate_reading(rule["profile"]).get("windows") or []:
             if isinstance(w, dict) and w.get("label") == rule["window"]:
                 resets = _instant(w.get("resets")) or resets
+        due = self._schedule_due(team, which, resets, rec, now)
+        if due is None:
+            return
+        how = await self._schedule_start(team, records, now, _iso_of(due))
+        self._schedule_fired(which, rec, due, how)
+
+    def _schedule_switched(
+        self, team: str, rule: dict[str, Any], rec: dict[str, Any], doc: dict[str, Any], now: datetime
+    ) -> None:
+        """A switched team's schedule on one tick (§6 *Schedule*, *After the cut-over*; §4.9d *When it runs*,
+        TD-2065), in `_schedule_team`'s once-per-reset bookkeeping: the rule's login while it is in the team's list,
+        else the first (`_schedule_login`), and that login's account's reset. Nothing is waited for where the list is
+        empty or the login is metered. At the reset the started mark is set on a team that is not started and either
+        has no `stopped` record or was stopped by its stop time; a team the person wound down waits for their Start.
+        Either way the reset counts as fired. Nothing is replayed: the stage pass reads the mark."""
+        login = self._schedule_login(doc, team, rule)
+        if login is None:
+            rec.pop("schedule_next", None)  # nothing upcoming; `schedule_fired` stays, a fact
+            return
+        which = {"login": login, "window": rule["window"]}
+        due = self._schedule_due(team, which, self._login_resets(login, rule["window"]), rec, now)
+        if due is None:
+            return
+        held = {team: rec}  # `rec` is the team's own host record, so its mark is written in it
+        stopped = rec.get("stopped")
+        if teamstore.started(held, team) or (isinstance(stopped, dict) and stopped.get("by") != "until"):
+            log.info(
+                "schedule: %s at the reset %s is started or wound down by the person: left alone", team, _iso_of(due)
+            )
+            how = "left"
+        else:
+            teamstore.mark_started(held, team, "schedule", now_iso())
+            log.info("schedule: %s started at the reset %s", team, _iso_of(due))
+            how = "started"
+        self._schedule_fired(which, rec, due, how)
+
+    def _schedule_due(
+        self, team: str, which: dict[str, str], resets: datetime | None, rec: dict[str, Any], now: datetime
+    ) -> datetime | None:
+        """The reset to act on now, or None (`_schedule_team`'s bookkeeping, `rec` written in place): `which` names
+        the rule's reading (its profile or login, and window), `resets` that reading's reset. A reset already fired,
+        or found more than `SCHEDULE_LATE` after it passed, is None, the late one counted as fired."""
         nxt = rec.get("schedule_next") if isinstance(rec.get("schedule_next"), dict) else {}
         upcoming = _instant(nxt.get("at")) if {k: nxt.get(k) for k in which} == which else None
         if upcoming is None and resets is None:
-            key = (team, which["profile"], which["window"])
+            key = (team, *which.values())
             if key not in self._schedule_quiet:  # said once a run: a window never reported, or no reading yet
                 self._schedule_quiet.add(key)
                 log.info("schedule: %s has no reset to wait for: no reading of %s's %s", team, *key[1:])
-            return
+            return None
         due = upcoming if upcoming is not None and upcoming <= now else None
         if due is None and resets is not None and resets <= now:
             due = resets  # a reading not yet rolled past its own reset
@@ -3010,13 +3055,16 @@ class TickMixin:
         elif due is not None and due == upcoming:
             rec.pop("schedule_next", None)  # acted on below; the next reading names the next reset
         if due is None or _instant(rec.get("schedule_fired")) == due:
-            return
+            return None
         held = bool(nxt.get("held")) and due == upcoming  # a reset already held for a link is never late
         if now - due > SCHEDULE_LATE and not held:
             log.info("schedule: %s's reset %s passed %s ago: counted, nothing started", team, _iso_of(due), now - due)
             rec["schedule_fired"] = _iso_of(due)
-            return
-        how = await self._schedule_start(team, records, now, _iso_of(due))
+            return None
+        return due
+
+    def _schedule_fired(self, which: dict[str, str], rec: dict[str, Any], due: datetime, how: str) -> None:
+        """What a start at the reset leaves on the team's host record: `started`, `left` or `wait` (a link down)."""
         if how == "wait":
             # held for a link: the same reset, next tick, however long the link stays down
             rec["schedule_next"] = {**which, "at": _iso_of(due), "held": True}
