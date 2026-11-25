@@ -1073,10 +1073,20 @@ class SettingsMixin:
         except ValueError as e:  # a set of no such name
             raise RpcError(str(e)) from None
 
-    def _team_head(self, team: str) -> dict[str, Any]:
-        """A team's head from the records the home holds (§4.9d *The page*): running with its live count, else wound
-        down or stopped, `by` saying who stopped it (`person`, `until`, `other`)."""
+    def _team_head(self, team: str, doc: dict[str, Any] | None = None) -> dict[str, Any]:
+        """A team's head (§4.9d *The page*): running with its live count, else wound down or stopped, `by` saying who
+        stopped it (`person`, `until`, `other`). After the cut-over a switched team's is read off its started mark and
+        nothing else (*Started is a mark the home keeps*): running while started, else stopped with `by` the mark's
+        `stopped.by` (none for a team never started) and `finishing`, its sessions still live while they end."""
         records = [r for r in self._graph().values() if r.team == team]
+        if doc is not None and teamstore.cut_over(doc) and teamstore.switched(doc, team):
+            live = sum(r.state not in work_mod.DEAD and not r.superseded_by for r in records)
+            marks = self._host_rec.get("teams")
+            if teamstore.started(marks, team):
+                return {"word": "running", "sessions": live, "by": None}
+            stopped = ((marks or {}).get(team) or {}).get("stopped")
+            by = stopped.get("by") if isinstance(stopped, dict) else None
+            return {"word": "stopped", "sessions": live, "by": by, **({"finishing": live} if live else {})}
         live = sum(r.state not in work_mod.DEAD for r in work_mod.crew(records))
         wound = work_mod.team_wound_down(records) is not None
         stopped = None if wound else work_mod.team_stopped(records)
@@ -1121,7 +1131,7 @@ class SettingsMixin:
             team=name,
             doc=doc,
             rows=rows,
-            head=self._team_head(name),
+            head=self._team_head(name, doc),
             entries=entries,
             here=hosts.local_host().name,
             roots=hosts.local_host().repos(),

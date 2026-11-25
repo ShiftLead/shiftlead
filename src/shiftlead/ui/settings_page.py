@@ -499,12 +499,13 @@ def new_team_form(
 
 
 def _switched_word(head: Mapping[str, Any]) -> str:
-    """The head's state (§4.9d *The page*). *n finishing* and a wound-down team's who wait on the started mark
-    (TD-2065)."""
+    """The head's state (§4.9d *The page*, *Start and Wind down*): *Running · n sessions*, else who stopped it, with
+    *· n finishing* while a wound-down team's sessions end (the home's head reads the started mark, TD-2065)."""
     if head.get("word") == "running":
         n, most = head.get("sessions") or 0, head.get("most")
         return f"Running · {n} of {most} sessions" if most else f"Running · {n} session{'' if n == 1 else 's'}"
-    return {"person": "Stopped by you", "until": "Stopped at its stop time"}.get(str(head.get("by") or ""), "Stopped")
+    word = {"person": "Stopped by you", "until": "Stopped at its stop time"}.get(str(head.get("by") or ""), "Stopped")
+    return f"{word} · {head['finishing']} finishing" if head.get("finishing") else word
 
 
 def _pill(e: Mapping[str, Any], repo: Any, now: datetime) -> dict[str, Any]:

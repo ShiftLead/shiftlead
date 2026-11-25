@@ -255,11 +255,32 @@ def test_team_show_reads_this_hosts_logins_with_the_teams_reserve(agent, monkeyp
         return {"team": kw["team"]}
 
     agent.rpc_tools, agent.rpc_gate = tools, gate
-    agent._graph = lambda: {}
+    agent._graph, agent._host_rec = (lambda: {}), {}
     agent._usage, agent._usage_acct = {}, {}
     monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: SimpleNamespace(call=call))
     assert asyncio.run(agent.rpc_team_show(team="a")) == {"team": "a"}
     assert seen["rows"]["claude:x"]["at_reserve"] is True and seen["head"]["word"] == "stopped"
+
+
+def test_after_the_cut_over_a_switched_teams_head_reads_its_started_mark(agent):
+    """§4.9d *The page*, *Start and Wind down* (TD-2065): running while started, else who stopped it, with the
+    sessions still ending as `finishing`; before the cut-over the head is read off the records as it was."""
+    from sessionorc.models import Session
+
+    live = Session(id="ao-x-s", name="s", kind="agent", adapter="shell", dir="/tmp/x", team="a", state="idle")
+    agent._graph = lambda: {live.id: live}
+    doc = settings_mod.load()
+    cut = doc.pop("cut_over")
+    agent._host_rec = {"teams": {"a": {"started": {"since": "t", "by": "person"}}}}
+    assert agent._team_head("a", doc)["word"] != "running", "before the cut-over the mark is not read"
+    doc["cut_over"] = cut
+    assert agent._team_head("a", doc) == {"word": "running", "sessions": 1, "by": None}
+    agent._host_rec = {"teams": {"a": {"stopped": {"at": "t", "by": "person"}}}}
+    assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 1, "by": "person", "finishing": 1}
+    live.state = "exited"
+    assert agent._team_head("a", doc) == {"word": "stopped", "sessions": 0, "by": "person"}
+    agent._host_rec = {}
+    assert agent._team_head("a", doc)["by"] is None, "never started: Stopped"
 
 
 # -- New team and Delete (design §4.9d *New team*, *Delete*, TD-2063) ------------------------------------------------
