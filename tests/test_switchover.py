@@ -489,3 +489,79 @@ def test_a_seat_that_is_none_and_a_manager_key_are_refused_by_name():
     assert whats[1] == "builtins.default.models names 'fact-check', which is not a built-in seat"
     assert whats[2] == "builtins.default.models.sweeper is not a model"
     assert "haiku" in whats[3], "a seat refused reads the package's model"
+
+
+# -- the director (§4.9e *The answers file*, *Blockers*: the director's cases) -----------------------------------------
+
+
+def director(row: Any = None, *, profile: str | None = "p", prompts: str | None = None) -> Any:
+    doc = {} if row is None else {"director": row}
+    sets = switchover.SetPlan({"prompts": prompts}) if prompts else None
+    return switchover.director(doc, HOME, sets, profile)
+
+
+def test_the_director_is_suggested_the_prompts_model_and_the_login_its_profile_becomes():
+    got, blockers = director()
+    assert (got.suggest_model, got.suggest_login, got.given) == ("sonnet", "claude-code:paul", False)
+    assert [b.what for b in blockers] == ["the org has a director and the answers give it none"]
+    assert blockers[0].cure == "write director: {model: sonnet, logins: [claude-code:paul]}"
+    assert blockers[0].where == switchover.DIRECTOR and not blockers[0].day
+    got, _ = director(prompts="opus", profile="elsewhere")
+    assert (got.suggest_model, got.suggest_login) == ("opus", None), "the set's prompts model; no login the home makes"
+    assert switchover.director_lines(got)[1] == "  none; suggested: model opus, login none the home would make " + (
+        "(from profile elsewhere)"
+    )
+    assert switchover.director(None, HOME, None, "p") == (None, []), "the file's own blocker stands"
+
+
+def test_a_director_the_answers_fill_has_no_blocker():
+    got, blockers = director({"model": "opus", "logins": ["claude-code:paul", "claude-code:paul"]})
+    assert blockers == [] and (got.model, got.logins) == ("opus", ["claude-code:paul"])
+    assert switchover.director_lines(got) == [
+        "the director the answers give",
+        "  model opus; logins claude-code:paul",
+        "    suggested: model sonnet, login claude-code:paul (from profile p)",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("row", "whats"),
+    [
+        ({"logins": ["claude-code:paul"]}, ["has no model"]),
+        ({"model": 4, "logins": ["claude-code:paul"]}, ["director.model is not a model"]),
+        ({"model": "opus"}, ["its login list is empty"]),
+        ({"model": "opus", "logins": []}, ["its login list is empty"]),
+        ({"model": "opus", "logins": "claude-code:paul"}, ["director.logins is not a list of <tool>:<name>"]),
+        (
+            {"model": "opus", "logins": ["claude-code:paul", "claude-code:far"]},
+            ["lists claude-code:far, a login the home would not have"],
+        ),
+        ({"model": "fable", "logins": ["claude-code:paul"]}, ["no login in its list offers fable, its model"]),
+        ({"model": "fable", "logins": ["claude-code:far"]}, ["lists claude-code:far, a login the home would not have"]),
+    ],
+)
+def test_each_director_case_blocks_by_name(row, whats):
+    assert [b.what for b in director([])[1]] == ["director is not a mapping"]
+    assert [b.what for b in director(row)[1]] == whats
+
+
+def test_the_check_reads_the_director_where_the_org_has_one(home, tmp_path, capsys):
+    a, b = tmp_path / "a", tmp_path / "b"
+    (home / "profiles.yml").write_text(f"default: q\nprofiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {b}}}\n")
+    found = {f"claude-code:{a}": {"name": "paul"}, f"claude-code:{b}": {"name": "grind"}}
+    answers(home, {"hosts": {"h": {"logins": found}}})
+    assert cli.main(["switch-over", "check"]) == 0
+    assert "director" not in capsys.readouterr().out, "no director in the org, none read"
+    (home / "org.yml").write_text(yaml.safe_dump({"director": {}}))
+    assert cli.main(["switch-over", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "  none; suggested: model sonnet, login claude-code:grind (from profile q)" in out, "the default profile's"
+    assert "the director: the org has a director and the answers give it none" in out
+    (home / "org.yml").write_text(yaml.safe_dump({"director": {"profile": "p"}}))
+    answers(home, {"hosts": {"h": {"logins": found}}, "director": {"model": "sonnet", "logins": ["claude-code:far"]}})
+    assert cli.main(["switch-over", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "suggested: model sonnet, login claude-code:paul (from profile p)" in out
+    assert "the director: lists claude-code:far, a login the home would not have" in out
+    answers(home, {"hosts": {"h": {"logins": found}}, "director": {"model": "sonnet", "logins": ["claude-code:paul"]}})
+    assert cli.main(["switch-over", "check"]) == 0, capsys.readouterr().out
