@@ -389,3 +389,52 @@ def test_compose_signs_with_the_name_it_is_given():
     env = {"AGENT_NAME": "x", "AGENT_MODEL": "m", "AGENT_MODEL_FILE": "f", "PATH": "/bin"}
     assert stage_merge.sync.squash_env(env, "shiftlead-home") == {"AGENT_NAME": "shiftlead-home", "PATH": "/bin"}
     assert stage_merge.sync.squash_env(env)["AGENT_NAME"] == "shiftlead-sync"
+
+
+# -- the merge gate's questions are rows (§4.9c *A question the home asks is a row*, TD-2158) ----------------------
+
+
+def _unread(store: StageStore) -> Any:
+    go(store, None)
+    return go(store, None, now=NOW + NO_READING_FOR)[0]
+
+
+@pytest.mark.parametrize(
+    ("case", "stage", "ask"),
+    [
+        ("merge-person", "review", lambda st: go(st, {"verdict": "fail", "failed": ["ci", "person"]})[0]),
+        ("merge-unread", "review", _unread),
+        (
+            "merge-stage-gone",
+            "review",
+            lambda st: _after_switch(
+                st,
+                {"verdict": "fail", "failed": ["ci"]},
+                SWITCHED,
+                Reading(pr_state="open", head=HEAD, flow_current=False, stage_known=False),
+            ),
+        ),
+        ("merge-refused", "plain", lambda st: go(st, {"verdict": "fail", "failed": ["ci"]})[0]),
+    ],
+)
+def test_each_merge_gate_question_writes_an_ask_row_with_no_run_in_its_intents_commit(store, case, stage, ask):
+    put(store, stage=stage)
+    assert ask(store).made
+    r = store.entry(TID)
+    *_, row = r["history"]
+    assert r["intent"] and "run" not in row
+    assert {k: row[k] for k in ("from", "to", "outcome", "by", "reason")} == {
+        "from": stage,
+        "to": "person",
+        "outcome": "ask",
+        "by": "home",
+        "reason": case,
+    }
+
+
+def test_a_merge_gate_question_on_a_record_carrying_the_homes_gate_writes_no_row(store):
+    put(store)
+    s = Reading(pr_state="open", head=HEAD, gate=True)
+    made, _ = go(store, {"verdict": "fail", "failed": ["ci", "person"]}, s)
+    r = store.entry(TID)
+    assert made.made and r["waits"] == "person" and not r.get("history")
