@@ -205,11 +205,7 @@ def _from_logins(home: Path) -> dict[str, Profile]:
     data = logins.load(home)
     if data is None:
         return {}
-    keyed = {lk: _login_profile(lk, entry) for lk, entry in sorted(data["logins"].items())}
-    bare: dict[str, list[str]] = {}
-    for lk in keyed:
-        bare.setdefault(logins.split(lk)[1], []).append(lk)
-    return {(name if len(lks) == 1 else lk): keyed[lk] for name, lks in bare.items() for lk in lks}
+    return {logins.profile_name(data, lk): _login_profile(lk, entry) for lk, entry in sorted(data["logins"].items())}
 
 
 def _login_profile(lk: str, entry: dict) -> Profile:

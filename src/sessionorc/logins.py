@@ -180,6 +180,13 @@ def account_of(lk: str, entry: Mapping[str, Any]) -> str:
     return str(entry.get("account") or lk)
 
 
+def profile_name(data: Mapping[str, Any], lk: str) -> str:
+    """The name a login is read under as a profile, and written as a record's `profile` (§4.9e *A record's
+    profile*): its bare name, or its key where another tool's login on this host shares that name."""
+    name = split(lk)[1]
+    return name if sum(split(other)[1] == name for other in data["logins"]) == 1 else lk
+
+
 def live_keys(data: Mapping[str, Any]) -> set[str]:
     return {account_of(n, e) for n, e in data["logins"].items()}
 

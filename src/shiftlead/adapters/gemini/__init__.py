@@ -340,13 +340,14 @@ class GeminiAdapter:
         cwd: Path,
         name: str = "",
         start_context: str | None = None,
+        model: str | None = None,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
         # a resume names an id the tool finds by its project, so it launches from the record's directory
         argv = [self.binary, *(["--resume", resume] if resume else ["--session-id", adapter_id])]
-        if prof.model:
-            argv += ["--model", prof.model]
+        if model or prof.model:  # a launch on a login's model, else the profile's pin (§4.9e, TD-2068)
+            argv += ["--model", model or prof.model]
         argv += prof.extra_args
         if unattended:
             args = prof.unattended_args or YOLO

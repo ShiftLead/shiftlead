@@ -201,7 +201,15 @@ class GrokAdapter:
         return read_version(self.binary, env)
 
     def launch(
-        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
+        self,
+        *,
+        profile: str,
+        resume: str | None,
+        prompt: str | None,
+        unattended: bool,
+        cwd: Path,
+        name: str = "",
+        model: str | None = None,
     ) -> LaunchSpec:
         """The binary by absolute path, refused in words where it is missing; `--session-id` with an id of
         ShiftLead's, or `--resume <id>` from the record's directory; `-m` for the profile's model;
@@ -230,8 +238,8 @@ class GrokAdapter:
             raise ValueError(f"Grok's launch home {launch_home} could not be made: {e}") from e
         adapter_id = resume or str(uuid.uuid4())
         argv = [self.binary, *(["--resume", resume] if resume else ["--session-id", adapter_id])]
-        if prof.model:
-            argv += ["--model", prof.model]
+        if model or prof.model:  # a launch on a login's model, else the profile's pin (§4.9e, TD-2068)
+            argv += ["--model", model or prof.model]
         argv += prof.extra_args
         if unattended:
             args = prof.unattended_args or ALWAYS_APPROVE

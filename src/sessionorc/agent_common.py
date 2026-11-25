@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, link, mail, paths
+from sessionorc import adapters, link, logins, mail, paths
 from sessionorc.gitinfo import absolute_git_dir, toplevel
 from sessionorc.models import (
     GRANTS,
@@ -787,6 +787,7 @@ LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
     "seat", "builtin", "review", "context_bound", "prompt_from", "start_context", "run_only", "scale",
+    "login", "seat_model", "login_list",
 )  # fmt: skip
 
 
@@ -946,6 +947,47 @@ def _scale(scale: Any) -> dict[str, Any] | None:
     if not isinstance(scale, dict) or set(scale) != {"line"} or not isinstance(line, str) or not line.strip():
         raise RpcError(f"scale is {{line: <the line's or seat's name>}} (§4.9 Scaling with the work), not {scale!r}")
     return {"line": line.strip()}
+
+
+def _on_login(
+    login: Any, adapter: str, profile: str, seat_model: Any, login_list: Any, home: Path | None = None
+) -> dict[str, Any] | None:
+    """A create's launch on a login (design §4.9e *The launch on a login*, TD-2068), resolved in this host's
+    `logins.yml`: `{login, account, profile, login_list}`, the login's key, its account, the name it is read under as
+    a profile and the list as given; None for a launch with no login. Refused, before anything is made: a seat model or
+    a list with no login, a login this host does not hold, and a profile or an adapter that is not the login's."""
+    if not login:
+        if seat_model or login_list:
+            raise RpcError("seat_model and login_list ride a launch on a login: name the login (design §4.9e)")
+        return None
+    if seat_model is not None and (not isinstance(seat_model, str) or not seat_model.strip()):
+        raise RpcError(f"seat_model is a model family's name, not {seat_model!r} (design §4.9e)")
+    if login_list is not None and (
+        not isinstance(login_list, list) or not all(isinstance(x, str) and x for x in login_list)
+    ):
+        raise RpcError(f"login_list is the logins' keys in order, not {login_list!r} (design §4.9e)")
+    try:
+        data = logins.load(home)
+    except logins.LoginError as e:
+        raise RpcError(str(e)) from None
+    if data is None:
+        raise RpcError("this host holds no logins.yml: a launch on a login is a switched host's (design §4.9e)")
+    try:
+        lk, entry = logins.resolve(data, str(login))
+    except logins.LoginError as e:
+        raise RpcError(str(e)) from None
+    tool = logins.split(lk)[0]
+    if adapter != tool:
+        raise RpcError(f"login {lk} runs {tool}, not {adapter}: a launch on a login runs its tool (design §4.9e)")
+    as_profile = logins.profile_name(data, lk)
+    if profile and profile != as_profile:
+        raise RpcError(f"a launch on login {lk} names no profile of its own, not {profile!r} (design §4.9e)")
+    return {
+        "login": lk,
+        "account": logins.account_of(lk, entry),
+        "profile": as_profile,
+        "login_list": list(login_list) if login_list else None,
+    }
 
 
 def _context_bound(bound: Any) -> int | None:

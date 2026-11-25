@@ -143,6 +143,8 @@ NODE_OWNED = frozenset(
         "doorbell_failed",
         "ring_seen",
         "tool_version",
+        "login",
+        "account",
         "first_prompt",
         "first_prompt_sent_at",
         "first_prompt_tries",
@@ -193,6 +195,8 @@ HOME_OWNED = frozenset(
         "seat_filled",
         "idle_open",
         "builtin",
+        "seat_model",
+        "login_list",
         "checks",
         "conventions_seen",
         "held_missed",
@@ -1549,6 +1553,14 @@ class Session:
     # The seat key (`techlead`, `sweeper`, `prompts`) of a built-in seat's record, which the home writes (§4.9d *How
     # each one runs*, TD-2065). After the cut-over rules 1, 3, 4 and 5 reach only such a record and the director's.
     builtin: str | None = None
+    # A session launched on a login (§4.9e *The launch on a login*, TD-2068): `login`, its key (`<tool>:<name>`), and
+    # `account`, the account it runs under, are the node's, written by the host the session runs on; `seat_model`, the
+    # model family the flow or the built-in set named, and `login_list`, the list it was launched with, are the home's,
+    # sent with the launch. None on a profile's launch, and `model` stays the one observed.
+    login: str | None = None
+    account: str | None = None
+    seat_model: str | None = None
+    login_list: list[str] | None = None
     # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`
