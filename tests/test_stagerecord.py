@@ -5,6 +5,7 @@ gate, the Ask, the lifting Answers and the covering decide item, which a crash d
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from _v3board import write_board
 from sessionorc import board, ledgerboard
 from sessionorc import ledger as ledger_mod
 from shiftlead import stagerecord
-from shiftlead.stagerecord import OTHER_ANSWER, StageStore, StateRefused, ask_words, new_record
+from shiftlead.stagerecord import OTHER_ANSWER, StageStore, StateRefused, ask_words, flow_version, new_record
 
 BOARD = (
     "# User attention\n\nFormat: `- [ ] …`\n\nPeople: paul\n\n## Needs the user\n\n- [ ] 2026-09-21 (n/a) — filler.\n"
@@ -399,3 +400,26 @@ def test_a_forgotten_session_records_run_keeps_what_the_record_and_the_ledger_ho
     ]
     assert (run["session"], run["team"], run["flow"], run["flow_hash"], run["ended"]) == ("s", "t", "f", "h", "E")
     assert run["models"] == {"opus": _m(1, {"≈$": 0.1})}
+
+
+# -- a flow version (§4.9c *The flow's content hash*, TD-2158) ----------------------------------------------------
+
+
+def test_a_flow_version_is_the_sha256_of_its_canonical_text():
+    text, h = flow_version("name: f\n", [{"stage": "build", "text": "Make it — well."}])
+    assert text == '{"briefs":[{"stage":"build","text":"Make it — well."}],"flow":"name: f\\n"}'
+    assert h == hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def test_flow_versions_differing_by_one_brief_or_the_flow_hash_apart():
+    one = [{"stage": "build", "text": "a"}, {"stage": "review", "text": "b"}]
+    base = flow_version("f", one)[1]
+    assert flow_version("f", [one[0], {"stage": "review", "text": "b\n\nalso"}])[1] != base
+    assert flow_version("g", one)[1] != base
+    assert flow_version("f", list(reversed(one)))[1] != base, "the stages' order is part of the text"
+    assert flow_version("f", [dict(b) for b in one])[1] == base
+
+
+def test_a_version_is_named_by_its_hash_alone(tmp_path):
+    with pytest.raises(ValueError, match="SHA-256"):
+        StageStore.version_path("../x")

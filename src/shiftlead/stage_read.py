@@ -329,7 +329,8 @@ class EntryFacts:
     flow and `was` the flow the record was written under. `rows` are the repo's pull requests, `held` is `held_on`'s
     answer and `session` the holder's record. `may_start` is whether the team may start a session, `within_size`
     whether the offer's stage and the team have room, and `holds_new` whether the team is over a Balance line, so only
-    an entry already in a stage is offered (§4.9d *Holds new work*).
+    an entry already in a stage is offered (§4.9d *Holds new work*). `flow_text` is `doc`'s own text, as the team's turn
+    chose it, which an offer hashes and never reads again (§4.9c *The flow's content hash*).
     """
 
     tid: str
@@ -356,6 +357,7 @@ class EntryFacts:
     may_start: bool = False
     within_size: bool = False
     holds_new: bool = False
+    flow_text: str | None = None
 
 
 def reading_on(record: Mapping[str, Any] | None, f: EntryFacts) -> Reading | None:

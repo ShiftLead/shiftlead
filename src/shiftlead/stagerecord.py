@@ -16,6 +16,7 @@ nothing twice.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -97,7 +98,20 @@ def new_record(
         "intent": None,
         "closed_at": None,
         "spent_before": {},
+        "flow_hash": None,
     }
+
+
+VERSIONS = "flows/versions"
+
+
+def flow_version(text: str, briefs: list[Mapping[str, Any]]) -> tuple[str, str]:
+    """A flow version's canonical text and its hash (§4.9c *The flow's content hash*): the JSON object of the flow
+    file's text and each stage's resolved brief in the stages' order, sorted and compact, its SHA-256 in hex over the
+    UTF-8 bytes. The text is what `flows/versions/<hash>.json` keeps."""
+    obj = {"flow": text, "briefs": [{"stage": str(b["stage"]), "text": str(b["text"])} for b in briefs]}
+    canon = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return canon, hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
 PLAIN_STAGE_WORDS = 4  # the most of a stage's name an Ask says (§4.9c)
@@ -149,6 +163,7 @@ class StageStore:
                 ["git", "-C", str(self.root), *args],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",  # a flow version's text is kept as its exact UTF-8 bytes, whatever the locale
                 timeout=GIT_TIMEOUT,
                 check=False,
                 input=stdin,
@@ -254,12 +269,13 @@ class StageStore:
                 out[Path(path).stem] = json.loads(text)
         return out
 
-    def put_entry(self, record: Mapping[str, Any], why: str) -> str:
+    def put_entry(self, record: Mapping[str, Any], why: str, *, also: Mapping[str, str] | None = None) -> str:
+        """The record, and `also`'s files (a path to its text) in the same commit."""
         tid = str(record["id"])
         if record.get("waits") not in WAITS:
             raise ValueError(f"a record waits on one of {WAITS}, not {record.get('waits')!r}")
         text = json.dumps(record, indent=1) + "\n"  # in order: the answers are offered as the flow lists them
-        return self.write({self._entry_path(tid): text}, f"shiftlead: {tid} {why}")
+        return self.write({**(also or {}), self._entry_path(tid): text}, f"shiftlead: {tid} {why}")
 
     def drop_entry(self, tid: str, why: str) -> str:
         return self.write({self._entry_path(tid): None}, f"shiftlead: {tid} {why}")
@@ -327,6 +343,16 @@ class StageStore:
     def put_flow(self, team: str, text: str) -> str:
         """The copy of the flow `team`'s records are written under; the caller has passed it through the check."""
         return self.write({f"flows/{self._named('team', team)}.yml": text}, f"shiftlead: last good flow of {team}")
+
+    @staticmethod
+    def version_path(flow_hash: str) -> str:
+        if not re.fullmatch(r"[0-9a-f]{64}", flow_hash):
+            raise ValueError(f"a flow version is named by its SHA-256 in hex, not {flow_hash!r}")
+        return f"{VERSIONS}/{flow_hash}.json"
+
+    def version(self, flow_hash: str) -> str | None:
+        """The text a flow version hashed to, as its offer kept it, or None where the branch keeps none."""
+        return self._read(self.tip(), self.version_path(flow_hash))
 
     def drop_flow(self, team: str) -> None:
         """The team's copy of its flow gone, at its Delete (§4.9d *Delete*); no branch or no copy writes nothing."""

@@ -633,3 +633,10 @@ def test_pushed_branches_reads_origin_now_and_a_closed_record_asks_for_them(tmp_
     assert not stage_fetch.carries_branch({"TD-7": {**closed, "closed_at": None}})
     assert not stage_fetch.carries_branch({"TD-7": {**closed, "carried": {"pr": 3}}})
     assert not stage_fetch.carries_branch({})
+
+
+def test_the_flow_that_runs_carries_its_own_text() -> None:
+    """§4.9c *The flow's content hash* (TD-2158): an offer hashes the text of the flow the turn chose."""
+    assert team_flow(NEW_FLOW, [], OLD_FLOW).text == NEW_FLOW
+    assert team_flow(OLD_FLOW, [], OLD_FLOW).text == OLD_FLOW
+    assert team_flow(NEW_FLOW, ["broken"], OLD_FLOW).text == OLD_FLOW, "a failing flow's runs hash the kept copy"

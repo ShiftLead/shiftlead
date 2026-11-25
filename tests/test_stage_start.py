@@ -261,3 +261,30 @@ def test_the_claim_is_the_holders_and_a_refusal_is_returned():
         raise AgentError("held")
 
     assert stage_start.claim(refuse, "s1", "TD-7") == "held"
+
+
+def test_the_flows_briefs_are_each_stages_as_its_start_reads_it_in_order(world):
+    """§4.9c *The flow's content hash* (TD-2158): an offer hashes each brief a session's start would be given."""
+    org, team, _ = world
+    doc = builtin("build-review")
+    doc["stages"][1]["also"] = "Read the tests first."
+    got = stage_start.briefs(org, team, doc, host="h", here="h")
+    assert [b["stage"] for b in got] == [flow3.key_of(st["name"]) for st in doc["stages"]]
+    for b, st in zip(got, doc["stages"], strict=True):
+        assert b["text"] == stage_start.brief_for(st, "package", None)
+    assert got[1]["text"].endswith("Read the tests first.")
+
+
+def test_an_unreadable_brief_on_any_stage_fails_the_flows_briefs(world):
+    org, team, root = world
+    doc = builtin("build-review")
+    doc["stages"][1]["brief"] = "gone"
+    with pytest.raises(teams.TeamError, match="brief 'gone' cannot be read"):
+        stage_start.briefs(org, team, doc, host="h", here="h", place="repo", flow_dir=root)
+
+
+def test_a_standard_brief_that_cannot_be_read_fails_the_flows_briefs(world, monkeypatch):
+    org, team, _ = world
+    monkeypatch.setattr(flow3, "STANDARD_DIR", world[2] / "nowhere")
+    with pytest.raises(OSError):
+        stage_start.briefs(org, team, builtin("build"), host="h", here="h")

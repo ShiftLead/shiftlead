@@ -133,6 +133,27 @@ def brief_for(stage: dict[str, Any], place: str, flow_dir: Path | None, read: re
     return _body(text) + (f"\n\n{also.strip()}" if isinstance(also, str) and also.strip() else "")
 
 
+def briefs(
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    doc: Mapping[str, Any],
+    *,
+    host: str,
+    here: str,
+    place: str = "package",
+    flow_dir: Path | None = None,
+    files: teams.Files | None = None,
+) -> list[dict[str, str]]:
+    """Each stage's brief as a session's start would read it now, in the stages' order, by the checkout and reader
+    `launch` uses (§4.9c *The flow's content hash*). Raises what `launch` would: `TeamError`, or a read's error."""
+    _, read = teams._checkout(org, team, team.repo, host, here, files, f"team {team.name}: the flow's briefs")
+    return [
+        {"stage": flow3.key_of(st.get("name")), "text": brief_for(st, place, flow_dir, read)}
+        for st in doc.get("stages") or []
+        if isinstance(st, dict)
+    ]
+
+
 def told(stage: dict[str, Any], key: str, work: Work, *, adds_review: bool) -> str:
     """How this stage is taken and ended: the `{flow}` of its session's prompt."""
     kind = stage["does"]

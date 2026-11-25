@@ -456,13 +456,17 @@ def offer(
     *,
     team: str,
     spent: Callable[[str], Any] | None = None,
+    version: tuple[str, str] | None = None,
 ) -> Made:
     """Act 5: a fresh session of the stage holds the entry, with its claim, and the record says so. `start` returns the
     holder's address or None; `claim` returns why it was refused or None. The lock is held throughout, so an entry is
     never offered twice. A session whose claim or record could not be written is named in `Made.end` for the caller to
     end, and the next pass offers afresh. `team` is the team whose flow `doc` is, written on a new record. `spent` reads
     a session id's `models` sums, kept in the record's `spent_before` under the holder's bare id, so the row that ends
-    it counts only its own run (§4.9c *Each holder leaves a `run`*); none, or one that raises, drops the id's value."""
+    it counts only its own run (§4.9c *Each holder leaves a `run`*); none, or one that raises, drops the id's value.
+    `version` is the flow's canonical text and its hash (`stagerecord.flow_version`), written as the record's
+    `flow_hash`, the text kept under `flows/versions/` in the same commit where the branch keeps none for it; None
+    writes `flow_hash` null and keeps nothing (§4.9c *The flow's content hash*)."""
     with store.locked():
         record = store.entry(tid)
         if act.name != "offer" or choose(record, s) != act:
@@ -498,7 +502,11 @@ def offer(
             else:
                 before[bare(holder)] = sums
             record["spent_before"] = before
-            store.put_entry(record, f"offered at {key} to {holder}")
+            record["flow_hash"] = version[1] if version is not None else None
+            kept = None
+            if version is not None and store.version(version[1]) is None:
+                kept = {store.version_path(version[1]): version[0]}
+            store.put_entry(record, f"offered at {key} to {holder}", also=kept)
         except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
             return Made(False, f"the offer did not finish: {e}", end=holder)
         return Made(True)
