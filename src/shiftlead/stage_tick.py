@@ -35,6 +35,7 @@ from shiftlead import (
     stage_job_tick,
     stage_merge,
     stage_pass,
+    stage_seats,
     stage_size,
     stage_start,
 )
@@ -244,6 +245,11 @@ def run(
         )
     except Exception:  # noqa: BLE001 — the audits' pass failing is a log line and never the teams' pass
         log.exception("the audit pass of %s failed", root)
+    try:  # a started team's built-in tech lead, written where none stands (§4.9d *How each one runs*)
+        if wrote := stage_seats.write_techleads(call, org(), teams, graph, host_teams, local):
+            log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
+    except Exception:  # noqa: BLE001 — the seats' records failing is a log line and never the teams' pass
+        log.exception("the seat records of %s could not be written", root)
     if orders is None or pr_orders is None:
         return got
     try:
