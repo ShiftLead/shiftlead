@@ -24,10 +24,12 @@ It blocks too on a director list whose every login leaves its prompts on: its `u
 `skip_args` (§4.9d *How each one runs*).
 `suggest` and `write_answers` are `--answers`: the answers file written where there is none, with what §4.9e *The
 answers file* says the home can suggest, with the seats each team runs today that its suggested flow lacks (`lacking`)
-in the file's head; the check lists those of the flow the answers pick beside each team. A container node's logins and
-`--host` are later slices of TD-2071. `in_flight` lists the work in flight from the home's last repo reading, by the
-Offer act's own function, each session the window ends taken as gone, and `first_shape_asks` each open ask to a member
-or seat of the first shape (§4.9e *Work in flight*: nothing answers it after the window).
+in the file's head; the check lists those of the flow the answers pick beside each team. `node_logins` reads each
+container node's own profiles from its directory on the home, its folders named in the answers beside the home's, and
+a team on one is checked against them. `--host` is a later slice of TD-2071. `in_flight` lists the work in flight
+from the home's last repo reading, by the Offer act's own function, each session the window ends taken as gone, and
+`first_shape_asks` each open ask to a member or seat of the first shape (§4.9e *Work in flight*: nothing answers it
+after the window).
 """
 
 from __future__ import annotations
@@ -149,12 +151,16 @@ def host_logins(
     env: Mapping[str, str] | None = None,
     salt: bytes | None = None,
     adapter_of: Callable[[str], Any] | None = None,
+    outside: Callable[[Path], Path | None] | None = None,
 ) -> tuple[list[Login], list[Blocker]]:
     """The logins the move would make on `host` from its `profiles`, in the order of each folder's first profile,
     and every blocker to cure beforehand. `names` is the answers' `hosts.<host>.logins.<found>.name`; a folder it
     does not name takes its first profile's name. A `shell` profile, one whose adapter is not registered, and one
     whose folder cannot be read makes no login. The tool's default home is read with no environment of the caller's
-    (`env` empty unless given), so the check does not change with the shell it is run from."""
+    (`env` empty unless given), so the check does not change with the shell it is run from. `outside`, for a
+    container node read from the home, gives where each of its folders is on the home (None: not here): a folder is
+    then kept as the node writes it, read there, and a profile with no `config_dir` (the container's own default
+    home) and one whose folder is not here make no login."""
     env = {} if env is None else env
     salt = salt if salt is not None else os.urandom(32)
     names = names or {}
@@ -175,7 +181,11 @@ def host_logins(
         tools[p.adapter] = adapter
         default = getattr(adapter, "default_home", None)
         try:
-            if p.config_dir is not None:
+            if outside is not None:
+                if p.config_dir is None or outside(Path(p.config_dir)) is None:
+                    continue
+                folder, by_default = Path(p.config_dir), False
+            elif p.config_dir is not None:
                 folder, by_default = Path(p.config_dir).expanduser().resolve(), False
             elif callable(default):
                 folder, by_default = Path(default(env)).expanduser().resolve(), True
@@ -232,7 +242,8 @@ def host_logins(
                     )
                 )
         name = str(names.get(at) or profs[0].name)
-        ident = _identity(tools[tool], folder, salt)
+        read_at = outside(folder) if outside is not None else folder
+        ident = _identity(tools[tool], read_at, salt) if read_at is not None else {}
         match = ident.get("match")
         made.append(
             Login(
@@ -244,7 +255,7 @@ def host_logins(
                 settings,
                 pin,
                 match if isinstance(match, str) and match else None,
-                _offer(tools[tool], folder, ident.get("plan")),
+                _offer(tools[tool], read_at, ident.get("plan")) if read_at is not None else [],
                 _asks(tools[tool], settings.get("unattended_args")),
             )
         )
@@ -252,6 +263,52 @@ def host_logins(
     blockers += _name_blockers(where, made)
     blockers += _identity_blockers(where, made)
     return made, blockers
+
+
+def node_logins(
+    answers: Mapping[str, Any] | None,
+    *,
+    nodes: Mapping[str, Any] | None = None,
+    salt: bytes | None = None,
+    adapter_of: Callable[[str], Any] | None = None,
+) -> tuple[dict[str, list[Login]], list[Blocker]]:
+    """Each container node's logins, from its own `profiles.yml` under the home's `nodes/<name>/home/` (§4.9e *The
+    window* step 2: the home moves it, and the answers' `hosts:` holds its folders beside the home's), named by
+    `hosts.<node>.logins`, with the blockers `host_logins` and `unnamed` give it. A folder under `/shiftlead` is read
+    at the node's directory on the home; one elsewhere, or climbing out of it, makes no login. A node with no
+    profiles file makes no login; one whose file cannot be read is a blocker.
+    `nodes` is `containers.container_nodes()`'s, by name."""
+    from sessionorc import containers
+    from shiftlead import profiles as profiles_mod
+
+    if nodes is None:
+        nodes = containers.container_nodes()
+    out: dict[str, list[Login]] = {}
+    blockers: list[Blocker] = []
+    for name in sorted(nodes):
+        root = Path(nodes[name].node_dir)
+        path = root / "home" / "profiles.yml"
+        if not path.is_file():
+            out[name] = []
+            continue
+        try:
+            profs, _default = profiles_mod.load(path)
+        except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
+            blockers.append(Blocker(f"host {name}", f"its profiles.yml cannot be read: {e}", f"mend {shown(path)}"))
+            continue
+
+        def outside(folder: Path, root: Path = root) -> Path | None:
+            inside = Path(containers.INSIDE)
+            if not folder.is_relative_to(inside) or ".." in folder.relative_to(inside).parts:
+                return None
+            return root / folder.relative_to(inside)
+
+        made, more = host_logins(
+            name, profs, names=names_of(answers, name), salt=salt, adapter_of=adapter_of, outside=outside
+        )
+        out[name] = made
+        blockers += more + unnamed(name, made, answers)
+    return out, blockers
 
 
 def _name_blockers(where: str, made: Iterable[Login]) -> list[Blocker]:
@@ -452,13 +509,15 @@ def teams(
     *,
     nodes: Mapping[str, Mapping[str, Any]] | None = None,
     offered: Callable[[str], list[Mapping[str, Any]]] | None = None,
+    node_made: Mapping[str, Iterable[Login]] | None = None,
 ) -> tuple[list[TeamPlan], list[Blocker]]:
     """Each team of `org` (`shiftlead.org.Org`, as `ao org` aggregates it) with what the answers give it, and §4.9e
     *Blockers*' team cases. `made` is the home's logins; a team on the home is checked against them, its flow's
     models too. A team on a node has its list checked for emptiness and its flow for reaching the node, and its
-    logins not here: an ssh node's are its own (§4.9d *A team on a node*), and a container node's profiles are not
-    read yet. `nodes` is `hosts.nodes()`; `offered` gives a repo's flows (`team_show.offered`). With no answers file
-    no team has a pick, and the file's own blocker says so."""
+    logins not here where they are an ssh node's, its own (§4.9d *A team on a node*); a container node's, in
+    `node_made` (`node_logins`), are checked as the home's are, its flow's models not. `nodes` is `hosts.nodes()`;
+    `offered` gives a repo's flows (`team_show.offered`). With no answers file no team has a pick, and the file's
+    own blocker says so."""
     from shiftlead import team_show
 
     if nodes is None:
@@ -495,7 +554,14 @@ def teams(
         if plan.flow is None:
             continue
         on_node = host != here
-        if on_node:
+        node_keys = {lg.key for lg in (node_made or {}).get(host, ())} if host in (node_made or {}) else None
+        if on_node and node_keys is not None:
+            out += [
+                Blocker(at, f"lists {lk}, a login {host} would not have", f"take it out of teams.{name}.logins")
+                for lk in plan.logins
+                if lk not in node_keys
+            ]
+        elif on_node:
             kind = "a container" if isinstance(nodes.get(host), Mapping) and nodes[host].get("container") else "an ssh"
             plan.note = f"not checked: the logins of {host}, {kind} node, are not read here"
         else:
@@ -812,16 +878,19 @@ def report(
     director: DirectorPlan | None = None,
     flights: Iterable[Flight] | None = None,
     asks: Iterable[FirstShapeAsk] | None = None,
+    node_made: Mapping[str, Iterable[Login]] | None = None,
 ) -> list[str]:
     """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, the built-in set where
     `builtins` is, the director where `director` is, then every blocker, those of the day last."""
-    lines = [f"{host}: logins the move would make"]
-    made = list(made)
-    for login in made:
-        pin = f", pinned to {login.pin}" if login.pin else ""
-        lines.append(f"  {login.tool}:{login.name}  {shown(login.folder)}  from {', '.join(login.profiles)}{pin}")
-    if not made:
-        lines.append("  none: no profile here names a registered tool")
+    lines: list[str] = []
+    for at, got in [(host, made), *(node_made or {}).items()]:
+        lines.append(f"{at}: logins the move would make" + ("" if at == host else ", a container node"))
+        got = list(got)
+        for login in got:
+            pin = f", pinned to {login.pin}" if login.pin else ""
+            lines.append(f"  {login.tool}:{login.name}  {shown(login.folder)}  from {', '.join(login.profiles)}{pin}")
+        if not got:
+            lines.append("  none: no profile here names a registered tool")
     if plans is not None:
         lines += team_lines(plans)
     if builtins is not None:
@@ -894,15 +963,18 @@ def suggest(
     offered: Callable[[str], list[Mapping[str, Any]]] | None = None,
     ran_on: Callable[[Any], list[str]] | None = None,
     lacks: dict[str, list[str]] | None = None,
+    node_made: Mapping[str, Iterable[Login]] | None = None,
 ) -> dict[str, Any]:
     """The answers file `--answers` writes where there is none (§4.9e *The answers file*): each folder named for its
     first profile; each team the format-3 flow of the name its flow has today (`design-wise` for `td`), the logins
     made from the profiles its members and seats run on, the members' first, `at_once` for the stage that takes
     ready-to-build entries the sum of today's builder lines' sizes, and a `schedule_login` where its schedule names a
     profile; the set the package's models and the first home team's logins; the director, where `org` has one, the
-    package's prompts model and the login made from its profile. A team on a node is given no logins: its host's are
-    not read here. `schedules` is `settings.teams`' reading; `offered` and `ran_on` stand in for the home's readings.
-    `lacks`, where given, gains each team the seats it runs today that its suggested flow lacks (`lacking`)."""
+    package's prompts model and the login made from its profile. A container node's folders (`node_made`) are named
+    beside the home's, and a team on one is given its node's logins as a home team is; a team on an ssh node is given
+    none, its host's not read here. `schedules` is `settings.teams`' reading; `offered` and `ran_on` stand in for
+    the home's readings. `lacks`, where given, gains each team the seats it runs today that its suggested flow
+    lacks (`lacking`)."""
     from shiftlead import flow3, team_show
     from shiftlead import teams as teamsmod
 
@@ -911,10 +983,14 @@ def suggest(
     offered = offered or (lambda repo: team_show.offered(repo, where_roots))
     schedules = schedules or {}
 
-    def login_of(profile: str | None) -> str | None:
-        return next((lg.key for lg in made if profile is not None and profile in lg.profiles), None)
+    node_made = {k: list(v) for k, v in (node_made or {}).items()}
+
+    def login_of(profile: str | None, on: Iterable[Login] = made) -> str | None:
+        return next((lg.key for lg in on if profile is not None and profile in lg.profiles), None)
 
     doc: dict[str, Any] = {"hosts": {here: {"logins": {lg.found: {"name": lg.name} for lg in made}}}, "teams": {}}
+    for node, got in node_made.items():
+        doc["hosts"][node] = {"logins": {lg.found: {"name": lg.name} for lg in got}}
     first: list[str] | None = None
     for name, team in org.teams.items():
         if name in getattr(org, "unlanded", {}):
@@ -929,10 +1005,11 @@ def suggest(
                 lacks[name] = gone
         on_home = not team.host or team.host == here
         listed: list[str] = []
-        if on_home:
+        if on_home or team.host in node_made:
+            on = made if on_home else node_made[team.host]
             profs = ran_on(team) if ran_on is not None else _profiles_ran_on(org, team, here, default)
-            listed = list(dict.fromkeys(lk for p in profs if (lk := login_of(p)) is not None))
-            if first is None:
+            listed = list(dict.fromkeys(lk for p in profs if (lk := login_of(p, on)) is not None))
+            if first is None and on_home:
                 first = listed
         pick["logins"] = listed
         builds = _build_role(team)

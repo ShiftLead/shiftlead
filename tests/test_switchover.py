@@ -938,3 +938,103 @@ def test_the_check_prints_the_open_asks_to_the_first_shape_and_makes_no_sessions
     (home / "sessions" / "bad.json").write_text("{")
     cli.main(["switch-over", "check"])
     assert "  m-1 to ao-m from ao-x (2026-11-24T10:00:00Z): which way?" in capsys.readouterr().out
+
+
+# -- a container node's logins (§4.9e *The window* step 2, *Blockers*) ------------------------------------------------
+
+
+def Node(root: Path, profiles: str | None) -> SimpleNamespace:  # noqa: N802
+    if profiles is not None:
+        (root / "home").mkdir(parents=True, exist_ok=True)
+        (root / "home" / "profiles.yml").write_text(profiles)
+    return SimpleNamespace(node_dir=root)
+
+
+def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directory_on_the_home(tmp_path):
+    root = tmp_path / "nodes" / "cm"
+    signed = {(root / "profiles" / "p").resolve(): "who"}
+    text = "profiles:\n  p: {config_dir: /shiftlead/profiles/p}\n  bare: {}\n  out: {config_dir: /elsewhere/x}\n"
+    nodes = {"cm": Node(root, text + "  up: {config_dir: /shiftlead/../x}\n")}
+    seen: list[Path] = []
+
+    class Spy(Fake):
+        def identity(self, home: Path, salt: bytes) -> dict | None:
+            seen.append(Path(home))
+            return super().identity(home, salt)
+
+    made, blockers = switchover.node_logins(
+        None, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path / "d", signed)
+    )
+    assert [(m.name, m.folder, m.match) for m in made["cm"]] == [("p", Path("/shiftlead/profiles/p"), "who")]
+    assert seen == [root / "profiles" / "p"], (
+        "read where the folder is on the home; a bare profile, one elsewhere or one climbing out makes none"
+    )
+    assert made["cm"][0].found == "claude-code:/shiftlead/profiles/p" and blockers == []
+    named, blockers = switchover.node_logins({"hosts": {}}, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path))
+    assert [b.what for b in blockers] == ["claude-code:/shiftlead/profiles/p has no name in the answers"]
+    doc = {"hosts": {"cm": {"logins": {"claude-code:/shiftlead/profiles/p": {"name": "paul"}}}}}
+    named, blockers = switchover.node_logins(doc, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path))
+    assert [m.key for m in named["cm"]] == ["claude-code:paul"] and blockers == []
+
+
+def test_a_node_with_no_profiles_makes_no_login_and_one_that_does_not_parse_blocks(tmp_path):
+    nodes = {"a": Node(tmp_path / "a", None), "b": Node(tmp_path / "b", "profiles: [")}
+    made, blockers = switchover.node_logins(None, nodes=nodes, salt=SALT, adapter_of=lambda _n: Fake(tmp_path))
+    assert made == {"a": []} and [b.where for b in blockers] == ["host b"]
+    assert "profiles.yml cannot be read" in blockers[0].what
+
+
+def test_a_team_on_a_container_node_is_checked_against_the_nodes_logins():
+    nodes = {"cm": {"container": {"devcontainer": "/x"}}}
+    node = [switchover.Login("claude-code", Path("/shiftlead/profiles/p"), "paul", ["p"], ["k"])]
+    team = Team(host="cm")
+    plans, blockers = plan(Org(grind=team), pick(), nodes=nodes, made=[])
+    assert plans[0].note and "not read here" in plans[0].note, "unread, as before"
+    plans, blockers = switchover.teams(
+        Org(grind=team), pick(), "h", [], [], nodes=nodes, offered=flows(), node_made={"cm": node}
+    )
+    assert plans[0].note is None and blockers == []
+    _, blockers = switchover.teams(
+        Org(grind=team), pick(logins=["claude-code:gone"]), "h", [], [], nodes=nodes, offered=flows(),
+        node_made={"cm": node},
+    )  # fmt: skip
+    assert [b.what for b in blockers] == ["lists claude-code:gone, a login cm would not have"]
+
+
+def test_answers_name_a_container_nodes_folders_and_give_its_team_the_nodes_logins():
+    org = SimpleNamespace(teams={"far": Def(host="cm", members=(Line(),))}, unlanded={}, director=None)
+    node = [switchover.Login("claude-code", Path("/shiftlead/profiles/p"), "p", ["p"], ["k"])]
+    got = suggest(org, node_made={"cm": node}, ran_on=lambda _t: ["p"])
+    assert got["hosts"]["cm"] == {"logins": {"claude-code:/shiftlead/profiles/p": {"name": "p"}}}
+    assert got["teams"]["far"]["logins"] == ["claude-code:p"]
+    assert got["builtins"]["default"]["logins"] == [], "the set takes the first home team's, and none is on the home"
+
+
+def test_the_report_prints_each_container_nodes_logins_after_the_homes():
+    node = [switchover.Login("claude-code", Path("/shiftlead/profiles/p"), "p", ["p"], ["k"])]
+    lines = switchover.report("h", [], [], node_made={"cm": node, "empty": []})
+    assert lines[:5] == [
+        "h: logins the move would make",
+        "  none: no profile here names a registered tool",
+        "cm: logins the move would make, a container node",
+        "  claude-code:p  /shiftlead/profiles/p  from p",
+        "empty: logins the move would make, a container node",
+    ]
+
+
+def test_the_check_and_its_answers_read_a_container_nodes_logins(home, tmp_path, capsys, monkeypatch):
+    from sessionorc import containers
+
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {tmp_path / 'a'}}}\n")
+    team = {"repo": "r", "host": "cm", "manager": {"role": "person"}, "members": [{"role": "grinder", "profile": "q"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    node = Node(home / "nodes" / "cm", "profiles:\n  q: {config_dir: /shiftlead/profiles/q}\n")
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": node})
+    monkeypatch.setattr(cli.hosts, "nodes", lambda: {"cm": {"container": {"devcontainer": "/x"}}})
+    cli.main(["switch-over", "check", "--answers"])
+    out = capsys.readouterr().out
+    assert "cm: logins the move would make, a container node\n  claude-code:q  /shiftlead/profiles/q  from q" in out
+    doc = yaml.safe_load((home / "switch-over" / "answers.yml").read_text())
+    assert doc["hosts"]["cm"] == {"logins": {"claude-code:/shiftlead/profiles/q": {"name": "q"}}}
+    assert doc["teams"]["grind"]["logins"] == ["claude-code:q"]
+    assert "a login cm would not have" not in out and "has no name in the answers" not in out

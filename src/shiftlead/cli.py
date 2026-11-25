@@ -5566,6 +5566,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
             from sessionorc import settings as settings_mod
 
             made, _ = switchover.host_logins(host, profs)
+            node_made, _ = switchover.node_logins(None)
             lacks: dict[str, list[str]] = {}
             doc = switchover.suggest(
                 org,
@@ -5575,6 +5576,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
                 default=default,
                 schedules=settings_mod.teams(settings_mod.load()),
                 lacks=lacks,
+                node_made=node_made,
             )
             try:
                 wrote = switchover.write_answers(doc, lacks=lacks)
@@ -5585,11 +5587,13 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
+    node_made, more = switchover.node_logins(answers)
+    blockers += more
     plans, builtins, director, flights, asks = None, None, None, None, None
     if org is None:
         blockers.append(switchover.Blocker("the org", str(org_error), "mend org.yml, or run the check on the home"))
     else:
-        plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos())
+        plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos(), node_made=node_made)
         builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
         blockers += more + sets
         if org.director is not None:  # the profile it launches on today: its own, else the profiles file's default
@@ -5597,7 +5601,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
             blockers += more
         flights = switchover.in_flight(_repo_readings(), org)
         asks = switchover.first_shape_asks(switchover.stored_records())
-    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director, flights, asks)))
+    lines = switchover.report(host, made, blockers, plans, builtins, director, flights, asks, node_made=node_made)
+    print("\n".join(lines))
     return 1 if any(not b.day for b in blockers) else 0
 
 
