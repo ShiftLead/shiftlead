@@ -260,6 +260,19 @@ def test_a_review_stages_ship_on_a_job_waits_merging_and_posts_its_review():
     assert "run" not in step and "findings" not in step, "a job's rows carry no run and no findings"
 
 
+def test_a_reviews_repeat_is_answered_and_a_verdict_sent_to_the_person_keeps_its_stage():
+    store = Store(_reviewed())
+    _end(store, "ship")
+    again = _end(store, "ship")
+    assert again["repeat"] and again["went"] == "merge" and len(store.writes) == 1
+    doc = flow()
+    doc["stages"][2]["ship"] = "person"
+    store = Store(_reviewed())
+    assert _end(store, "ship", doc=doc)["went"] == "person"
+    r = store.record
+    assert (r["stage"], r["waits"], r["verdicts"]["review"]["outcome"]) == ("review", "person", "ship")
+
+
 def test_a_ship_on_a_head_the_review_did_not_read_is_refused_and_writes_nothing():
     store = Store(_reviewed())
     with pytest.raises(Refused, match="not what you read"):
