@@ -14,8 +14,11 @@ folder it names nothing for is a blocker (`unnamed`). `teams` gives each team of
 answers give it, with §4.9e *Blockers*' team cases: no flow, a flow the team's host cannot follow, an empty list, a
 login its host would not have, a model no login in its list offers.
 `ao switch-over check` prints them, and exits non-zero while a blocker to cure beforehand stands.
-The built-in set, the director, the work in flight, a container node's logins, writing the answers file (`--answers`)
-and `--host` are later slices of TD-2071.
+`builtin_set` reads the answers' `builtins.default`, every seat's model with the package's where it is left out, and
+§4.9e *Blockers*' set cases: an empty list on a home with a team, a login the home would not have, a seat's model no
+login in the list offers.
+The director, the work in flight, a container node's logins, writing the answers file (`--answers`) and `--host` are
+later slices of TD-2071.
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, logins, naming, paths, yamltext
+from sessionorc import adapters, builtinstore, logins, naming, paths, teamstore, yamltext
 from shiftlead.profiles import Profile
 
 SETTINGS = ("billing", "prices", "extra_args", "unattended_args", "permission_wait")  # what one folder's must share
@@ -509,6 +512,119 @@ def _team_blockers(plan: TeamPlan, pick: Mapping[str, Any], at: str) -> list[Blo
     return out
 
 
+@dataclass
+class SetPlan:
+    """The built-in set the answers give (§4.9e *The answers file*, `builtins.default`): every seat's model, the
+    package's where the answers leave the seat out, and the ordered list. `director` marks an org with a director,
+    whose prompts seat is not written. `note` says what is not checked here."""
+
+    models: dict[str, str]
+    logins: list[str] = field(default_factory=list)
+    director: bool = False
+    note: str | None = None
+
+
+SET = "the built-in set"  # a set blocker's `where`
+
+
+def builtin_set(
+    answers: Mapping[str, Any] | None,
+    made: Iterable[Login],
+    plans: Iterable[TeamPlan],
+    here: str,
+    *,
+    director: bool = False,
+    nodes: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[SetPlan | None, list[Blocker]]:
+    """The answers' `builtins.default` and §4.9e *Blockers*' set cases: an empty list on a home that has a team; a
+    login in the list the home would not have, unless a team runs on an ssh node, the list then being taken as names
+    there (§4.9d *A team on a node*); a seat's model that no login in the list the home has offers, the prompts seat's
+    not read where the org has a director. A seat the answers name that is no built-in seat is refused, named (a
+    `manager` key among them: there is no manager after the move). With no answers file, None and nothing."""
+    if answers is None:
+        return None, []
+    if nodes is None:
+        from sessionorc import hosts
+
+        nodes = hosts.nodes()
+    plans = list(plans)
+    row = _under(answers, "builtins", "default")
+    out: list[Blocker] = []
+    held: dict[str, str] = {}
+    raw = row.get("models")
+    if raw is not None and not isinstance(raw, Mapping):
+        out.append(Blocker(SET, "builtins.default.models is not a mapping of seat to model", "mend it"))
+    for key, model in (raw if isinstance(raw, Mapping) else {}).items():
+        if key not in builtinstore.SEAT_KEYS:
+            gone = ": there is no manager after the move (design §4.9d)" if key == "manager" else ""
+            out.append(
+                Blocker(
+                    SET,
+                    f"builtins.default.models names {key!r}, which is not a built-in seat{gone}",
+                    f"take it out; the seats are {', '.join(builtinstore.SEAT_KEYS)}",
+                )
+            )
+        elif not isinstance(model, str) or not builtinstore._MODEL.fullmatch(model):
+            out.append(Blocker(SET, f"builtins.default.models.{key} is not a model", "name a model family, or none"))
+        else:
+            held[str(key)] = model
+    plan = SetPlan({k: builtinstore.model({"models": held}, k) for k in builtinstore.SEAT_KEYS}, director=director)
+    listed = row.get("logins")
+    if isinstance(listed, list) and all(isinstance(x, str) and all(logins.split(x)) for x in listed):
+        plan.logins = list(dict.fromkeys(listed))
+    elif listed is not None:
+        out.append(Blocker(SET, "builtins.default.logins is not a list of <tool>:<name>", "mend it"))
+    if not plan.logins:
+        if plans:
+            out.append(Blocker(SET, "its login list is empty", "list a login in builtins.default.logins"))
+        return plan, out
+    rows = {lg.key: {"models": lg.models, "pin": lg.pin} for lg in made}
+    ssh = sorted(
+        {
+            p.host
+            for p in plans
+            if p.host != here and not (isinstance(nodes.get(p.host), Mapping) and nodes[p.host].get("container"))
+        }
+    )
+    elsewhere = [lk for lk in plan.logins if lk not in rows]
+    if ssh and elsewhere:
+        plan.note = f"not checked: {', '.join(elsewhere)}, taken as names on {', '.join(ssh)}"
+    else:
+        out += [
+            Blocker(SET, f"lists {lk}, a login {here} would not have", "take it out of builtins.default.logins")
+            for lk in elsewhere
+        ]
+    known = [lk for lk in plan.logins if lk in rows]
+    for key, _shown, words, _does, _for in builtinstore.SEATS:
+        if director and key == builtinstore.PROMPTS:
+            continue
+        model = plan.models[key]
+        if known and not any(teamstore.offers(rows[lk], model) for lk in known):
+            out.append(
+                Blocker(
+                    SET,
+                    f"no login in its list offers {model}, the model of {words}",
+                    f"list a login that offers {model}, or give builtins.default.models.{key} another model",
+                )
+            )
+    return plan, out
+
+
+def set_lines(plan: SetPlan) -> list[str]:
+    """`ao switch-over check`'s lines for the built-in set."""
+    seats = ", ".join(
+        f"{key} {plan.models[key]}"
+        for key in builtinstore.SEAT_KEYS
+        if not (plan.director and key == builtinstore.PROMPTS)
+    )
+    lines = ["the built-in set the answers give", f"  default: {seats}; logins {', '.join(plan.logins) or 'none'}"]
+    if plan.director:
+        lines.append("    the director answers prompts: no prompts seat is written")
+    if plan.note:
+        lines.append(f"    {plan.note}")
+    return lines
+
+
 def team_lines(plans: Iterable[TeamPlan]) -> list[str]:
     """`ao switch-over check`'s lines for the teams: each with what the answers give it."""
     plans = list(plans)
@@ -532,10 +648,14 @@ def team_lines(plans: Iterable[TeamPlan]) -> list[str]:
 
 
 def report(
-    host: str, made: Iterable[Login], blockers: Iterable[Blocker], plans: Iterable[TeamPlan] | None = None
+    host: str,
+    made: Iterable[Login],
+    blockers: Iterable[Blocker],
+    plans: Iterable[TeamPlan] | None = None,
+    builtins: SetPlan | None = None,
 ) -> list[str]:
-    """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, then every blocker, those
-    of the day last."""
+    """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, the built-in set where
+    `builtins` is, then every blocker, those of the day last."""
     lines = [f"{host}: logins the move would make"]
     made = list(made)
     for login in made:
@@ -545,6 +665,8 @@ def report(
         lines.append("  none: no profile here names a registered tool")
     if plans is not None:
         lines += team_lines(plans)
+    if builtins is not None:
+        lines += set_lines(builtins)
     blockers = list(blockers)
     first = [b for b in blockers if not b.day]
     day = [b for b in blockers if b.day]

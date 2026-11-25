@@ -218,14 +218,20 @@ def test_the_check_names_each_team_with_what_the_answers_give_it(home, tmp_path,
     (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
     found = {f"claude-code:{a}": {"name": "paul"}}
     pick = {"flow": "design-wise", "logins": ["claude-code:paul"], "at_once": {"build": 2}, "most": 4}
+    sets = {"default": {"logins": ["claude-code:paul"]}}
     answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": pick}})
+    assert cli.main(["switch-over", "check"]) == 1, "a home with a team and no set's list"
+    assert "the built-in set: its login list is empty" in capsys.readouterr().out
+    answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": pick}, "builtins": sets})
     before = {p: p.read_bytes() for p in home.rglob("*") if p.is_file()}
     assert cli.main(["switch-over", "check"]) == 0
     out = capsys.readouterr().out
     assert "  grind: r on h, flow design-wise; logins claude-code:paul; at once build 2, at most 4 in all" in out
     assert "claude-code:paul" in out.splitlines()[1]
     assert {p: p.read_bytes() for p in home.rglob("*") if p.is_file()} == before  # changes nothing
-    answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": {**pick, "logins": ["claude-code:gone"]}}})
+    assert "  default: tech-lead opus, prompts sonnet" in out and "logins claude-code:paul" in out.split("built-in")[1]
+    gone = {"grind": {**pick, "logins": ["claude-code:gone"]}}
+    answers(home, {"hosts": {"h": {"logins": found}}, "teams": gone, "builtins": sets})
     assert cli.main(["switch-over", "check"]) == 1
     out = capsys.readouterr().out
     assert "lists claude-code:gone, a login h would not have" in out
@@ -410,3 +416,74 @@ def test_a_folder_under_a_symlinked_home_is_shown_from_tilde(tmp_path, monkeypat
     (tmp_path / "link").symlink_to(real)
     monkeypatch.setenv("HOME", str(tmp_path / "link"))
     assert switchover.shown((tmp_path / "link" / ".claude").resolve()) == "~/.claude"
+
+
+# -- the built-in set (§4.9e *Blockers*: the set's cases) --------------------------------------------------------------
+
+HOME = [switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"], models=["opus", "sonnet"])]
+
+
+def builtins(models: Any = None, logins: Any = ("claude-code:paul",), *, plans: Any = ("grind",), **kw: Any) -> Any:
+    row: dict[str, Any] = {"logins": list(logins) if isinstance(logins, tuple) else logins}
+    if models is not None:
+        row["models"] = models
+    teams = [p if isinstance(p, switchover.TeamPlan) else switchover.TeamPlan(p, "r", "h") for p in plans]
+    return switchover.builtin_set({"builtins": {"default": row}}, HOME, teams, "h", nodes=kw.pop("nodes", {}), **kw)
+
+
+def test_the_set_takes_the_packages_model_for_a_seat_left_out_and_reads_the_rest():
+    got, blockers = builtins({"tech-lead": "sonnet", "sweeper": "sonnet"})
+    assert blockers == [] and got.logins == ["claude-code:paul"]
+    assert got.models == {
+        "tech-lead": "sonnet",
+        "prompts": "sonnet",
+        "board-answers": "sonnet",
+        "unheld-pull-requests": "sonnet",
+        "sweeper": "sonnet",
+    }
+    assert switchover.builtin_set(None, HOME, [], "h", nodes={}) == (None, []), "the file's own blocker stands"
+
+
+def test_a_seat_no_login_offers_blocks_by_name_and_the_package_haiku_is_one():
+    _, blockers = builtins()
+    assert [b.what for b in blockers] == ["no login in its list offers haiku, the model of the sweeper"]
+    assert "builtins.default.models.sweeper" in blockers[0].cure and blockers[0].where == switchover.SET
+
+
+def test_where_the_org_has_a_director_the_prompts_seat_is_not_read():
+    models = {"prompts": "fable", "sweeper": "sonnet"}
+    assert [b.what for b in builtins(models)[1]] == ["no login in its list offers fable, the model of the prompts seat"]
+    got, blockers = builtins(models, director=True)
+    assert blockers == [] and "prompts" not in switchover.set_lines(got)[1]
+    assert "the director answers prompts" in switchover.set_lines(got)[2]
+
+
+def test_an_empty_list_blocks_only_on_a_home_with_a_team():
+    assert [b.what for b in builtins(logins=[])[1]] == ["its login list is empty"]
+    assert builtins(logins=[], plans=())[1] == []
+    assert [b.what for b in builtins(logins="claude-code:paul")[1]][0] == (
+        "builtins.default.logins is not a list of <tool>:<name>"
+    )
+
+
+def test_a_login_the_home_lacks_blocks_unless_a_team_runs_on_an_ssh_node():
+    lacks = ("claude-code:paul", "claude-code:far")
+    models = {"sweeper": "sonnet"}
+    assert [b.what for b in builtins(models, lacks)[1]] == ["lists claude-code:far, a login h would not have"]
+    far = switchover.TeamPlan("away", "r", "far")
+    got, blockers = builtins(models, lacks, plans=("grind", far), nodes={"far": {}})
+    assert blockers == [] and got.note == "not checked: claude-code:far, taken as names on far"
+    _, blockers = builtins(models, lacks, plans=("grind", far), nodes={"far": {"container": True}})
+    assert [b.what for b in blockers] == ["lists claude-code:far, a login h would not have"], "a container's is"
+
+
+def test_a_seat_that_is_none_and_a_manager_key_are_refused_by_name():
+    _, blockers = builtins({"manager": "opus", "fact-check": "sonnet", "sweeper": 4})
+    whats = [b.what for b in blockers]
+    assert whats[0] == (
+        "builtins.default.models names 'manager', which is not a built-in seat: there is no manager after the move"
+        " (design §4.9d)"
+    )
+    assert whats[1] == "builtins.default.models names 'fact-check', which is not a built-in seat"
+    assert whats[2] == "builtins.default.models.sweeper is not a model"
+    assert "haiku" in whats[3], "a seat refused reads the package's model"
