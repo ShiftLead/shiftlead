@@ -96,6 +96,7 @@ from sessionorc.agent_common import (
     STALL_AFTER,
     SWEEP_DRY_S,
     TAIL_LINES,
+    TECHLEAD_FILL_CEILING,
     RpcError,
     _clean,
     _cool_left,
@@ -4708,17 +4709,20 @@ class TickMixin:
         team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`.
         A seat whose ceiling a person's restart cleared (a `{why: person}` entry with no fill after it)
-        is filled once past the count; that fill is written and counted as any (§6 rule 2, TD-1422)."""
+        is filled once past the count; that fill is written and counted as any (§6 rule 2, TD-1422).
+        A built-in seat's record (`builtin`) is counted alone, a tech lead's against `TECHLEAD_FILL_CEILING` (§4.9d
+        *How each one runs*, TD-2065)."""
         if self._unfillable_word(s, now):
             return
         mine = set(self._ctl(s))
+        ceiling = TECHLEAD_FILL_CEILING if s.builtin == "techlead" else FILL_CEILING
         fellows = [
             r
             for r in records
             if r.seat
             and not r.superseded_by
             and not r.scale  # a seat's extras are a group of their own (§6 rule 3 *An extra seat*, TD-1547)
-            and (r is s or (mine and mine & set(self._ctl(r))))
+            and (r is s or (not s.builtin and not r.builtin and mine and mine & set(self._ctl(r))))
         ]
         fills = [
             e
@@ -4726,7 +4730,7 @@ class TickMixin:
             for e in r.restarts
             if isinstance(e, dict) and e.get("why") == "fill" and _recent(e.get("at"), now, FILL_WINDOW)
         ]
-        if len(fills) >= FILL_CEILING and not _person_cleared(s.restarts):
+        if len(fills) >= ceiling and not _person_cleared(s.restarts):
             self.unfillable[s.id] = "fill ceiling"
             tripped = any(
                 r is not s

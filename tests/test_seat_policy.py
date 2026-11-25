@@ -12,6 +12,7 @@ from conftest import park_ticks
 
 from sessionorc import agent_notify, reports
 from sessionorc.agent import FILL_CEILING, FILL_WINDOW, SEAT_ASK_LINGER, SEAT_IDLE_GRACE, SEAT_PR_WAIT
+from sessionorc.agent_common import TECHLEAD_FILL_CEILING
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry, Session
 
@@ -694,3 +695,34 @@ def test_filled_for_names_a_tag_causes_ids():
     assert filled_for({"by": "tag", "ids": ["TD-801", "TD-802"]}) == (
         "[shiftlead] you are filled for: tag — TD-801, TD-802"
     )
+
+
+@pytest.mark.parametrize(
+    ("builtin", "fills", "filled"),
+    [("techlead", 24, True), ("techlead", 25, False), ("sweeper", 5, True), ("sweeper", 6, False)],
+    ids=["techlead-under", "techlead-at", "sweeper-under", "sweeper-at"],
+)
+async def test_a_built_in_seats_fills_are_counted_alone_a_tech_leads_to_25(agent, tmp_path, builtin, fills, filled):
+    """§4.9d *How each one runs* (TD-2065): a tech lead's record is bounded at `TECHLEAD_FILL_CEILING` fills an hour,
+    the sweeper's at `FILL_CEILING`, each counted for that seat alone, never with another seat's fills."""
+    assert TECHLEAD_FILL_CEILING == 25
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _seat(person, tmp_path, name=f"{builtin}-t", builtin=builtin)
+        other = await _seat(person, tmp_path, name="other", builtin=builtin)
+        for x in (sid, other):
+            _end(agent, x)
+        # the other built-in seat's fills are its own: none of them counts against this seat's
+        agent.sessions[other].restarts = [{"at": _iso(now - timedelta(minutes=1)), "why": "fill"}] * 30
+        agent.sessions[sid].seat_due = {"at": _iso(now), "by": "every"}
+        agent.sessions[sid].restarts = [
+            {"at": _iso(now - timedelta(minutes=2 * (i + 1))), "why": "fill"} for i in range(fills)
+        ]
+        rec = agent.sessions[sid]
+        await agent._keep_running(now)
+        assert (agent.sessions[sid] is not rec) is filled
+        if not filled:
+            assert rec.restart_ceiling and rec.restart_ceiling["why"] == "fill"
+        for x in (sid, other):
+            await person.call("kill", id=x)

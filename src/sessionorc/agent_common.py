@@ -146,6 +146,9 @@ RESTART_SETTLE = timedelta(seconds=60)
 # seat must sit hook-confirmed idle with nothing due before the tick closes it — so a seat just
 # filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
 FILL_CEILING = 6
+# a built-in tech lead's record (`builtin: techlead`), counted alone (§4.9d *How each one runs*, TD-2065; Paul,
+# 2026-11-22: the bound only stops a runaway): every stage's session is fresh and may ask, so it is filled far more
+TECHLEAD_FILL_CEILING = 25
 FILL_WINDOW = timedelta(hours=1)
 MOVE_FILL_BACKOFF = timedelta(minutes=10)  # the tick's mover fills one extra again no sooner (§4.9, TD-1547)
 SEAT_IDLE_GRACE = timedelta(minutes=2)

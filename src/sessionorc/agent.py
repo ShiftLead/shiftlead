@@ -162,6 +162,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     SUBMIT_SECONDS,  # noqa: F401
     SWEEP_DRY_S,  # noqa: F401
     TAIL_LINES,  # noqa: F401
+    TECHLEAD_FILL_CEILING,  # noqa: F401
     TICK_SECONDS,  # noqa: F401
     TITLE_CAP,  # noqa: F401
     TRAIL_FLOOR,  # noqa: F401
