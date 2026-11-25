@@ -563,9 +563,12 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
 
 def is_director(s: Mapping[str, Any]) -> bool:
     """The org's director seat's record (§4.9b *The director seat*, TD-642): a record of the `prompt` trigger,
-    the director's alone, with no team badge — never a superseded one."""
+    with no team badge and no `builtin` mark — a repo's prompts seat is on `prompt` too, as `builtin: prompts` (§4.9d
+    *How each one runs*, TD-2065) — never a superseded one."""
     trigger = (s.get("seat") or {}).get("trigger") if isinstance(s.get("seat"), dict) else None
-    return trigger == orgmod.DIRECTOR_TRIGGER and not s.get("team") and not s.get("superseded_by")
+    return (
+        trigger == orgmod.DIRECTOR_TRIGGER and not s.get("team") and not s.get("builtin") and not s.get("superseded_by")
+    )
 
 
 def size_words(size: Mapping[str, Any] | None, team: orgmod.TeamDef | None) -> list[str]:

@@ -355,3 +355,4 @@ def test_seat_ids_draw_the_director_on_call_only_where_the_org_defines_it():
     assert not teamrun.is_director({**director, "superseded_by": "x"})
     assert not teamrun.is_director({**director, "team": "t"})
     assert not teamrun.is_director({**director, "seat": {"trigger": "asks"}})
+    assert not teamrun.is_director({**director, "builtin": "prompts"}), "a repo's prompts seat (§4.9d, TD-2065)"
