@@ -280,7 +280,7 @@ def reach_block(org: orgmod.Org, here: Path | str, host: str) -> tuple[str, str]
 
 # The director seat's directory, its own outside every repo (§4.9b *The director seat*, §9 invariant 2, TD-642)
 DIRECTOR_DIR = "~/.local/share/shiftlead/director"
-DIRECTOR_ROLE = "director"
+DIRECTOR_ROLE = orgmod.DIRECTOR_ROLE
 # the profiles whose prompts reach a seat rather than being skipped (§4.2a): a director on one would wait on itself
 DIRECTOR_REFUSED_PROMPTS = ("ask", "all")
 
@@ -296,14 +296,15 @@ def director_create(org: orgmod.Org) -> dict[str, Any] | None:
     call is, for rule 3 to fill on its `prompt` trigger; unattended and supervised; holding `permit` and no
     controller; in its own directory (`director_dir`). Its brief is the package's `director.md`, or the file
     `director.brief` names (relative to the org file), whose `{org}` is the Org block the home reads from the repo
-    registry at each fill (`brief.org_block`), each repo named with its project heading. Raises `TeamError` for a
+    registry at each fill (`brief.org_block`), each repo named with its project heading. Its profile is
+    `Org.director_profile`: `director:`'s own, else `roles: {director: {profile}}`. Raises `TeamError` for a
     profile that is unknown, runs a shell, or does not skip prompts (`ask`, `all`, §4.2a): nothing above the
     director would answer its own."""
     d = org.director
     if d is None:
         return None
     where = f"director {d.name}"
-    profile = d.profile or ""
+    profile = org.director_profile() or ""
     adapter = profiles.DEFAULT_ADAPTER
     try:  # the default profile too: one that asks is no director's either
         p = profiles.get(profile or None)

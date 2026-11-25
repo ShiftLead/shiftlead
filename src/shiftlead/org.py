@@ -97,6 +97,7 @@ class ManagerDef:
 DIRECTOR_NAME = "director"  # the org's one director seat's session name (§4.9b *The director seat*, TD-642)
 DIRECTOR_TRIGGER = "prompt"  # its trigger, the director's alone (§6 rule 3)
 DIRECTOR_GRANT = "permit"  # its grant (§4.8), which only the director seat holds
+DIRECTOR_ROLE = "director"  # its role, whose `roles:` profile it launches on where `director:` names none (§4.9)
 
 
 @dataclass
@@ -433,6 +434,14 @@ class Org:
     checkouts: dict[str, dict[str, Path]] = field(default_factory=dict)
     # the org's director seat where `director:` defines it, else None: no director (§4.9b, TD-642)
     director: DirectorDef | None = None
+
+    def director_profile(self) -> str | None:
+        """The profile the director seat launches on (§4.9b *The director seat*, §4.9e *The answers file*):
+        `director:`'s own, else the role's precedence — `roles: {director: {profile}}` here, the director being no
+        repo's and no preset's — else None, the profiles file's default. None too where the org has no director."""
+        if self.director is None:
+            return None
+        return self.director.profile or (self.roles.get(DIRECTOR_ROLE) or {}).get("profile") or None
 
     def copy(self) -> Org:
         """A copy whose maps can be written without touching this one's (`with_repos` lands teams on it)."""

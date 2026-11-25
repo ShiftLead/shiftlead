@@ -5599,8 +5599,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos(), node_made=node_made)
         builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
         blockers += more + sets
-        if org.director is not None:  # the profile it launches on today: its own, else the profiles file's default
-            director, more = switchover.director(answers, made, builtins, org.director.profile or default)
+        if org.director is not None:  # the profile it launches on today: by the role's precedence, else the default
+            director, more = switchover.director(answers, made, builtins, org.director_profile() or default)
             blockers += more
         flights = switchover.in_flight(_repo_readings(), org)
         asks = switchover.first_shape_asks(switchover.stored_records())

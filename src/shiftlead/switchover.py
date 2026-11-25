@@ -1029,7 +1029,7 @@ def suggest(
         "default": {"models": {k: builtinstore.model({}, k) for k in seats}, "logins": list(first or [])}
     }
     if org.director is not None:
-        lk = login_of(org.director.profile or default)
+        lk = login_of(org.director_profile() or default)
         doc["director"] = {"model": builtinstore.model({}, builtinstore.PROMPTS), "logins": [lk] if lk else []}
     return doc
 

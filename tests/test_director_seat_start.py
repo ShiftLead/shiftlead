@@ -112,6 +112,20 @@ def test_a_brief_the_org_names_is_read_beside_the_org_file(tmp_path, monkeypatch
 
 
 @pytest.mark.unit
+@pytest.mark.unit
+def test_a_director_naming_no_profile_launches_on_the_one_its_role_gives(tmp_path, monkeypatch):
+    """§4.9e *The answers file*: the role's precedence where `director:` names none, `director:`'s own above it."""
+    org = _org(tmp_path, monkeypatch, {})
+    assert teams.director_create(org)["profile"] == "", "neither says: the profiles file's default"
+    org.roles = {"director": {"profile": "grind"}}
+    assert org.director_profile() == "grind" and teams.director_create(org)["profile"] == "grind"
+    org.roles = {"director": {"profile": "asks"}}
+    with pytest.raises(teams.TeamError, match="permission_prompts: ask"):
+        teams.director_create(org)
+    org.director.profile = "grind"
+    assert teams.director_create(org)["profile"] == "grind", "director:'s own wins over its role's"
+
+
 @pytest.mark.parametrize("profile", ["asks", "close"])
 def test_a_director_on_a_profile_that_asks_is_refused_and_said(tmp_path, monkeypatch, profile):
     """§4.9b *Its first read*: nothing above the director would answer its own prompts."""

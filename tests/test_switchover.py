@@ -13,6 +13,7 @@ import pytest
 import yaml
 
 from shiftlead import cli, switchover
+from shiftlead import org as orgmod
 from shiftlead.adapters import claude_code, gemini, grok
 from shiftlead.profiles import Profile
 
@@ -566,6 +567,9 @@ def test_the_check_reads_the_director_where_the_org_has_one(home, tmp_path, caps
     assert "the director: lists claude-code:far, a login the home would not have" in out
     answers(home, {"hosts": {"h": {"logins": found}}, "director": {"model": "sonnet", "logins": ["claude-code:paul"]}})
     assert cli.main(["switch-over", "check"]) == 0, capsys.readouterr().out
+    (home / "org.yml").write_text(yaml.safe_dump({"director": {}, "roles": {"director": {"profile": "p"}}}))
+    assert cli.main(["switch-over", "check"]) == 0, "the login the role's profile makes is the one it launches on"
+    assert "suggested: model sonnet, login claude-code:paul (from profile p)" in capsys.readouterr().out
 
 
 def test_a_director_list_whose_every_login_leaves_its_prompts_on_blocks():
@@ -656,12 +660,27 @@ def test_answers_suggest_no_flow_offered_none_and_no_logins_for_a_node_team():
 
 
 def test_answers_give_the_director_the_prompts_model_and_its_profiles_login_and_drop_the_prompts_seat():
-    org = SimpleNamespace(teams={}, unlanded={}, director=SimpleNamespace(profile="fc"))
+    org = orgmod.Org(director=orgmod.DirectorDef(profile="fc"))
     got = suggest(org)
     assert got["director"] == {"model": "sonnet", "logins": ["gemini:reader"]}
     assert "prompts" not in got["builtins"]["default"]["models"] and got["builtins"]["default"]["logins"] == []
     org.director.profile = None
     assert suggest(org)["director"]["logins"] == ["claude-code:paul"], "the profiles file's default"
+    org.roles = {"director": {"profile": "fc"}}
+    assert suggest(org)["director"]["logins"] == ["gemini:reader"], "the role's precedence where director: names none"
+
+
+def test_check_answers_suggest_the_login_of_the_profile_the_director_role_gives(home, tmp_path, capsys):
+    a, b = tmp_path / "a", tmp_path / "b"
+    (home / "profiles.yml").write_text(f"default: q\nprofiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {b}}}\n")
+    doc = {"director": {}, "roles": {"director": {"profile": "p"}}, "teams": {}}
+    (home / "org.yml").write_text(yaml.safe_dump(doc))
+    cli.main(["switch-over", "check", "--answers"])
+    capsys.readouterr()
+    assert yaml.safe_load((home / "switch-over" / "answers.yml").read_text())["director"] == {
+        "model": "sonnet",
+        "logins": ["claude-code:p"],
+    }, "roles: gives the director p, so the login p makes, not the default q's"
 
 
 def test_check_answers_writes_a_file_the_check_accepts_and_leaves_one_that_is_there(home, tmp_path, capsys):
