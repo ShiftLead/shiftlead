@@ -33,11 +33,15 @@ FACTS = {
 
 @dataclass(frozen=True)
 class Work:
-    """The entry a stage's session is started for, with the branch and pull request its record already carries."""
+    """The entry a stage's session is started for, with the branch and pull request its record already carries, and
+    the last move that brought it to this stage (`came`: a review's changes, a refused merge's failing row) and the
+    person's own words where their answer sent it here (`answer`)."""
 
     entry: str
     branch: str | None = None
     pr: int | None = None
+    came: str | None = None
+    answer: str | None = None
 
 
 @dataclass(frozen=True)
@@ -109,6 +113,10 @@ def told(stage: dict[str, Any], key: str, work: Work, *, adds_review: bool) -> s
         lines.append(f"Its record already carries {where}: read what is there and work on that branch.")
     elif kind != "review":
         lines.append("It has no branch yet: branch off the default branch and open its one pull request.")
+    if work.came:
+        lines.append(f"It came to this stage by a move whose reason was: {work.came}")
+    if work.answer:
+        lines.append(f"The person's answer that sent it here, in their own words: {work.answer}")
     lines.append(
         '\nEnd the stage with one command, run in your worktree: **`ao stage end <outcome> [--reason "…"]`**. Until '
         "you run it you are working, and a red check or a failing test is no outcome. The home checks each outcome's "

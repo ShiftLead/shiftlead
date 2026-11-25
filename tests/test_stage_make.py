@@ -566,6 +566,42 @@ def test_an_offer_after_a_loss_keeps_the_count_and_the_work(store):
     assert (record["holder"], record["offers"], record["pr"]) == ("s9", 2, 3)
 
 
+def test_an_offer_after_a_refused_merge_tells_the_session_the_failing_row(store):
+    step = {"from": "review", "outcome": "refused", "reason": "the merge gate failed on ci", "to": "build"}
+    put(store, stage="build", branch="b", pr=3, history=[step])
+    got, started, _ = offer_it(store)
+    came = "the merge gate failed on ci (`refused` at `review`)"
+    assert got.made and started == [("build", Work(TID, "b", 3, came))]
+
+
+def test_an_offer_after_the_persons_answer_gives_their_words_and_what_raised_the_question(store):
+    history = [
+        {"from": "review", "outcome": "refused", "reason": "the merge gate failed on ci", "to": "person"},
+        {"from": "review", "outcome": "answer", "reason": "fix the flaky test", "to": "build"},
+    ]
+    put(store, stage="build", history=history, answer="fix the flaky test")
+    got, started, _ = offer_it(store)
+    work = started[0][1]
+    assert got.made and work.came == "the merge gate failed on ci (`refused` at `review`)"
+    assert work.answer == "fix the flaky test"
+
+
+def test_an_answer_with_no_move_to_the_person_before_it_tells_no_older_reason(store):
+    history = [
+        {"from": "build", "outcome": "work-pushed", "reason": "old", "to": "review"},
+        {"from": "review", "outcome": "answer", "reason": "go on", "to": "build"},
+    ]
+    put(store, stage="build", history=history, answer="go on")
+    _, started, _ = offer_it(store)
+    assert (started[0][1].came, started[0][1].answer) == (None, "go on")
+
+
+def test_an_offer_tells_no_reason_for_a_move_into_another_stage(store):
+    put(store, stage="polish", history=[{"from": "build", "outcome": "work-pushed", "reason": "x", "to": "review"}])
+    _, started, _ = offer_it(store)
+    assert started[0][1].came is None
+
+
 def test_a_reopened_entry_is_offered_afresh_with_nothing_carried_over(store):
     put(store, stage="polish", closed_at="2026-11-01T00:00:00Z", branch="old", pr=3, offers=2)
     got, started, _ = offer_it(store)

@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import pinned_script
 
 from shiftlead import stage_merge
 from shiftlead.stage_acts import Act, Reading, choose
@@ -86,6 +88,29 @@ def test_a_row_a_session_can_cure_takes_the_refused_move_and_counts_it(store):
     assert made.made and not landed
     assert (r["stage"], r["waits"], r["merging"]) == ("build", None, None)
     assert r["counts"]["review:refused"] == 1 and r["history"][-1]["by"] == "home"
+
+
+def test_the_refused_move_names_the_failing_row_in_its_reason(store):
+    put(store)
+    go(store, {"verdict": "fail", "failed": ["ci", "board"]})
+    step = store.entry(TID)["history"][-1]
+    assert (step["outcome"], step["to"], step["reason"]) == ("refused", "build", "the merge gate failed on ci, board")
+
+
+@pytest.mark.parametrize("failed", [["ci", "a-row-a-later-pin-adds"], []])
+def test_a_failed_row_no_list_sorts_goes_to_the_person_and_spends_no_limit(store, failed):
+    put(store)
+    made, landed = go(store, {"verdict": "fail", "failed": failed})
+    r = store.entry(TID)
+    assert made.made and not landed and r["intent"]["answers"][TRY_AGAIN] == {"merge": True}
+    assert not r.get("counts") and r["stage"] == "review"
+
+
+def test_every_row_the_pinned_gate_writes_is_sorted_once():
+    rows = set(re.findall(r'\brow\(\s*"([a-z_-]+)"', pinned_script("check_cadence.py").read_text(encoding="utf-8")))
+    assert rows, "the pinned gate's rows were not found"
+    assert not stage_merge.PERSON_ROWS & stage_merge.SESSION_ROWS
+    assert rows <= stage_merge.PERSON_ROWS | stage_merge.SESSION_ROWS, rows - stage_merge.SESSION_ROWS
 
 
 def test_a_refused_move_past_its_limit_goes_to_the_person(store):
