@@ -298,3 +298,44 @@ def test_an_audit_whose_record_cannot_be_read_has_no_next_clock(tmp_path):
     assert team_show.audit_rounds("t", FLOW, None, tmp_path, NOW) == {}
     assert team_show.audit_rounds("t", FLOW, SimpleNamespace(audit=lambda team, key: [1]), tmp_path, NOW) == {}
     assert team_show.audit_rounds("t", None, SimpleNamespace(audit=boom), tmp_path, NOW) == {}
+
+
+class _AuditStore:
+    """A state branch holding the team's copy of `FLOW`, its entries read or broken (TD-2190)."""
+
+    def __init__(self, root, broken=False):
+        self.root, self.broken = root, broken
+
+    def flow(self, team):
+        return yaml.safe_dump(FLOW)
+
+    def entries(self):
+        if self.broken:
+            raise ValueError("bad json")
+        return {}
+
+
+def test_the_call_hands_the_page_each_audits_next_clock(tmp_path, monkeypatch):
+    root = tmp_path / "shiftlead"
+    root.mkdir()
+    seen: list[tuple] = []
+
+    def rounds(team, flow_doc, store, at):
+        seen.append((team, flow_doc["name"], at))
+        return {"docs": "in 4h"}
+
+    monkeypatch.setattr(team_show, "StageStore", _AuditStore)
+    monkeypatch.setattr(team_show, "audit_rounds", rounds)
+    got = team_show.call(team="t", doc=_doc(), rows={}, head=HEAD, here="home", roots=[root])
+    assert got["unread"] is None and seen == [("t", "build", root)]
+    assert [(a["name"], a["next"]) for a in got["audits"]] == [("Docs", "in 4h")]
+
+
+def test_a_state_branch_that_cannot_be_read_draws_no_next_clock(tmp_path, monkeypatch):
+    root = tmp_path / "shiftlead"
+    root.mkdir()
+    monkeypatch.setattr(team_show, "StageStore", lambda r: _AuditStore(r, broken=True))
+    monkeypatch.setattr(team_show, "audit_rounds", lambda *a: {"docs": "in 4h"})
+    got = team_show.call(team="t", doc=_doc(), rows={}, head=HEAD, here="home", roots=[root])
+    assert "could not be read" in got["unread"]
+    assert [(a["name"], a["next"]) for a in got["audits"]] == [("Docs", None)]
