@@ -52,7 +52,7 @@ def test_a_job_starts_in_the_build_role_on_the_seats_model_its_lane_the_work_ord
     x = got.launch
     assert (x.role, x.lane, x.name, x.team, got.model) == ("grinder", [lane], name, "t", "sonnet")
     assert x.create_params([])["controllers"] == [] and x.create_params([])["supervised"] is True
-    text = (stage_job_start.JOB_BRIEFS / f"{brief}.md").read_text().strip()
+    text = stage_job_start.brief_of(brief)
     marks = ["one job of a built-in seat", "## Mechanics", "ao stage end <outcome>", "## This repo's rules", text]
     at = [x.prompt.index(m) for m in marks]
     assert at == sorted(at)
@@ -187,3 +187,58 @@ def test_only_a_pull_request_jobs_session_is_told_closed_unmerged():
     assert "- `closed-unmerged`: a reason is given, and the pull request is closed and not merged" in pr
     board = stage_job_start.told(BOARD, team="t", adds_review=False)
     assert "closed-unmerged" not in board
+
+
+@pytest.mark.parametrize(
+    ("kind", "words"),
+    [
+        ("red", "**A red pull request**"),
+        ("filing", "**A filing pull request**"),
+        ("sync", "**A sync pull request**"),
+        ("lift", "**A lift pull request**"),
+        ("sweep", "**A sweep pull request**"),
+    ],
+)
+def test_a_pull_request_jobs_brief_is_its_orders_words_by_its_kind(world, kind, words):
+    prompt = made(world, {**PR, "kind": kind, **({"reason": "src/x.py is not in the lock"} if kind == "sync" else {})})
+    text = prompt.launch.prompt
+    assert words in text
+    others = [
+        w
+        for k, w in (
+            ("red", "**A red"),
+            ("filing", "**A filing"),
+            ("sync", "**A sync"),
+            ("lift", "**A lift"),
+            ("sweep", "**A sweep"),
+        )
+        if k != kind
+    ]
+    assert not any(w in text for w in others), "only the order's own kind's words"
+    assert "<!-- kind -->" not in text and "Work on the pull request you were given" in text
+    assert f"Its pull request is #42, a **{kind}** one: work on its own branch." in text
+    assert ("Its order's reason, as the first offer read it: src/x.py is not in the lock" in text) == (kind == "sync")
+
+
+def test_a_pull_request_job_with_no_kind_is_told_the_red_and_filing_words(world):
+    text = stage_job_start.brief_of("unheld-pull-requests")
+    assert "**A red pull request**" in text and "**A filing pull request**" in text
+    assert "**A sync pull request**" not in text and "<!-- kind -->" not in text
+    assert "Its pull request is #42: work on its own branch." in stage_job_start.told(PR, team="t", adds_review=False)
+    with pytest.raises(ValueError):
+        stage_job_start.brief_of("unheld-pull-requests", "fork")
+
+    with pytest.raises(teams.TeamError, match="kind is one of"):
+        made(world, {**PR, "kind": "fork"})
+    board = made(world, {**BOARD, "kind": "red"}).launch.prompt
+    assert "**A red pull request**" not in board, "a board answer's job takes no pull request's kind"
+
+
+def test_the_closing_words_each_kind_ends_on_are_its_outcomes():
+    for kind in stage_job_start.PR_KINDS:
+        text = stage_job_start.brief_of("unheld-pull-requests", kind)
+        assert "`work-pushed`" in text and "`closed-unmerged`" in text, kind
+    lift = stage_job_start.brief_of("unheld-pull-requests", "lift")
+    assert "a fresh gate <new> in place of <old>" in lift and "never by `ledger.py lift`" in lift
+    assert "end `other` with what you read" in lift
+    assert "`gh pr ready <n>`" in stage_job_start.brief_of("unheld-pull-requests", "sync")
