@@ -296,6 +296,13 @@ def test_changes_wanted_sends_the_job_back_to_a_fresh_job_session_told_the_revie
     assert came == "the test misses the closed line (`changes-wanted` at `review`)"
 
 
+def test_changes_wanted_on_a_job_is_taken_when_the_head_moved_since_it_was_read():
+    store, facts = Store(_reviewed()), Fake(_pr(), read="d" * 40)
+    assert _end(store, "changes-wanted", "the test misses the closed line", facts=facts)["went"] == "build"
+    assert facts.posted[1].startswith("cadence-review: BLOCK · sonnet · code · 1 findings")
+    assert store.record["verdicts"]["review"]["head"] == "d" * 40, "the verdict names the head the review read"
+
+
 def test_a_reviews_move_past_its_limit_or_the_cap_goes_to_the_person():
     doc = flow()
     doc["stages"][2]["changes-wanted"] = {"to": "build", "limit": 1}
