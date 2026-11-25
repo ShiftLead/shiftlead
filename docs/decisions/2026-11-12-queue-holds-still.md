@@ -66,8 +66,9 @@ holding while a box is open. Links written as `/queue?card=…` redirect there. 
 - **Freezing the whole page while the person is on it.** Trading users report that it hides values. Only the
   card under the pointer holds.
 - **A pause toggle, as the page's default.** The bar is the page's pause (WCAG 2.2.2): nothing moves until it is
-  pressed. Since 2026-11-24 (TD-2182) the person may turn the other way: a **Held** | **Live** switch on the bar,
-  **Held** by default and remembered in the browser, draws each re-read whole in **Live**, for watching the work
+  pressed. Designed 2026-11-25 (TD-2182, built by TD-2197), the person may turn the other way: a **Held** |
+  **Live** switch on the bar, **Held** by default and remembered in the browser, draws each re-read whole in
+  **Live**, for watching the work
   move, while a card the person is on still holds the whole page. **Held** stays the default for answering cards,
   since a card moving under a press is what TD-1555 was. Pressing **Live** is the person's own choice to let the
   page move, and **Held** is its pause, so WCAG 2.2.2 still holds (§4.5 screen 12 *Held or Live*).
