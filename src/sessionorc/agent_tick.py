@@ -4665,6 +4665,8 @@ class TickMixin:
         while its team is started and on while that team's unattended sessions finish; a repo's seat (the sweeper, the
         prompts seat) while any of the repo's teams is started, the prompts seat also on while a session of one of
         them finishes. A seat is counted as no team's finishing session."""
+        if s.builtin == "prompts" and any(self._is_director(r) for r in records if r is not s):
+            return {"at": "", "by": "director", "team": ""}  # a director added to the org answers instead (§4.9d)
         if self._builtin_runs(s, self._started_teams()):
             return None
         serves = {s.team} if s.team else self._repo_teams(str(s.repo or ""))

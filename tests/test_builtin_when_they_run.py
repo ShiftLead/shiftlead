@@ -35,7 +35,7 @@ async def _cut(agent, **marks) -> None:
     agent._host_rec["teams"] = marks
 
 
-def _seat(agent, name: str, builtin: str, team: str = "", trigger: dict | None = None, **kw) -> Session:
+def _seat(agent, name: str, builtin: str | None, team: str = "", trigger: dict | None = None, **kw) -> Session:
     s = Session(
         id=f"ao-t-{name}", name=name, kind="interactive", adapter="shell", dir="/tmp/x", state="closed", team=team,
         repo="/tmp/repo", supervised=True, unattended=True, builtin=builtin,
@@ -137,3 +137,11 @@ async def test_an_odd_team_mark_holds_without_a_crash(agent):
     await _cut(agent, a="started", b=_stopped(at="2026-12-01T08:00:00Z"))
     seat = _seat(agent, "sweeper-repo", "sweeper", trigger={"trigger": "swept"})
     assert agent._builtin_hold(seat, [seat]) == {"at": "2026-12-01T08:00:00Z", "by": "person", "team": ""}
+
+
+async def test_a_prompts_seat_is_held_once_the_org_has_a_director(agent):
+    await _cut(agent, a=STARTED)
+    seat = _seat(agent, "prompts-repo", "prompts", trigger={"trigger": "prompt"})
+    assert agent._builtin_hold(seat, [seat]) is None
+    director = _seat(agent, "director", None, trigger={"trigger": "prompt"})
+    assert agent._builtin_hold(seat, [seat, director]) == {"at": "", "by": "director", "team": ""}
