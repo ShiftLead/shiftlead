@@ -260,6 +260,7 @@ PERSON_ONLY = frozenset(
         "team_set",
         "team_new",
         "team_delete",
+        "team_switch",
         "builtins_new",
         "builtins_delete",
         "builtins_set",

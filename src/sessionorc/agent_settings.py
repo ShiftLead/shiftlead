@@ -8,6 +8,7 @@ home's definition files committed (`rpc_commit_defs`). A mixin `HostAgent` inher
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import shutil
 import time
@@ -40,7 +41,7 @@ from sessionorc.agent_common import (
     _usage_key,
     log,
 )
-from sessionorc.agent_stage import TEAM, home_call
+from sessionorc.agent_stage import TEAM, home_call, switching
 from sessionorc.models import (
     PERSON,
     Session,
@@ -48,6 +49,7 @@ from sessionorc.models import (
 )
 
 BUILTINS_SECTION = "§4.9d *The built-in seats and their page*"
+SWITCH_SECTION = "§4.9d *The flow pick and a switch*"
 
 
 class SettingsMixin:
@@ -739,6 +741,178 @@ class SettingsMixin:
                 log.exception("writing the home's host record failed")
             await self._push_changes()
         return {"team": name, "change": words}
+
+    async def _team_rows(self, doc: dict[str, Any], name: str) -> dict[str, dict[str, Any]]:
+        """The team's login rows as `team_show` reads them: this host's `tools` read with the team's reserve added."""
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        return teamstore.login_rows(
+            read, self._projected(gate["accounts"], doc, now), settings_mod.team_extra(doc, name), now
+        )
+
+    def _team_live(self, name: str) -> list[str]:
+        """The addresses a live session of the team is held under in a stage record: its graph key, and its bare id
+        with the home's name, the form a holder may be written in."""
+        here = hosts.local_host().name
+        out: list[str] = []
+        for address, r in self._graph().items():
+            if r.team == name and r.state not in work_mod.DEAD:
+                out += [str(address), str(r.id), f"{r.id}@{here}"]
+        return out
+
+    def _mark_switching(self, name: str, flow: str | None) -> None:
+        """The home's `host` record's `teams.<team>.switching` set to `flow`, or cleared (§4.9d *A switch is recorded
+        before it is made*), saved before the caller goes on."""
+        teams = self._host_rec.setdefault("teams", {})
+        before = copy.deepcopy(teams.get(name))
+        rec = teams.setdefault(name, {})
+        if flow is None:
+            rec.pop("switching", None)
+            if not rec:
+                teams.pop(name, None)
+        else:
+            rec["switching"] = flow
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:  # the record in memory is put back, so it never says what the file does not
+            if before is None:
+                teams.pop(name, None)
+            else:
+                teams[name] = before
+            raise
+
+    async def _stage_quiet(self) -> None:
+        """Wait out a stage pass already running (TD-2051's), which read the team before its switch was marked."""
+        task = getattr(self, "_stage_task", None)
+        if task is not None and not task.done():
+            with contextlib.suppress(Exception):
+                await asyncio.shield(task)
+
+    async def rpc_team_switch_preview(self, team: str = "", flow: str = "", caller: Any = None) -> dict[str, Any]:
+        """The switch preview (§4.9d *The flow pick and a switch*, TD-2062), read only: each open stage record of the
+        team and what a switch to `flow` does to it, from the function the switch's reconcile takes, and `refused`
+        where the team cannot run `flow`. With no `flow`, the pick alone: every flow the team could be given."""
+        name = str(team or "")
+        doc = settings_mod.load()
+        if not teamstore.switched(doc, name):
+            raise RpcError(f"no switched team {name!r}")
+        rows = await self._team_rows(doc, name)
+        body = home_call(TEAM)
+        here, roots = hosts.local_host().name, hosts.local_host().repos()
+        picks = await asyncio.to_thread(body.choices, name, doc, rows, here, roots)
+        if not flow:
+            return {"team": name, "choices": picks, "version": teamstore.version(doc, name)}
+        try:
+            got = await asyncio.to_thread(
+                body.switch_preview,
+                team=name,
+                flow=str(flow),
+                doc=doc,
+                rows=rows,
+                here=here,
+                roots=roots,
+                live=self._team_live(name),
+            )
+        except Exception as e:  # noqa: BLE001 — a state branch not read is no preview, said
+            raise RpcError(f"no preview of {name}'s switch: {e}") from None
+        return {**got, "choices": picks}
+
+    async def rpc_team_switch(
+        self, team: str = "", flow: str = "", version: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """**Switch now** (§4.9d *The flow pick and a switch*, §4.5a, TD-2062): a person's own act, version-checked,
+        refused before the cut-over and while the team cannot run `flow`. Recorded before it is made: `switching` on
+        the home's team record, the team's copy of `flow` pushed to the state branch — the commit point, so a push the
+        forge refuses refuses the switch — then `flow` and the kept sessions-at-once numbers written, and the mark
+        cleared. The records are then the tick's reconcile's; nothing is relaunched."""
+        agent_common.person_only(caller, "switch a team's flow", SWITCH_SECTION, self._graph())
+        name, want = str(team or ""), str(flow or "")
+        doc = settings_mod.load()
+        try:
+            teamstore.switch(copy.deepcopy(doc), name, want, version, ())  # its refusals first, on a copy
+        except teamstore.TeamError as e:
+            raise RpcError(str(e)) from None
+        rows = await self._team_rows(doc, name)
+        # no await between the check and the mark, so two presses at once cannot both pass it
+        if (under := switching(self._host_rec.get("teams"), name)) is not None:
+            raise RpcError(f"{name} is already switching to {under}")
+        try:
+            self._mark_switching(name, want)
+        except OSError as e:
+            raise RpcError(f"{name} was not switched: the home's record could not be written ({e})") from None
+        try:
+            await self._stage_quiet()
+            words = await self._switch_finish(name, want, doc, rows, check=True)
+        except BaseException:
+            try:
+                self._mark_switching(name, None)
+            except OSError:
+                log.error(
+                    "team %s's refused switch to %s is still marked in the home's record on disk: a restart would"
+                    " finish it; clear teams.%s.switching in host.json by hand",
+                    name,
+                    want,
+                    name,
+                )
+            raise
+        return {"team": name, "change": words, "version": teamstore.version(settings_mod.load(), name)}
+
+    async def _switch_finish(
+        self, name: str, want: str, doc: dict[str, Any], rows: dict[str, Any], *, check: bool
+    ) -> str:
+        """The push, then the key and the mark cleared. A push that fails refuses the switch: the caller clears the
+        mark. Once the push is made the key is written whatever has moved since, the version having been checked
+        before the mark."""
+        body = home_call(TEAM)
+        try:
+            keys = await asyncio.to_thread(
+                body.switch_push,
+                team=name,
+                flow=want,
+                doc=doc,
+                rows=rows,
+                here=hosts.local_host().name,
+                roots=hosts.local_host().repos(),
+                check=check,
+            )
+        except Exception as e:  # noqa: BLE001 — a refused push, an unread branch or a flow it cannot run refuse alike
+            raise RpcError(f"{name} was not switched to {want}: {e}") from None
+        now = settings_mod.load()
+        before = copy.deepcopy(now)
+        try:
+            words = teamstore.switch(now, name, want, teamstore.version(now, name), keys)
+        except teamstore.TeamError as e:
+            raise RpcError(f"{name} was not switched to {want}: {e}") from None
+        await self._team_store_saved(before, now)
+        self._mark_switching(name, None)
+        await self._push_changes()
+        log.info("team %s switched to flow %s", name, want)
+        return words
+
+    async def _finish_switches(self) -> None:
+        """A home that restarts with a switch recorded finishes it (§4.9d): the push again where the copy is not yet
+        the new flow's, then the key. A team gone, one already on the flow, or a switch that cannot be finished has its
+        mark cleared, said in the log; nothing is inferred from a copy that merely differs."""
+        for name, rec in sorted((self._host_rec.get("teams") or {}).items()):
+            want = rec.get("switching") if isinstance(rec, dict) else None
+            if not want:
+                continue
+            doc = settings_mod.load()
+            entry = (doc.get("teams") or {}).get(name) if isinstance(doc.get("teams"), dict) else None
+            try:
+                if not teamstore.switched(doc, name) or not isinstance(entry, dict):
+                    log.warning("team %s's switch to %s was not finished: the team is gone", name, want)
+                elif entry.get("flow") == want:
+                    pass  # the key was written before the restart; only the mark is left
+                else:
+                    await self._switch_finish(name, str(want), doc, {}, check=False)
+                    continue
+            except RpcError as e:
+                log.warning("team %s's switch was not finished at the restart: %s", name, e)
+            except Exception:  # noqa: BLE001 — one team's unfinished switch never stops the home's start
+                log.exception("team %s's switch to %s could not be finished", name, want)
+            with contextlib.suppress(OSError):
+                self._mark_switching(name, None)
 
     async def _builtins_write(self, edit: Callable[[dict[str, Any]], str]) -> dict[str, Any]:
         """One write of the Built-in seats page (§4.9d, TD-2066): the store's refusal in the person's words, then the

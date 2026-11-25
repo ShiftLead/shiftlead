@@ -143,6 +143,32 @@ def apply(doc: dict[str, Any], team: str, change: Mapping[str, Any], sent: str |
     return f"{team} {key} {'cleared' if new is None else 'set'}"
 
 
+def switch(doc: dict[str, Any], team: str, flow: str, sent: str | None, keys: Iterable[str]) -> str:
+    """A switch's write (§4.9d *The flow pick and a switch*, TD-2062), in place: `flow` set, and `at_once` keeping the
+    numbers of the stage keys the new flow has, `keys`. Refused before the cut-over, for a team that is not switched,
+    over a newer version and to the flow it runs."""
+    if not cut_over(doc):
+        raise TeamError(BEFORE)
+    if not switched(doc, team):
+        raise TeamError(f"no switched team {team!r}")
+    if sent is None or sent != version(doc, team):
+        raise TeamError(STALE)
+    entry = doc["teams"][team]
+    if not isinstance(flow, str) or not flow.strip():
+        raise TeamError("a switch names a flow")
+    if flow == entry.get("flow"):
+        raise TeamError(f"{team} already runs {flow}")
+    entry["flow"] = flow
+    held = entry.get("at_once")
+    if isinstance(held, Mapping):
+        kept = {k: n for k, n in held.items() if k in set(keys)}
+        if kept:
+            entry["at_once"] = kept
+        else:
+            entry.pop("at_once", None)
+    return f"{team} switched to {flow}"
+
+
 def new(doc: dict[str, Any], name: str, *, label: Any, repo: str, host: str, flow: str) -> str:
     """**+ New team**'s write (§4.9d *New team*, TD-2063), in place: the team stopped, with an empty login list. Its
     name follows a login's rule, is unique compared case-folded and is fixed once made. Refused before the cut-over."""

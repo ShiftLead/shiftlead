@@ -27,6 +27,7 @@ from shiftlead import org as orgmod
 from shiftlead.stage_fetch import (
     TeamFlow,
     carries_branch,
+    flow_doc_of,
     ledger_read,
     protected_at,
     pushed_branches,
@@ -160,6 +161,12 @@ def run(
     flows = {team: flow_now(root, entry.get("flow")) for team, entry in teams.items()}
 
     pushed: list[frozenset[str] | None] = []  # origin's branches, read once a pass and only when a record needs them
+    by_name: dict[str, Mapping[str, Any] | None] = {}  # a switched record's old flow, read once a pass by its name
+
+    def named(name: str) -> Mapping[str, Any] | None:
+        if name not in by_name:
+            by_name[name] = flow_doc_of(flow_now(root, name)[0])
+        return by_name[name]
 
     def facts(team: str, flow: TeamFlow, records: Mapping[str, Any]) -> Any:
         branches: frozenset[str] | None = frozenset()
@@ -189,6 +196,7 @@ def run(
             protected=protected,
             branches=branches,
             started=False,  # stage_start.team_started, false until TD-2065 writes the started mark
+            named=named,
         )
 
     held: list[orgmod.Org | None] = []
