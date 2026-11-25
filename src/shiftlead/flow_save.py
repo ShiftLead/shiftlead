@@ -181,7 +181,7 @@ def save(
         raise FlowError(briefs.STALE)
     if was_text is not None and not flow3.is_format3(was_text):
         raise FlowError(f"{name} is a first-shape flow a team may be running: save this under another name")
-    got = flow3.check_text(text, place="org", flow_dir=path.parent)
+    got = flow3.check_text(text, place="org", flow_dir=path.parent, saving=True)
     if got.problems:
         raise FlowError("; ".join(got.problems))
     was, now = stages_of(was_text), stages_of(text)
@@ -265,7 +265,7 @@ def checked(name: str, doc: Any, version: str | None = None) -> dict[str, Any]:
         path = _path(name)
     except FlowError as e:
         return {"text": text, "problems": [str(e)], "info": []}
-    got = flow3.check_text(text, place="org", flow_dir=path.parent)
+    got = flow3.check_text(text, place="org", flow_dir=path.parent, saving=True)
     problems = list(got.problems)
     if version is None and path.parent.exists():
         problems.append(f"a flow named {name} already exists")

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from sessionorc import briefs
-from shiftlead import flow3, flow_save
+from shiftlead import flow3, flow_save, repoconfig
 from shiftlead.flow_save import FlowError
 from shiftlead.stagerecord import new_record
 
@@ -248,3 +248,39 @@ def test_a_note_about_where_a_team_lands_does_not_refuse_a_delete(home, monkeypa
     monkeypatch.setattr(flow_save.orgmod, "with_repos", lambda o, roots: (o, ["t cannot land", "place.x: no team"]))
     monkeypatch.setattr(flow_save.orgmod, "with_home_settings", lambda o: o)
     assert _call(delete=True, version=v) == {"name": "mine", "deleted": True}
+
+
+LONG = "Second Build Readings"  # its key `second-build-readings` is 21 characters (§4.9c rule 7)
+
+
+def test_a_stage_key_past_20_characters_is_named_on_a_save_its_preview_and_ao_flow_check(home, tmp_path):
+    assert len(flow3.key_of(LONG)) == flow3.KEY_MAX + 1
+    with pytest.raises(FlowError, match="second-build-readings` is 21 characters"):
+        flow_save.save("mine", _flow(build=LONG))
+    assert not (home / "flows" / "mine").exists()
+    shown = flow_save.checked("mine", repoconfig.parse_yaml(_flow(build=LONG)))
+    assert any("second-build-readings" in p and "rename the stage" in p for p in shown["problems"])
+    loose = tmp_path / "loose" / "flow.yml"
+    loose.parent.mkdir()
+    loose.write_text(_flow(build=LONG))
+    assert any("21 characters" in p for p in flow3.check_file(loose).problems)
+    # twenty characters is the most a save takes
+    flow_save.save("mine", _flow(build="Second Build Reading"))
+
+
+def test_a_flow_saved_before_the_rule_is_read_as_usable_and_its_next_save_names_the_key(home, tmp_path):
+    from shiftlead import flowdefs, stage_tick
+
+    path = home / "flows" / "mine" / "flow.yml"
+    path.parent.mkdir(parents=True)
+    text = _flow(build=LONG)
+    path.write_text(text)
+    assert not flow3.check_text(text, place="org", flow_dir=path.parent).problems
+    assert stage_tick.flow_now(tmp_path, "mine") == (text, ())
+    row = next(r for r in flow_save.listing([])["flows"] if r["name"] == "mine")
+    assert row["problems"] == []
+    assert next(r for r in flowdefs.visible([]) if r["name"] == "mine")["usable"]
+    edited = text.replace("model: sonnet", "model: opus")
+    with pytest.raises(FlowError, match="second-build-readings` is 21 characters"):
+        flow_save.save("mine", edited, version=briefs.version_of(text))
+    assert path.read_text() == text
