@@ -40,7 +40,7 @@ from shiftlead.stage_fetch import (
 from shiftlead.stage_make import Made
 from shiftlead.stage_read import EntryFacts, pickable_on, reading_on
 from shiftlead.stage_start import Work
-from shiftlead.stagerecord import StageStore, StateError, flow_version
+from shiftlead.stagerecord import StageStore, StateError, flow_version, session_fields
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +107,8 @@ def _make(store: StageStore, act: Act, s: Reading, f: EntryFacts, reach: Reach) 
         return stage_make.offer(
             store, f.tid, act, s, doc, reach.start, reach.claim, team=f.team, spent=reach.spent, version=version
         )
-    return stage_make.make(store, f.tid, act, s, doc, f.person)
+    session = session_fields(f.session) if f.session is not None else None
+    return stage_make.make(store, f.tid, act, s, doc, f.person, session=session, spent=reach.spent)
 
 
 def _version(f: EntryFacts, doc: Mapping[str, Any], reach: Reach) -> tuple[str, str] | None:

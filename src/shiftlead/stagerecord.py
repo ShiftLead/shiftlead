@@ -458,6 +458,24 @@ SESSION_FIELDS = ("model", "tool", "tool_version", "login", "login_moves", "crea
 hands it: `tool` the record's adapter, `created` its `started`, `person_asks` its `asks`."""
 
 
+def session_fields(s: Any) -> dict[str, Any]:
+    """`SESSION_FIELDS` from a session record (`sessionorc.models.Session`), as the host agent hands them to
+    `ao stage end`'s row: what the home's own rows copy from the holder's record, a node's session's as mirrored."""
+    return {
+        "model": getattr(s, "model", None),
+        "tool": getattr(s, "adapter", None),
+        "tool_version": getattr(s, "tool_version", None),
+        "login": getattr(s, "login", None),
+        "login_moves": getattr(s, "login_moves", None),
+        "created": getattr(s, "created", None),
+        "person_asks": getattr(s, "person_asks", None),
+    }
+
+
+HOME_ROWS = ("lost", "ended", "ask")
+"""The outcomes of the rows the home writes as it ends a holder or asks the person, which move nothing (§4.9c)."""
+
+
 def bare(holder: Any) -> str:
     """A holder's session id as `seat_spend.json` keys it: the home's `<id>@<node>` without its `@<node>`."""
     return str(holder).split("@", 1)[0]
