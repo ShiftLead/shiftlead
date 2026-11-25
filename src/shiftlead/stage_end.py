@@ -31,6 +31,8 @@ FILES_CAP = 100  # what `gh pr view --json files` returns at most
 NEEDS_NO_REASON = ("work-pushed", "ship")
 CHECK_WAITS_LIMIT = 3  # a live check's refused merges back to its stage, on the stage's one `refused` count
 AUDIT_OUTCOMES = ("findings-filed", "nothing-found")
+CLOSED_UNMERGED = "closed-unmerged"  # a pull request's job alone, never a stage's (§4.9c's table, TD-2165)
+PR_JOB_ALONE = f"{CLOSED_UNMERGED} ends a pull request's job alone"
 CARRY_ON = "Carry on — a session takes the move that was stopped, and its counts start again"
 ARCHIVE = "Archive the entry — the home archives it"
 BUILD_ANYWAY = "Build it anyway — a session builds it in this stage again"
@@ -471,6 +473,8 @@ def end(
     records: Records | None = None,
 ) -> dict[str, Any]:
     """Check `outcome` and write its move: `{entry, outcome, went, repeat}`, or `Refused` with nothing written."""
+    if outcome == CLOSED_UNMERGED:
+        raise Refused(PR_JOB_ALONE)
     said = " ".join((reason or "").split())
     with store.locked():
         record = store.entry(tid)

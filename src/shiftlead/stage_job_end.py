@@ -1,7 +1,10 @@
 """`ao stage end` from a built-in seat's job session (design §4.9d *How each one runs*, §4.7, TD-2053).
 
 A job's session holds its work order's reference (`board:<8 hex>`, `pr:<n>`), not an entry, and ends its job with
-`work-pushed` or `other`. `work-pushed` is checked as a build stage's is — the branch pushed, its pull request open on
+`work-pushed` or `other`, and a pull request's job also with `closed-unmerged` (TD-2165): a reason given and the pull
+request the job was given read on the forge as closed and not merged, it closes the record as Reconcile closes one whose
+object is gone; from the session the record last named, after Reconcile closed it, it is answered as a repeat, *the
+job is closed*. `work-pushed` is checked as a build stage's is — the branch pushed, its pull request open on
 this repo at the worktree's head, its precheck green — except that no entry is archived, a job having none; and, for a
 board answer, that the pull request closes the decided line (it moves the line's file into the board's archive); for a
 pull request nobody holds, that it is the one the job was given. Accepted, the record stands in its team's flow as a
@@ -18,8 +21,7 @@ review stage sends that outcome, by the same rule: back to the job's stage (a fr
 reason), to another review stage or to `merge`, counted as any move; anything else goes to the person.
 
 `stage_end.call` routes a job's reference here. A job sent to `merge` is merged by the home (`stage_job_merge`).
-The tick offers a review stage's session on a job (`stage_job.choose`, `stage_job_start.review_launch`);
-`closed-unmerged` (TD-2165) is later work.
+The tick offers a review stage's session on a job (`stage_job.choose`, `stage_job_start.review_launch`).
 """
 
 from __future__ import annotations
@@ -31,11 +33,22 @@ from typing import Any
 
 from sessionorc import workorders
 from shiftlead import flow3, stage_job
-from shiftlead.stage_end import NEEDS_NO_REASON, PullRequest, Refused, _check_read, _review_body, destination
+from shiftlead.stage_end import (
+    CLOSED_UNMERGED,
+    NEEDS_NO_REASON,
+    PR_JOB_ALONE,
+    PullRequest,
+    Refused,
+    _check_read,
+    _review_body,
+    destination,
+)
 from shiftlead.stage_job_start import job_stage, lane_of
 from shiftlead.stagerecord import StageStore, _now
 
 OUTCOMES = ("work-pushed", flow3.OTHER)
+PR_OUTCOMES = ("work-pushed", CLOSED_UNMERGED, flow3.OTHER)  # a pull request's job's (§4.9d)
+CLOSED = "closed"  # where `closed-unmerged` takes a job: its record closed
 REVIEW_OUTCOMES = (*flow3.OUTCOMES["review"], flow3.OTHER)
 BOARD_DIR = "docs/user_attention"
 REF = re.compile(rf"(?:{re.escape(workorders.PREFIX)}[0-9a-f]{{8}}|{re.escape(workorders.PR_PREFIX)}[1-9]\d{{0,6}})")
@@ -124,6 +137,24 @@ def _counted(record: dict[str, Any], doc: Mapping[str, Any], at: str, outcome: s
     return ""
 
 
+def _close_unmerged(
+    store: StageStore, record: dict[str, Any], ref: str, caller: str, at: str, said: str, facts: Any
+) -> dict[str, Any]:
+    """`closed-unmerged`'s fact, read on the forge: the pull request the job was given is closed and not merged. The
+    record then closes as Reconcile closes one whose object is gone (`stage_job.closed`), its move in the history."""
+    number = int(record.get("pr") or str(record.get("object")))
+    pr = facts.pull_request(None, number)
+    if pr is None:
+        raise Refused(f"pull request #{number} could not be read on the forge: try again")
+    if pr.state != "CLOSED":
+        state = "merged" if pr.state == "MERGED" else "still open" if pr.state == "OPEN" else pr.state.lower()
+        raise Refused(f"pull request #{number} is {state}: {CLOSED_UNMERGED} ends a job whose pull request was closed")
+    step = {"from": at, "outcome": CLOSED_UNMERGED, "reason": said, "by": caller, "to": CLOSED, "head": pr.head}
+    record["history"] = [*(record.get("history") or []), {**step, "at": _now()}]
+    store.put_job(stage_job.closed(record), f"{CLOSED_UNMERGED}: closed")
+    return {"entry": ref, "outcome": CLOSED_UNMERGED, "went": CLOSED, "repeat": False}
+
+
 def end_job(
     store: StageStore,
     ref: str,
@@ -141,6 +172,8 @@ def end_job(
     sent to the person and returns its id; `board` is the board's directory (`board_dir`). The line is written before
     the record, so a record that then fails to be written leaves a line the retry writes again."""
     key = key_of_ref(ref)
+    if outcome == CLOSED_UNMERGED and not ref.startswith(workorders.PR_PREFIX):
+        raise Refused(PR_JOB_ALONE)
     said = " ".join((reason or "").split())
     with store.locked():
         found = store.job(key)
@@ -151,6 +184,8 @@ def end_job(
         if record.get("holder") != caller or record.get("closed_at"):
             if last and last.get("by") == caller and last.get("outcome") == outcome:
                 return {"entry": ref, "outcome": outcome, "went": last.get("to"), "repeat": True}
+            if outcome == CLOSED_UNMERGED and record.get("closed_at") and record.get("closed_holder") == caller:
+                return {"entry": ref, "outcome": outcome, "went": CLOSED, "repeat": True, "said": "the job is closed"}
             raise Refused("the job is closed" if record.get("closed_at") else "this job is not yours")
         here = job_stage(doc)
         stage = _stage(doc, here)
@@ -164,10 +199,12 @@ def end_job(
             if outcome not in REVIEW_OUTCOMES:
                 listed = ", ".join(REVIEW_OUTCOMES)
                 raise Refused(f"{outcome} is not an outcome of a review stage: its outcomes are {listed}")
-        elif outcome not in OUTCOMES:
-            raise Refused(f"{outcome} is not an outcome of a job: its outcomes are {', '.join(OUTCOMES)}")
+        elif outcome not in (taken := PR_OUTCOMES if ref.startswith(workorders.PR_PREFIX) else OUTCOMES):
+            raise Refused(f"{outcome} is not an outcome of a job: its outcomes are {', '.join(taken)}")
         if outcome not in NEEDS_NO_REASON and not said:
             raise Refused(f"{outcome} needs --reason")
+        if outcome == CLOSED_UNMERGED:
+            return _close_unmerged(store, record, ref, caller, at, said, facts)
         head: str | None = None
         went, why = "person", said
         if outcome == "work-pushed":

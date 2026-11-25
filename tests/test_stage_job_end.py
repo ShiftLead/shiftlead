@@ -416,3 +416,66 @@ def test_the_board_directory_is_the_stubs_name_less_md(tmp_path):
     (tmp_path / "docs" / "user_attention").mkdir(parents=True)
     (tmp_path / "docs" / "user_attention.md").write_text("stub\n")
     assert stage_job_end.board_dir(tmp_path) == "docs/user_attention"
+
+
+def _pr_job(**kw) -> Store:
+    return Store(_record("unheld-pull-requests", "41", **kw))
+
+
+def test_closed_unmerged_closes_a_pull_request_job_whose_pull_request_is_closed_unmerged():
+    store, facts = _pr_job(), Fake(_pr(state="CLOSED"), on=None)
+    got = _end(store, "closed-unmerged", "its filing already landed on main", ref="pr:41", facts=facts)
+    assert got == {"entry": "pr:41", "outcome": "closed-unmerged", "went": "closed", "repeat": False}
+    assert facts.asked == (None, 41)
+    r = store.record
+    assert r["closed_at"] and (r["holder"], r["waits"], r["closed_holder"]) == (None, None, ME)
+    last = r["history"][-1]
+    assert (last["outcome"], last["to"], last["by"], last["reason"]) == (
+        "closed-unmerged",
+        "closed",
+        ME,
+        "its filing already landed on main",
+    )
+    assert store.writes == ["closed-unmerged: closed"]
+    again = _end(store, "closed-unmerged", "its filing already landed on main", ref="pr:41", facts=facts)
+    assert again["repeat"] and again["went"] == "closed" and len(store.writes) == 1
+
+
+@pytest.mark.parametrize(("state", "words"), [("OPEN", "is still open"), ("MERGED", "is merged")])
+def test_closed_unmerged_is_refused_on_a_pull_request_still_open_or_merged(state, words):
+    store = _pr_job()
+    with pytest.raises(Refused, match=f"#41 {words}"):
+        _end(store, "closed-unmerged", "closed it", ref="pr:41", facts=Fake(_pr(state=state), on=None))
+    assert store.writes == []
+
+
+def test_closed_unmerged_needs_a_reason_and_a_readable_pull_request():
+    with pytest.raises(Refused, match="closed-unmerged needs --reason"):
+        _end(_pr_job(), "closed-unmerged", ref="pr:41", facts=Fake(_pr(state="CLOSED")))
+    with pytest.raises(Refused, match="could not be read"):
+        _end(_pr_job(), "closed-unmerged", "closed it", ref="pr:41", facts=Fake(None))
+
+
+def test_closed_unmerged_is_refused_from_a_board_answers_job():
+    store = Store(_record())
+    with pytest.raises(Refused, match="closed-unmerged ends a pull request's job alone"):
+        _end(store, "closed-unmerged", "closed it", facts=Fake(_pr(state="CLOSED")))
+    assert store.writes == []
+
+
+def test_closed_unmerged_after_reconcile_closed_the_record_is_answered_as_a_repeat():
+    store = Store(stage_job.closed(_record("unheld-pull-requests", "41")))
+    got = _end(store, "closed-unmerged", "closed it", ref="pr:41", facts=Fake(_pr(state="CLOSED")))
+    assert got["repeat"] and got["said"] == "the job is closed" and store.writes == []
+    with pytest.raises(Refused, match="the job is closed"):
+        _end(store, "other", "x", ref="pr:41")
+    other = Store(stage_job.closed(_record("unheld-pull-requests", "41", holder="ao-repo-job-other")))
+    with pytest.raises(Refused, match="the job is closed"):
+        _end(other, "closed-unmerged", "closed it", ref="pr:41")
+
+
+def test_a_pull_request_jobs_outcomes_name_closed_unmerged_and_a_board_jobs_do_not():
+    with pytest.raises(Refused, match="its outcomes are work-pushed, closed-unmerged, other"):
+        _end(_pr_job(), "not-needed", "x", ref="pr:41")
+    with pytest.raises(Refused, match="its outcomes are work-pushed, other$"):
+        _end(Store(_record()), "not-needed", "x")

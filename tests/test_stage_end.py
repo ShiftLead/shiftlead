@@ -682,3 +682,10 @@ def test_any_other_outcome_clears_the_check_waits_mark():
     store = _store(check_waits=9)
     _end(store, "other", "something else")
     assert store.record["check_waits"] is None
+
+
+def test_closed_unmerged_is_refused_from_a_stages_session():
+    store = _store()
+    with pytest.raises(Refused, match="closed-unmerged ends a pull request's job alone"):
+        _end(store, "closed-unmerged", "closed it")
+    assert store.record["holder"] == ME

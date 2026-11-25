@@ -23,7 +23,7 @@ from typing import Any
 
 from shiftlead import stage_audit
 from shiftlead.stage_audit import LEASE_PREFIX
-from shiftlead.stage_end import Refused
+from shiftlead.stage_end import CLOSED_UNMERGED, PR_JOB_ALONE, Refused
 from shiftlead.stagerecord import StageStore
 
 TID = re.compile(r"\bTD-[1-9]\d*\b")
@@ -99,6 +99,8 @@ def end_audit(
     lease, or `Refused` with nothing written. `team` is the calling session's; `given()` the home's handed-out ids of
     the repo (`ids.json`'s `given`); `line(text)` writes the home's plain board line and returns its id. The line is
     written before the record, so a record that then fails to be written leaves a line the retry writes again."""
+    if outcome == CLOSED_UNMERGED:
+        raise Refused(PR_JOB_ALONE)
     parts = split_ref(ref)
     if parts is None:
         raise Refused(f"{ref} is no audit run's reference")

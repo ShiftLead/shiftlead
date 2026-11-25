@@ -180,3 +180,10 @@ def test_a_record_at_no_review_stage_is_refused_a_review_session(world):
     for stage in ("build", "qa", None):
         with pytest.raises(teams.TeamError):
             reviewed(world, {**BOARD, "stage": stage})
+
+
+def test_only_a_pull_request_jobs_session_is_told_closed_unmerged():
+    pr = stage_job_start.told(PR, team="t", adds_review=False)
+    assert "- `closed-unmerged`: a reason is given, and the pull request is closed and not merged" in pr
+    board = stage_job_start.told(BOARD, team="t", adds_review=False)
+    assert "closed-unmerged" not in board
