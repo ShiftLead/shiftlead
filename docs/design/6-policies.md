@@ -719,7 +719,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      under `on_work: ask` the answer then waits on the Inbox's team-start row, with no `free-pick` fallback) — and
      in `free-pick` as before where there is none. The answer is a design's next step (*Go*, *One more round*,
      *Hold: <note>*), its designer knows the round, and a grinder that took it could only carry it to a
-     design-first entry (§4.9a *What a session does with a decided line*). It carries TD-n's `Owner:` and is
+     design-first entry, or a *Go* on a line naming no gate to a new `decide` item on the design's gate
+     (§4.9a *What a session does with a decided line*, *A design's answer*). It carries TD-n's `Owner:` and is
      narrowed by a lane's `owner:<word>` as an entry is. **The design's own designer first**: of the designers to
      reach, the one whose own `progress` names TD-n in its latest word (`claimed` or `done`, the design PR's merge
      being a `done`; never `dropped`), the newest such word winning, is the order's `for` — and the line matches that
