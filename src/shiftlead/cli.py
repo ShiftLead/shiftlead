@@ -5540,7 +5540,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
-    plans = None
+    plans, builtins = None, None
     try:
         org, notes = _org_notes("ao switch-over check")
     except (ValueError, OSError, yaml.YAMLError) as e:  # a node, or an org file that cannot be read
@@ -5549,8 +5549,9 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         for note in notes:
             print(note, file=sys.stderr)
         plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos())
-        blockers += more
-    print("\n".join(switchover.report(host, made, blockers, plans)))
+        builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
+        blockers += more + sets
+    print("\n".join(switchover.report(host, made, blockers, plans, builtins)))
     return 1 if any(not b.day for b in blockers) else 0
 
 
