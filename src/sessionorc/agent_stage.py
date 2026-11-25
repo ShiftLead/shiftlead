@@ -16,7 +16,7 @@ from importlib.metadata import entry_points
 from pathlib import PurePath
 from typing import Any
 
-from sessionorc import hosts, naming, seams, teamstore, workorders
+from sessionorc import hosts, naming, seams, seats, teamstore, workorders
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import ACT_TIMEOUT, RpcError, log
 from sessionorc.agent_ids import origin_key
@@ -147,6 +147,21 @@ def held_ref(ref: str, *, jobs: bool = False) -> bool:
     return jobs and bool(HELD.fullmatch(ref))
 
 
+def _run_fields(s: Session) -> dict[str, Any]:
+    """What a stage row's `run` copies from the ending session's record (§4.9c *Each holder leaves a `run`*), a node's
+    session's as the home mirrors it: its model, tool and version, login (none until TD-2068 and TD-2069 put it on the
+    record), `created` and the home's `person_asks`."""
+    return {
+        "model": s.model,
+        "tool": s.adapter,
+        "tool_version": s.tool_version,
+        "login": getattr(s, "login", None),
+        "login_moves": getattr(s, "login_moves", None),
+        "created": s.created,
+        "person_asks": s.person_asks,
+    }
+
+
 class StageMixin:
     def _stage_entry(self, s: Any, *, jobs: bool = False) -> str:
         """The one entry a stage's session holds: its lane is that entry (§4.8). With `jobs`, a job's work order or an
@@ -183,6 +198,8 @@ class StageMixin:
             outcome=outcome,
             reason=reason,
             seen=seen,
+            session=_run_fields(s),
+            spent=lambda: seats.record_reading(self._seats, s.id)["models"],  # type: ignore[attr-defined]
         )
         if "refused" in got:
             raise RpcError(str(got["refused"]))

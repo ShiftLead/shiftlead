@@ -358,3 +358,44 @@ def test_an_entry_another_is_blocked_by_can_be_archived_and_a_missing_one_is_gon
     store = StageStore(repo)
     assert store.archive("TD-999", "no such entry") == {"gone": True}
     assert store.archive("TD-191", "the person's answer")["pr"]
+
+
+def _m(turns, figure, **kinds):
+    return {"input": 0, "output": 0, **kinds, "turns": turns, "unweighed": 0, "figure": figure}
+
+
+def test_a_runs_spend_is_the_reading_less_its_offers_apart_by_unit():
+    before = {"opus": _m(2, {"≈$": 0.5}, input=10)}
+    now = {"opus": _m(5, {"≈$": 0.5, "$": 0.3}, input=30)}  # it moved to a metered login on a later day
+    assert stagerecord.spend_since(now, before) == {"opus": _m(3, {"≈$": 0.0, "$": 0.3}, input=20)}
+    assert stagerecord.spend_since(now, {}) == now
+
+
+@pytest.mark.parametrize(
+    "now",
+    [
+        {"opus": _m(1, {"≈$": 0.5}, input=10)},  # fewer turns than at the offer
+        {"opus": _m(5, {"$": 0.6}, input=30)},  # the offer's unit is gone: a day's unit changed after it
+        {"sonnet": _m(5, {"≈$": 0.6}, input=30)},  # the offer's model is gone
+        None,  # no reading
+        {"opus": _m(5, {"≈$": "lots"}, input=30)},  # a value that is no number
+    ],
+)
+def test_a_difference_below_zero_or_a_missing_model_or_unit_is_null(now):
+    assert stagerecord.spend_since(now, {"opus": _m(2, {"≈$": 0.5}, input=10)}) is None
+
+
+def test_a_forgotten_session_records_run_keeps_what_the_record_and_the_ledger_hold():
+    record = {**new_record("TD-7", "f", "build", team="t"), "flow_hash": "h", "spent_before": {"s": {}}}
+    run = stagerecord.run_of(record, "s@node", None, {"opus": _m(1, {"≈$": 0.1})}, ended="E")
+    assert [k for k, v in run.items() if v is None] == [
+        "model",
+        "tool",
+        "tool_version",
+        "login",
+        "login_moves",
+        "started",
+        "asks",
+    ]
+    assert (run["session"], run["team"], run["flow"], run["flow_hash"], run["ended"]) == ("s", "t", "f", "h", "E")
+    assert run["models"] == {"opus": _m(1, {"≈$": 0.1})}

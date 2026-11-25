@@ -308,6 +308,11 @@ class _Session:
     team = "t"
     lane: ClassVar[list[str]] = ["TD-7"]
     progress: ClassVar[list] = []
+    model = "claude-opus-5-5"
+    adapter = "claude-code"
+    tool_version = "2.3.1"
+    created = "2026-11-25T10:00:00Z"
+    person_asks = 2
 
 
 class _Agent(agent_stage.StageMixin):
@@ -380,6 +385,17 @@ def test_a_session_on_a_node_ends_its_stage_with_its_own_worktrees_facts(monkeyp
     asyncio.run(agent.rpc_stage_end(ME, "work-pushed", caller=f"{ME}@node"))
     assert agent.asked == [("node", "stage_worktree", {"dir": "/node/repo/wt"})]
     assert got["root"] == "/home-checkout" and got["seen"] == NODE_READING and got["caller"] == f"{ME}@node"
+    assert got["session"] == {
+        "model": "claude-opus-5-5",
+        "tool": "claude-code",
+        "tool_version": "2.3.1",
+        "login": None,
+        "login_moves": None,
+        "created": "2026-11-25T10:00:00Z",
+        "person_asks": 2,
+    }
+    agent._seats = {"days": {}}
+    assert got["spent"]() == {}, "the node's session's spend is read by its bare id from the home's seat ledger"
     assert agent.reported == [(f"{ME}@node", {"ref": "TD-7", "status": "done", "caller": f"{ME}@node"})]
 
 
@@ -689,3 +705,124 @@ def test_closed_unmerged_is_refused_from_a_stages_session():
     with pytest.raises(Refused, match="closed-unmerged ends a pull request's job alone"):
         _end(store, "closed-unmerged", "closed it")
     assert store.record["holder"] == ME
+
+
+SESSION = {
+    "model": "claude-opus-5-5",
+    "tool": "claude-code",
+    "tool_version": "2.3.1",
+    "login": None,
+    "login_moves": None,
+    "created": "2026-11-25T10:00:00Z",
+    "person_asks": 1,
+}
+BEFORE = {"opus": {"input": 10, "output": 5, "turns": 2, "unweighed": 0, "figure": {"≈$": 0.5}}}
+NOW = {
+    "opus": {"input": 25, "output": 9, "turns": 5, "unweighed": 1, "figure": {"≈$": 1.25}},
+    "haiku": {"input": 3, "output": 1, "turns": 1, "unweighed": 0, "figure": {"$": 0.01}},
+}
+
+
+def _end_run(store, outcome="work-pushed", reason="", *, session=SESSION, spent=lambda: NOW, caller=ME, **kw):
+    return end(store, "TD-7", caller, outcome, reason, FLOW, Fake(_pr()), "paul", session=session, spent=spent, **kw)
+
+
+def test_an_accepted_end_leaves_the_holders_run_on_its_row():
+    store = _store(flow_hash="f" * 64, spent_before={ME: BEFORE}, team="t")
+    _end_run(store)
+    run = store.record["history"][-1]["run"]
+    assert {k: run[k] for k in ("session", "team", "flow", "flow_hash", "spent_before")} == {
+        "session": ME,
+        "team": "t",
+        "flow": "t",
+        "flow_hash": "f" * 64,
+        "spent_before": BEFORE,
+    }
+    assert (run["model"], run["tool"], run["tool_version"], run["started"], run["asks"]) == (
+        "claude-opus-5-5",
+        "claude-code",
+        "2.3.1",
+        "2026-11-25T10:00:00Z",
+        1,
+    )
+    assert run["login"] is None and run["login_moves"] is None and run["ended"]
+    assert run["models"] == {
+        "haiku": {"input": 3, "output": 1, "turns": 1, "unweighed": 0, "figure": {"$": 0.01}},
+        "opus": {"input": 15, "output": 4, "turns": 3, "unweighed": 1, "figure": {"≈$": 0.75}},
+    }
+
+
+def test_a_node_holders_run_names_its_bare_session_id():
+    store = _store(holder=f"{ME}@node", spent_before={ME: BEFORE})
+    _end_run(store, caller=f"{ME}@node")
+    run = store.record["history"][-1]["run"]
+    assert run["session"] == ME and run["spent_before"] == BEFORE and run["models"] is not None
+
+
+def _boom():
+    raise OSError("the seat ledger is gone")
+
+
+@pytest.mark.parametrize(
+    ("kw", "before"),
+    [
+        ({}, None),  # no value at the offer: the run's spend unknown
+        ({"spent": _boom}, BEFORE),  # the end-side reading raises
+        ({"spent": None}, BEFORE),  # no reader
+    ],
+)
+def test_a_row_whose_spend_cannot_be_taken_is_written_with_models_null(kw, before):
+    store = _store(spent_before={ME: before} if before else {})
+    assert _end_run(store, **kw)["went"] == "review"
+    run = store.record["history"][-1]["run"]
+    assert run["models"] is None and run["spent_before"] == before
+
+
+def test_a_blocked_move_keeps_its_blocked_on_its_row():
+    store = _store("review", branch="td7-thing", pr=9, counts={"review:changes-wanted": 3}, moves=6)
+    _end_run(store, "changes-wanted", "still wrong")
+    row = store.record["history"][-1]
+    assert row["blocked"] == {"to": "build", "count": "review:changes-wanted"} == store.record["blocked"]
+    assert "run" in row
+
+
+@pytest.mark.parametrize(
+    ("after", "went"),
+    [
+        ({"waits": "merging"}, "merge"),
+        ({"waits": "parts"}, "merge"),
+        ({"waits": "person"}, "person"),
+        ({"closed_at": "2026-11-25T12:00:00Z"}, "done"),
+        ({"stage": "build"}, "build"),  # re-entered by the home
+    ],
+)
+def test_a_retry_after_a_home_row_is_answered_with_where_the_entry_is_now(after, went):
+    store = _store()
+    _end_run(store)
+    writes = store.writes
+    store.record["history"].append({"from": "review", "outcome": "ended", "by": "home", "to": "review"})
+    store.record.update(after)
+    got = _end_run(store)
+    assert got["repeat"] is True and got["went"] == went and store.writes == writes
+
+
+def test_a_later_runs_session_under_the_same_id_is_not_taken_for_the_holder():
+    store = _store()
+    _end_run(store)
+    with pytest.raises(Refused, match="not yours"):
+        _end_run(store, session={**SESSION, "created": "2026-11-26T09:00:00Z"})
+
+
+def test_a_retry_whose_last_row_has_no_run_is_matched_on_its_by():
+    store = _store()
+    _end(store, "work-pushed")
+    store.record["history"][-1].pop("run", None)
+    assert _end_run(store, session={**SESSION, "created": "another"})["repeat"] is True
+
+
+def test_a_retry_after_the_persons_answer_row_is_still_refused():
+    store = _store()
+    _end_run(store)
+    store.record["history"].append({"from": "review", "outcome": "answer", "by": "paul", "to": "review"})
+    with pytest.raises(Refused, match="not yours"):
+        _end_run(store)

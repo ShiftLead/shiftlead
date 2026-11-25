@@ -423,3 +423,92 @@ class StageStore:
         }
         self.put_entry(record, "waits on the person")
         return got
+
+
+HOME = "home"  # the `by` of a row the home writes (§4.9c)
+SESSION_FIELDS = ("model", "tool", "tool_version", "login", "login_moves", "created", "person_asks")
+"""What a row's `run` copies from the holder's session record (§4.9c *Each holder leaves a `run`*), as the host agent
+hands it: `tool` the record's adapter, `created` its `started`, `person_asks` its `asks`."""
+
+
+def bare(holder: Any) -> str:
+    """A holder's session id as `seat_spend.json` keys it: the home's `<id>@<node>` without its `@<node>`."""
+    return str(holder).split("@", 1)[0]
+
+
+def spend_since(now: Any, before: Any) -> dict[str, Any] | None:
+    """`run.models` (§4.9c): per model `now` less `before`, each a reading of `seats.record_reading`'s `models`, each
+    figure apart by unit and rounded to 4 places. None where either is not a reading, where a model, field or unit of
+    `before` is absent from `now`, or where any difference is below zero: the run's spend unknown, never guessed."""
+    try:
+        return _since(now, before)
+    except (TypeError, ValueError):  # a stored value edited by hand into no number: unknown, never a failed end
+        return None
+
+
+def _since(now: Any, before: Any) -> dict[str, Any] | None:
+    if not isinstance(now, Mapping) or not isinstance(before, Mapping):
+        return None
+    if any(name not in now for name in before):
+        return None
+    out: dict[str, Any] = {}
+    for name, n in now.items():
+        b = before.get(name) or {}
+        if not isinstance(n, Mapping) or not isinstance(b, Mapping):
+            return None
+        row: dict[str, Any] = {}
+        for k in {*n, *b} - {"figure"}:
+            if k not in n:
+                return None
+            d = int(n.get(k) or 0) - int(b.get(k) or 0)
+            if d < 0:
+                return None
+            row[k] = d
+        nf, bf = n.get("figure") or {}, b.get("figure") or {}
+        if not isinstance(nf, Mapping) or not isinstance(bf, Mapping) or any(u not in nf for u in bf):
+            return None
+        figure = {u: round(float(f) - float(bf.get(u) or 0.0), 4) for u, f in nf.items()}
+        if any(f < 0 for f in figure.values()):
+            return None
+        out[str(name)] = {**dict(sorted(row.items())), "figure": figure}
+    return out
+
+
+def run_of(
+    record: Mapping[str, Any], holder: Any, session: Mapping[str, Any] | None, now: Any, *, ended: str | None = None
+) -> dict[str, Any]:
+    """The `run` a row that ends `holder` carries (§4.9c *Each holder leaves a `run`*): `session` the holder's
+    session record's fields (`SESSION_FIELDS`), None where it is forgotten, which leaves `null` what it supplies;
+    `now` that id's `models` reading at this moment, None where it could not be read. `team`, `flow` and `flow_hash`
+    are the record's as it stands, and `spent_before` the id's sums at its offer, which `models` is taken less."""
+    sid = bare(holder)
+    before = (record.get("spent_before") or {}).get(sid)
+    s = session or {}
+    return {
+        "session": sid,
+        "team": record.get("team"),
+        "flow": record.get("flow"),
+        "model": s.get("model"),
+        "tool": s.get("tool"),
+        "tool_version": s.get("tool_version"),
+        "login": s.get("login"),
+        "login_moves": s.get("login_moves"),
+        "started": s.get("created"),
+        "ended": ended or _now(),
+        "models": spend_since(now, before) if before is not None else None,
+        "spent_before": before,
+        "asks": s.get("person_asks"),
+        "flow_hash": record.get("flow_hash"),
+    }
+
+
+def where_now(record: Mapping[str, Any]) -> str:
+    """Where an entry is now, in the words `ao stage end` answers with (§4.9c, §4.7): `done` for a closed record,
+    `person` where it waits on the person, `merge` where it waits `merging` or for its `parts`, else its stage."""
+    if record.get("closed_at"):
+        return "done"
+    if record.get("waits") == "person":
+        return "person"
+    if record.get("waits") in ("merging", "parts"):
+        return "merge"
+    return str(record.get("stage"))
