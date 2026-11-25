@@ -3041,8 +3041,12 @@ def inbox_sections(
     # several stuck rows with one actor and reason on one surface read once (§6 rule 13, TD-1497)
     for rows in out.values():  # per section: a *waiting* row never cuts a counted one
         stuck_cut(rows)
-    queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
-    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
+    # an undecided line covering only members asked early counts in no **Needs you (n)**, top bar or rail (§4.4 *A
+    # question whose entry only waits is asked early*, TD-2172): its early mark is the reading's (`item_home`)
+    counted = [e for e in out["needs"] if not (e.get("early") and e.get("row") == "board")]
+    queue_n = sum(1 for e in counted if e["home"] == "queue")
+    overdue = sum(1 for e in counted if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
+    return {**out, "count": len(counted), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 
 
 # -- the rail (design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**; TD-129,
@@ -3610,6 +3614,9 @@ def ledger_for_you(
             # its design, where it is a held build: what a covering line's Go releases (`ui.queue.releases_of`, TD-2026)
             **({"held_by": held_of[q]} if q in held_of else {}),
             "open_work": work.get(q) or [],  # the fact, which a covering line reads (`ui.queue.line_then_yours`)
+            # what an early member waits on, which a covering line and an `ask --lift` read (`ui.queue.line_early`,
+            # `ui.queue.mail_early`, TD-2172)
+            "early_line": how.early.get(q, ""),
         }
         for q, e in opens.items()
     }
