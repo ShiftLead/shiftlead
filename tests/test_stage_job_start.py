@@ -103,3 +103,17 @@ def test_the_briefs_ship_with_the_package():
     for seat in stage_job.SEATS:
         assert stage_job_start.brief_of(seat)
     assert stage_job_start.JOB_TEMPLATE.is_file()
+
+
+def test_a_job_takes_no_members_profile_and_runs_an_agent(world):
+    _, team, _ = world
+    team.members[0].profile = "some-shell"
+    x = made(world, BOARD).launch
+    assert x.profile == "" and x.adapter == teams.profiles.DEFAULT_ADAPTER != teams.profiles.SHELL_ADAPTER
+
+
+def test_a_flow_with_no_stage_for_other_entries_adds_no_review(world):
+    doc = builtin("build")
+    doc["stages"][0]["takes"] = "design-first"
+    assert stage_job_start.job_stage(doc) is None
+    assert stage_job_start.job_stage({"stages": [{"name": "x", "takes": "any"}]}) == "x"

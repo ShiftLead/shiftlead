@@ -138,6 +138,8 @@ def launch(
         )
     except ValueError as e:
         raise teams.TeamError(f"{where}: {e}") from None
+    # no member's or role's profile: a job runs on the seat's model and the set's login (§4.9d *The login a seat
+    # starts on*), which TD-2068 launches on; until then the package's default adapter, never a shell
     x = teams.Launch(
         name=name,
         role=role.name,
