@@ -621,36 +621,41 @@ def _land(org: Org, here: str, repos_of: ReposOf | None) -> None:
         if host == here:
             continue
         team.host = host
-        if org.checkout(repo, host) is not None:
-            continue
-        p = org.heading(repo)
-        fix = (
-            f"add `{host}: <path>` under `projects.{p.name}.repos.{repo}` in org.yml"
-            if p is not None
-            else f"register the one checkout of {repo} on {host} (design §5 *Repos*)"
-        )
         try:
-            if repos_of is None:
-                raise OSError("nothing here asks a host for its registry")
-            found = _named(repos_of(host), repo)
+            got = host_checkout(org, repo, host, repos_of)
         except OSError as e:
             org.unlanded[team.name] = (
                 f"team {team.name}: `place:` puts it on {host}, whose registry could not be read ({e}) — "
                 "nothing was started"
             )
             continue
-        if len(found) != 1:
-            org.unlanded[team.name] = (
-                f"team {team.name}: `place:` puts it on {host}, whose registry "
-                + (
-                    f"holds {repo} {len(found)} times ({', '.join(found)})"
-                    if found
-                    else f"holds no checkout named {repo}"
-                )
-                + f" — {fix}"
-            )
+        if isinstance(got, str):
+            org.unlanded[team.name] = f"team {team.name}: `place:` puts it on {host}, whose registry {got}"
             continue
-        org.checkouts.setdefault(repo, {})[host] = Path(found[0])
+        org.checkouts.setdefault(repo, {})[host] = got
+
+
+def host_checkout(org: Org, repo: str, host: str, repos_of: ReposOf | None) -> Path | str:
+    """Where `repo` is checked out on `host`, as a team start finds it (§4.9 *The repo is the team's repo*): the path
+    the org file gives under the repo's heading for that host, used as it stands with nothing asked; else the one
+    entry of the host's registry, asked through `repos_of`, that is `repo`. Where the registry holds none or several,
+    what it holds and the fix, in a start's words (*holds no checkout named …* — the caller says *whose registry*);
+    a registry that cannot be read raises `OSError`."""
+    if (at := org.checkout(repo, host)) is not None:
+        return at
+    p = org.heading(repo)
+    fix = (
+        f"add `{host}: <path>` under `projects.{p.name}.repos.{repo}` in org.yml"
+        if p is not None
+        else f"register the one checkout of {repo} on {host} (design §5 *Repos*)"
+    )
+    if repos_of is None:
+        raise OSError("nothing here asks a host for its registry")
+    found = _named(repos_of(host), repo)
+    if len(found) == 1:
+        return Path(found[0])
+    held = f"holds {repo} {len(found)} times ({', '.join(found)})" if found else f"holds no checkout named {repo}"
+    return f"{held} — {fix}"
 
 
 def with_repos(

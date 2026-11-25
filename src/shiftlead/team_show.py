@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 
 from sessionorc import builtinstore, logins, teamstore
-from shiftlead import flow3, flow_save, repoconfig
+from shiftlead import flow3, flow_save, flowdefs, repoconfig
 from shiftlead import org as orgmod
 from shiftlead.stage_acts import switch_case
 from shiftlead.stage_read import flow_on
@@ -328,6 +328,8 @@ def call(
 # -- the flow pick and a switch (§4.9d *The flow pick and a switch*, TD-2062) ---------------------------------------
 
 NODE_REPO_FLOW = "unknown: a node's checkout is not read here yet"
+# which of a repo's flows a node's checkout holds (`{name: held}`), or why it was not read (§4.9d, TD-2062)
+OnNode = Mapping[str, bool] | str | None
 SWITCH_LINES = {
     "stays": "stays in {stage}, and its session carries on",
     "to-person": "its stage is gone: it comes to you, its branch and pull request kept",
@@ -348,8 +350,17 @@ def _offered(team: str, doc: Mapping[str, Any], roots: Iterable[str | Path]) -> 
     return offered(str(doc["teams"][team]["repo"]), roots)
 
 
-def cannot_pick(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], rows: Mapping[str, Any], here: str) -> Any:
-    """Why `team` cannot run the flow of `row`, *cannot run here: …*, or None."""
+def cannot_pick(
+    team: str,
+    row: Mapping[str, Any],
+    entry: Mapping[str, Any],
+    rows: Mapping[str, Any],
+    here: str,
+    on_node: OnNode = None,
+) -> Any:
+    """Why `team` cannot run the flow of `row`, *cannot run here: …*, or None. For a team on a node, a repo flow is
+    judged by `on_node` (§4.9c *An org flow or role is not usable by a team on a node*): which of the repo's flows the
+    node's checkout holds, as the host agent read them there (`node_flow_paths`), or why they were not read."""
     if row["problems"]:
         return f"cannot run here: {row['problems'][0]}"
     node = str(entry.get("host") or here)
@@ -357,7 +368,13 @@ def cannot_pick(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], row
         if row["place"] == "own":
             return f"not followable: an org flow, and {team} runs on {node} — define it in the repo"
         if row["place"] == "repo":
-            return NODE_REPO_FLOW
+            if on_node is None:
+                return NODE_REPO_FLOW
+            if isinstance(on_node, str):
+                return f"unknown: {on_node}"
+            if not on_node.get(str(row["name"])):
+                return f"not followable: {row['name']} is not in {node}'s checkout of {entry.get('repo')} yet"
+            return None
         return None  # a package flow rides the wheel; a node's logins are not read here
     doc = row["doc"]
     models = list(
@@ -367,8 +384,47 @@ def cannot_pick(team: str, row: Mapping[str, Any], entry: Mapping[str, Any], row
     return f"cannot run here: {why}" if why else None
 
 
+def node_flow_paths(team: str, doc: Mapping[str, Any], here: str, roots: Iterable[str | Path]) -> dict[str, str]:
+    """For a team on a node, the path in its repo's checkout of each of the repo's flows the home sees, `{name:
+    path}`, for the host agent to ask the node for (§4.9c: a repo flow the node's checkout does not hold yet is not
+    followable); none for a team here."""
+    if str(doc["teams"][team].get("host") or here) == here:
+        return {}
+    where = [Path(r).expanduser() for r in roots]
+    return {
+        str(r["name"]): str(flowdefs.REPO_DIR / str(r["name"]) / "flow.yml")
+        for r in _offered(team, doc, where)
+        if r["place"] == "repo"
+    }
+
+
+def node_checkout(team: str, doc: Mapping[str, Any], repos_of: orgmod.ReposOf) -> str:
+    """Where a node team's repo is checked out on its node, found as its start finds it (`org.host_checkout`: the org
+    file's path for the node first, else the node's one registry entry of the repo, asked through `repos_of`), for
+    the host agent to read its flows there (§4.9c). Where it cannot be told, raises with the start's reason, the node
+    named first; the pick then reads each repo flow *unknown*."""
+    entry = doc["teams"][team]
+    host, repo = str(entry.get("host") or ""), str(entry.get("repo") or "")
+    try:
+        org = orgmod.load()
+    except ValueError as e:  # a start refuses on the same file
+        raise ValueError(f"{host}'s checkout of {repo} could not be told: {e}") from None
+    try:
+        got = orgmod.host_checkout(org, repo, host, repos_of)
+    except OSError as e:
+        raise ValueError(f"{host}'s registry could not be read ({e})") from None
+    if isinstance(got, str):
+        raise ValueError(f"{host}'s registry {got}")
+    return str(got)
+
+
 def choices(
-    team: str, doc: Mapping[str, Any], rows: Mapping[str, Mapping[str, Any]], here: str, roots: Iterable[str | Path]
+    team: str,
+    doc: Mapping[str, Any],
+    rows: Mapping[str, Mapping[str, Any]],
+    here: str,
+    roots: Iterable[str | Path],
+    on_node: OnNode = None,
 ) -> list[dict[str, Any]]:
     """The flow pick (§4.9d): every flow the team could be given, each it cannot run with its reason, `current` the
     one it runs. One reading, which the switch is refused by too."""
@@ -379,7 +435,7 @@ def choices(
             "name": r["name"],
             "place": r["place"],
             "current": r["name"] == entry.get("flow"),
-            "cannot_run": cannot_pick(team, r, entry, rows, here),
+            "cannot_run": cannot_pick(team, r, entry, rows, here, on_node),
         }
         for r in _offered(team, doc, where)
     ]
@@ -401,7 +457,14 @@ def _keys(flow_doc: Mapping[str, Any], old: Any = None) -> list[str]:
 
 
 def _picked(
-    team: str, flow: str, doc: Mapping[str, Any], rows: Any, here: str, where: list[Path], check: bool = True
+    team: str,
+    flow: str,
+    doc: Mapping[str, Any],
+    rows: Any,
+    here: str,
+    where: list[Path],
+    check: bool = True,
+    on_node: OnNode = None,
 ) -> Mapping[str, Any]:
     """The flow row a switch to `flow` would run, refused (ValueError) where the team cannot run it; with `check`
     False, only where there is no such flow, for a switch a restart finishes, which was checked when it was pressed."""
@@ -411,7 +474,7 @@ def _picked(
         raise ValueError(f"there is no flow named {flow} that {team} could be given")
     if flow == entry.get("flow"):
         raise ValueError(f"{team} already runs {flow}")
-    why = cannot_pick(team, row, entry, rows, here) if check else None
+    why = cannot_pick(team, row, entry, rows, here, on_node) if check else None
     if why:
         raise ValueError(f"{team} cannot be switched to {flow}: {why}")
     return row
@@ -455,6 +518,7 @@ def switch_preview(
     here: str,
     roots: Iterable[str | Path],
     live: Iterable[str] = (),
+    on_node: OnNode = None,
 ) -> dict[str, Any]:
     """The switch preview (§4.9d): every open record of the team and what a switch to `flow` does to it, and the
     sessions-at-once numbers it drops. `refused` says why the team cannot run it, and Switch now is then disabled. A
@@ -470,7 +534,7 @@ def switch_preview(
         "version": teamstore.version(doc, team),
     }
     try:
-        row = _picked(team, flow, doc, rows, here, where)
+        row = _picked(team, flow, doc, rows, here, where, on_node=on_node)
     except ValueError as e:
         return {**out, "refused": str(e), "records": [], "drops": [], "none_ended": True}
     root = _root(str(entry["repo"]), where)
@@ -499,12 +563,13 @@ def switch_push(
     here: str,
     roots: Iterable[str | Path],
     check: bool = True,
+    on_node: OnNode = None,
 ) -> list[str]:
     """A switch's commit point (§4.9d): the team's copy of `flow` pushed to the state branch, unless the copy already
     is it (a switch a restart finishes). Its stage keys, for the numbers kept. Raises where the team cannot run the
     flow (ValueError) and where the branch is not written (`StateError`, a refused push `StateRefused`)."""
     where = [Path(r).expanduser() for r in roots]
-    row = _picked(team, flow, doc, rows, here, where, check)
+    row = _picked(team, flow, doc, rows, here, where, check, on_node)
     root = _root(str(doc["teams"][team]["repo"]), where)
     if root is None:
         raise StateError(f"{doc['teams'][team]['repo']} is not a registered checkout here")

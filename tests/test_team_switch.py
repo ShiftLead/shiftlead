@@ -7,15 +7,18 @@ from __future__ import annotations
 import asyncio
 import copy
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from sessionorc import link
 from sessionorc import settings as settings_mod
 from sessionorc import teamstore as ts
 from sessionorc.agent_common import RpcError
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_stage import stage_teams
+from shiftlead import org as orgmod
 from shiftlead import stage_fetch, team_show
 from shiftlead.stage_acts import Reading, choose, switch_case
 from shiftlead.stage_read import flow_on
@@ -136,6 +139,106 @@ def test_a_team_on_a_node_is_offered_no_org_flow(monkeypatch):
     monkeypatch.setattr(team_show.flow_save, "listing", _listing(NEW))
     got = {c["name"]: c for c in team_show.choices("t", _doc(host="far"), {}, "home", ["/x/shiftlead"])}
     assert got["lean"]["cannot_run"].startswith("not followable: an org flow, and t runs on far")
+
+
+def _with_repo_flows(*names):
+    rows = [{"name": "lean", "place": "own", "doc": NEW, "text": "", "problems": []}]
+    rows += [{"name": n, "place": "repo", "repo": "shiftlead", "doc": NEW, "text": "", "problems": []} for n in names]
+    return lambda _roots: {"flows": rows}
+
+
+def test_a_node_teams_repo_flow_is_judged_by_what_the_nodes_checkout_holds(monkeypatch):
+    """§4.9c *An org flow or role is not usable by a team on a node*, §4.9d (TD-2062 slice 3): a repo flow the node's
+    checkout does not hold yet is not followable, by name; a node that did not answer reads unknown, never offered."""
+    monkeypatch.setattr(team_show.flow_save, "listing", _with_repo_flows("merged", "branch"))
+    doc = _doc(host="far")
+    assert team_show.node_flow_paths("t", doc, "home", ["/x/shiftlead"]) == {
+        "merged": ".shiftlead/flows/merged/flow.yml",
+        "branch": ".shiftlead/flows/branch/flow.yml",
+    }
+    assert team_show.node_flow_paths("t", _doc(), "home", ["/x/shiftlead"]) == {}, "a team here asks no node"
+
+    def pick(on_node):
+        return {c["name"]: c["cannot_run"] for c in team_show.choices("t", doc, {}, "home", ["/x"], on_node)}
+
+    held = pick({"merged": True, "branch": False})
+    assert (
+        held["merged"] is None and held["branch"] == "not followable: branch is not in far's checkout of shiftlead yet"
+    )
+    assert held["lean"].startswith("not followable: an org flow"), "an org flow is never a node team's"
+    assert pick("far did not answer: link down")["merged"] == "unknown: far did not answer: link down"
+    assert pick(None)["merged"] == team_show.NODE_REPO_FLOW, "not asked: not read, as the switch-over check says"
+
+
+def _on_node_agent(agent, monkeypatch, repos, org=None):
+    """An agent whose node `far` answers its registry with `repos` (a list, or an error to raise) and its files with
+    `m.yml` held and `b.yml` not; the checkout found by the start's own helper, on `org` (the org file)."""
+    monkeypatch.setattr(team_show.orgmod, "load", lambda: org or orgmod.Org())
+    a = agent(SimpleNamespace())
+    asked = []
+
+    async def registry(host):
+        if isinstance(repos, Exception):
+            raise repos
+        return {"host": host, "repos": list(repos)}
+
+    class Mux:
+        async def request(self, method, **kw):
+            asked.append((method, kw["dir"], kw["paths"]))
+            return {"dir": kw["dir"], "files": {"m.yml": "name: merged\n", "b.yml": None}}
+
+    a.rpc_host_repos, a._node_mux = registry, lambda _host: Mux()
+    return a, asked
+
+
+def _node_body(paths=None):
+    paths = paths or {"merged": "m.yml", "branch": "b.yml"}
+    return SimpleNamespace(node_flow_paths=lambda *_a: paths, node_checkout=team_show.node_checkout)
+
+
+def _ask(a, body=None):
+    return asyncio.run(a._on_node(body or _node_body(), "t", _doc(host="far"), "home", []))
+
+
+def test_the_host_agent_asks_the_node_which_repo_flows_its_checkout_holds(agent, monkeypatch):
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/other", "/srv/shiftlead"])
+    assert _ask(a) == {"merged": True, "branch": False} and asked == [("files", "/srv/shiftlead", ["m.yml", "b.yml"])]
+    many = {f"f{i}": f"f{i}.yml" for i in range(17)}  # past the 16 files a node reads in one request
+    asked.clear()
+    assert _ask(a, _node_body(many)) == dict.fromkeys(many, False) and [len(p) for _m, _d, p in asked] == [16, 1]
+    assert asyncio.run(a._on_node(SimpleNamespace(node_flow_paths=HERE), "t", _doc(), "home", [])) is None
+
+
+def test_the_nodes_checkout_is_found_as_a_start_finds_it(agent, monkeypatch):
+    """The org file's path for the node first, with nothing asked of the registry; else the registry's one entry,
+    two of them refused as a start refuses them (`org.host_checkout`, the helper `_land` takes)."""
+    org = orgmod.Org(checkouts={"shiftlead": {"far": Path("/org/shiftlead")}})
+    a, asked = _on_node_agent(agent, monkeypatch, OSError("the registry is not asked"), org)
+    assert _ask(a) == {"merged": True, "branch": False} and asked[0][1] == "/org/shiftlead"
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/shiftlead", "/home/x/shiftlead"])
+    assert (
+        _ask(a)
+        == (
+            "far's registry holds shiftlead 2 times (/srv/shiftlead, /home/x/shiftlead) — register the one checkout of"
+            " shiftlead on far (design §5 *Repos*)"
+        )
+        and not asked
+    )
+    a, asked = _on_node_agent(agent, monkeypatch, ["/srv/other"])
+    assert _ask(a).startswith("far's registry holds no checkout named shiftlead — register") and not asked
+
+
+def test_a_node_that_cannot_be_read_says_why(agent, monkeypatch):
+    a, _ = _on_node_agent(agent, monkeypatch, RpcError("far did not answer: the link dropped"))
+    assert _ask(a) == "far's registry could not be read (far did not answer: the link dropped)"
+    a, _ = _on_node_agent(agent, monkeypatch, ["/srv/shiftlead"])
+
+    class Refusing:
+        async def request(self, method, **kw):
+            raise link.LinkError("path outside the checkout")
+
+    a._node_mux = lambda _host: Refusing()
+    assert _ask(a) == "far: path outside the checkout", "a node's refusal in host_files' words, not *did not answer*"
 
 
 # -- the preview and the push ---------------------------------------------------------------------------------------
@@ -270,6 +373,10 @@ def agent(tmp_path, monkeypatch):
     return make
 
 
+def HERE(*_a):  # a team here: no node is asked for its repo flows
+    return {}
+
+
 def _body(pushes, *, refuse=None, seen=None):
     def push(**kw):
         if seen is not None:
@@ -279,7 +386,7 @@ def _body(pushes, *, refuse=None, seen=None):
         pushes.append(kw["flow"])
         return ["build", "docs"]
 
-    return SimpleNamespace(switch_push=push)
+    return SimpleNamespace(switch_push=push, node_flow_paths=HERE)
 
 
 def test_switch_now_marks_pushes_writes_the_key_and_clears_the_mark(agent):
@@ -314,7 +421,7 @@ def test_a_switch_is_refused_while_another_is_under_way_and_over_a_newer_version
 
 def test_a_switch_waits_out_a_stage_pass_already_running(agent):
     order = []
-    a = agent(SimpleNamespace(switch_push=lambda **_kw: order.append("push") or ["build"]))
+    a = agent(SimpleNamespace(switch_push=lambda **_kw: order.append("push") or ["build"], node_flow_paths=HERE))
 
     async def go():
         async def pass_():
@@ -356,7 +463,7 @@ def test_the_preview_rpc_answers_the_pick_and_says_an_unread_branch(agent):
     def preview(**kw):
         raise OSError("origin away")
 
-    a = agent(SimpleNamespace(choices=lambda *a: [{"name": "lean"}], switch_preview=preview))
+    a = agent(SimpleNamespace(choices=lambda *a: [{"name": "lean"}], switch_preview=preview, node_flow_paths=HERE))
     got = asyncio.run(a.rpc_team_switch_preview(team="t"))
     assert got["choices"] == [{"name": "lean"}] and got["version"] == ts.version(settings_mod.load(), "t")
     with pytest.raises(RpcError, match="no preview of t's switch: origin away"):
