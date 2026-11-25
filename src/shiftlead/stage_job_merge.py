@@ -7,7 +7,8 @@ again under it before anything is merged or written. The gate ends one of four w
 
 - it passes, and the home merges; the record stays `merging` until Reconcile reads its object gone (the pull request
   nobody held merged, or a board answer's line archived by its pull request) and closes it;
-- a cause a session can cure takes the job stage's `refused` move for `work-pushed`, counted as any move's: back to
+- a cause a session can cure takes the `refused` move of the outcome that sent the job to merge, from the stage that
+  gave it (the job stage's `work-pushed`, or a review stage's `ship`), counted as any move's: back to
   the job's own stage, where the seat's next pass starts a fresh job session told the failing rows, or to a review
   stage; anywhere else, a limit or the cap reached, the job goes to the person;
 - a row only a person can cure sends the job to the person, spending no limit: they merge by hand, which ends the job,
@@ -99,30 +100,33 @@ def _no_reading(store: StageStore, key: str, head: str | None, why: str, line: L
 
 
 def _refused(store: StageStore, key: str, head: str | None, doc: Mapping[str, Any], why: str, line: Line) -> Made:
-    """A cause a session can cure: the job stage's `refused` move for `work-pushed`, its limit and the flow's cap
+    """A cause a session can cure: the `refused` move of the outcome and stage `merging` names (the job stage's
+    `work-pushed`, or a review stage's `ship`), its limit and the flow's cap
     counted as any move's. A destination a job never goes to, `merge` among them, is the person's."""
     with store.locked():
         record = _current(store, key, head)
         if record is None:
             return Made(False, "the record moved while the gate ran")
         here = job_stage(doc)
-        stage = _stage(doc, here)
+        merging = record.get("merging") or {}
+        at = str(merging.get("stage") or here or "")  # the stage whose outcome sent the job to merge
+        stage = _stage(doc, at) if here is not None else None
         if here is None or stage is None:
             return _to_person(store, record, f"the merge was refused: {why}", line)
-        outcome = str((record.get("merging") or {}).get("outcome") or "work-pushed")
+        outcome = str(merging.get("outcome") or "work-pushed")
         raw = destination(stage, outcome).get("refused", "person")
         where = destination({"refused": raw}, "refused")
         went = _where(doc, here, str(where["to"]))
         if went in ("person", "merge"):
             return _to_person(store, record, f"the merge was refused: {why}", line)
-        count, counts = f"{here}:refused", dict(record.get("counts") or {})
+        count, counts = f"{at}:refused", dict(record.get("counts") or {})
         limit, cap = where.get("limit"), doc.get("max-moves", flow3.MAX_MOVES)
         if limit is not None and int(counts.get(count, 0)) >= int(limit):
             return _to_person(store, record, f"the merge was refused ({why}), and refused reached its limit", line)
         if int(record.get("moves") or 0) >= int(cap):
             return _to_person(store, record, f"the merge was refused ({why}), and the job reached the flow's cap", line)
         counts[count] = int(counts.get(count, 0)) + 1
-        step = {"from": here, "outcome": "refused", "reason": why, "by": "home", "to": went, "head": head, "at": _now()}
+        step = {"from": at, "outcome": "refused", "reason": why, "by": "home", "to": went, "head": head, "at": _now()}
         store.put_job(
             {
                 **record,
