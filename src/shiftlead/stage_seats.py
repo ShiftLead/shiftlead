@@ -21,8 +21,9 @@ The director's record is the org's: where `org.yml` has `director:` and no recor
 exactly as a first-shape Start does (`teamrun.write_director`), held for rule 3's `prompt` fill whatever teams are
 started; once the key is gone it removes the director's records, as Forget does, when no session of them is live.
 
-Launching a fill on the built-in set's model and login is TD-2068's; a record moved to a new host is a later slice of
-TD-2065.
+Where *Where a seat's session launches* gives a seat another host while its record is ended, the home writes the
+record on that host and marks the old one superseded by it, its mail moved (`seat_moved`); a live or suspended record
+stays where it is until it has ended. Launching a fill on the built-in set's model and login is TD-2068's.
 """
 
 from __future__ import annotations
@@ -226,11 +227,14 @@ def write_techleads(
     made: list[str] = []
     for team in sorted(teams_cfg):
         teamdef = org.teams.get(team)
-        if teamdef is None or not stage_start.team_started(host_teams, team) or techlead_of(graph, team) is not None:
+        if teamdef is None or not stage_start.team_started(host_teams, team):
             continue
         entry = teams_cfg.get(team) or {}
         host = str(entry.get("host") or local)
-        if got := _write(call, partial(techlead_launch, org, teamdef, host=host, here=local), TECHLEAD, f"team {team}"):
+        launch = partial(techlead_launch, org, teamdef, host=host, here=local)
+        if got := _write_or_move(
+            call, _currents(graph, TECHLEAD, team=team), host, local, launch, TECHLEAD, f"team {team}"
+        ):
             made.append(got)
     return made
 
@@ -254,11 +258,12 @@ def write_sweepers(
     every = str(switch.get("every") or "")
     made: list[str] = []
     for repo, team in sorted(first.items()):
-        if repo in (switch.get("off") or ()) or sweeper_of(graph, repo) is not None:
+        if repo in (switch.get("off") or ()):
             continue
         teamdef, host = org.teams[team], str((teams_cfg.get(team) or {}).get("host") or local)
-        if got := _write(
-            call, partial(sweeper_launch, org, teamdef, every, host=host, here=local), SWEEPER, f"repo {repo}"
+        launch = partial(sweeper_launch, org, teamdef, every, host=host, here=local)
+        if got := _write_or_move(
+            call, _currents(graph, SWEEPER, name=sweeper_name(repo)), host, local, launch, SWEEPER, f"repo {repo}"
         ):
             made.append(got)
     return made
@@ -279,10 +284,11 @@ def write_prompts(
         return []
     made: list[str] = []
     for repo, team in sorted(_first_started(org, teams_cfg, host_teams).items()):
-        if prompts_of(graph, repo) is not None:
-            continue
         teamdef, host = org.teams[team], str((teams_cfg.get(team) or {}).get("host") or local)
-        if got := _write(call, partial(prompts_launch, org, teamdef, host=host, here=local), PROMPTS, f"repo {repo}"):
+        launch = partial(prompts_launch, org, teamdef, host=host, here=local)
+        if got := _write_or_move(
+            call, _currents(graph, PROMPTS, name=prompts_name(repo)), host, local, launch, PROMPTS, f"repo {repo}"
+        ):
             made.append(got)
     return made
 
@@ -341,7 +347,66 @@ def _first_started(
     return first
 
 
-def _write(call: Callable[..., Any], launch: Callable[[], teams.Launch], key: str, of: str) -> str:
+def _currents(graph: Mapping[str, Session], key: str, *, team: str = "", name: str = "") -> list[Session]:
+    """Every record of one built-in seat superseded by none: two only while a move is half made (`_write_or_move`)."""
+    return [
+        s
+        for s in graph.values()
+        if s.builtin == key and not s.superseded_by and (s.team == team if team else s.name == name)
+    ]
+
+
+def _write_or_move(
+    call: Callable[..., Any],
+    currents: list[Session],
+    host: str,
+    local: str,
+    launch: Callable[[], teams.Launch],
+    key: str,
+    of: str,
+) -> str:
+    """Write the seat's record where none stands, or move the current one where *Where a seat's session launches* now
+    gives another host (§4.9d *How each one runs*): the record written on `host`, then the old one marked superseded
+    by it with its mail moved (`seat_moved`). The host is read again only while the record is ended and not suspended,
+    since a seat's live session finishes where it runs; otherwise nothing is done. Where a record already stands on
+    `host` beside an ended one elsewhere — a move whose `seat_moved` failed — only `seat_moved` is asked again.
+    Returns the id written, "" where nothing was."""
+    if not currents:
+        return _write(call, launch, key, of)
+
+    def at(s: Session) -> str:
+        return s.host or local
+
+    def address(s: Session) -> str:
+        return s.id if at(s) == local else f"{s.id}@{at(s)}"
+
+    away = [s for s in currents if at(s) != host and s.state in ("exited", "closed") and not s.suspended]
+    if here := [s for s in currents if at(s) == host]:
+        for s in away:
+            _moved(call, address(s), address(here[0]), of, key, host)
+        return ""
+    if not away:
+        return ""
+    got = _write(call, launch, key, of, keep=False)
+    if got:
+        new = got if host == local or "@" in got else f"{got}@{host}"
+        for s in away:
+            _moved(call, address(s), new, of, key, host)
+    return got
+
+
+def _moved(call: Callable[..., Any], old: str, new: str, of: str, key: str, host: str) -> None:
+    """Ask the home to mark `old` superseded by `new` and move its mail; a refusal is a log line, and the next pass,
+    reading both records still current, asks again."""
+    try:
+        call("seat_moved", old=old, new=new)
+    except Exception:  # noqa: BLE001 — a log line; the next pass asks again
+        log.exception("%s: its %s record moved to %s, but %s was not marked superseded", of, key, host, old)
+
+
+def _write(
+    call: Callable[..., Any], launch: Callable[[], teams.Launch], key: str, of: str, *, keep: bool = True
+) -> str:
     """Create one built-in seat's record from `launch()` and return its id, "" where nothing was written: a name a
     live session holds waits for the next pass, a first-shape record of the very name is superseded with its mail kept
     (§4.9d), and a launch that cannot be made or a refused create is a log line."""
@@ -352,7 +417,7 @@ def _write(call: Callable[..., Any], launch: Callable[[], teams.Launch], key: st
         if check.get("verdict") in ("live", "suspended"):
             log.warning("%s: a live session holds %s, so its %s record waits", of, x.name, key)
             return ""
-        keep = check.get("verdict") == "supersede" and check.get("holder_state") != "unrecorded"
+        keep = keep and check.get("verdict") == "supersede" and check.get("holder_state") != "unrecorded"
         got = call("create", **create_params(x, keep_mail=keep, builtin=key))
     except Exception:  # noqa: BLE001 — one record failing is a log line, never another's or the pass
         log.exception("%s: its %s record could not be written", of, key)
