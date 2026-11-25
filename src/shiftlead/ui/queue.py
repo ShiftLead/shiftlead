@@ -1016,11 +1016,11 @@ def attach(
             e = {**e, "lift_reply": lift}
         if (
             e.get("row") == "ledger"
-            and (want in WANTS or (want == "answered" and answered_case(e) == "then_yours"))
+            and (want in WANTS or (want == "answered" and answered_case(e) in ("then_yours", "early")))
             and (str(e.get("on_row") or "") in strip_rows or covered_by(e, strip))
         ):
-            # only the entry's own question goes, its grey *waiting, then yours* too, the line standing in its place
-            # (TD-1926): *with you* and *answered* are no question to draw over
+            # only the entry's own question goes, its grey *waiting, then yours* and *asked early* too, the line
+            # standing in its place (TD-1926, TD-2172): *with you* and *answered* are no question to draw over
             return
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
         pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)

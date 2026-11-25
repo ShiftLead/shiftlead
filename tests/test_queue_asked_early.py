@@ -224,3 +224,17 @@ def test_the_later_row_draws_the_early_line_with_its_question_whole(tmp_path):
     html = inbox(_early_row(tmp_path), section="later")
     assert "Asked early: your answer acts once TD-002 closes" in html
     assert "Not clear" in html and "Reply" in html, "its question drawn whole"
+
+
+@pytest.mark.unit
+def test_a_covering_line_stands_in_an_early_entrys_place():
+    from test_queue_covers_once import ENTRIES, index, ledger_row, line
+
+    from shiftlead.ui.queue import attach, item_home
+
+    idx = index(("r#TD-050", [50, 51, 52]))
+    placed = {**line(), **item_home(line(), idx, entries=ENTRIES)}
+    later = [ledger_row(n, "r#TD-050") for n in (50, 52)]
+    later.append({**ledger_row(51, "r#TD-050"), "early": True, "early_line": "once TD-055 closes"})
+    got = attach({"needs": [placed]}, lambda e, sec: e.get("key") or e.get("id"), later)["cards"]["r#TD-050"]["needs"]
+    assert [m["html"] for m in got] == ["board:k1"], "the line alone, no early item beside it"
