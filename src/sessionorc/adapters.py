@@ -101,6 +101,11 @@ class Adapter(Protocol):
     #                                                      permission, added by the adapter's own `launch`
     #                                                      under `permission_prompts: all` (§4.2a, TD-823);
     #                                                      unset, nothing is added
+    #   skip_args: list[str]                              the launch arguments that make an unattended launch skip
+    #                                                      permission prompts, the launch's own where a profile
+    #                                                      names no `unattended_args`: a login whose
+    #                                                      `unattended_args` lack them leaves its prompts on
+    #                                                      (§4.3, §4.9e, TD-2071); unset, it is not read
     #   cadence_hook_line: str                            the SessionStart command the adapter's launch carries
     #                                                      for agent-cadence (design §5 *The seams*): a repo whose
     #                                                      `.claude/settings.json` lacks it is warned on the Repo

@@ -289,6 +289,7 @@ class GeminiAdapter:
     marks_errors = True  # a tool call's `status` word (design §4.3 `read_transcript`, TD-1719)
     state_source: Confidence = "hook"
     scratch_env: str | None = None  # Gemini CLI names no temp variable of its own: `TMPDIR` (§4.3, §4.6)
+    skip_args = YOLO  # an unattended launch's own, which skip its prompts (§4.3 `skip_args`, TD-2071)
     # the tool writes its state into its terminal title: the tick asks `explain` with the pane's title
     # and writes its verdict with `confidence: title` (design §4.2 *A title the tool writes its state into*)
     state_in_title = True
