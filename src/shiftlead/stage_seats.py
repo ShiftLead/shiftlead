@@ -322,8 +322,8 @@ def write_director(
                 continue
             try:
                 call("remove", id=r["id"])
-            except Exception:  # noqa: BLE001 — one not removed is a log line and the next pass's to try again
-                log.exception("the director record %s could not be removed", r.get("id"))
+            except Exception as e:  # noqa: BLE001 — one not removed is a log line and the next pass's to try again
+                log.warning("the director record %s could not be removed: %s", r.get("id"), e)
                 continue
             gone.append(f"{r.get('name') or r['id']}: removed, the org has no director")
         return gone
