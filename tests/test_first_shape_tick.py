@@ -315,6 +315,7 @@ async def test_the_tagging_seat_is_a_built_in_one_after_the_marker(agent):
     assert agent._tagging_seat("/tmp/repo", records) is old
     await _cut_over(agent)
     assert agent._tagging_seat("/tmp/repo", records) is None
+    agent._host_rec["teams"] = {"g": {"started": {"since": "2026-12-01T00:00:00Z", "by": "person"}}}
     built_in = _asks_seat(agent, "lead", builtin="tech-lead")
     assert agent._tagging_seat("/tmp/repo", [old, built_in]) is built_in
 
@@ -339,6 +340,7 @@ async def test_a_first_shape_sweeper_does_not_stand_in_for_a_built_in_one_after_
     old.seat = {"trigger": "swept"}
     built_in = _asks_seat(agent, "sweeper", builtin="sweeper")
     built_in.seat = {"trigger": "swept", "by": "settings"}
+    agent._host_rec["teams"] = {"g": {"started": {"since": "2026-12-01T00:00:00Z", "by": "person"}}}
     records = [old, built_in]
     await _cut_over(agent, marked=False)
     assert agent._sweep_idle(built_in, records) == "other"

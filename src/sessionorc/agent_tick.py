@@ -4339,9 +4339,14 @@ class TickMixin:
             await self._push_changes()
         # *A stopped team's seats are held* (§6 rule 3, TD-1564): read every pass, due or not, before the
         # link-down return, which keeps the mark as it keeps its others
-        held = work_mod.held_for(s, records)
-        word = work_mod.seats_held_by([r for r in records if r.team == s.team]) if held else None
-        await self._stop_held(s, {"at": word["at"], "by": word["by"], "team": s.team} if word else None)
+        if s.builtin and self._first_shape_off:
+            hold = self._builtin_hold(s, records)  # after the cut-over, *When they run* (§4.9d)
+            held = hold is not None
+            await self._stop_held(s, hold)
+        else:
+            held = work_mod.held_for(s, records)
+            word = work_mod.seats_held_by([r for r in records if r.team == s.team]) if held else None
+            await self._stop_held(s, {"at": word["at"], "by": word["by"], "team": s.team} if word else None)
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
         mark = s.restart_ceiling
@@ -4630,6 +4635,51 @@ class TickMixin:
         first = self._first_seat(root, records, lambda m: m.get("trigger") == "swept" and m.get("by") == "settings")
         return "" if first is s else "other"
 
+    def _started_teams(self) -> set[str]:
+        """The teams carrying the home's started mark (§4.9d *Started is a mark the home keeps*)."""
+        marks = self._host_rec.get("teams")
+        return {str(t) for t in marks or {} if teamstore.started(marks, str(t))} if isinstance(marks, dict) else set()
+
+    def _repo_teams(self, root: str) -> set[str]:
+        """The teams of the repo at `root`: `settings.yml`'s `teams` whose `repo` is the repo's roster name."""
+        name = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+        doc = settings_mod.load()
+        held = doc.get("teams") if isinstance(doc, dict) else None
+        if not isinstance(held, dict):
+            return set()
+        return {str(t) for t, e in held.items() if isinstance(e, dict) and e.get("repo") == name}
+
+    def _builtin_runs(self, r: Session, started: set[str]) -> bool:
+        """Whether a built-in seat's record is one whose seat runs by its started teams (§4.9d *When they run*): a tech
+        lead's while its own team is started, a repo's seat's (no `team`) while any of the repo's teams is."""
+        if r.team:
+            return r.team in started
+        return bool(started & self._repo_teams(str(r.repo or "")))
+
+    def _builtin_hold(self, s: Session, records: list[Session]) -> dict[str, Any] | None:
+        """After the cut-over, a built-in seat's hold by §4.9d *When they run* (TD-2065): None where a fill is allowed,
+        else its `stop_held` mark, `{at, by, team}` from the last `stopped` of the teams it serves. A tech lead's runs
+        while its team is started and on while that team's unattended sessions finish; a repo's seat (the sweeper, the
+        prompts seat) while any of the repo's teams is started, the prompts seat also on while a session of one of
+        them finishes. A seat is counted as no team's finishing session."""
+        if self._builtin_runs(s, self._started_teams()):
+            return None
+        serves = {s.team} if s.team else self._repo_teams(str(s.repo or ""))
+        if (s.team or s.builtin == "prompts") and any(
+            r.team in serves
+            and r.unattended
+            and r.state not in work_mod.DEAD
+            and not r.superseded_by
+            and r.seat is None
+            and not r.builtin
+            for r in records
+        ):
+            return None  # a wound-down team's session finishing: its question is still answered
+        marks = self._host_rec.get("teams") if isinstance(self._host_rec.get("teams"), dict) else {}
+        stops = [st for t in serves if isinstance(st := (marks.get(t) or {}).get("stopped"), dict)]
+        last = max(stops, key=lambda st: str(st.get("at") or ""), default={})
+        return {"at": str(last.get("at") or ""), "by": str(last.get("by") or "other"), "team": s.team or ""}
+
     @staticmethod
     def _live_teams(records: list[Session]) -> set[str]:
         """The teams with an unattended session live (§4.9 *Starting and stopping*)."""
@@ -4640,16 +4690,19 @@ class TickMixin:
     def _first_seat(self, root: str, records: list[Session], marked: Any) -> Session | None:
         """Among the repo's seats whose mark `marked` takes and whose team is live — supervised,
         unattended, unsuspended — the one whose team comes first in the ledger's `declared_teams`, a
-        team it leaves out after, by name (§4.4 *An entry names its team*)."""
+        team it leaves out after, by name (§4.4 *An entry names its team*). After the cut-over a team is
+        read by its started mark, not its live sessions, and a repo's seat (no `team`) stands while any of
+        the repo's teams is started (§4.9d *When they run*), so a closed built-in record is taken."""
         led = (self._repos.get(root) or {}).get("ledger") or {}
         declared = [str(t).casefold() for t in led.get("declared_teams") or []]
         live = self._live_teams(records)
+        started = self._started_teams() if self._first_shape_off else None
         seats = [
             r
             for r in records
             if r.repo == root
             and marked(r.seat or {})
-            and r.team in live
+            and (r.team in live if started is None else self._builtin_runs(r, started))
             and r.supervised
             and r.unattended
             and not r.superseded_by
