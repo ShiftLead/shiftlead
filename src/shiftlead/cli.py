@@ -5522,6 +5522,25 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return emit(args, result, lambda: print(f"{args.behavior}: {pend['text']}"))
 
 
+def cmd_switch_over_check(args: argparse.Namespace) -> int:
+    """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles and every
+    blocker, nothing changed; exit 1 while a blocker to cure beforehand stands."""
+    from shiftlead import profiles as profiles_mod
+    from shiftlead import switchover
+
+    try:
+        profs, _ = profiles_mod.load()
+    except (OSError, ValueError, TypeError, AttributeError) as e:
+        print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
+        return 1
+    from sessionorc import hosts
+
+    host = hosts.local_host().name
+    made, blockers = switchover.host_logins(host, profs)
+    print("\n".join(switchover.report(host, made, blockers)))
+    return 1 if any(not b.day for b in blockers) else 0
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     from shiftlead import migrate
 
@@ -6807,6 +6826,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("migrate", help="once, with no session running: move ~/.agentorc and the old units to shiftlead's names")
     p.set_defaults(fn=cmd_migrate)
+
+    p = add("switch-over", help="the one-time move from profiles and members to logins and flows (§4.9e)")
+    so_sub = p.add_subparsers(dest="switch_action", required=True)
+    q = so_sub.add_parser("check", help="print what the move would make and what stands in its way; changes nothing")
+    q.set_defaults(fn=cmd_switch_over_check)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])

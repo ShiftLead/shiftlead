@@ -259,6 +259,9 @@ class Adapter(Protocol):
     #                                                      exception holds it); `display` a name, never an email;
     #                                                      `billing` the tool's record read as `subscription` or
     #                                                      `metered`, None where it does not say — only a suggestion
+    #   model_family(model: str) -> str | None            the family a model id maps to through the adapter's table
+    #                                                      (§4.2b), None for one it has none for: the switch-over's
+    #                                                      pin of a login (TD-2071)
     #   models(home: Path, plan: str | None) -> dict      the model families the account offers (§4.2b):
     #                                                      {families, default, unconfirmed} — `model_offer` over the
     #                                                      adapter's tables of each plan's families; a plan the table
