@@ -5522,6 +5522,15 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return emit(args, result, lambda: print(f"{args.behavior}: {pend['text']}"))
 
 
+def _repo_readings() -> dict[str, Any]:
+    """The home's last repo reading, `repos.json` by checkout (§4.4 *Repo facts*); {} where there is none."""
+    try:
+        got = json.loads(paths.repos_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return got if isinstance(got, dict) else {}
+
+
 def cmd_switch_over_check(args: argparse.Namespace) -> int:
     """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles, named by the
     answers file, each team with what the answers give it, and every blocker, nothing changed; exit 1 while a blocker
@@ -5573,7 +5582,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     answers, blockers = switchover.read_answers()
     made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
     blockers += more + switchover.unnamed(host, made, answers)
-    plans, builtins, director = None, None, None
+    plans, builtins, director, flights = None, None, None, None
     if org is None:
         blockers.append(switchover.Blocker("the org", str(org_error), "mend org.yml, or run the check on the home"))
     else:
@@ -5583,7 +5592,8 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         if org.director is not None:  # the profile it launches on today: its own, else the profiles file's default
             director, more = switchover.director(answers, made, builtins, org.director.profile or default)
             blockers += more
-    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director)))
+        flights = switchover.in_flight(_repo_readings(), org)
+    print("\n".join(switchover.report(host, made, blockers, plans, builtins, director, flights)))
     return 1 if any(not b.day for b in blockers) else 0
 
 

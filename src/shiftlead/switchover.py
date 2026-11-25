@@ -24,7 +24,8 @@ It blocks too on a director list whose every login leaves its prompts on: its `u
 `skip_args` (§4.9d *How each one runs*).
 `suggest` and `write_answers` are `--answers`: the answers file written where there is none, with what §4.9e *The
 answers file* says the home can suggest. The seats a picked flow lacks, the open asks to a first-shape member or seat,
-the work in flight, a container node's logins and `--host` are later slices of TD-2071.
+a container node's logins and `--host` are later slices of TD-2071. `in_flight` lists the work in flight from the home's
+last repo reading, by the Offer act's own function, each session the window ends taken as gone.
 """
 
 from __future__ import annotations
@@ -770,6 +771,7 @@ def report(
     plans: Iterable[TeamPlan] | None = None,
     builtins: SetPlan | None = None,
     director: DirectorPlan | None = None,
+    flights: Iterable[Flight] | None = None,
 ) -> list[str]:
     """`ao switch-over check`'s lines: the host's logins, the teams where `plans` is given, the built-in set where
     `builtins` is, the director where `director` is, then every blocker, those of the day last."""
@@ -786,6 +788,8 @@ def report(
         lines += set_lines(builtins)
     if director is not None:
         lines += director_lines(director)
+    if flights is not None:
+        lines += flight_lines(flights)
     blockers = list(blockers)
     first = [b for b in blockers if not b.day]
     day = [b for b in blockers if b.day]
@@ -924,3 +928,99 @@ def write_answers(doc: Mapping[str, Any], path: Path | None = None) -> bool:
     finally:
         tmp.unlink(missing_ok=True)
     return True
+
+
+@dataclass
+class Flight:
+    """One repo's work in flight as the home will take it up after the window (§4.9e *Work in flight*): the entries
+    taken up with their pull requests, those that wait, those whose pull request is not read at its head yet, and the
+    branches nothing will read. `unread` says why the repo's pull requests were not read; the repo is then no
+    blocker, and nothing else is listed."""
+
+    repo: str
+    taken: list[tuple[str, int, str]] = field(default_factory=list)  # (entry, pull request, branch)
+    waits: list[tuple[str, str]] = field(default_factory=list)  # (entry, why)
+    unknown: list[tuple[str, str]] = field(default_factory=list)  # (entry, why): its PR's files not read at its head
+    nobodys: list[tuple[str, str]] = field(default_factory=list)  # (branch, why)
+    unread: str | None = None
+
+
+def in_flight(
+    readings: Mapping[str, Mapping[str, Any]],
+    org: Any,
+    *,
+    branches_of: Callable[[str], frozenset[str] | None] | None = None,
+) -> list[Flight]:
+    """Each repo of `org`'s teams, from the home's last repo reading (`readings`, `repos.json` by checkout), with what
+    `stage_work.entry_work` — the Offer act's own function — gives each entry a team's lane may pick, every session
+    the window ends taken as gone (no pull request is held). A branch holding two entries' ids is nobody's work, and a
+    pushed branch that holds an entry's id with no open pull request is read by nothing (`branches_of`, origin's
+    branches by `git ls-remote`; None, not read). A person's own session's hold is not read here."""
+    from shiftlead import stage_fetch, stage_read, stage_work
+
+    branches_of = branches_of or stage_fetch.pushed_branches
+    by_repo: dict[str, list[str]] = {}
+    for name in sorted(org.teams):
+        if name not in getattr(org, "unlanded", {}):
+            by_repo.setdefault(str(org.teams[name].repo), []).append(name)
+    out: list[Flight] = []
+    for repo, names in sorted(by_repo.items()):
+        flight = Flight(repo)
+        out.append(flight)
+        root, reading = next(((k, v) for k, v in readings.items() if isinstance(v, Mapping) and v.get("name") == repo),
+                             (None, None))  # fmt: skip
+        prs = reading.get("prs") if reading is not None else None
+        if not isinstance(prs, Mapping) or "error" in prs or not isinstance(prs.get("open"), list):
+            flight.unread = (
+                "the home has not read its pull requests"
+                if reading is None or prs is None
+                else (f"its pull requests could not be read: {prs.get('error') if isinstance(prs, Mapping) else prs}")
+            )
+            continue
+        rows = [r for r in prs["open"] if isinstance(r, Mapping)]
+        entries = (reading.get("ledger") or {}).get("entries") or []
+        for e in entries:
+            tid = str(e.get("id") or "")
+            if not tid or not any(stage_read.pickable_on(dict(e), team) for team in names):
+                continue
+            work = stage_work.entry_work(tid, rows)
+            if work.state == "take" and work.pr is not None:
+                flight.taken.append((tid, int(work.pr["number"]), str(work.pr.get("branch") or "")))
+            elif work.state == "wait":
+                flight.waits.append((tid, work.why))
+            elif work.state == "unread":
+                flight.unknown.append((tid, work.why))
+        for r in rows:
+            ids = stage_work.branch_ids(r.get("branch"))
+            if len(ids) > 1 and r.get("state") == "open" and not r.get("fork"):
+                flight.nobodys.append((str(r["branch"]), f"#{r.get('number')} holds {', '.join(sorted(ids))}"))
+        pushed = branches_of(root) if root is not None and Path(root).is_dir() else None
+        if pushed is None:
+            flight.nobodys.append(("", "origin's branches could not be read"))
+            continue
+        with_pr = {str(r.get("branch")) for r in rows}
+        for b in sorted(pushed - with_pr):
+            ids = stage_work.branch_ids(b)
+            if ids:
+                flight.nobodys.append((b, f"holds {', '.join(sorted(ids))} and has no open pull request"))
+    return out
+
+
+def flight_lines(flights: Iterable[Flight]) -> list[str]:
+    """`ao switch-over check`'s lines for the work in flight (§4.9e *Work in flight*)."""
+    lines = ["work in flight, as the home will take it up after the window"]
+    flights = list(flights)
+    for f in flights:
+        if f.unread is not None:
+            lines.append(f"  {f.repo}: not read — {f.unread}")
+            continue
+        lines.append(f"  {f.repo}:")
+        lines += [f"    taken up with its pull request: {tid} #{n} ({b})" for tid, n, b in f.taken]
+        lines += [f"    waits, offered to nobody: {tid} — {why}" for tid, why in f.waits]
+        lines += [f"    not yet known: {tid} — {why}" for tid, why in f.unknown]
+        lines += [f"    nothing will read: {b + ' — ' if b else ''}{why}" for b, why in f.nobodys]
+        if not (f.taken or f.waits or f.unknown or f.nobodys):
+            lines.append("    nothing in flight: every pickable entry is offered afresh")
+    if not flights:
+        lines.append("  none: the org defines no team")
+    return lines
