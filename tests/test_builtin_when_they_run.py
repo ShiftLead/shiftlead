@@ -200,7 +200,7 @@ async def test_before_the_cut_over_a_built_in_mark_reads_the_first_shape_hold(ag
 
 async def test_a_held_built_in_tech_lead_takes_no_blank_pick_and_one_started_does(agent):
     """A blank Team pick's target is able and not held (§4.10 *A team or a repo as the address*, TD-1564): after the
-    cut-over a built-in tech lead's hold is §4.9d's, so a wound-down team's lead refuses it and a started one takes it."""
+    cut-over a built-in tech lead's hold is §4.9d's, a wound-down team's lead refuses it, a started one takes it."""
     await _cut(agent, a=_stopped(), b=STARTED)
     held = _seat(agent, "techlead-a", "techlead", team="a")
     started = _seat(agent, "techlead-b", "techlead", team="b")
