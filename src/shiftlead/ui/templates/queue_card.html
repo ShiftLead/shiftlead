@@ -54,7 +54,7 @@
           top entry *stalled* beside a *stalled* status is drawn once, the status's (§4.5 screen 12, TD-1724); a top
           entry's restart word on the row its restart row is homed on is none, the pill counting that Do item (TD-1856) #}
       {%- set mine_word = (t.state or '').startswith('with you in') and not t.needs and not (c.wait and c.wait.id == t.qid) %}
-      {%- if not mine_word %}{{ holder(t.holder) }}{% endif %}{% if t.state and t.state != 'ready' and (not t.needs or t.then_yours or t.held_by) and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) and not (t.state == 'stalled' and c.status == 'stalled') and not (t.restart_home and t.restart_word) %}{{ state(t, True) }}{% endif %}
+      {%- if not mine_word %}{{ holder(t.holder) }}{% endif %}{% if t.state and t.state != 'ready' and (not t.needs or t.then_yours or t.early or t.held_by) and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) and not (t.state == 'stalled' and c.status == 'stalled') and not (t.restart_home and t.restart_word) %}{{ state(t, True) }}{% endif %}
       {#- the header's ⋯ acts on the top entry, the same macro as a row's (§4.5 screen 12 *Three verbs: ⋯*, TD-914);
           then **Its own page**, a link, so a *done* header keeps it (TD-1808) #}
       {%- if not t.ext %}{{ menu(t) }}{% endif %}

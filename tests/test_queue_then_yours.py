@@ -78,7 +78,8 @@ def test_a_lone_marked_member_waits_with_its_blocker(tmp_path):
     root, r = _one(tmp_path / "b", _entry(1, "held", Priority="High", Blocked_by="TD-002, decision (paul)"),
                    _entry(2, "in progress", Priority="High"))  # fmt: skip
     c = _card(_read({root: r}), "r#TD-001")
-    assert _row(_read({root: r}), "r#TD-001")["state"] == WORD
+    row = _row(_read({root: r}), "r#TD-001")  # a blocker alone is a wait: asked early (TD-2172)
+    assert row["state"] == "asked early" and row["early_line"] == "once TD-002 closes" and not row["then_yours"]
     assert c["status"] == "ready" and c["wait"] is None
 
 
@@ -86,7 +87,8 @@ def test_a_lone_marked_member_waits_with_its_blocker(tmp_path):
 def test_a_cross_repo_open_blocker_counts_and_an_unresolved_one_does_not(tmp_path):
     a, ra = _one(tmp_path, _entry(1, "held", Priority="High", Blocked_by="s#TD-005, decision (paul)"), name="r")
     b, rb = _one(tmp_path, _entry(5, "theirs", Priority="High"), name="s")
-    assert _row(_read({a: ra, b: rb}), "r#TD-001")["then_yours"] == ["s#TD-005"]
+    row = _row(_read({a: ra, b: rb}), "r#TD-001")  # a wait, so asked early (TD-2172)
+    assert row["early"] and row["early_line"] == "once s#TD-005 closes" and not row["then_yours"]
     a, ra = _one(tmp_path / "x", _entry(1, "held", Priority="High", Blocked_by="zz#TD-009, decision (paul)"))
     row = _row(_read({a: ra}), "r#TD-001")
     assert row["state"] == "" and not row["then_yours"]
