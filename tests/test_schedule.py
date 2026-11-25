@@ -363,9 +363,104 @@ async def test_a_nodes_team_cannot_save_a_schedule(agent):
             await person.call("set_settings", teams={"sw": {"schedule": LOGIN_RULE}})
 
 
-async def test_a_login_rule_fires_nothing_until_its_build(agent, monkeypatch):
+async def test_a_login_rule_fires_nothing_before_the_cut_over(agent, monkeypatch):
     replays = await _setup(agent, monkeypatch, _rec("w"))
     settings_mod.save({"teams": {"g": {"repo": "r", "schedule": LOGIN_RULE}}})
     _reading(agent, datetime.now(UTC) - timedelta(minutes=1))
     await agent._schedules(datetime.now(UTC))
     assert replays.calls == [] and "schedule_next" not in _rec_of(agent)
+
+
+SW_HELD = {
+    "claude-code:a": {"account": "claude-code:acct"},
+    "claude-code:b": {},
+    "claude-code:m": {"billing": "metered"},
+}
+
+
+async def _switched(agent, monkeypatch, logins_=("claude-code:a", "claude-code:b"), rule=LOGIN_RULE) -> _Replays:
+    """A switched team `g` after the cut-over, its schedule on a login (§6 *Schedule*, *After the cut-over*)."""
+    replays = await _setup(agent, monkeypatch, _rec("w"))
+    entry = {"repo": "r", "host": agent.host, "logins": list(logins_), "schedule": rule}
+    settings_mod.save({"cut_over": "2026-12-01", "teams": {"g": entry}})
+    agent._read_cut_over()
+    monkeypatch.setattr("sessionorc.logins.load", lambda *_a: {"logins": SW_HELD, "forgotten": {}})
+    return replays
+
+
+def _acct(agent, key: str, resets: datetime) -> None:
+    agent._usage_acct[key] = {"windows": [{"label": "week", "pct": 3, "resets": _iso(resets)}]}
+
+
+async def test_a_switched_teams_reset_sets_its_started_mark_once_and_replays_nothing(agent, monkeypatch):
+    """TD-2065: at its login's account's reset the schedule starts a team never started (no `stopped`) by its mark."""
+    replays = await _switched(agent, monkeypatch)
+    now = datetime.now(UTC)
+    _acct(agent, "claude-code:acct", now + timedelta(hours=1))
+    await agent._schedules(now)
+    rec = _rec_of(agent)
+    assert "started" not in rec and rec["schedule_next"]["login"] == "claude-code:a"
+    assert agent._schedule_starts("g", LOGIN_RULE, now) == {"at": rec["schedule_next"]["at"]}
+    later = now + timedelta(hours=1, minutes=2)
+    await agent._schedules(later)
+    rec = _rec_of(agent)
+    assert rec["started"]["by"] == "schedule" and rec["schedule_fired"] == _iso(now + timedelta(hours=1))
+    assert replays.calls == [], "a switched team is started by its mark, never by a replay"
+    assert json.loads(paths.host_file().read_text())["teams"]["g"]["started"]["by"] == "schedule"
+    agent._host_rec["teams"]["g"].pop("started")
+    await agent._schedules(later)
+    assert "started" not in _rec_of(agent), "once per reset"
+
+
+@pytest.mark.parametrize(("stopped", "starts"), [({"by": "until"}, True), ({"by": "person"}, False)])
+async def test_the_reset_starts_a_team_its_stop_time_stopped_and_never_one_the_person_wound_down(
+    agent, monkeypatch, stopped, starts
+):
+    await _switched(agent, monkeypatch)
+    now = datetime.now(UTC)
+    agent._host_rec.setdefault("teams", {})["g"] = {"stopped": {"at": _iso(now - timedelta(days=1)), **stopped}}
+    _acct(agent, "claude-code:acct", now - timedelta(minutes=1))
+    await agent._schedules(now)
+    rec = _rec_of(agent)
+    assert ("started" in rec) is starts and ("stopped" in rec) is not starts
+    assert rec["schedule_fired"] == _iso(now - timedelta(minutes=1)), "either way the reset counts as fired"
+
+
+async def test_a_rule_whose_login_left_the_list_reads_the_first_and_a_metered_or_empty_list_starts_nothing(
+    agent, monkeypatch
+):
+    now, gone = datetime.now(UTC), {**LOGIN_RULE, "login": "x:gone"}
+    await _switched(agent, monkeypatch, logins_=("claude-code:b", "claude-code:a"), rule=gone)
+    _acct(agent, "claude-code:b", now - timedelta(minutes=1))
+    await agent._schedules(now)
+    assert _rec_of(agent)["started"]["by"] == "schedule"
+    for order in (("claude-code:m", "claude-code:a"), ()):
+        agent._host_rec.get("teams", {}).pop("g", None)
+        await _switched(agent, monkeypatch, logins_=order, rule=gone)  # the first is read: metered, or none
+        _acct(agent, "claude-code:acct", now - timedelta(minutes=1))
+        agent._usage_acct["claude-code:m"] = agent._usage_acct["claude-code:acct"]
+        await agent._schedules(now)
+        assert "started" not in _rec_of(agent) and "schedule_fired" not in _rec_of(agent), order
+        assert agent._schedule_starts("g", gone, now) == {"at": None}
+
+
+async def test_the_rules_own_login_is_read_where_it_is_in_the_list_and_a_started_team_is_left(agent, monkeypatch):
+    """The named login, not the first, while it is in the list; a reset on a started team leaves its mark as it was."""
+    await _switched(agent, monkeypatch, logins_=("claude-code:b", "claude-code:a"))
+    now = datetime.now(UTC)
+    _acct(agent, "claude-code:acct", now - timedelta(minutes=1))  # `a`'s account alone has a reading
+    since = {"since": _iso(now - timedelta(days=2)), "by": "person"}
+    agent._host_rec.setdefault("teams", {})["g"] = {"started": dict(since)}
+    await agent._schedules(now)
+    rec = _rec_of(agent)
+    assert rec["started"] == since and rec["schedule_fired"] == _iso(now - timedelta(minutes=1))
+
+
+async def test_a_login_rule_answers_no_next_reset_before_the_cut_over(agent, monkeypatch):
+    await _switched(agent, monkeypatch)
+    _acct(agent, "claude-code:acct", datetime.now(UTC) + timedelta(hours=1))
+    assert agent._schedule_starts("g", LOGIN_RULE, datetime.now(UTC))["at"]
+    doc = settings_mod.load()
+    doc.pop("cut_over")
+    settings_mod.save(doc)
+    assert agent._schedule_starts("g", LOGIN_RULE, datetime.now(UTC)) == {"at": None}

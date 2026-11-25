@@ -358,13 +358,49 @@ class SettingsMixin:
             )
         return True
 
+    def _schedule_login(self, doc: dict[str, Any], team: str, rule: Any) -> str | None:
+        """The login a switched team's schedule reads its reset from (§4.9d *When it runs*, TD-2065), resolved as the
+        row resolves it and never refused: the rule's login while it is in the team's list, else the first. None,
+        so nothing starts, where the list is empty, the resolved login is metered (no reset start spends metered
+        money), or the team is on a node, whose logins are not read here."""
+        entry = (doc.get("teams") or {}).get(team) or {}
+        if str(entry.get("host") or hosts.local_host().name) != hosts.local_host().name:
+            return None
+        order = [str(lk) for lk in entry.get("logins") or ()]
+        named = str(rule.get("login") or "") if isinstance(rule, dict) else ""
+        login = named if named in order else (order[0] if order else None)
+        if login is None:
+            return None
+        held = ((logins.load() or logins.empty()).get("logins") or {}).get(login) or {}
+        return None if held.get("billing") == "metered" else login
+
+    def _login_resets(self, login: str, window: str) -> datetime | None:
+        """The reset of `window` in the login's account's reading (§4.9d *When it runs*): None with no reading, or
+        none of that window."""
+        held = ((logins.load() or logins.empty()).get("logins") or {}).get(login) or {}
+        resets: datetime | None = None
+        for w in (self._usage_acct.get(logins.account_of(login, held)) or {}).get("windows") or []:
+            if isinstance(w, dict) and w.get("label") == window:
+                with contextlib.suppress(TypeError, ValueError):
+                    t = _parse(str(w.get("resets")))
+                    resets = t.astimezone(UTC) if t.tzinfo is not None else resets
+        return resets
+
     def _schedule_starts(self, team: str, rule: Any, now: datetime) -> dict[str, Any]:
         """When a team's schedule next fires (§4.7 `ao schedule`, §4.5a *starts* note, TD-133): the
         upcoming reset the tick last read for this rule (`schedule_next` on the home's host record), else
         the reset in the profile's reading while it is ahead — `{at}`, with `held` while a passed reset
         waits for a node's link; `{at: None}` when nothing is known to wait for."""
-        if not isinstance(rule, dict) or not rule.get("profile"):  # a login's rule fires from TD-2065
+        if not isinstance(rule, dict) or not rule.get("window"):
             return {"at": None}
+        login = None
+        if not rule.get("profile"):  # a switched team's rule reads its login's account (§4.9d, TD-2065)
+            doc = settings_mod.load()
+            if not teamstore.cut_over(doc) or not teamstore.switched(doc, team):
+                return {"at": None}  # before the cut-over a login's rule fires nothing (`_schedules`)
+            login = self._schedule_login(doc, team, rule)
+            if login is None:
+                return {"at": None}
 
         def utc(value: Any) -> datetime | None:  # an offset-carrying instant, else None: never a guessed clock
             try:
@@ -379,9 +415,13 @@ class SettingsMixin:
         teams = self._host_rec.get("teams")
         rec = teams.get(team) if isinstance(teams, dict) else None
         nxt = rec.get("schedule_next") if isinstance(rec, dict) else None
-        same = isinstance(nxt, dict) and all(nxt.get(k) == rule.get(k) for k in ("profile", "window"))
+        which = {"login": login, "window": rule["window"]} if login else {k: rule.get(k) for k in ("profile", "window")}
+        same = isinstance(nxt, dict) and all(nxt.get(k) == v for k, v in which.items())
         if same and (at := utc(nxt.get("at"))) is not None:
             return {"at": said(at), **({"held": True} if nxt.get("held") else {})}
+        if login:
+            at = self._login_resets(login, rule["window"])
+            return {"at": said(at.replace(microsecond=0))} if at is not None and at > now else {"at": None}
         for w in self._gate_reading(str(rule.get("profile") or "")).get("windows") or []:
             mine = isinstance(w, dict) and w.get("label") == rule.get("window")
             if mine and (at := utc(w.get("resets"))) is not None and at > now:
