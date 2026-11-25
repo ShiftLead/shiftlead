@@ -1,4 +1,5 @@
-"""The built-in tech lead's record the home writes after the cut-over (design §4.9d *How each one runs*, TD-2065)."""
+"""The built-in tech lead's and sweeper's records the home writes after the cut-over (design §4.9d *How each one runs*,
+TD-2065)."""
 
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ STARTED = {"t": {"started": {"since": "2026-11-25T00:00:00Z", "by": "person"}}}
 def world(tmp_path, monkeypatch):
     monkeypatch.setattr(teams, "_person", lambda *_a: ([], False))
     (tmp_path / "rules.md").write_text("THE REPO RULES\n")
-    (tmp_path / ".shiftlead.yml").write_text("roles: {techlead: {brief: rules.md}}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {techlead: {brief: rules.md}, sweeper: {brief: rules.md}}\n")
     team = SimpleNamespace(name="t", repo="r", members=[])
     org = SimpleNamespace(
         checkout=lambda _repo, _host: str(tmp_path),
@@ -150,6 +151,58 @@ def test_the_record_lands_on_the_teams_host(world):
     assert home.created[0]["host"] == "node"
 
 
+ON = {"on": True, "every": "7d", "off": []}
+
+
+def test_the_sweepers_launch_is_the_repos_record_on_swept_made_by_the_switch(world):
+    org, team, root = world
+    x = stage_seats.sweeper_launch(org, team, "7d", host="h", here="h")
+    assert (x.name, x.role, x.team, x.dir, x.lane) == ("sweeper-r", "sweeper", "", root, [])
+    assert "THE REPO RULES" in x.prompt
+    p = stage_seats.create_params(x, builtin="sweeper")
+    assert p["seat"] == {"trigger": "swept", "after": "7d", "by": "settings"}
+    assert (p["held"], p["builtin"], p["team"], p["worktree"]) == (True, "sweeper", "", "sweeper-r")
+
+
+def test_a_repo_with_a_started_team_gets_one_sweeper_record_while_the_switch_is_on(world):
+    org, _team, _ = world
+    org.teams["u"] = SimpleNamespace(name="u", repo="r", members=[])
+    marks = {**STARTED, "u": STARTED["t"]}
+    home = Home()
+    got = stage_seats.write_sweepers(home, org, {"t": {"host": "node"}, "u": {}}, {}, marks, "h", ON)
+    assert got == ["ao-r-sweeper-r"] and len(home.created) == 1, "one record for the repo, never one per team"
+    assert home.created[0]["host"] == "node", "on the host of the first of the repo's started teams by name"
+    graph = {"ao-r-sweeper-r": record(id="ao-r-sweeper-r", name="sweeper-r", team="", builtin="sweeper")}
+    assert stage_seats.write_sweepers(home, org, {"t": {}, "u": {}}, graph, marks, "h", ON) == []
+    assert len(home.created) == 1, "the record stands, so the next pass writes no second"
+
+
+@pytest.mark.parametrize(
+    "switch",
+    [None, {"on": False, "every": "7d", "off": []}, {"on": True, "every": "7d", "off": ["r"]}],
+    ids=["unread", "off", "repo-off"],
+)
+def test_no_sweeper_record_while_either_switch_is_off(world, switch):
+    org, _team, _ = world
+    home = Home()
+    assert stage_seats.write_sweepers(home, org, {"t": {}}, {}, STARTED, "h", switch) == []
+    assert home.created == []
+
+
+def test_no_sweeper_record_while_no_team_of_the_repo_is_started(world):
+    org, _team, _ = world
+    home = Home()
+    assert stage_seats.write_sweepers(home, org, {"t": {}}, {}, {}, "h", ON) == []
+    assert home.created == []
+
+
+def test_a_first_shape_sweep_seat_is_not_the_repos_sweeper(world):
+    org, _team, _ = world
+    home = Home()
+    graph = {"sw": record(id="sw", name="sweep-t", seat={"trigger": "swept", "after": "7d", "by": "settings"})}
+    assert stage_seats.write_sweepers(home, org, {"t": {}}, graph, STARTED, "h", ON) == ["ao-r-sweeper-r"]
+
+
 @pytest.mark.integration
 async def test_the_home_takes_the_record_held_built_in_and_due_on_a_question(agent, world):
     """The `create` the pass sends: a closed record marked `builtin: techlead` that tags, filled when an ask waits."""
@@ -176,3 +229,28 @@ async def test_the_home_takes_the_record_held_built_in_and_due_on_a_question(age
         assert agent._seat_due(rec, datetime.now(UTC), list(agent.sessions.values())) is None
         await person.call("msg", to=sid, text="is this figure right?", kind="ask")
         assert agent._seat_due(rec, datetime.now(UTC), list(agent.sessions.values())) is not None
+
+
+@pytest.mark.integration
+async def test_the_home_takes_the_sweeper_record_held_built_in_and_of_the_repo(agent, world):
+    """The `create` the pass sends for a sweeper: a closed record marked `builtin: sweeper`, of no team, its seat the
+    switch's `swept` mark."""
+    import subprocess
+
+    from sessionorc.client import LocalClient
+
+    org, team, root = world
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+    x = stage_seats.sweeper_launch(org, team, "7d", host="h", here="h")
+    async with LocalClient() as person:
+        sid = (await person.call("create", **stage_seats.create_params(x, builtin="sweeper")))["id"]
+        rec = agent.sessions[sid]
+        assert (rec.state, rec.builtin, rec.seat, rec.team or "") == (
+            "closed",
+            "sweeper",
+            {"trigger": "swept", "after": "7d", "by": "settings"},
+            "",
+        )
+        assert rec.unattended and rec.supervised and rec.controllers == []
+        assert stage_seats.sweeper_of(agent.sessions, "r") is rec

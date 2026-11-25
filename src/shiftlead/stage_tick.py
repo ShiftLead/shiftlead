@@ -250,6 +250,12 @@ def run(
             log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
     except Exception:  # noqa: BLE001 — the seats' records failing is a log line and never the teams' pass
         log.exception("the seat records of %s could not be written", root)
+    try:  # the repo's built-in sweeper, written where none stands while the sweep switch is on (§4.9d)
+        switch = call("sweep_switch") if any(stage_start.team_started(host_teams, t) for t in teams) else None
+        if wrote := stage_seats.write_sweepers(call, org(), teams, graph, host_teams, local, switch):
+            log.info("the stage pass of %s wrote the built-in seat records %s", root, ", ".join(wrote))
+    except Exception:  # noqa: BLE001 — the sweeper's record failing is a log line and never the teams' pass
+        log.exception("the sweeper record of %s could not be written", root)
     if orders is None or pr_orders is None:
         return got
     try:
