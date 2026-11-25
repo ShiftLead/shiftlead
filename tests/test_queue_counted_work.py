@@ -8,6 +8,8 @@ from __future__ import annotations
 import pytest
 
 from sessionorc import queue
+from sessionorc.agent_common import RpcError
+from sessionorc.agent_inbox import InboxMixin
 
 GATE = "decision (paul)"
 TODAY = "2026-11-25"
@@ -43,28 +45,28 @@ def test_a_gated_blocker_that_waits_on_open_work_counts_as_a_wait_at_each_link()
         _e(3, "TD-004", GATE),
         _e(4, until=["2026-12-20"]),
     )
-    assert c.work["r#TD-003"] == ["r#TD-004"]
-    assert c.work["r#TD-001"] == ["r#TD-003"], "B counts, A with nothing counts for nothing"
+    assert c.wide["r#TD-003"] == ["r#TD-004"]
+    assert c.wide["r#TD-001"] == ["r#TD-003"], "B counts, A with nothing counts for nothing"
     assert not c.parts, "a wait is no open part"
     # blocked by A alone: no counted work, asked as any
     c = _count(_e(1, "TD-002", GATE), _e(2, GATE))
-    assert "r#TD-001" not in c.work
+    assert "r#TD-001" not in c.wide
 
 
 @pytest.mark.unit
 def test_a_members_own_unreached_until_or_event_gate_is_a_date_or_event_wait():
     c = _count(_e(1, GATE, until=["2026-12-01"]), _e(2, GATE, until=["2026-11-25"]), _e(3, GATE, events=["live"]))
     assert c.gates == {"r#TD-001": ["until 2026-12-01"], "r#TD-003": ["event (live)"]}, "a day come is no wait"
-    assert not c.work
+    assert not c.wide
     # a gated blocker whose only wait is its own date counts as a wait id
     c = _count(_e(1, "TD-002", GATE), _e(2, GATE, until=["2026-12-01"]))
-    assert c.work == {"r#TD-001": ["r#TD-002"]} and "r#TD-002" in c.gates
+    assert c.wide == {"r#TD-001": ["r#TD-002"]} and "r#TD-002" in c.gates
 
 
 @pytest.mark.unit
 def test_open_parts_are_the_counted_ids_part_of_the_member_or_its_held_build():
     c = _count(_e(1, "TD-002", GATE), _e(2), _e(3, part_of=1))
-    assert c.work["r#TD-001"] == ["r#TD-002", "r#TD-003"] and c.parts == {"r#TD-001": ["r#TD-003"]}
+    assert c.wide["r#TD-001"] == ["r#TD-002", "r#TD-003"] and c.parts == {"r#TD-001": ["r#TD-003"]}
     # a held build's own open part is among its design's open parts; its blocker is a wait
     c = _count(
         _e(1, GATE),
@@ -73,7 +75,7 @@ def test_open_parts_are_the_counted_ids_part_of_the_member_or_its_held_build():
         _e(4, part_of=2),
         held={"r#TD-002": "r#TD-001"},
     )
-    assert c.work["r#TD-001"] == ["r#TD-003", "r#TD-004"] and c.parts["r#TD-001"] == ["r#TD-004"]
+    assert c.wide["r#TD-001"] == ["r#TD-003", "r#TD-004"] and c.parts["r#TD-001"] == ["r#TD-004"]
 
 
 @pytest.mark.unit
@@ -85,17 +87,17 @@ def test_a_held_build_whose_only_blocker_is_a_gated_entry_that_waits_passes_the_
         _e(4),
         held={"r#TD-002": "r#TD-001"},
     )
-    assert c.work["r#TD-002"] == ["r#TD-003"] and c.work["r#TD-001"] == ["r#TD-003"]
+    assert c.wide["r#TD-002"] == ["r#TD-003"] and c.wide["r#TD-001"] == ["r#TD-003"]
     assert "r#TD-001" not in c.parts
 
 
 @pytest.mark.unit
 def test_a_cycle_of_gated_blockers_counts_for_nothing():
     c = _count(_e(1, "TD-002", GATE), _e(2, "TD-001", GATE))
-    assert not c.work
+    assert not c.wide
     # even where one link of the cycle has open work of its own
     c = _count(_e(1, "TD-002", "TD-003", GATE), _e(2, "TD-001", GATE), _e(3))
-    assert c.work == {"r#TD-001": ["r#TD-003"]}
+    assert c.wide == {"r#TD-001": ["r#TD-003"]}
 
 
 @pytest.mark.unit
@@ -109,7 +111,7 @@ def test_the_fact_is_an_open_part_or_any_counted_work_on_a_gated_owner_paul_entr
 @pytest.mark.unit
 def test_a_chain_of_gated_links_counts_at_each_link_over_several_passes():
     c = _count(_e(1, "TD-002", GATE), _e(2, "TD-003", GATE), _e(3, "TD-004", GATE), _e(4))
-    assert c.work == {"r#TD-001": ["r#TD-002"], "r#TD-002": ["r#TD-003"], "r#TD-003": ["r#TD-004"]}
+    assert c.wide == {"r#TD-001": ["r#TD-002"], "r#TD-002": ["r#TD-003"], "r#TD-003": ["r#TD-004"]}
 
 
 @pytest.mark.unit
@@ -121,4 +123,20 @@ def test_a_gated_blocker_whose_only_work_is_its_held_builds_waits():
         _e(4),
         held={"r#TD-003": "r#TD-002"},
     )
-    assert c.work["r#TD-002"] == ["r#TD-004"] and c.work["r#TD-001"] == ["r#TD-002"]
+    assert c.wide["r#TD-002"] == ["r#TD-004"] and c.wide["r#TD-001"] == ["r#TD-002"]
+
+
+@pytest.mark.unit
+def test_open_work_stays_as_every_reader_reads_it_so_a_press_on_an_early_member_is_not_refused():
+    # a gated entry blocked only by a gated entry that waits until a later day: the wider reading counts the
+    # blocker, `open_work` (what `_refuse_waiting`, the word and the then-yours reads read) does not (techlead, #4674)
+    es = dict([_e(1, "TD-002", GATE), _e(2, GATE, until=["2026-12-01"])])
+    c = queue.counted_work(es, lambda _item: None, {}, today=TODAY)
+    assert c.wide == {"r#TD-001": ["r#TD-002"]} and c.work == {}
+    InboxMixin._refuse_waiting(None, ["r#TD-001"], c.work)  # type: ignore[arg-type]  # not refused
+    # work an open id gives is in both, and still refused as before
+    es = dict([_e(1, "TD-002", GATE), _e(2)])
+    c = queue.counted_work(es, lambda _item: None, {}, today=TODAY)
+    assert c.work == c.wide == {"r#TD-001": ["r#TD-002"]}
+    with pytest.raises(RpcError, match="TD-001 waits on TD-002"):
+        InboxMixin._refuse_waiting(None, ["r#TD-001"], c.work)  # type: ignore[arg-type]

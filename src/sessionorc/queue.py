@@ -2023,11 +2023,14 @@ def with_held(
 
 
 class Counted(NamedTuple):
-    """`counted_work`'s reading: `work`, each member's counted ids (stamped `open_work`); `parts`, those that are open
-    parts (`open_parts`); `gates`, each member's own date or event wait words (`early_gates`). Each by `<repo>#TD-n`,
-    holding only members with some."""
+    """`counted_work`'s reading: `work`, each member's counted ids by `with_held(open_work(…))` as every reader reads
+    them today (stamped `open_work`); `wide`, those with each gated blocker that itself waits added (stamped
+    `counted_work`, read by no reader until the asked-early readers read the fact, TD-2184); `parts`, the counted ids
+    that are open parts (`open_parts`); `gates`, each member's own date or event wait words (`early_gates`). Each by
+    `<repo>#TD-n`, holding only members with some."""
 
     work: dict[str, list[str]]
+    wide: dict[str, list[str]]
     parts: dict[str, list[str]]
     gates: dict[str, list[str]]
 
@@ -2058,8 +2061,9 @@ def counted_work(
     aside) whose merged work, or own date or event wait, is non-empty, so a chain of gated entries that ends in open
     work counts at each link and a held build that waits only on a gated blocker passes it to its design. A gated
     blocker whose own chain reaches the member is not added, as `open_work` drops one (a cycle of gated ids counts
-    for nothing). `parts` are the counted ids naming the member, or one of its held builds, in `Part of:`; `gates`
-    each member's own `gate_waits` (`today`, the UTC day, by default the clock's)."""
+    for nothing). `work` is `with_held(open_work(…))` alone, what every reader reads until the next slice switches
+    them to the fact; `wide` is the fixed point. `parts` are the counted ids naming the member, or one of its held
+    builds, in `Part of:`; `gates` each member's own `gate_waits` (`today`, the UTC day, by default the clock's)."""
     today = today or datetime.now(UTC).date().isoformat()
     blockers = _open_blockers(entries, xref)
 
@@ -2068,7 +2072,8 @@ def counted_work(
 
     members = [q for q in entries if gated(q)]
     gates = {q: w for q in members if (w := gate_waits(entries[q], today))}
-    work = {q: list(ids) for q, ids in open_work(entries, xref).items()}
+    base = open_work(entries, xref)
+    work = {q: list(ids) for q, ids in base.items()}
     while True:
         merged = with_held(work, held, entries, xref)
         added = False
@@ -2095,12 +2100,18 @@ def counted_work(
         return False
 
     parts = {q: ps for q, ids in merged.items() if (ps := [w for w in ids if within(parent_qid(entries[w]), q)])}
-    return Counted(merged, parts, gates)
+    return Counted(with_held(base, held, entries, xref), merged, parts, gates)
 
 
 def _stamp(open_: Mapping[str, dict[str, Any]], counted: Counted) -> None:
-    """Stamp `counted_work`'s reading on its members: `open_work`, `open_parts` and `early_gates` (TD-2172)."""
-    for name, by in (("open_work", counted.work), ("open_parts", counted.parts), ("early_gates", counted.gates)):
+    """Stamp `counted_work`'s reading on its members: `open_work`, `counted_work`, `open_parts` and `early_gates`
+    (TD-2172)."""
+    for name, by in (
+        ("open_work", counted.work),
+        ("counted_work", counted.wide),
+        ("open_parts", counted.parts),
+        ("early_gates", counted.gates),
+    ):
         for q, ids in by.items():
             open_[q][name] = ids
 
@@ -2112,7 +2123,7 @@ def has_fact(q: str, counted: Counted, entries: Mapping[str, Mapping[str, Any]])
     if counted.parts.get(q):  # `counted` holds gated members alone, so the gate needs no test of its own
         return True
     e = entries.get(q) or {}
-    return bool(counted.work.get(q)) and str(e.get("owner") or "").lower() == PERSON
+    return bool(counted.wide.get(q)) and str(e.get("owner") or "").lower() == PERSON
 
 
 def _holder(rec: Any) -> dict[str, Any]:
