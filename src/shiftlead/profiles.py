@@ -18,6 +18,12 @@ account's quota windows — or `metered`, bound by an amount on its spend; `pric
 profile, and none at all for a self-hosted model, whose reading is tokens.
 
 With no file, one implicit profile named `default` uses the tool's own default config directory.
+
+**On a switched host** (one with a `logins.yml`, §4.2b) the reader also answers from that file (design §4.9e *A
+record's profile*, TD-2068): each login is a profile under its name (its `<tool>:<name>` key where two tools'
+logins share the name), with its folder, account, billing, prices, arguments and pin, so a record whose
+`profile` is a login's name reads as one whose profile it was. A name in both files is the login's; a profile with
+no login of its name, a `shell` profile's above all, is answered as it is today.
 """
 
 from __future__ import annotations
@@ -27,7 +33,7 @@ from pathlib import Path
 
 import yaml
 
-from sessionorc import paths, yamltext
+from sessionorc import logins, paths, yamltext
 
 DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member with no profile (teams.create_params)
 SHELL_ADAPTER = "shell"  # no agent: a profile may name it, a team session may not (teams.plan, TD-329)
@@ -154,11 +160,13 @@ def profiles_file() -> Path:
     return paths.home() / "profiles.yml"
 
 
-def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
-    """Return (profiles by name, default profile name)."""
+def load(path: Path | None = None, *, with_logins: bool = True) -> tuple[dict[str, Profile], str]:
+    """Return (profiles by name, default profile name); on a switched host the logins too (`_from_logins`), but for
+    a reader of `profiles.yml` itself (the switch-over's, the Settings page's profile cards), `with_logins=False`."""
     path = path or profiles_file()
+    kept = _from_logins(path.parent) if with_logins else {}
     if not path.is_file():
-        return {"default": Profile(name="default")}, "default"
+        return {"default": Profile(name="default"), **kept}, "default"
     data = yamltext.load(path.read_text(encoding="utf-8")) or {}
     out: dict[str, Profile] = {}
     for name, raw in (data.get("profiles") or {}).items():
@@ -183,9 +191,52 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
     if not out:
         out["default"] = Profile(name="default")
     default = data.get("default") or next(iter(out))
+    out.update(kept)
     if default not in out:
         raise ValueError(f"profiles.yml: default {default!r} is not a declared profile ({sorted(out)})")
     return out, default
+
+
+def _from_logins(home: Path) -> dict[str, Profile]:
+    """The host's logins as profiles by name (§4.9e *A record's profile*), each once, so a reader that walks every
+    profile counts each login once: under its bare name, the name a launch writes on a record, or under its key
+    (`<tool>:<name>`) where two tools' logins share that name; none where the host is not switched. A `logins.yml` that
+    does not read raises, as a `profiles.yml` that does not read does (`LoginError` is a `ValueError`)."""
+    data = logins.load(home)
+    if data is None:
+        return {}
+    keyed = {lk: _login_profile(lk, entry) for lk, entry in sorted(data["logins"].items())}
+    bare: dict[str, list[str]] = {}
+    for lk in keyed:
+        bare.setdefault(logins.split(lk)[1], []).append(lk)
+    return {(name if len(lks) == 1 else lk): keyed[lk] for name, lks in bare.items() for lk in lks}
+
+
+def _login_profile(lk: str, entry: dict) -> Profile:
+    """One login as the profile a launch and today's readers take: its tool as the adapter, its folder as the config
+    directory, its account's key, its pin as the model, and its own billing, prices and arguments."""
+    tool, name = logins.split(lk)
+    folder = entry.get("folder")
+    billing = entry.get("billing") if entry.get("billing") in BILLINGS else "subscription"
+    prices = entry.get("prices") if billing == "metered" and isinstance(entry.get("prices"), dict) else {}
+    wait = entry.get("permission_wait")
+    return Profile(
+        name=name,
+        adapter=tool,
+        account=logins.account_of(lk, entry),
+        model=str(entry["pin"]) if entry.get("pin") else None,
+        config_dir=Path(str(folder)).expanduser() if folder else None,
+        permission_wait=int(wait) if isinstance(wait, int) and not isinstance(wait, bool) else DEFAULT_PERMISSION_WAIT,
+        extra_args=_args(entry.get("extra_args")),
+        unattended_args=_args(entry.get("unattended_args")),
+        billing=str(billing),
+        prices={str(k): float(v) for k, v in prices.items() if k in PRICE_KINDS and isinstance(v, int | float)},
+    )
+
+
+def _args(value: object) -> list[str]:
+    """A login's argument list as written; anything but a list (a hand edit) is none, never a string's characters."""
+    return [str(a) for a in value] if isinstance(value, list) else []
 
 
 def account_of(name: str | None, adapter: str, path: Path | None = None) -> str | None:

@@ -5572,7 +5572,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     from shiftlead import switchover
 
     try:
-        profs, default = profiles_mod.load()
+        profs, default = profiles_mod.load(with_logins=False)
     except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1

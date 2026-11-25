@@ -5902,7 +5902,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         whose `settings` read takes the names, timed as `files`. A malformed file is a note, never a 500."""
         with timing.step("files"):
             try:
-                profiles, default = profiles_mod.load()
+                profiles, default = profiles_mod.load(with_logins=False)
             except ValueError as e:
                 return {}, "", [str(e)]
             return dict(profiles), default, []
