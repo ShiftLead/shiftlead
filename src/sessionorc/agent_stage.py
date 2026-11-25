@@ -87,6 +87,17 @@ def refused_words(r: Any) -> str:
     )
 
 
+def rested_words(step: Any) -> str:
+    """The note to the person once an audit's run is lost a second time and the audit rests (§4.9c *Audits start on a
+    clock*: *the person is told with one note*)."""
+    act = getattr(step, "act", None)
+    how = "went silent" if getattr(act, "case", "") == "silent" else "was lost"
+    return (
+        f"The audit {step.audit} of team {step.team} lost its run twice (its session {how} again), so it waits for its "
+        "next clock, counted afresh from now. Nothing needs doing unless it keeps happening."
+    )
+
+
 def home_call(name: str) -> Any:
     """The module the group names `name`, or a refusal naming the install that lacks it."""
     for ep in entry_points(group=GROUP):
@@ -278,8 +289,8 @@ class StageMixin:
         return out
 
     async def _stage_repo(self, calls: Any, root: str, args: dict[str, Any]) -> None:
-        """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check, and of
-        each entry whose act's refusal has newly come to stand."""
+        """One repo's pass in a thread, then the person told once of each team whose flow newly fails its check, of
+        each entry whose act's refusal has newly come to stand, and of each audit that rested at its second loss."""
         try:
             pool = self.__dict__.get("_stage_pool")
             if pool is None:
@@ -298,6 +309,13 @@ class StageMixin:
                 self._system_note(PERSON, refused_words(r), team=r.team)  # type: ignore[attr-defined]
             except Exception:  # noqa: BLE001 — as above
                 log.exception("the stage pass could not tell the person of %s's refusal", r.tid)
+        for step in getattr(got, "audits", None) or ():
+            if not getattr(step, "tell", False):
+                continue
+            try:
+                self._system_note(PERSON, rested_words(step), team=step.team)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 — as above
+                log.exception("the stage pass could not tell the person of audit %s/%s", step.team, step.audit)
 
     def _stage_call(self, loop: asyncio.AbstractEventLoop) -> Callable[..., Any]:
         """The host agent's call as the pass's thread makes it: the RPC dispatched on the loop with no session caller,

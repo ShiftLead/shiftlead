@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from sessionorc import agent_stage, hosts
-from sessionorc.agent_stage import STAGE_EVERY, StageMixin, refused_words, stage_teams, told
+from sessionorc.agent_stage import STAGE_EVERY, StageMixin, refused_words, rested_words, stage_teams, told
 from sessionorc.client import AgentError
 
 pytestmark = pytest.mark.unit
@@ -256,3 +256,18 @@ def test_an_entry_whose_refusal_stands_is_told_to_the_person_once_by_its_team(
     text = refused_words(r)
     assert text.startswith("The home cannot move TD-7 (team build-r): its reconcile (merged) step was refused")
     assert "since 2026-11-24 23:00 UTC" in text and "- the ledger refused the archive" in text
+
+
+def test_an_audit_that_rested_is_told_to_the_person_once_by_its_team(monkeypatch: pytest.MonkeyPatch, body) -> None:
+    """TD-2053: an audit whose run is lost a second time rests, and the person is told with one note; a step that
+    started or offered a run again tells nothing."""
+    rested = SimpleNamespace(team="build-r", audit="docs", act=SimpleNamespace(case="silent"), tell=True)
+    started = SimpleNamespace(team="build-r", audit="tests", act=SimpleNamespace(case=""), tell=False)
+    module = SimpleNamespace(call=lambda **kw: SimpleNamespace(tell={}, audits=(started, rested)), Kept=lambda: None)
+    monkeypatch.setattr(agent_stage, "home_call", lambda name: module)
+    agent = _Agent()
+    asyncio.run(agent._stage_pass())
+    assert agent.notes == [("person", rested_words(rested), "build-r")]
+    assert rested_words(rested).startswith(
+        "The audit docs of team build-r lost its run twice (its session went silent again)"
+    )
