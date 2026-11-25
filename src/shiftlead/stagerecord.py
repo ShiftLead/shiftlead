@@ -44,6 +44,8 @@ OTHER = "Something else: <what>"
 OTHER_ANSWER = f"{OTHER} — a session takes your words back to the stage that asked"
 
 _ID = re.compile(r"TD-\d+")
+CLOSED = "closed"
+_COPY = re.compile(rf"{CLOSED}/(?P<id>TD-\d+)@(?P<day>\d{{4}}-\d\d-\d\d)(?:-(?P<n>[2-9]|[1-9]\d+))?\.json")
 JOB_KEY = re.compile(r"board-[0-9a-f]{8}|pr-[1-9]\d{0,6}")  # a built-in seat's job (§4.9d *How each one runs*)
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _LOCKS: dict[str, threading.RLock] = {}  # re-entrant: a caller holds it from a record's read to its write
@@ -60,6 +62,20 @@ class StateRefused(StateError):
     def __init__(self, reason: str) -> None:
         super().__init__(f"origin refused the push to {BRANCH} ({reason})")
         self.reason = reason
+
+
+def _closed_day(closed_at: Any) -> str:
+    """The UTC day a record closed, from its `closed_at`; today's where that is not a time the home wrote."""
+    day = str(closed_at or "")[:10]
+    return day if re.fullmatch(r"\d{4}-\d\d-\d\d", day) else _now()[:10]
+
+
+def _day(copy: str) -> str:
+    """The UTC day a closed copy's name carries."""
+    m = _COPY.fullmatch(copy)
+    if m is None:
+        raise ValueError(f"not a closed copy's name: {copy!r}")
+    return m["day"]
 
 
 def _lock(root: Path) -> threading.RLock:
@@ -285,10 +301,72 @@ class StageStore:
         return self.write({self._entry_path(t): None for t in tids}, f"shiftlead: {why}")
 
     def move_entry(self, record: Mapping[str, Any], old: str, why: str) -> str:
-        """A renumbered entry's record, under its new id, and its old file gone, in one commit."""
+        """A renumbered entry's record, under its new id, and its old file gone, in one commit, with the entry's closed
+        copies renamed beside it, the `id` each holds rewritten as the live record's is (§4.4 *The stage record*)."""
         new = str(record["id"])
         text = json.dumps(record, indent=1) + "\n"
-        return self.write({self._entry_path(old): None, self._entry_path(new): text}, f"shiftlead: {new} {why}")
+        tip = self.tip()
+        changes: dict[str, str | None] = {self._entry_path(old): None, self._entry_path(new): text}
+        taken = set(self._list(tip, CLOSED))
+        for path in self._copies(tip, old):
+            copy = json.loads(self._read(tip, path) or "{}")
+            copy["id"] = new
+            changes[path] = None
+            taken.discard(path)
+            to = self._copy_path(new, _day(path), taken)
+            taken.add(to)
+            changes[to] = json.dumps(copy, indent=1) + "\n"
+        return self.write(changes, f"shiftlead: {new} {why}")
+
+    # -- closed copies (§4.9c *A closed record is kept thirty days*): no pass reads them and nothing removes them ----
+
+    @staticmethod
+    def _copy_path(tid: str, day: str, taken: set[str]) -> str:
+        """`closed/<id>@<day>.json`, or `-2` and on after the day where that name is taken."""
+        n = 1
+        while (path := f"{CLOSED}/{tid}@{day}{'' if n == 1 else f'-{n}'}.json") in taken:
+            n += 1
+        return path
+
+    def _copies(self, tip: str | None, tid: str) -> list[str]:
+        self._entry_path(tid)  # an id that is not TD-n is refused here too
+        found = [(m["day"], int(m["n"] or 1), p) for p in self._list(tip, CLOSED) if (m := _COPY.fullmatch(p))]
+        return [p for _day, _n, p in sorted(found) if _COPY.fullmatch(p)["id"] == tid]  # a day's first, then its -2
+
+    def copy_closed(self, tid: str, tip: str | None = None) -> dict[str, str]:
+        """The change that copies the entry's closed record, its bytes unchanged, to its next free name: for a write
+        the caller makes, beside whatever else that commit holds. Nothing where the entry has no closed record."""
+        tip = tip if tip is not None else self.tip()
+        text = self._read(tip, self._entry_path(tid))
+        closed = json.loads(text).get("closed_at") if text else None
+        if not text or not closed:
+            return {}
+        return {self._copy_path(tid, _closed_day(closed), set(self._list(tip, CLOSED))): text}
+
+    def keep_closed(self, tids: list[str], why: str) -> str:
+        """Several closed records moved to their copies, bytes unchanged, in one commit."""
+        tip = self.tip()
+        changes: dict[str, str | None] = {}
+        taken = set(self._list(tip, CLOSED))
+        for tid in tids:
+            text = self._read(tip, self._entry_path(tid))
+            if not text:
+                continue
+            to = self._copy_path(tid, _closed_day(json.loads(text).get("closed_at")), taken)
+            taken.add(to)
+            changes.update({to: text, self._entry_path(tid): None})
+        return self.write(changes, f"shiftlead: {why}")
+
+    def closed(self, tid: str) -> list[dict[str, Any]]:
+        """The entry's closed copies, in the order of their `closed_at` (a `-2` after its day's first where two
+        closed in one second), from the branch's head."""
+        tip = self.tip()
+        got = []
+        for path in self._copies(tip, tid):
+            text = self._read(tip, path)
+            if text:
+                got.append((str(json.loads(text).get("closed_at") or ""), int(_COPY.fullmatch(path)["n"] or 1), text))
+        return [json.loads(text) for _at, _n, text in sorted(got, key=lambda g: g[:2])]
 
     # -- the jobs of the two built-in seats (§4.9d *How each one runs*) ------------------------------------------
 

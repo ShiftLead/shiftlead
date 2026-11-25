@@ -684,9 +684,12 @@ def call(
         return {"refused": str(e)}
 
 
-def show(*, root: str, tid: str) -> dict[str, Any]:
-    """The `stage_show` RPC's body: the entry's record, or `{refused: …}`."""
+def show(*, root: str, tid: str, closed: bool = False) -> dict[str, Any]:
+    """The `stage_show` RPC's body: the entry's record, or `{refused: …}`; with `closed`, `{entry, closed: [...]}`, its
+    closed copies in the order of their `closed_at` (§4.7 `ao stage show --closed`)."""
     try:
+        if closed:
+            return {"entry": tid, "closed": StageStore(root).closed(tid)}
         record = StageStore(root).entry(tid)
     except (StateError, ValueError) as e:
         return {"refused": str(e)}

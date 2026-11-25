@@ -12,10 +12,10 @@ pull request, a lift on a record whose pull request has since merged applied to 
 pass, and the record's half of offering again (the
 holder cleared, the offer counted, or a second loss sent to the person). `offer` makes act 5: it starts the session,
 takes its claim and writes the record.
-`sweep_closed` removes a closed record after its thirty days. The `merging` case is `stage_merge.run`'s, whose gate and
-merge run outside the lock; *Try the merge again* is this module's answer. Every other case returns `Made(False, …)`
-and writes nothing. A write that takes a record from its holder names that session in `Made.end`, for the caller to
-end outside the lock. Nothing calls this yet.
+`sweep_closed` moves a closed record to its closed copy after its thirty days. The `merging` case is
+`stage_merge.run`'s, whose gate and merge run outside the lock; *Try the merge again* is this module's answer. Every
+other case returns `Made(False, …)` and writes nothing. A write that takes a record from its holder names that session
+in `Made.end`, for the caller to end outside the lock. Nothing calls this yet.
 """
 
 from __future__ import annotations
@@ -545,6 +545,7 @@ def offer(
             return Made(False, "the record moved since it was read")
         name = doc.get("name")
         first = record is None or bool(record.get("closed_at"))
+        reopened = record is not None and first  # its closed record is copied in the offer's commit (§4.9c)
         if record is None or first:  # a reopened entry's closed record carries nothing over (§4.9c)
             key = _way_in(doc, s.design)
             row = act.work.pr if act.work is not None and act.work.state == "take" else None
@@ -575,9 +576,9 @@ def offer(
                 before[bare(holder)] = sums
             record["spent_before"] = before
             record["flow_hash"] = version[1] if version is not None else None
-            kept = None
+            kept: dict[str, str] = store.copy_closed(tid) if reopened else {}
             if version is not None and store.version(version[1]) is None:
-                kept = {store.version_path(version[1]): version[0]}
+                kept[store.version_path(version[1])] = version[0]
             store.put_entry(record, f"offered at {key} to {holder}", also=kept)
         except Exception as e:  # noqa: BLE001 — whatever failed, a started session must not be left unnamed
             return Made(False, f"the offer did not finish: {e}", end=holder)
@@ -609,9 +610,10 @@ def _spent_at_offer(spent: Callable[[str], Any] | None, holder: str, tid: str) -
 
 
 def sweep_closed(store: StageStore, now: datetime | None = None) -> list[str]:
-    """Remove the closed records kept their thirty days, in one commit; the branch's history keeps them."""
+    """Move the closed records kept their thirty days to their closed copies, bytes unchanged, in one commit (§4.9c *A
+    closed record is kept thirty days*)."""
     with store.locked():
         gone = sorted(tid for tid, r in store.entries().items() if closed_expired(r, now))
         if gone:
-            store.drop_entries(gone, f"removed {len(gone)} closed record(s) past thirty days")
+            store.keep_closed(gone, f"kept {len(gone)} closed record(s) past thirty days as closed copies")
     return gone

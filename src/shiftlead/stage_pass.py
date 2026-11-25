@@ -404,10 +404,10 @@ def note_refusals(state: RepoState, team: str, steps: Iterable[Step], now: datet
 @dataclass(frozen=True)
 class RepoPass:
     """What one repo's pass did. `unread`: the teams with no reading this pass. `tell`: the teams whose flow has newly
-    stopped passing its check, with its problems, for the person to be told once. `swept`: closed records removed.
-    `refused`: the entries whose act's refusal has newly come to stand, for the person to be told once each. `jobs`:
-    the built-in seats' steps, where the caller read them (`stage_tick.run`); `audits` its audits' steps, a rested
-    one for the person to be told once (`AuditStep.tell`)."""
+    stopped passing its check, with its problems, for the person to be told once. `swept`: closed records moved to their
+    closed copies. `refused`: the entries whose act's refusal has newly come to stand, for the person to be told once
+    each. `jobs`: the built-in seats' steps, where the caller read them (`stage_tick.run`); `audits` its audits' steps,
+    a rested one for the person to be told once (`AuditStep.tell`)."""
 
     teams: Mapping[str, TeamPass] = field(default_factory=dict)
     unread: tuple[str, ...] = ()

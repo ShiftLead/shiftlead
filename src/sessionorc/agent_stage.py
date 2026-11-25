@@ -236,10 +236,13 @@ class StageMixin:
         return root, seen
 
     async def rpc_stage_show(
-        self, id: str | None = None, entry: str | None = None, repo: str | None = None
+        self, id: str | None = None, entry: str | None = None, repo: str | None = None, closed: bool = False
     ) -> dict[str, Any]:
         """`ao stage show [TD-n]`: the entry's record; with no id, the one the session holds. From a person's shell
-        there is no session: it names the entry, and `repo` is the registered checkout it was run in (§4.7)."""
+        there is no session: it names the entry, and `repo` is the registered checkout it was run in (§4.7). `closed`
+        reads the entry's closed copies instead, which it must name (`ao stage show --closed TD-n`)."""
+        if closed and not entry:
+            raise RpcError("name the entry whose closed copies to print: ao stage show --closed TD-n")
         if id:
             s = self._find(id)  # type: ignore[attr-defined]
             tid = entry or self._stage_entry(s)
@@ -251,7 +254,7 @@ class StageMixin:
             if not entry or checkout is None:
                 raise RpcError("name the entry and a registered repo, or run this inside a stage's session")
             tid, root = entry, str(checkout)
-        got = await asyncio.to_thread(stage_calls().show, root=root, tid=tid)
+        got = await asyncio.to_thread(stage_calls().show, root=root, tid=tid, closed=bool(closed))
         if "refused" in got:
             raise RpcError(str(got["refused"]))
         return got
