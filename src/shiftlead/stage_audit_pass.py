@@ -19,7 +19,7 @@ note, which is the caller's: a step whose act is `rest` and whose write was made
 What reaches the world is an `AuditReach`, so one audit's failure is that audit's. The pull requests merged since a
 base are counted as the default branch's first-parent commits after it (`merged_since`): each squash or merge of a
 pull request is one, and so is a rare push straight to it. A run's `findings-filed`, `nothing-found` and `other` are
-`ao stage end`'s, a later slice. Nothing starts a run yet: `stage_start.team_started` is false until TD-2065.
+`ao stage end`'s (`stage_audit_end`). Nothing starts a run yet: `stage_start.team_started` is false until TD-2065.
 """
 
 from __future__ import annotations

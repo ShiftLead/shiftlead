@@ -4,8 +4,8 @@ verdict is on the stage record*, *One holder ends a stage*, *Where an outcome go
 The host agent calls `call` through the `shiftlead.home_calls` entry point, since `sessionorc` never imports this
 package. One repo's calls run one at a time: the store's lock is held from the record's read to its write. Each
 outcome's fact is read here, from the session's worktree and the forge, never taken from the session. Nothing calls
-this until a stage's session exists (TD-2051's offer); an audit's outcomes are TD-2053's, and a job's are
-`stage_job_end`'s.
+this until a stage's session exists (TD-2051's offer); an audit's outcomes are `stage_audit_end`'s, and a job's
+are `stage_job_end`'s.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import json
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -386,6 +387,21 @@ def _person_of(root: Path) -> str:
     return people[0]
 
 
+def _given(root: Path) -> list[dict[str, Any]]:
+    """The ids the home handed out for the repo at `root`, as `ids.json` keeps them by its origin."""
+    from sessionorc import agent_ids, gatesweep
+
+    url = gatesweep.origin_url(root)
+    return agent_ids.given_of(agent_ids.origin_key(url)) if url else []
+
+
+def _home_line(root: Path, text: str) -> str | None:
+    """The home's plain board line (`board.add`, a `Due:` of today and no detail block): its eight hex digits."""
+    got = board.add(root, text, date.today().isoformat())
+    key = str(got.get("key") or "")
+    return key[len(workorders.PREFIX) :] if key.startswith(workorders.PREFIX) else None
+
+
 def call(
     *,
     root: str,
@@ -399,8 +415,9 @@ def call(
 ) -> dict:
     """The `stage_end` RPC's body, in a thread of the host agent: a refusal is `{refused: <the fact>}`. `seen` is a
     node session's worktree as its node read it; `root` is then the home's checkout of that repo. `tid` is the entry the
-    session holds, or a job's work order reference (`board:<8 hex>`, `pr:<n>`), whose outcomes `stage_job_end` takes."""
-    from shiftlead import stage_job_end, stage_job_tick  # stage_job_end imports this module
+    session holds, a job's work order reference (`board:<8 hex>`, `pr:<n>`), whose outcomes `stage_job_end` takes, or
+    an audit run's lease (`audit:<team>/<audit>`), whose outcomes `stage_audit_end` takes."""
+    from shiftlead import stage_audit_end, stage_job_end, stage_job_tick  # each imports this module
 
     store = StageStore(root)
     try:
@@ -412,6 +429,17 @@ def call(
         except yaml.YAMLError:  # a stored flow edited by hand into bad YAML is a refusal, not a failed call (TD-2150)
             return {"refused": f"team {team}'s flow on the state branch cannot be read"}
         facts = ForgeFacts(directory) if seen is None else NodeFacts(root, seen)
+        if stage_audit_end.is_ref(tid):  # an audit run's session holds the run's lease, not an entry (TD-2053)
+            return stage_audit_end.end_audit(
+                store,
+                tid,
+                caller,
+                outcome,
+                reason,
+                team=team,
+                given=lambda: _given(Path(root)),
+                line=lambda text: _home_line(Path(root), text),
+            )
         if stage_job_end.is_ref(tid):  # a built-in seat's job session holds its work order, not an entry (TD-2053)
             return stage_job_end.end_job(
                 store,

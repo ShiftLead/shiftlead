@@ -157,6 +157,15 @@ def end_refusal(outcome: str, reason: str, filed: Sequence[str]) -> str | None:
     return None
 
 
-def finished(run: Mapping[str, Any], outcome: str, reason: str, now: datetime) -> dict[str, Any]:
-    """The run ended by its session's outcome: no holder; its start and base stand, so the next clock runs from them."""
-    return {**run, "holder": None, "ended": {"outcome": outcome, "reason": reason, "at": _stamp(now)}}
+def finished(
+    run: Mapping[str, Any], outcome: str, reason: str, now: datetime, *, by: str = "", line: str | None = None
+) -> dict[str, Any]:
+    """The run ended by its session's outcome: no holder; its start and base stand, so the next clock runs from them.
+    `by` is the session that ended it (a repeat of its call is answered from it), `line` the home's board line an
+    `other` wrote."""
+    ended: dict[str, Any] = {"outcome": outcome, "reason": reason, "at": _stamp(now)}
+    if by:
+        ended["by"] = by
+    if line:
+        ended["line"] = line
+    return {**run, "holder": None, "ended": ended}
