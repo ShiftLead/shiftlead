@@ -171,10 +171,11 @@ def step(
     f: JobFacts,
     reach: JobReach,
     *,
-    asked_at: str,
+    asked_at: str | stage_job.PrObject,
     seat_busy: bool,
 ) -> JobStep:
-    """Take the job `key`'s one act this pass, if it has one."""
+    """Take the job `key`'s one act this pass, if it has one. `asked_at` is the seat's trigger's value for the key:
+    when its object asked, and for a pull request its order's kind, which a new record keeps."""
     s = reading_on(record, key, f, seat_busy=seat_busy)
     if s is None:
         return JobStep(key, read=False)
@@ -185,9 +186,11 @@ def step(
     if team is None:
         return JobStep(key)  # a new job with no started team to run under: Offer's own condition, read again
     try:
+        pr = asked_at if isinstance(asked_at, stage_job.PrObject) else None
         made = stage_job_make.make(
-            store, key, act, s, reach, seat=seat, obj=_object_of(key), team=team, opened_at=asked_at
-        )
+            store, key, act, s, reach, seat=seat, obj=_object_of(key), team=team,
+            opened_at=stage_job.since_of(asked_at), kind=pr.kind if pr else "", reason=pr.reason if pr else "",
+        )  # fmt: skip
     except Exception as e:  # noqa: BLE001 — one job's failure must not stop the pass over the others
         log.exception("the job act %s %s on %s failed", act.name, act.case, key)
         return JobStep(key, act=act, made=Made(False, f"the act failed: {e}"))
@@ -211,12 +214,13 @@ def _started_one(got: JobStep) -> bool:
 
 
 def seat_pass(
-    store: StageStore, seat: str, objects: Mapping[str, str], f: JobFacts, reach: JobReach
+    store: StageStore, seat: str, objects: Mapping[str, str | stage_job.PrObject], f: JobFacts, reach: JobReach
 ) -> tuple[JobStep, ...] | None:
     """One pass over `seat`'s jobs. `objects` is the seat's trigger (`stage_job.board_objects` or `pr_objects`): each
-    object's key and when it asked. Every open record of the seat takes its act, those waiting for a job session in
-    `stage_job.order`'s order, then each object with no open record, oldest first; while a job session of the seat is
-    live, or once this pass started one, no other is offered. None: the records could not be read."""
+    object's key and when it asked (a pull request's a `PrObject`, its kind with it). Every open record of the seat
+    takes its act, those waiting for a job session in `stage_job.order`'s order, then each object with no open record,
+    a sync's first, else oldest first; while a job session of the seat is live, or once this pass started one, no
+    other is offered. None: the records could not be read."""
     if seat not in SEATS:
         raise ValueError(f"a job's seat is one of {SEATS}, not {seat!r}")
     try:
@@ -226,7 +230,8 @@ def seat_pass(
         return None
     opened = {k: r for k, r in records.items() if not r.get("closed_at")}
     first = f.first_started
-    queued = stage_job.order(opened.values(), objects, job_stage(f.docs.get(first) or {}) if first else None)
+    syncs = [k for k, o in objects.items() if isinstance(o, stage_job.PrObject) and o.kind == "sync"]
+    queued = stage_job.order(opened.values(), objects, job_stage(f.docs.get(first) or {}) if first else None, syncs)
     rest = sorted((k for k in opened if k not in queued), key=lambda k: (str(opened[k].get("entered_at") or ""), k))
     busy = any(_busy(r, f) for r in opened.values())
     steps = []

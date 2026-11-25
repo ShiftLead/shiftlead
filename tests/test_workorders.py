@@ -490,6 +490,15 @@ def test_a_sync_pr_is_an_order_from_the_first_reading_whatever_its_checks_but_pe
 
 
 @pytest.mark.unit
+def test_a_sync_order_carries_the_readings_fork():
+    """TD-2165: a fork's sync is still an order, the person's; its row says it is a fork's, so no seat takes it."""
+    (fork,) = workorders.red_prs([_sync(5, fork=True)], [], T0, {}, HOUR)[0]
+    (own,) = workorders.red_prs([_sync(6)], [], T0, {}, HOUR)[0]
+    assert (fork["fork"], own["fork"]) == (True, False)
+    assert "fork" not in workorders.pr_order(_red())  # only a sync's row carries it
+
+
+@pytest.mark.unit
 def test_a_held_sync_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over_on_sync_since():
     working = _rec(state="working", git={"branch": "cadence-sync-1728"})
     assert workorders.red_prs([_sync()], [working], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])

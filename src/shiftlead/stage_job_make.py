@@ -95,9 +95,12 @@ def make(
     obj: str | int,
     team: str,
     opened_at: str,
+    kind: str = "",
+    reason: str = "",
 ) -> Made:
     """Write `act` on the job `key`, if a fresh read under the lock still chooses it. `seat`, `obj`, `team` and
-    `opened_at` make the record of an object with none, or one whose record closed (a new job, written over it)."""
+    `opened_at` make the record of an object with none, or one whose record closed (a new job, written over it), and a
+    pull request's `kind` and a sync's `reason` are kept on it (`stage_job.new_job`)."""
     with store.locked():
         found = store.job(key)
         if stage_job.choose(found, s) != act:
@@ -107,7 +110,7 @@ def make(
         if starts and fresh and act.review != (found.get("stage") not in (None, s.job_stage)):
             return Made(False, "the record moved since it was read")  # a review's session, or the seat's
         if found is None or found.get("closed_at"):
-            record = stage_job.new_job(seat, obj, team, opened_at)
+            record = stage_job.new_job(seat, obj, team, opened_at, kind=kind, reason=reason)
             if record["id"] != key:
                 return Made(False, f"{seat} {obj} is not the job {key}")
         else:

@@ -955,7 +955,8 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
     """A red PR nobody holds as the lanes and the pages read an entry: `pr:<n>`, the PR's title, High,
     pickable, its `Context` the URL and the failing checks. `pr_order` marks it, and every `free-pick`
     lane takes it: the grinders' pick list (§4.9b *No anchor seat*, TD-757). A sync PR's (TD-684) is marked `sync`, with
-    `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL. A lift PR's
+    `sync_since`, its `reason` (`sync_reason`), which is its `Context` beside the URL, and the reading's `fork`
+    (`true|false`; a fork's sync is still an order, the person's, and a seat takes no fork's). A lift PR's
     (TD-1450, TD-1854) is marked `lift`, with `lift_since`, its `entry` and `gate`; its priority is its entry's,
     from `priorities` (the repo's ledger, by id, lower-case as the reading keeps it), High where it is not there,
     and its `Context` the URL and the gate. A sweep PR's (TD-1854) is marked `sweep`, with `sweep_since`,
@@ -997,7 +998,11 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
         "context": context,
         "refs": [],
         "text": "",
-        **({"sync": True, "sync_since": pr.get("sync_since"), "reason": why} if sync else {}),
+        **(
+            {"sync": True, "sync_since": pr.get("sync_since"), "reason": why, "fork": bool(pr.get("fork"))}
+            if sync
+            else {}
+        ),
         **({"lift": True, "lift_since": pr.get("lift_since"), "entry": tid, "gate": gate} if lift else {}),
         **({"sweep": True, "sweep_since": pr.get("sweep_since")} if sweep else {}),
         **({"filing": True, "filing_since": since} if filing else {}),
