@@ -409,19 +409,19 @@ class TeamPlan:
     lacks: list[str] = field(default_factory=list)  # the seats it runs today that its flow lacks (`lacking`)
 
 
-# A seat of the first shape whose work a built-in seat takes after the window (§4.9d *The built-in seats and their
-# page*): the techlead seat is the set's tech-lead, a sweeper the set's sweeper.
+# The role of a `seats:` line whose work a built-in seat takes after the window (§4.9d *The built-in seats and their
+# page*): a sweeper is the set's sweeper. The techlead seat is the set's tech-lead, and is no `seats:` line.
 SET_ROLES = ("sweeper",)
 
 
 def lacking(team: Any, doc: Any) -> list[str]:
     """The seats `team` runs today that the format-3 flow `doc` lacks (§4.9e *The answers file*, §4.9d *What the
-    cut-over's move must produce*), each as `<name> (<role>)`, which go at the window. The techlead seat and a
-    sweeper are the built-in set's, never lacking. An auditor is had where the flow has an audit whose brief begins
-    with, or is begun by, the first word of its own brief's file name, else of its name (`docs-audit.md` and an audit's
-    `docs`; `test-audit-ao-1` and `tests`). Every other seat — a fact-checker, an asks seat of any other role — has no
-    place in a format-3 flow, whose stages each run on the flow's own model (ao-grind's fact-check seats, Paul,
-    2026-11-22). A pool is its one line."""
+    cut-over's move must produce*), each as `<name> (<role>)`, which go at the window. Only its `seats:` lines are
+    read: the techlead seat (`techlead:`) is the set's tech-lead, and a sweeper the set's sweeper, never lacking. An
+    auditor is had where the flow has an audit whose brief begins with, or is begun by, the first word of its own
+    brief's file name, else of its name (`docs-audit.md` and an audit's `docs`; `test-audit-ao-1` and `tests`). Every
+    other seat — a fact-checker, an asks seat of any other role — has no place in a format-3 flow, whose stages each
+    run on the flow's own model (ao-grind's fact-check seats, Paul, 2026-11-22). A pool is its one line."""
     audits = doc.get("audits") if isinstance(doc, Mapping) else None
     briefs = [str(a["brief"]) for a in audits or () if isinstance(a, Mapping) and isinstance(a.get("brief"), str)]
     out: list[str] = []
@@ -1125,14 +1125,16 @@ def first_shape(r: Session) -> bool:
 def first_shape_asks(records: Mapping[str, Session]) -> list[FirstShapeAsk]:
     """Each open ask to a member or seat of the first shape, in the order the records hold them (§4.9e *Work in
     flight*: for the person to answer or close before the window), the person's own and one passed up to the person
-    left out, as `stuck.open_asks` leaves them out."""
+    left out, as `stuck.open_asks` leaves them out, and once per id (a handed entry may sit in two mailboxes)."""
+    seen: set[str] = set()
     out: list[FirstShapeAsk] = []
     for key, r in records.items():
         if not first_shape(r):
             continue
         for e in r.inbox:
-            if e.kind != "ask" or not e.open or e.passed_to == mail.PERSON or mail.PERSON in e.to:
+            if e.id in seen or e.kind != "ask" or not e.open or e.passed_to == mail.PERSON or mail.PERSON in e.to:
                 continue
+            seen.add(e.id)
             out.append(FirstShapeAsk(e.id, r.id or key, e.from_, mail.heading(e), e.at))
     return out
 

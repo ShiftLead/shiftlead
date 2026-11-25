@@ -914,7 +914,11 @@ def test_first_shape_asks_are_open_asks_to_a_teams_member_or_seat_alone():
     loose.inbox = [Ask("m-6", "ao-l")]
     own = Rec("o", unattended=False, by_person=True)
     own.inbox = [Ask("m-7", "ao-o")]
-    got = switchover.first_shape_asks({r.id: r for r in (member, seat, loose, own)})
+    twin = Rec("t")
+    twin.inbox = [Ask("m-1", "ao-m"), Ask("m-8", "ao-t", passed_up=True, passes=[{"to": "ao-director"}])]
+    got = switchover.first_shape_asks({r.id: r for r in (member, seat, loose, own, twin)})
+    assert [(a.id, a.to) for a in got] == [("m-1", "ao-m"), ("m-8", "ao-t")], "once per id; the director's counts"
+    got = got[:1]
     assert [(a.id, a.to, a.sender, a.subject) for a in got] == [("m-1", "ao-m", "ao-x", "which way?")]
     assert switchover.ask_lines(got)[1] == "  m-1 to ao-m from ao-x (2026-11-24T10:00:00Z): which way?"
     assert switchover.ask_lines([])[1:] == ["  none"]
