@@ -172,10 +172,12 @@ def test_the_report_lists_logins_then_blockers(tmp_path):
     assert switchover.report("h", [], [])[-1] == "no blockers"
 
 
-def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(tmp_path, capsys):
+def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(tmp_path, capsys, monkeypatch):
     from sessionorc import paths
 
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # never the suite's shared unit home
     home = paths.home()
+    home.mkdir()
     a, b = tmp_path / "a", tmp_path / "b"
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {a}}}\n")
     assert cli.main(["switch-over", "check"]) == 1
@@ -185,9 +187,10 @@ def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(tmp_path,
     assert "no blockers" in capsys.readouterr().out
 
 
-def test_a_profiles_file_that_does_not_parse_is_reported_not_raised(capsys):
+def test_a_profiles_file_that_does_not_parse_is_reported_not_raised(tmp_path, capsys, monkeypatch):
     from sessionorc import paths
 
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))  # never the suite's shared unit home: a later test reads it
     (paths.home() / "profiles.yml").write_text("profiles: [unclosed\n")
     assert cli.main(["switch-over", "check"]) == 1
     assert "cannot be read" in capsys.readouterr().err
