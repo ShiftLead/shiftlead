@@ -288,3 +288,9 @@ def test_a_reader_of_the_profiles_file_itself_reads_no_logins(tmp_path):
     (tmp_path / "profiles.yml").write_text("profiles:\n  grind: {account: old}\n")
     got, _ = profiles.load(tmp_path / "profiles.yml", with_logins=False)
     assert set(got) == {"grind"} and got["grind"].account == "old"
+
+
+def test_a_login_s_argument_list_that_is_not_a_list_is_none(tmp_path):
+    (tmp_path / "logins.yml").write_text("logins:\n  claude-code:odd: {extra_args: 5, unattended_args: '--a --b'}\n")
+    got = profiles.get("odd", tmp_path / "profiles.yml")
+    assert got.extra_args == [] and got.unattended_args == []

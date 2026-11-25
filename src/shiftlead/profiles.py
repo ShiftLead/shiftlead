@@ -227,11 +227,16 @@ def _login_profile(lk: str, entry: dict) -> Profile:
         model=str(entry["pin"]) if entry.get("pin") else None,
         config_dir=Path(str(folder)).expanduser() if folder else None,
         permission_wait=int(wait) if isinstance(wait, int) and not isinstance(wait, bool) else DEFAULT_PERMISSION_WAIT,
-        extra_args=[str(a) for a in entry.get("extra_args") or []],
-        unattended_args=[str(a) for a in entry.get("unattended_args") or []],
+        extra_args=_args(entry.get("extra_args")),
+        unattended_args=_args(entry.get("unattended_args")),
         billing=str(billing),
         prices={str(k): float(v) for k, v in prices.items() if k in PRICE_KINDS and isinstance(v, int | float)},
     )
+
+
+def _args(value: object) -> list[str]:
+    """A login's argument list as written; anything but a list (a hand edit) is none, never a string's characters."""
+    return [str(a) for a in value] if isinstance(value, list) else []
 
 
 def account_of(name: str | None, adapter: str, path: Path | None = None) -> str | None:
