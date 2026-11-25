@@ -27,6 +27,7 @@ from sessionorc import (
     hosts,
     link,
     logins,
+    naming,
     teamstore,
 )
 from sessionorc import cadence as cadence_mod
@@ -741,7 +742,8 @@ class SettingsMixin:
         """**Delete** (§4.9d *Delete*, §4.5a, TD-2063): a person's own act, version-checked, refused before the
         cut-over, while the team is started (the home's started mark), while any session of the team is live and
         while it has open stage records, naming them. The state branch's copy goes first, so a failed removal leaves
-        the team whole and a new team of this name never inherits an old flow."""
+        the team whole and a new team of this name never inherits an old flow; the team's built-in tech lead records
+        (`_forget_techleads`) go before it, so a record not removed leaves the copy too."""
         agent_common.person_only(caller, "delete a team", "§4.9d *Delete*", self._graph())
         name = str(team or "")
         checked = settings_mod.load()
@@ -759,12 +761,15 @@ class SettingsMixin:
         body = home_call(TEAM)
         try:
             held = await asyncio.to_thread(body.open_records, name, repo, roots)
-            if not held:
-                await asyncio.to_thread(body.drop_copy, name, repo, roots)
-        except Exception as e:  # noqa: BLE001 — a state branch not read or not written refuses, and changes no setting
+        except Exception as e:  # noqa: BLE001 — a state branch not read refuses, and changes no setting
             raise RpcError(f"{name} was not deleted: {e}") from None
         if held:
             raise RpcError(f"{name} has open stage records: {'; '.join(held)}")
+        await self._forget_techleads(name, caller)  # before the copy goes, so a refusal here leaves the team whole
+        try:
+            await asyncio.to_thread(body.drop_copy, name, repo, roots)
+        except Exception as e:  # noqa: BLE001 — a state branch not written refuses, and changes no setting
+            raise RpcError(f"{name} was not deleted: {e}") from None
         doc = settings_mod.load()  # read again: the state branch's calls ran outside any lock on this file
         before = copy.deepcopy(doc)
         try:
@@ -780,6 +785,25 @@ class SettingsMixin:
                 log.exception("writing the home's host record failed")
             await self._push_changes()
         return {"team": name, "change": words}
+
+    async def _forget_techleads(self, name: str, caller: Any) -> None:
+        """Delete removes the team's built-in tech lead records (`builtin: techlead`) as Forget removes one (§4.9d *How
+        each one runs*, TD-2065), on whichever host holds each, so a later team of the name starts with none. Run once
+        nothing of the team is live; a record that cannot be removed refuses the Delete, the team kept."""
+        here = hosts.local_host().name
+        for address, r in sorted(self._graph().items()):
+            if getattr(r, "builtin", None) != "techlead" or r.team != name:
+                continue
+            rid, host = naming.split_address(str(address))
+            try:
+                if host and host != here:
+                    await self._route_act("remove", {"id": str(address)}, caller, host)
+                else:
+                    await self.rpc_remove(rid, caller=caller)
+            except RpcError as e:
+                raise RpcError(
+                    f"{name} was not deleted: its tech lead's record {address} was not removed: {e}"
+                ) from None
 
     async def _team_rows(self, doc: dict[str, Any], name: str) -> dict[str, dict[str, Any]]:
         """The team's login rows as `team_show` reads them: this host's `tools` read with the team's reserve added."""

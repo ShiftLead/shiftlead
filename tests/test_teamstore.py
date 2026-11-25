@@ -510,3 +510,45 @@ def test_delete_is_refused_while_the_team_is_started(agent, monkeypatch):
     with pytest.raises(RpcError, match="a is started: wind it down first"):
         asyncio.run(a.rpc_team_delete(team="a", version=v))
     assert "a" in settings_mod.load()["teams"]
+
+
+def test_delete_removes_the_teams_built_in_tech_lead_records_on_their_hosts(agent, monkeypatch):
+    """§4.9d *How each one runs* (TD-2065): Delete removes the team's `builtin: techlead` records as Forget does, here
+    and on a node, and no first-shape seat or another team's record."""
+    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *_: None)
+    recs = {
+        "ao-s-techlead-a": SimpleNamespace(id="ao-s-techlead-a", team="a", state="closed", builtin="techlead"),
+        "ao-s-techlead-a@node": SimpleNamespace(id="ao-s-techlead-a", team="a", state="closed", builtin="techlead"),
+        "ao-s-techlead-ao-1": SimpleNamespace(id="ao-s-techlead-ao-1", team="a", state="closed", builtin=None),
+        "ao-s-techlead-b": SimpleNamespace(id="ao-s-techlead-b", team="b", state="closed", builtin="techlead"),
+    }
+    a = _agent_on(monkeypatch, body)
+    a._graph = lambda: dict(recs)
+    removed, routed = [], []
+
+    async def remove(id, caller=None):
+        removed.append(id)
+
+    async def route(method, params, caller, host):
+        routed.append((method, params["id"], host))
+
+    a.rpc_remove, a._route_act = remove, route
+    asyncio.run(a.rpc_team_delete(team="a", version=ts.version(settings_mod.load(), "a")))
+    assert removed == ["ao-s-techlead-a"] and routed == [("remove", "ao-s-techlead-a@node", "node")]
+    assert "a" not in (settings_mod.load().get("teams") or {})
+
+
+def test_a_tech_lead_record_not_removed_refuses_the_delete_and_keeps_the_team(agent, monkeypatch):
+    dropped = []
+    body = SimpleNamespace(open_records=lambda *_: [], drop_copy=lambda *a: dropped.append(a))
+    a = _agent_on(monkeypatch, body)
+    rec = SimpleNamespace(id="ao-s-techlead-a", team="a", state="closed", builtin="techlead")
+    a._graph = lambda: {"ao-s-techlead-a@node": rec}
+
+    async def route(*_a):
+        raise RpcError("node is unreachable")
+
+    a._route_act = route
+    with pytest.raises(RpcError, match="not deleted: its tech lead's record ao-s-techlead-a@node was not removed"):
+        asyncio.run(a.rpc_team_delete(team="a", version=ts.version(settings_mod.load(), "a")))
+    assert "a" in settings_mod.load()["teams"] and not dropped, "the state branch's copy is kept too"
