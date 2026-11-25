@@ -325,6 +325,7 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
         "stage_job.py",
         "stage_job_end.py",
         "stage_job_make.py",
+        "stage_job_merge.py",
         "stage_job_pass.py",
         "stage_job_tick.py",
         "stage_make.py",
@@ -332,9 +333,9 @@ def test_only_the_stage_end_call_and_a_flows_save_read_the_store_so_far():
         "stage_pass.py",
         "stage_tick.py",
         "team_show.py",
-    ]  # stage_job takes only the job key's pattern, stage_job_make and stage_job_end write a job's record,
-    # stage_job_pass and stage_job_tick read the seats' records, stage_audit_pass reads and writes an audit's run
-    # record, stage_audit_end writes a run's end, and team_show only reads
+    ]  # stage_job takes only the job key's pattern, stage_job_make, stage_job_end and stage_job_merge write a job's
+    # record, stage_job_pass and stage_job_tick read the seats' records, stage_audit_pass reads and writes an audit's
+    # run record, stage_audit_end writes a run's end, and team_show only reads
 
 
 def test_the_home_archives_an_entry_in_one_pull_request_and_a_second_call_writes_nothing(repo):

@@ -7,8 +7,11 @@ It makes each seat's trigger (`stage_job.board_objects`, `pr_objects`), one `Job
 `stage_job_start.launch` on the seat's model (`builtinstore`, the set the repo uses) and created through the host
 agent, its claim on the job's work order, and the home's plain board line (`board.add`) and its close.
 
+Once both seats have passed, each job that waits `merging` has its merge made (`stage_job_merge.run`), with the
+repo's one gate and land the teams' pass keeps.
+
 Nothing starts a session yet: `stage_start.team_started` is false until TD-2065, so no team is started and no job is
-offered; and the home hands this its reading only once its own half is wired.
+offered.
 """
 
 from __future__ import annotations
@@ -22,10 +25,11 @@ from typing import Any
 from sessionorc import board, builtinstore, workorders
 from sessionorc import settings as settings_mod
 from shiftlead import org as orgmod
-from shiftlead import stage_job, stage_job_pass, stage_job_start, stage_pass, stage_start
+from shiftlead import stage_job, stage_job_merge, stage_job_pass, stage_job_start, stage_pass, stage_start
 from shiftlead.stage_fetch import SessionsRead, held_read
 from shiftlead.stage_job_make import JobReach
 from shiftlead.stage_job_pass import JobFacts, JobStep
+from shiftlead.stage_merge import Gate, Land
 from shiftlead.stage_read import pickable_on
 from shiftlead.stagerecord import StageStore, StateError
 
@@ -126,10 +130,12 @@ def run(
     started: Collection[str],
     docs: Mapping[str, Mapping[str, Any]],
     may_start: bool,
+    gate_land: tuple[Gate, Land] | None = None,
 ) -> dict[str, tuple[JobStep, ...] | None]:
-    """Both seats' passes. `entries` are the ledger's rows, for which pull requests are a pickable entry's work;
-    `started` the repo's started teams and `docs` their flows. A seat whose records could not be read is None; with
-    the stage records unread, neither seat's trigger can be told, so neither runs."""
+    """Both seats' passes, then the merges (`merges`, with `gate_land`). `entries` are the ledger's rows, for which
+    pull requests are a pickable entry's work; `started` the repo's started teams and `docs` their flows. A seat whose
+    records could not be read is None; with the stage records unread, neither seat's trigger can be told, so neither
+    runs."""
     rows = tuple(rows)
     orders, pr_orders = list(orders), list(pr_orders)
     try:
@@ -168,4 +174,44 @@ def run(
         except Exception:  # noqa: BLE001 — one seat's failure is that seat's
             log.exception("the job pass of seat %s failed", seat)
             out[seat] = None
+    if gate_land is not None:
+        for seat, steps in merges(store, rows, docs, gate_land, reach).items():
+            if out.get(seat) is not None:
+                out[seat] = (*(out[seat] or ()), *steps)
     return out
+
+
+MERGING = stage_job.JobAct("reconcile", "merging")
+
+
+def merges(
+    store: StageStore,
+    rows: Iterable[Mapping[str, Any]],
+    docs: Mapping[str, Mapping[str, Any]],
+    gate_land: tuple[Gate, Land],
+    reach: JobReach,
+) -> dict[str, tuple[JobStep, ...]]:
+    """Each job waiting `merging` has its merge made, by seat. Its head is its pull request's as `rows` read it (an
+    open one's `head`), and its flow its team's (`docs`); a job whose team's flow is not read this pass is left as it
+    is. One job's failure is that job's."""
+    gate, land = gate_land
+    heads = {r.get("number"): r.get("head") for r in rows if r.get("state") == "open"}
+    out: dict[str, list[JobStep]] = {}
+    try:
+        keys = stage_job_merge.merging(store)
+        records = store.jobs()
+    except (StateError, ValueError):
+        log.exception("the job records could not be read for their merges")
+        return {}
+    for key in keys:
+        record = records.get(key) or {}
+        doc = docs.get(str(record.get("team") or ""))
+        if doc is None:
+            continue
+        try:
+            made = stage_job_merge.run(store, key, heads.get(record.get("pr")), doc, gate, land, reach.line)
+        except Exception:  # noqa: BLE001 — one job's merge failing is that job's
+            log.exception("the merge of job %s failed", key)
+            continue
+        out.setdefault(str(record.get("seat") or ""), []).append(JobStep(key, act=MERGING, made=made))
+    return {seat: tuple(steps) for seat, steps in out.items()}

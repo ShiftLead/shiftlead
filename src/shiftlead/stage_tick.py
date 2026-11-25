@@ -243,6 +243,8 @@ def run(
     if orders is None or pr_orders is None:
         return got
     try:
+        if kept.gate_land is None:  # the repo's one gate and land, the teams' pass's own where it made them
+            kept.gate_land = stage_merge.gate_and_land(root)
         jobs = _jobs(
             store,
             root,
@@ -259,6 +261,7 @@ def run(
             call,
             org,
             now,
+            gate_land=kept.gate_land,
         )
         return dataclasses.replace(got, jobs=jobs)
     except Exception:  # noqa: BLE001 — the jobs' pass failing is a log line and never the teams' pass
@@ -282,11 +285,13 @@ def _jobs(
     call: Callable[..., Any],
     org: Callable[[], orgmod.Org | None],
     now: datetime,
+    *,
+    gate_land: tuple[stage_merge.Gate, stage_merge.Land],
 ) -> dict[str, Any]:
     """The jobs' pass, once the teams' pass is done: each team's flow as its records read it, the last good copy
     while it fails (`team_flow`), and the rows, with each open board answer's own pull request read by its number.
     The repo's name, which picks its built-in set, is its teams' `repo`. A pull request reading that cannot be read
-    passes over no job."""
+    passes over no job. A job waiting `merging` is merged through `gate_land`, the repo's one gate and land."""
     docs = _docs(store, flows)
     wanted = sorted({r["pr"] for r in store.jobs().values() if isinstance(r.get("pr"), int) and not r.get("closed_at")})
     rows = rows_of(prs, wanted, lambda n: reports.pr_state_row(root, n))
@@ -314,6 +319,7 @@ def _jobs(
         started=started,
         docs=docs,
         may_start=bool(started),
+        gate_land=gate_land,
     )
 
 

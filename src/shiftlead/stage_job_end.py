@@ -10,8 +10,8 @@ the flow's limits and its cap on moves as an entry's move is. A job goes only to
 `merge`; any other destination, a limit or the cap reached, and `other` send the job to the person: the home's plain
 board line is written first (`line`), its id kept on the record as `person_line`, and the record waits.
 
-`stage_end.call` routes a job's reference here. A review stage's verdict on a job's pull request, the home's merge of
-it, and `closed-unmerged` (TD-2165) are later work.
+`stage_end.call` routes a job's reference here. A job sent to `merge` is merged by the home (`stage_job_merge`). A
+review stage's verdict on a job's pull request and `closed-unmerged` (TD-2165) are later work.
 """
 
 from __future__ import annotations
