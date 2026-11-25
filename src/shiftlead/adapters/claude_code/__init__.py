@@ -663,6 +663,7 @@ class ClaudeCodeAdapter:
         name: str = "",
         start_context: str | None = None,
         keep_context: bool = False,
+        model: str | None = None,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
@@ -671,8 +672,8 @@ class ClaudeCodeAdapter:
         argv += ["--resume", resume] if resume else ["--session-id", adapter_id]
         if name:
             argv += ["--name", name]
-        if prof.model:
-            argv += ["--model", prof.model]
+        if model or prof.model:  # a launch on a login's model, else the profile's pin (§4.9e, TD-2068)
+            argv += ["--model", model or prof.model]
         argv += prof.extra_args
         if unattended:
             # the skip flag only under `permission_prompts: skip`, the default (§4.2a, TD-641): under

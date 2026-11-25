@@ -198,6 +198,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _new_done,  # noqa: F401
     _older,  # noqa: F401
     _oldest_first,  # noqa: F401
+    _on_login,  # noqa: F401
     _pane_title,  # noqa: F401
     _parse,  # noqa: F401
     _peer_args,  # noqa: F401
@@ -1764,8 +1765,18 @@ class HostAgent(
         succeeds: str | None = None,
         scratch: str | None = None,
         stage: bool = False,
+        login: str | None = None,
+        seat_model: str | None = None,
+        login_list: list[str] | None = None,
     ) -> dict[str, Any]:
-        """`stage` (design §4.3, §4.9c *What a run records, for comparing flows*, TD-2158): the launch is a stage's
+        """`login` (design §4.9e *The launch on a login*, TD-2068): the launch is on that login of this host's
+        `logins.yml`, by its key or its bare name, so the adapter is its tool and the record's `profile` the name the
+        login is read under (*A record's profile*); the record holds its key as `login` and its account as `account`.
+        `seat_model`, the model family the flow or the built-in set named, is handed to the adapter's launch as its
+        `model` and kept on the record with `login_list`, the list the pick read. Both are refused without a login, a
+        login on a host with no `logins.yml`, and a `profile` or `adapter` that is not the login's.
+
+        `stage` (design §4.3, §4.9c *What a run records, for comparing flows*, TD-2158): the launch is a stage's
         session, whose create reads its tool's version as a seat's does, for its rows' `run.tool_version`; the
         upgrade check still reads only seats' records.
 
@@ -1844,6 +1855,10 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
+        on_login = await asyncio.to_thread(_on_login, login, adapter, profile, seat_model, login_list)
+        if on_login is not None:
+            profile, account = on_login["profile"], on_login["account"]
+            login, login_list = on_login["login"], on_login["login_list"]
         grants = _grants(capabilities or [], ALL_GRANTS)  # validate before anything starts
         references = _lane(lane or [])
         reading, bound, extra = _review(review), _context_bound(context_bound), _scale(scale)
@@ -2038,6 +2053,7 @@ class HostAgent(
                     cwd=directory,
                     name=name,
                     **handed_context,
+                    **({"model": str(seat_model)} if on_login is not None and seat_model else {}),
                 )
             except (KeyError, ValueError, OSError) as e:  # OSError: the start context's file (TD-339)
                 raise RpcError(str(e).strip('"')) from None
@@ -2171,6 +2187,10 @@ class HostAgent(
                     run_only=bool(run_only),
                     seat=dict(seat) if seat else None,
                     builtin=builtin,
+                    login=login if on_login is not None else None,
+                    account=account if on_login is not None else None,
+                    seat_model=str(seat_model) if on_login is not None and seat_model else None,
+                    login_list=login_list if on_login is not None else None,
                     scale=extra,
                     review=reading,
                     context_bound=bound,
