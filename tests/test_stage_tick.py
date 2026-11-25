@@ -416,6 +416,13 @@ def test_the_pass_writes_the_orgs_director_record_through_the_homes_call(
 
     a_pass(root, Kept(), call=call)
     assert [(m, p.get("name")) for m, p in calls] == [("list", None), ("create", "director")]
+    from sessionorc.models import Session
+
+    held = Session(id="ao-director", name="director", dir="/d", kind="agent", adapter="claude-code", state="closed")
+    held.seat = {"trigger": "prompt"}
+    calls.clear()
+    a_pass(root, Kept(), call=call, graph={held.id: held})
+    assert calls == [], "the pass's own snapshot holds the director, so nothing is asked of the home"
 
 
 @pytest.mark.unit
