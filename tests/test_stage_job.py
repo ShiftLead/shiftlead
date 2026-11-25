@@ -10,16 +10,20 @@ from shiftlead.stage_acts import SILENT_AFTER, Holder
 from shiftlead.stage_job import (
     JobAct,
     JobReading,
+    board_objects,
     choose,
     cleared,
     closed,
+    entries_work,
     key_of,
     moved,
     new_job,
     offered,
     order,
+    pr_objects,
     to_person,
 )
+from shiftlead.stagerecord import new_record
 
 GO = {"may_start": True}
 
@@ -150,3 +154,82 @@ def test_writes() -> None:
     assert gone["stage"] is None and gone["counts"] == {} and gone["offers"] == 0
     shut = closed(one)
     assert shut["closed_at"] and shut["holder"] is None
+
+
+# -- the two seats' triggers (design §4.9c *Two of the five are not seats today*) -----------------------------------
+
+
+def decided(item: str, context: str | None = None, date: str = "2026-11-24") -> dict[str, Any]:
+    return {"id": f"board:{item}", "context": context, "decided": {"text": "Go", "date": date}}
+
+
+def waiting(tid: str, **over: Any) -> dict[str, Any]:
+    return {**new_record(tid, "build", "build", team="ao-grind"), **over}
+
+
+def test_a_decided_line_asks_for_a_job_keyed_by_its_item() -> None:
+    got = board_objects([decided("9099da3b"), decided("6bca1e0d", date="2026-11-21")], {})
+    assert got == {"board-9099da3b": "2026-11-24", "board-6bca1e0d": "2026-11-21"}
+
+
+def test_a_covering_item_of_an_entry_waiting_on_the_person_is_the_homes() -> None:
+    lines = [decided("9099da3b", "TD-2053 decision (paul)"), decided("6bca1e0d", "TD-2054 decision (paul)")]
+    entries = {"TD-2053": waiting("TD-2053", waits="person"), "TD-2054": waiting("TD-2054", intent={"nonce": "x"})}
+    assert board_objects(lines, entries) == {}
+
+
+def test_a_covering_item_asks_for_a_job_where_its_entry_does_not_wait() -> None:
+    lines = [decided("9099da3b", "TD-2053 decision (paul)"), decided("6bca1e0d", "TD-2054 decision (paul)")]
+    entries = {
+        "TD-2053": waiting("TD-2053"),  # open, waiting on nothing
+        "TD-2054": waiting("TD-2054", waits="person", closed_at="2026-11-24T00:00:00Z"),  # closed
+    }
+    assert set(board_objects(lines, entries)) == {"board-9099da3b", "board-6bca1e0d"}
+
+
+def test_a_line_whose_context_is_no_entrys_gate_asks_for_a_job() -> None:
+    entries = {"TD-2053": waiting("TD-2053", waits="person")}
+    assert set(board_objects([decided("9099da3b", "TD-2053, TD-2054 decision (paul)")], entries)) == {"board-9099da3b"}
+
+
+def test_an_order_with_no_board_id_is_no_board_answer() -> None:
+    assert board_objects([{"id": "pr:12", "decided": {}}, {"id": "board:nothex!"}], {}) == {}
+
+
+def red(n: int, **over: Any) -> dict[str, Any]:
+    return {"id": f"pr:{n}", "pr_order": True, "pr": n, "red_since": "2026-11-24T01:00:00Z", **over}
+
+
+def test_a_red_and_a_filing_pr_ask_for_a_job() -> None:
+    orders = [red(12), red(13, filing=True, filing_since="2026-11-23T00:00:00Z", red_since=None)]
+    assert pr_objects(orders, {}, {}) == {"pr-12": "2026-11-24T01:00:00Z", "pr-13": "2026-11-23T00:00:00Z"}
+
+
+def test_a_sync_lift_or_sweep_pr_is_no_job() -> None:
+    assert pr_objects([red(1, sync=True), red(2, lift=True), red(3, sweep=True)], {}, {}) == {}
+
+
+def test_a_pr_a_record_names_is_that_records() -> None:
+    entries = {"TD-7": waiting("TD-7", pr=12), "TD-8": waiting("TD-8", pr=13, closed_at="2026-11-24T00:00:00Z")}
+    jobs = {
+        "board-9099da3b": job(pr=14),
+        "pr-15": job("unheld-pull-requests", 15),  # its own seat's record: `order` reads it as that record's
+    }
+    got = pr_objects([red(12), red(13), red(14), red(15)], entries, jobs)
+    assert set(got) == {"pr-13", "pr-15"}
+
+
+def test_a_pickable_entrys_work_is_the_offer_acts() -> None:
+    assert pr_objects([red(12), red(13)], {}, {}, work={12}) == {"pr-13": "2026-11-24T01:00:00Z"}
+
+
+def row(n: int, branch: str, **over: Any) -> dict[str, Any]:
+    head = f"sha{n}"
+    return {"number": n, "state": "open", "branch": branch, "head": head, "filing_head": head, "filing": False, **over}
+
+
+def test_entries_work_is_a_pickable_entry_with_no_record() -> None:
+    prs = [row(12, "td2053-triggers"), row(13, "td2054-x"), row(14, "td2055-y"), row(15, "td2056-z", filing_head=None)]
+    entries = {"TD-2054": waiting("TD-2054")}  # has a record: the Offer act took it already
+    got = entries_work(["TD-2053", "TD-2054", "TD-2056", "TD-9999"], entries, prs)
+    assert got == {12, 15}  # #15's files unread at its head: maybe an entry's, so skipped this reading
