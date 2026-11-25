@@ -36,6 +36,7 @@ from sessionorc import spend as spend_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
+    FILES_MAX,
     RpcError,
     _parse,
     _usage_key,
@@ -804,13 +805,14 @@ class SettingsMixin:
             root = next((str(r) for r in listed if Path(str(r)).name == repo), None)
             if root is None:
                 return f"{host} registers no checkout of {repo}"
-            got = await self._node_mux(host).request(
-                "files", timeout=NODE_FLOWS_WAIT, dir=root, paths=[*paths.values()]
-            )
+            wanted, files = [*paths.values()], {}
+            for at in range(0, len(wanted), FILES_MAX):  # a node reads at most FILES_MAX files in one request
+                part = wanted[at : at + FILES_MAX]
+                got = await self._node_mux(host).request("files", timeout=NODE_FLOWS_WAIT, dir=root, paths=part)
+                files.update((got if isinstance(got, dict) else {}).get("files") or {})
         except Exception as e:  # noqa: BLE001 — a node away, a link refused or a checkout refused: not read, said
             why = str(e) or type(e).__name__
             return why if why.startswith(host) else f"{host} did not answer: {why}"
-        files = (got if isinstance(got, dict) else {}).get("files") or {}
         return {n: files.get(p) is not None for n, p in paths.items()}
 
     async def rpc_team_switch_preview(self, team: str = "", flow: str = "", caller: Any = None) -> dict[str, Any]:

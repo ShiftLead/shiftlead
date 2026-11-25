@@ -185,6 +185,11 @@ def test_the_host_agent_asks_the_node_which_repo_flows_its_checkout_holds(agent)
     got = asyncio.run(a._on_node(body, "t", doc, "home", []))
     assert got == {"merged": True, "branch": False} and asked == [("files", "/srv/shiftlead", ["m.yml", "b.yml"])]
 
+    many = {f"f{i}": f"f{i}.yml" for i in range(17)}  # past the 16 files a node reads in one request
+    asked.clear()
+    got = asyncio.run(a._on_node(SimpleNamespace(node_flow_paths=lambda *_a: many), "t", doc, "home", []))
+    assert [len(p) for _m, _d, p in asked] == [16, 1] and got == dict.fromkeys(many, False)
+
     async def none_here(host):
         return {"host": host, "repos": ["/srv/other"]}
 
