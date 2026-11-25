@@ -114,7 +114,7 @@ def _re_enter(store: StageStore, record: dict[str, Any], s: Reading, doc: dict[s
             "at": _now(),
         }
     )
-    record.update(flow=name, stage=to, holder=None, offers=0, entered_at=_now())
+    record.update(flow=name, stage=to, holder=None, offers=0, entered_at=_now(), answer=None)
     store.put_entry(record, f"re-entered at {to}")
     return Made(True)
 
@@ -405,8 +405,8 @@ def _came(record: dict[str, Any], key: str) -> tuple[str | None, str | None]:
     if not steps or steps[-1].get("to") != key:
         return None, answer
     last = steps[-1]
-    if last.get("outcome") == "answer":
-        if len(steps) < 2:
+    if last.get("outcome") == "answer":  # the move that raised the question went to the person; a question with no
+        if len(steps) < 2 or steps[-2].get("to") != "person":  # such step (a stage gone) tells no reason
             return None, answer
         last = steps[-2]
     why = str(last.get("reason") or "").strip()

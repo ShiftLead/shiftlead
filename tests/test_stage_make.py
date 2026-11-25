@@ -586,6 +586,16 @@ def test_an_offer_after_the_persons_answer_gives_their_words_and_what_raised_the
     assert work.answer == "fix the flaky test"
 
 
+def test_an_answer_with_no_move_to_the_person_before_it_tells_no_older_reason(store):
+    history = [
+        {"from": "build", "outcome": "work-pushed", "reason": "old", "to": "review"},
+        {"from": "review", "outcome": "answer", "reason": "go on", "to": "build"},
+    ]
+    put(store, stage="build", history=history, answer="go on")
+    _, started, _ = offer_it(store)
+    assert (started[0][1].came, started[0][1].answer) == (None, "go on")
+
+
 def test_an_offer_tells_no_reason_for_a_move_into_another_stage(store):
     put(store, stage="polish", history=[{"from": "build", "outcome": "work-pushed", "reason": "x", "to": "review"}])
     _, started, _ = offer_it(store)

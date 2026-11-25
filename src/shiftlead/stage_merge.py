@@ -208,7 +208,8 @@ def run(
                 record = _current(store, tid, head)
                 if record is None:
                     return Made(False, "the record moved while the gate ran")
-                return _to_person(store, record, s, doc, person, f"The merge gate's {rows} row needs a person.")
+                context = f"The merge gate failed on {rows}, which needs a person."
+                return _to_person(store, record, s, doc, person, context)
         return _refused(store, tid, head, s, doc, person, f"the merge gate failed on {rows}")
     if verdict != "pass":
         return unread("the merge gate gave no reading")
