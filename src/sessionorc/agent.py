@@ -2321,6 +2321,11 @@ class HostAgent(
             by_person=None if self.mode == "node" else False,  # supervised: a team's (§4.10, TD-1069)
             seat=dict(given["seat"]) if given.get("seat") else None,
             builtin=given.get("builtin"),
+            # a launch on a login's fields, as the create resolved them (§4.9e, TD-2068)
+            login=(given.get("on_login") or {}).get("login"),
+            account=(given.get("on_login") or {}).get("account"),
+            seat_model=str(given["seat_model"]) if given.get("on_login") and given.get("seat_model") else None,
+            login_list=(given.get("on_login") or {}).get("login_list"),
             scale=given["extra"],
             review=given["reading"],
             context_bound=given["bound"],

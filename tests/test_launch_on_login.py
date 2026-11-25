@@ -153,3 +153,33 @@ async def test_a_create_on_a_login_this_host_lacks_makes_nothing(agent, tmp_path
         with pytest.raises(AgentError, match="no login nobody on this host"):
             await person.call("create", **_params(tmp_path, "w", login="nobody", seat_model="opus"))
     assert not launched and not agent.sessions
+
+
+async def test_a_held_seat_on_a_login_holds_its_login_fields(agent, tmp_path, launched):
+    """A held record is written by `_schedule`, not the launch: it carries the login's fields too (review of #4688)."""
+    (paths.home() / "logins.yml").write_text(LOGINS)
+    async with LocalClient() as person:
+        sid = (
+            await person.call(
+                "create",
+                **_params(
+                    tmp_path,
+                    "techlead",
+                    supervised=True,
+                    held=True,
+                    seat={"trigger": "asks"},
+                    login="grind",
+                    seat_model="opus",
+                    login_list=["hookstub:grind"],
+                ),
+            )
+        )["id"]
+    s = agent.sessions[sid]
+    assert s.state == "closed" and not launched
+    assert (s.login, s.account, s.seat_model, s.login_list, s.profile) == (
+        "hookstub:grind",
+        "acct-1",
+        "opus",
+        ["hookstub:grind"],
+        "grind",
+    )
