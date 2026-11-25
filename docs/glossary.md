@@ -107,7 +107,7 @@ not mix:
   prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it. Since TD-210 (2026-09-28, designed) the org is an **aggregate**: the teams each registered repo defines in its own `.shiftlead.yml`, with the org file holding only what spans repos or belongs to one install (design §4.9 *The org is an aggregate*).
 - **team** — a manager (or the person) plus its workers on **one repo**, defined once and started
   many times; a repo may have several teams, listed together and never combined. After the cut-over
-  (§4.9d, TD-1153, designed) a team is a repo, the one flow it runs and an ordered list of logins, held
+  (§4.9d, TD-1153, built) a team is a repo, the one flow it runs and an ordered list of logins, held
   in `settings.yml`, with no members: its sessions are started for one entry in one stage. — *proposed* (ADR
   2026-09-13); one repo per team and no nesting **decided** 2026-10-15 (Paul, TD-722).
 - **project** — a heading on repos that belong together; a repo sits in at most one, and a repo in
