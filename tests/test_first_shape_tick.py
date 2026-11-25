@@ -110,14 +110,15 @@ async def test_a_member_s_idle_open_goes_at_the_marker(agent, monkeypatch):
     assert agent.sessions["ao-t-w"].idle_open is None
 
 
+@pytest.mark.parametrize("lane", ["TD-7", "audit:g/docs", "board:1a2b3c4d", "pr:41"])
 @pytest.mark.parametrize("marked", [True, False], ids=["after", "before"])
-async def test_a_restart_from_a_stage_s_session_is_refused_after_the_marker(agent, monkeypatch, marked):
+async def test_a_restart_from_a_stage_s_session_is_refused_after_the_marker(agent, monkeypatch, marked, lane):
     await park_ticks(agent)
     if marked:
         _mark()
     agent._read_cut_over()
     s = Session(
-        id="ao-t-s", name="s", kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g", lane=["TD-7"]
+        id="ao-t-s", name="s", kind="interactive", adapter="shell", dir="/tmp/x", state="idle", team="g", lane=[lane]
     )  # fmt: skip
     agent.sessions[s.id] = s
     monkeypatch.setattr(agent, "_is_self", lambda *_: True)

@@ -125,8 +125,9 @@ class StageMixin:
 
     @staticmethod
     def _holds_stage(s: Any) -> bool:
-        """Whether `s` is a stage's session: a team's, no seat, its lane one entry (§4.8)."""
-        refs = [r for r in lane_refs(s.lane or []) if r.startswith("TD-")]
+        """Whether `s` is a stage's, a job's or an audit's session: a team's, no seat, its lane one entry, one job's
+        work order or one audit run's lease (§4.8; §4.9e: each ends by `ao stage end`, never a restart)."""
+        refs = [r for r in lane_refs(s.lane or []) if held_ref(r, jobs=True)]
         return bool(s.team) and s.seat is None and not s.builtin and len(refs) == 1
 
     async def rpc_stage_end(self, id: str, outcome: str, reason: str = "", caller: Any = None) -> dict[str, Any]:
