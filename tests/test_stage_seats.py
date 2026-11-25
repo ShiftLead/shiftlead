@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from sessionorc.models import Session
-from shiftlead import stage_seats, teams
+from shiftlead import stage_seats, teamrun, teams
 
 pytestmark = pytest.mark.unit
 
@@ -306,3 +306,69 @@ async def test_the_home_takes_the_sweeper_record_held_built_in_and_of_the_repo(a
         )
         assert rec.unattended and rec.supervised and rec.controllers == []
         assert stage_seats.sweeper_of(agent.sessions, "r") is rec
+
+
+class Records:
+    """The home's `list`, `create` and `remove`, on records it holds as dicts, so a second pass reads the first's."""
+
+    def __init__(self, *records) -> None:
+        self.records, self.removed, self.refuse = [dict(r) for r in records], [], set()
+
+    def __call__(self, method: str, **params):
+        if method == "list":
+            return [dict(r) for r in self.records]
+        if method == "create":
+            self.records.append({"id": f"ao-{params['name']}", "state": "closed", **params})
+            return {"id": f"ao-{params['name']}"}
+        assert method == "remove"
+        if params["id"] in self.refuse:
+            raise RuntimeError("refused")
+        self.removed.append(params["id"])
+        self.records = [r for r in self.records if r["id"] != params["id"]]
+        return None
+
+
+def _director_params(tmp_path):
+    return {"name": "director", "dir": str(tmp_path / "director"), "seat": {"trigger": "prompt"}, "held": True}
+
+
+def test_the_director_record_is_written_once_where_the_org_has_a_director(world, monkeypatch):
+    org, _team, tmp_path = world
+    org.director = SimpleNamespace(name="director")
+    monkeypatch.setattr(teams, "director_create", lambda _org: _director_params(tmp_path))
+    home = Records()
+    assert stage_seats.write_director(home, org) == [f"director: {teamrun.DIRECTOR_LINE}"]
+    assert stage_seats.write_director(home, org) == [], "the record stands, so a second pass writes none"
+    assert [r["name"] for r in home.records] == ["director"] and (tmp_path / "director").is_dir()
+    prompts = {"id": "p", "name": "prompts-r", "seat": {"trigger": "prompt"}, "builtin": "prompts", "state": "closed"}
+    home = Records(prompts)
+    assert stage_seats.write_director(home, org) == [f"director: {teamrun.DIRECTOR_LINE}"], "a prompts seat is not it"
+    assert stage_seats.write_director(Records(), None) == []
+
+
+def test_the_director_record_is_removed_once_the_key_is_gone_and_no_session_of_it_is_live(world):
+    org, _team, _ = world
+    org.director = None
+    seat = {"seat": {"trigger": "prompt"}}
+    home = Records(
+        {"id": "d1", "name": "director", "state": "closed", **seat},
+        {"id": "d2", "name": "director-old", "state": "working", **seat},
+        {"id": "p", "name": "prompts-r", "state": "closed", "builtin": "prompts", **seat},
+        {"id": "x", "name": "techlead-t", "state": "closed", "seat": {"trigger": "asks"}},
+    )
+    assert stage_seats.write_director(home, org) == ["director: removed, the org has no director"]
+    assert home.removed == ["d1"], "a live director, a prompts seat and another seat are kept"
+    home.records[0]["state"] = "exited"
+    home.refuse.add("d2")
+    assert stage_seats.write_director(home, org) == [] and home.removed == ["d1"], "a refused remove is retried later"
+
+
+def test_the_pass_asks_the_home_nothing_where_its_snapshot_reads_as_the_key_wants(world):
+    org, _team, _ = world
+    home = Records()
+    org.director = None
+    assert stage_seats.write_director(home, org, {"x": record(id="x")}) == []
+    org.director = SimpleNamespace(name="director")
+    graph = {"d": record(id="d", name="director", team="", seat={"trigger": "prompt"})}
+    assert stage_seats.write_director(home, org, graph) == []
+    assert home.records == [] and home.removed == []
