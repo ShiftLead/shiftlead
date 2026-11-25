@@ -196,3 +196,49 @@ async def test_before_the_cut_over_a_built_in_mark_reads_the_first_shape_hold(ag
     agent._held_words(lead, [lead])
     agent._seat_held(lead, [lead])
     assert calls == []
+
+
+async def test_a_held_built_in_tech_lead_takes_no_blank_pick_and_one_started_does(agent):
+    """A blank Team pick's target is able and not held (§4.10 *A team or a repo as the address*, TD-1564): after the
+    cut-over a built-in tech lead's hold is §4.9d's, a wound-down team's lead refuses it, a started one takes it."""
+    await _cut(agent, a=_stopped(), b=STARTED)
+    held = _seat(agent, "techlead-a", "techlead", team="a")
+    started = _seat(agent, "techlead-b", "techlead", team="b")
+    assert not agent._seat_id_takes(held.id)
+    assert agent._seat_id_takes(started.id)
+
+
+def _blank_pick(to: str, teams: list[tuple[str, str]]):
+    from sessionorc.mail import PERSON
+    from sessionorc.models import MailEntry
+
+    e = MailEntry(id="m-blank0000001", from_=PERSON, to=[to], at="2026-12-01T10:05:00Z", kind="ask", text="blank")
+    e.handed = True
+    e.entry = {"repo": "repo", "type": "debt", "teams": [{"team": t, "seat": s} for t, s in teams]}
+    return e
+
+
+async def test_a_blank_pick_moves_off_a_built_in_tech_lead_only_while_its_team_is_held(agent):
+    """The tick moves a blank pick off a held seat to the next team's (§4.9b *A question already waiting*, TD-1564),
+    reading a built-in seat's hold by §4.9d after the cut-over: a started team's lead keeps it, however few of its
+    first-shape crew run, and a wound-down team's lead hands it on."""
+    await _cut(agent, a=STARTED, b=STARTED)
+    lead = _seat(agent, "techlead-a", "techlead", team="a")
+    other = _seat(agent, "techlead-b", "techlead", team="b")
+    e = _blank_pick(lead.id, [("a", lead.id), ("b", other.id)])
+    lead.inbox.append(e)
+    await agent._reroute_waiting(datetime.now(UTC))
+    assert e.open and not other.inbox, "a started team's lead is not held: the pick stays"
+    agent._host_rec["teams"]["a"] = _stopped()
+    await agent._reroute_waiting(datetime.now(UTC))
+    assert e.closed_reason == "rerouted"
+    (moved,) = other.inbox
+    assert moved.root == e.id and moved.routed["why"] == "its team is stopped"
+
+
+async def test_a_built_in_seat_that_sat_out_reads_no_hold(agent):
+    await _cut(agent, a=_stopped())
+    lead = _seat(agent, "techlead-a", "techlead", team="a")
+    assert agent._seat_held(lead, [lead])
+    lead.sit_out = {"at": "2026-12-01T10:00:00Z"}
+    assert not agent._seat_held(lead, [lead]) and agent._held_words(lead, [lead]) is None
