@@ -269,5 +269,5 @@ def test_an_audit_that_rested_is_told_to_the_person_once_by_its_team(monkeypatch
     asyncio.run(agent._stage_pass())
     assert agent.notes == [("person", rested_words(rested), "build-r")]
     assert rested_words(rested).startswith(
-        "The audit docs of team build-r lost its run twice (its session went silent again)"
+        "The audit docs of team build-r lost its run twice (the second time, its session went silent)"
     )
