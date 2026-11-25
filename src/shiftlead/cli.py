@@ -5523,8 +5523,9 @@ def cmd_decide(args: argparse.Namespace) -> int:
 
 
 def cmd_switch_over_check(args: argparse.Namespace) -> int:
-    """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles and every
-    blocker, nothing changed; exit 1 while a blocker to cure beforehand stands."""
+    """`ao switch-over check` (§4.9e *The three commands*, TD-2071): this host's logins from its profiles, named by the
+    answers file, each team with what the answers give it, and every blocker, nothing changed; exit 1 while a blocker
+    to cure beforehand stands."""
     import yaml
 
     from shiftlead import profiles as profiles_mod
@@ -5535,11 +5536,21 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
     except (OSError, ValueError, TypeError, AttributeError, KeyError, yaml.YAMLError) as e:
         print(f"ao switch-over check: profiles.yml cannot be read: {e}", file=sys.stderr)
         return 1
-    from sessionorc import hosts
-
     host = hosts.local_host().name
-    made, blockers = switchover.host_logins(host, profs)
-    print("\n".join(switchover.report(host, made, blockers)))
+    answers, blockers = switchover.read_answers()
+    made, more = switchover.host_logins(host, profs, names=switchover.names_of(answers, host))
+    blockers += more + switchover.unnamed(host, made, answers)
+    plans = None
+    try:
+        org, notes = _org_notes("ao switch-over check")
+    except (ValueError, OSError, yaml.YAMLError) as e:  # a node, or an org file that cannot be read
+        blockers.append(switchover.Blocker("the org", str(e), "mend org.yml, or run the check on the home"))
+    else:
+        for note in notes:
+            print(note, file=sys.stderr)
+        plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos())
+        blockers += more
+    print("\n".join(switchover.report(host, made, blockers, plans)))
     return 1 if any(not b.day for b in blockers) else 0
 
 

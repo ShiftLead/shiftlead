@@ -1,12 +1,15 @@
-"""The switch-over's check, its first slice: the logins a host's profiles make and the blockers to cure beforehand
-(design §4.9e *The three commands*, §4.2b *What the switch-over makes*, TD-2071)."""
+"""The switch-over's check: the logins a host's profiles make, named by the answers file, each team with what the
+answers give it, and the blockers to cure beforehand (design §4.9e *The three commands*, *Blockers*, §4.2b *What the
+switch-over makes*, TD-2071)."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+import yaml
 
 from shiftlead import cli, switchover
 from shiftlead.adapters import claude_code, gemini, grok
@@ -172,19 +175,215 @@ def test_the_report_lists_logins_then_blockers(tmp_path):
     assert switchover.report("h", [], [])[-1] == "no blockers"
 
 
-def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(tmp_path, capsys, monkeypatch):
-    from sessionorc import paths
-
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # never the suite's shared unit home
-    home = paths.home()
+@pytest.fixture
+def home(tmp_path, monkeypatch):
+    """A home of its own (the worker's is read by every later test on it), on a host `h` with no node and no
+    registered checkout."""
+    home = tmp_path / "home"
     home.mkdir()
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    registry = home / "repos.txt"
+    registry.write_text("")
+    monkeypatch.setattr(
+        cli.hosts, "local_host", lambda: cli.hosts.Host(name="h", vscode_host="h", repos_registry=registry)
+    )
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+    monkeypatch.setattr(cli.hosts, "nodes", lambda: {})
+    return home
+
+
+def answers(home: Path, doc: dict) -> None:
+    (home / "switch-over").mkdir(exist_ok=True)
+    (home / "switch-over" / "answers.yml").write_text(yaml.safe_dump(doc))
+
+
+def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(home, tmp_path, capsys):
     a, b = tmp_path / "a", tmp_path / "b"
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {a}}}\n")
     assert cli.main(["switch-over", "check"]) == 1
     assert "more than one key" in capsys.readouterr().out
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n  q: {{config_dir: {b}}}\n")
+    assert cli.main(["switch-over", "check"]) == 1  # no answers file
+    assert "there is no answers file" in capsys.readouterr().out
+    answers(home, {"hosts": {"h": {"logins": {f"claude-code:{a}": {"name": "p"}, f"claude-code:{b}": {"name": "q"}}}}})
     assert cli.main(["switch-over", "check"]) == 0
-    assert "no blockers" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "no blockers" in out and "none: the org defines no team" in out
+
+
+def test_the_check_names_each_team_with_what_the_answers_give_it(home, tmp_path, capsys):
+    a = tmp_path / "a"
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    found = {f"claude-code:{a}": {"name": "paul"}}
+    pick = {"flow": "design-wise", "logins": ["claude-code:paul"], "at_once": {"build": 2}, "most": 4}
+    answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": pick}})
+    before = {p: p.read_bytes() for p in home.rglob("*") if p.is_file()}
+    assert cli.main(["switch-over", "check"]) == 0
+    out = capsys.readouterr().out
+    assert "  grind: r on h, flow design-wise; logins claude-code:paul; at once build 2, at most 4 in all" in out
+    assert "claude-code:paul" in out.splitlines()[1]
+    assert {p: p.read_bytes() for p in home.rglob("*") if p.is_file()} == before  # changes nothing
+    answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": {**pick, "logins": ["claude-code:gone"]}}})
+    assert cli.main(["switch-over", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "lists claude-code:gone, a login h would not have" in out
+
+
+def test_no_answers_file_a_bad_one_and_one_not_a_mapping_each_block(tmp_path):
+    got, blockers = switchover.read_answers(tmp_path / "none.yml")
+    assert got is None and "there is no answers file" in blockers[0].what and not blockers[0].day
+    (tmp_path / "bad.yml").write_text("hosts: [unclosed\n")
+    assert "cannot be read" in switchover.read_answers(tmp_path / "bad.yml")[1][0].what
+    (tmp_path / "list.yml").write_text("- a\n")
+    assert "not a mapping" in switchover.read_answers(tmp_path / "list.yml")[1][0].what
+    (tmp_path / "teams.yml").write_text("teams: [a]\n")
+    assert "teams" in switchover.read_answers(tmp_path / "teams.yml")[1][0].what
+    (tmp_path / "ok.yml").write_text("")
+    assert switchover.read_answers(tmp_path / "ok.yml") == ({}, [])
+
+
+def test_a_folder_the_answers_name_takes_that_name_and_one_they_do_not_blocks(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    doc = {"hosts": {"h": {"logins": {f"claude-code:{a.resolve()}": {"name": "paul"}}}}}
+    made, _ = run(tmp_path, [P("p", a), P("q", b)], names=switchover.names_of(doc, "h"))
+    assert [m.name for m in made] == ["paul", "q"]
+    got = switchover.unnamed("h", made, doc)
+    assert len(got) == 1 and f"claude-code:{b.resolve()} has no name" in got[0].what
+    assert switchover.unnamed("h", made, None) == []  # the file's own blocker stands for every name
+
+
+# -- the teams (§4.9e *Blockers*: a team's cases) ----------------------------------------------------------------------
+
+
+def Team(repo: str = "r", host: str = "") -> SimpleNamespace:  # noqa: N802 — a fixture's constructor
+    return SimpleNamespace(repo=repo, host=host)
+
+
+def Org(unlanded: dict | None = None, **teams: SimpleNamespace) -> SimpleNamespace:  # noqa: N802
+    return SimpleNamespace(teams=teams, unlanded=unlanded or {})
+
+
+FLOW = {"stages": [{"name": "Build", "model": "opus"}], "audits": [{"name": "Docs", "model": "sonnet"}]}
+
+
+def flows(*rows: dict) -> Any:
+    got = [{"name": "design-wise", "place": "builtin", "doc": FLOW, "problems": []}, *rows]
+    return lambda _repo: got
+
+
+def plan(org: Any, doc: dict | None, *, made: list | None = None, nodes: dict | None = None, offered: Any = None):
+    made = (
+        made
+        if made is not None
+        else [switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"], models=["opus", "sonnet"])]
+    )
+    return switchover.teams(org, doc, "h", made, [], nodes=nodes or {}, offered=offered or flows())
+
+
+def pick(**kw: Any) -> dict:
+    return {"teams": {"grind": {"flow": "design-wise", "logins": ["claude-code:paul"], **kw}}}
+
+
+def test_a_team_the_answers_fill_has_no_blocker_and_carries_its_counts():
+    plans, blockers = plan(Org(grind=Team()), pick(at_once={"build": 2}, most=4, label="Builders"))
+    assert blockers == []
+    p = plans[0]
+    assert (p.flow, p.logins, p.at_once, p.most, p.label, p.host) == (
+        "design-wise",
+        ["claude-code:paul"],
+        {"build": 2},
+        4,
+        "Builders",
+        "h",
+    )
+
+
+def test_with_no_answers_file_a_team_is_listed_and_blocks_nothing_of_its_own():
+    plans, blockers = plan(Org(grind=Team()), None)
+    assert [p.flow for p in plans] == [None] and blockers == []
+
+
+@pytest.mark.parametrize(
+    ("doc", "words"),
+    [
+        ({"teams": {}}, "has no flow in the answers"),
+        (pick(logins=[]), "its login list is empty"),
+        (pick(logins="claude-code:paul"), "not a list of <tool>:<name>"),
+        (pick(logins=["claude-code:gone"]), "lists claude-code:gone, a login h would not have"),
+        (pick(flow="nope"), "its flow nope is no format-3 flow it could be given"),
+        (pick(at_once={"build": 0}), "at_once is not whole numbers"),
+        (pick(most=True), "its most is not a whole number"),
+        ({"teams": {**pick()["teams"], "ghost": {}}}, "teams.ghost names no team of the org"),
+    ],
+)
+def test_each_team_case_blocks_by_name(doc, words):
+    _, blockers = plan(Org(grind=Team()), doc)
+    assert [b for b in blockers if words in b.what and not b.day], blockers
+
+
+def test_an_empty_list_is_one_blocker_not_two():
+    _, blockers = plan(Org(grind=Team()), pick(logins=[]))
+    assert len(blockers) == 1
+
+
+def test_a_login_the_home_lacks_is_one_blocker_not_two():
+    _, blockers = plan(Org(grind=Team()), pick(logins=["claude-code:gone"]))
+    assert [b.what for b in blockers] == ["lists claude-code:gone, a login h would not have"]
+    _, blockers = plan(Org(grind=Team()), pick(logins=["claude-code:gone", "claude-code:paul"]))
+    assert len(blockers) == 1
+
+
+def test_a_model_its_flow_names_that_no_login_in_its_list_offers_blocks():
+    made = [switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"], models=["opus"])]
+    _, blockers = plan(Org(grind=Team()), pick(), made=made)
+    assert any("no login in its list offers sonnet" in b.what for b in blockers)
+    pinned = [switchover.Login("claude-code", Path("/a"), "paul", ["p"], ["k"], pin="opus", models=["opus", "sonnet"])]
+    _, blockers = plan(Org(grind=Team()), pick(), made=pinned)
+    assert any("offers sonnet" in b.what for b in blockers)  # a pin narrows what the login offers
+
+
+def test_a_flow_with_problems_blocks():
+    bad = {"name": "mine", "place": "own", "doc": FLOW, "problems": ["stage Build names no brief"]}
+    _, blockers = plan(Org(grind=Team()), pick(flow="mine"), offered=flows(bad))
+    assert any("names no brief" in b.what for b in blockers)
+
+
+def test_a_node_team_is_not_checked_for_its_logins_and_an_org_flow_does_not_reach_it():
+    own = {"name": "mine", "place": "own", "doc": FLOW, "problems": []}
+    nodes = {"far": {}, "box": {"container": {"devcontainer": "~/x"}}}
+    org = Org(grind=Team(host="far"), boxed=Team(host="box"))
+    doc = {
+        "teams": {"grind": {"flow": "mine", "logins": ["grok:x"]}, "boxed": {"flow": "design-wise", "logins": ["a:b"]}}
+    }
+    plans, blockers = plan(org, doc, nodes=nodes, offered=flows(own))
+    assert [b.what for b in blockers] == [
+        "its flow mine: not followable: an org flow, and grind runs on far — define it in the repo"
+    ]
+    notes = {p.name: p.note for p in plans}
+    assert "far, an ssh node" in notes["grind"] and "box, a container node" in notes["boxed"]
+
+
+def test_a_repo_flow_on_a_node_is_said_not_checked():
+    mine = {"name": "ours", "place": "repo", "repo": "r", "doc": FLOW, "problems": []}
+    plans, blockers = plan(Org(grind=Team(host="far")), pick(flow="ours"), nodes={"far": {}}, offered=flows(mine))
+    assert blockers == [] and "checkout of r is not read here" in plans[0].note
+
+
+def test_a_team_on_a_host_that_is_no_node_and_one_unlanded_block():
+    org = Org({"lost": "team lost: its registry could not be read"}, gone=Team(host="mars"), lost=Team())
+    _, blockers = plan(org, pick())
+    whats = [b.what for b in blockers]
+    assert "runs on mars, which is not a node of this home" in whats
+    assert "team lost: its registry could not be read" in whats
+
+
+def test_the_report_lists_the_teams_between_the_logins_and_the_blockers():
+    plans, blockers = plan(Org(grind=Team()), {"teams": {}})
+    lines = switchover.report("h", [], blockers, plans)
+    assert lines.index("teams the answers give") < lines.index("blockers to cure beforehand")
+    assert "  grind: r on h, no flow picked" in lines
 
 
 def test_a_profiles_file_that_does_not_parse_is_reported_not_raised(tmp_path, capsys, monkeypatch):
