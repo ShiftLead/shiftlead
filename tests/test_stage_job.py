@@ -10,6 +10,7 @@ from shiftlead.stage_acts import SILENT_AFTER, Holder
 from shiftlead.stage_job import (
     JobAct,
     JobReading,
+    PrObject,
     board_objects,
     choose,
     cleared,
@@ -236,7 +237,10 @@ def red(n: int, **over: Any) -> dict[str, Any]:
 
 def test_a_red_and_a_filing_pr_ask_for_a_job() -> None:
     orders = [red(12), red(13, filing=True, filing_since="2026-11-23T00:00:00Z", red_since=None)]
-    assert pr_objects(orders, {}, {}) == {"pr-12": "2026-11-24T01:00:00Z", "pr-13": "2026-11-23T00:00:00Z"}
+    assert pr_objects(orders, {}, {}) == {
+        "pr-12": PrObject("2026-11-24T01:00:00Z", "red"),
+        "pr-13": PrObject("2026-11-23T00:00:00Z", "filing"),
+    }
 
 
 def test_a_sync_lift_or_sweep_pr_is_no_job() -> None:
@@ -254,7 +258,7 @@ def test_a_pr_a_record_names_is_that_records() -> None:
 
 
 def test_a_pickable_entrys_work_is_the_offer_acts() -> None:
-    assert pr_objects([red(12), red(13)], {}, {}, work={12}) == {"pr-13": "2026-11-24T01:00:00Z"}
+    assert pr_objects([red(12), red(13)], {}, {}, work={12}) == {"pr-13": PrObject("2026-11-24T01:00:00Z", "red")}
 
 
 def row(n: int, branch: str, **over: Any) -> dict[str, Any]:
@@ -270,4 +274,28 @@ def test_entries_work_is_a_pickable_entry_with_no_record() -> None:
 
 
 def test_a_number_no_pull_request_has_is_skipped() -> None:
-    assert pr_objects([red(0), red(-3), red(12)], {}, {}) == {"pr-12": "2026-11-24T01:00:00Z"}
+    assert pr_objects([red(0), red(-3), red(12)], {}, {}) == {"pr-12": PrObject("2026-11-24T01:00:00Z", "red")}
+
+
+def test_order_offers_the_first_keys_before_older_objects_but_after_begun_records() -> None:
+    begun = [job("unheld-pull-requests", 9, entered_at="2026-11-25T05:00:00Z")]
+    objects = {
+        "pr-11": PrObject("2026-11-20T00:00:00Z", "red"),
+        "pr-12": PrObject("2026-11-25T04:00:00Z", "sync", "conflicting"),
+        "pr-13": PrObject("2026-11-25T03:00:00Z", "sync", "red"),
+        "pr-14": PrObject("2026-11-19T00:00:00Z", "filing"),
+    }
+    assert order(begun, objects, "build", first={"pr-12", "pr-13"}) == ["pr-9", "pr-13", "pr-12", "pr-14", "pr-11"]
+    assert order(begun, objects, "build") == ["pr-9", "pr-14", "pr-11", "pr-13", "pr-12"]
+
+
+def test_a_pull_requests_job_keeps_its_kind_and_a_syncs_its_reason() -> None:
+    assert new_job("unheld-pull-requests", 12, "t", "x", kind="red")["kind"] == "red"
+    assert "reason" not in new_job("unheld-pull-requests", 12, "t", "x", kind="lift", reason="ignored")
+    got = new_job("unheld-pull-requests", 12, "t", "x", kind="sync", reason="conflicting")
+    assert (got["kind"], got["reason"]) == ("sync", "conflicting")
+    assert "kind" not in new_job("board-answers", "9099da3b", "t", "x")
+    with pytest.raises(ValueError):
+        new_job("board-answers", "9099da3b", "t", "x", kind="red")
+    with pytest.raises(ValueError):
+        new_job("unheld-pull-requests", 12, "t", "x", kind="merge")

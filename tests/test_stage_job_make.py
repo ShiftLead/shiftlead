@@ -118,6 +118,18 @@ def test_a_closed_record_is_written_over_by_a_new_job(store):
     assert (r["closed_at"], r["offers"], r["history"], r["holder"]) == (None, 1, [], "s-1")
 
 
+def test_a_pull_requests_closed_record_written_over_keeps_the_new_kind(store):
+    record = {**stage_job.new_job("unheld-pull-requests", 12, "t", "2026-11-01", kind="red"), "closed_at": "x"}
+    store.put_job(record, "test")
+    got = stage_job_make.make(
+        store, "pr-12", JobAct("offer", "new"), GO, World().reach(), seat="unheld-pull-requests", obj=12, team="t",
+        opened_at="2026-11-24", kind="sync", reason="conflicting",
+    )  # fmt: skip
+    assert got.made
+    r = store.job("pr-12")
+    assert (r["kind"], r["reason"], r["entered_at"], r["closed_at"]) == ("sync", "conflicting", "2026-11-24", None)
+
+
 def test_a_lost_job_is_offered_again_once_and_the_lost_session_named_to_end(store):
     put(store, holder="s-0", offers=1)
     s = JobReading(may_start=True, holder=Holder(ended=True))

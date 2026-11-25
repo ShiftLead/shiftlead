@@ -159,6 +159,18 @@ def test_one_session_a_pass_the_oldest_object_first(store):
     assert store.job("board-0000aaaa")["holder"] == "s-1" and store.job("board-1a2b3c4d") is None
 
 
+def test_a_sync_is_offered_first_and_a_pull_requests_record_keeps_its_kind(store):
+    w = World()
+    objects = {
+        "pr-12": stage_job.PrObject("2026-11-20T00:00:00Z", "red"),
+        "pr-13": stage_job.PrObject("2026-11-25T00:00:00Z", "sync", "conflicting"),
+    }
+    steps = stage_job_pass.seat_pass(store, "unheld-pull-requests", objects, facts(live=set(objects)), w.reach())
+    assert w.started == ["pr-13"] and [s.key for s in steps] == ["pr-13", "pr-12"]
+    got = store.job("pr-13")
+    assert (got["kind"], got["reason"], got["entered_at"]) == ("sync", "conflicting", "2026-11-25T00:00:00Z")
+
+
 def test_a_live_job_session_holds_every_other_object_back(store):
     put(store, holder="s-9")
     w = World()

@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from sessionorc import workorders
 from shiftlead import stage_work
@@ -31,6 +31,21 @@ from shiftlead.stagerecord import JOB_KEY
 SEATS = ("board-answers", "unheld-pull-requests")
 
 JobActName = Literal["reconcile", "offer", "offer-again"]
+PR_KINDS = ("red", "filing", "sync", "lift", "sweep")  # the orders a pull request's job is (§4.9c)
+
+
+class PrObject(NamedTuple):
+    """One object of the seat for pull requests nobody holds: when it asked (its kind's own stamp), its order's kind
+    (`PR_KINDS`), and a sync's `reason` as its order gives it."""
+
+    since: str
+    kind: str
+    reason: str = ""
+
+
+def since_of(obj: str | PrObject) -> str:
+    """When an object asked: a board answer's trigger gives the day itself, a pull request's a `PrObject`."""
+    return obj.since if isinstance(obj, PrObject) else str(obj)
 
 
 def key_of(seat: str, obj: str | int) -> str:
@@ -83,10 +98,19 @@ class JobAct:
         return self.name in ("offer", "offer-again") and self.case.startswith("review")
 
 
-def new_job(seat: str, obj: str | int, team: str, opened_at: str) -> dict[str, Any]:
-    """A job's record, written when the job is first offered; `opened_at` is when its object asked for it."""
+def new_job(
+    seat: str, obj: str | int, team: str, opened_at: str, *, kind: str = "", reason: str = ""
+) -> dict[str, Any]:
+    """A job's record, written when the job is first offered, and again when a closed record's object comes back;
+    `opened_at` is when its object asked for it. A pull request's job keeps its order's `kind` (`PR_KINDS`), and a
+    sync's its `reason`, as they read at that offer: the brief reads them from the record, since the session's own
+    push changes the order's row."""
+    if kind and (seat != "unheld-pull-requests" or kind not in PR_KINDS):
+        raise ValueError(f"a {seat} job has no kind {kind!r}")
     return {
         "id": key_of(seat, obj),
+        **({"kind": kind} if kind else {}),
+        **({"reason": reason} if kind == "sync" else {}),
         "seat": seat,
         "object": str(obj),
         "team": team,
@@ -159,11 +183,18 @@ def choose(record: Mapping[str, Any] | None, s: JobReading) -> JobAct | None:
     return JobAct("offer") if s.may_start and not s.seat_busy else None
 
 
-def order(records: Iterable[Mapping[str, Any]], objects: Mapping[str, str], job_stage: str | None) -> list[str]:
+def order(
+    records: Iterable[Mapping[str, Any]],
+    objects: Mapping[str, str | PrObject],
+    job_stage: str | None,
+    first: Collection[str] = (),
+) -> list[str]:
     """The keys of one seat's jobs that want a job session, in the order they are offered: records already begun
     (open, no holder, waiting on nothing, and at the job's own stage `job_stage` or not yet in the flow) before objects
-    with no open record, each oldest first. `objects` maps the key of each object the seat's trigger names to when it
-    asked (an ISO time); one with an open record is that record's, never a new job."""
+    with no open record, each oldest first — but the keys in `first` (the sync orders of the seat for pull requests
+    nobody holds) before every other object with no record. `objects` maps the key of each object the seat's trigger
+    names to when it asked (an ISO time, or a `PrObject`); one with an open record is that record's, never a new
+    job."""
     records = list(records)
     open_keys = {str(r["id"]) for r in records if not r.get("closed_at")}
     begun = [
@@ -171,9 +202,12 @@ def order(records: Iterable[Mapping[str, Any]], objects: Mapping[str, str], job_
         for r in records
         if not r.get("closed_at") and not r.get("holder") and not r.get("waits") and r.get("stage") in (None, job_stage)
     ]
-    first = sorted(begun, key=lambda r: (str(r.get("entered_at") or ""), str(r["id"])))
-    rest = sorted(((at, k) for k, at in objects.items() if k not in open_keys), key=lambda p: (str(p[0]), p[1]))
-    return [str(r["id"]) for r in first] + [k for _at, k in rest]
+    begun_first = sorted(begun, key=lambda r: (str(r.get("entered_at") or ""), str(r["id"])))
+    rest = sorted(
+        ((k not in first, since_of(at), k) for k, at in objects.items() if k not in open_keys),
+        key=lambda p: (p[0], p[1], p[2]),
+    )
+    return [str(r["id"]) for r in begun_first] + [k for *_, k in rest]
 
 
 def _open(record: object) -> bool:
@@ -230,16 +264,16 @@ def pr_objects(
     jobs: Mapping[str, Mapping[str, Any]],
     *,
     work: Collection[int] = (),
-) -> dict[str, str]:
+) -> dict[str, PrObject]:
     """The trigger of the seat for pull requests nobody holds (design §4.9c *Two of the five are not seats today*): of
     a repo reading's pull request orders (`teamrun.pr_orders`, each unheld, past its bound and never a fork's or a
-    draft's), the key of each red or filing pull request that asks for a job, mapped to when it went red or opened. A
+    draft's), the key of each red or filing pull request that asks for a job, with when it went red or opened. A
     pull request an open stage record names (`entries`), or a board answer's open job (`jobs`), is that record's;
     one in `work` is a pickable entry's (`entries_work`). A sync's and the gate sweep's are no red or filing pull
-    request of the seat's."""
+    request of the seat's yet. Each key maps to a `PrObject`, its kind `red` or `filing`."""
     named = {str(r.get("pr")) for r in entries.values() if _open(r) and r.get("pr") is not None}
     named |= {str(r.get("pr")) for r in jobs.values() if _open(r) and r.get("seat") == "board-answers" and r.get("pr")}
-    out: dict[str, str] = {}
+    out: dict[str, PrObject] = {}
     for o in orders:
         num = o.get("pr")
         if not o.get("pr_order") or not isinstance(num, int) or isinstance(num, bool):
@@ -251,8 +285,8 @@ def pr_objects(
         key = f"pr-{num}"
         if not JOB_KEY.fullmatch(key):
             continue  # no pull request's number: never a job, and never a raise that stops the pass
-        since = o.get("filing_since") if o.get("filing") else o.get("red_since")
-        out[key] = str(since or "")
+        kind = "filing" if o.get("filing") else "red"
+        out[key] = PrObject(str(o.get(f"{kind}_since") or ""), kind)
     return out
 
 
