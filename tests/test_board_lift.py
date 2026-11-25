@@ -354,11 +354,20 @@ def test_a_moved_entrys_question_is_cleared_in_one_pull_request(repo):
     assert git(repo, "rev-parse", "origin/main") == head
 
 
-def test_a_live_checks_question_is_cleared_with_its_own_words(repo):
-    """TD-2120, §4.9c *A merge the person takes over*: the same clear, its why the caller's."""
+def test_a_live_checks_question_is_cleared_with_its_own_words(repo, monkeypatch):
+    """TD-2120, §4.9c *A merge the person takes over*: the same clear, its why the caller's, the PR's body too."""
     _push(repo, [ASKED], {190: _entry(190) + MOVED_LOG})
     why = "its entry waits behind the blocker its live check merged"
+    bodies: list[str] = []
+    land = board._land
+
+    def spy(*a, **k):
+        bodies.append(k.get("body", ""))
+        return land(*a, **k)
+
+    monkeypatch.setattr(board, "_land", spy)
     assert board.clear_question(repo, "TD-190", "paul", "n1", why)["commit"]
+    assert bodies == [board.CLEAR_BODY.format(why=why)] and why in bodies[0] and "another team" not in bodies[0]
     git(repo, "fetch", "-q", "origin")
     assert f"override: {why}" in git(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "TD-190, waits behind the blocker its live check merged" in git(

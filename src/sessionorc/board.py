@@ -1561,7 +1561,7 @@ def _archive_entry(root: Path, tid: str, why: str, clock: _Clock) -> dict[str, A
 
 
 CLEAR_BODY = (
-    "shiftlead clears the question it set on an entry that has moved to another team: the entry's `decision (<p>)` "
+    "shiftlead clears the question it set on an entry, as {why}: the entry's `decision (<p>)` "
     "gate and Ask, and the board item covering them (design §4.9c, reconcile)."
 )
 MOVED_WHY = "its entry moved to another team"
@@ -1622,7 +1622,7 @@ def _clear_question(root: Path, tid: str, person: str, nonce: str, clock: _Clock
             f"{TOOL}: clear decision ({person}) on {tid}, {why.removeprefix('its entry ')} (session n/a)",
             clock,
             lambda: _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0,
-            body=CLEAR_BODY,
+            body=CLEAR_BODY.format(why=why),
             also=[entry_rel],
         )
         return {**landed, "closed": [item_ref(it) for it in covering]}
