@@ -251,3 +251,26 @@ async def test_a_prompts_seat_whose_every_login_asks_is_not_filled(agent, tmp_pa
     await _fill(agent, sid)
     assert agent.sessions[sid] is old and not launched
     assert agent.unfillable[sid] == "no login usable"
+
+
+async def test_a_fill_reads_the_real_logins_and_passes_over_one_at_its_reserve(agent, tmp_path, launched, monkeypatch):
+    """TD-2251: the pick's rows come from the home's own `tools` and `gate` replies (`teamstore.login_rows` left
+    real), so a first login whose account is over its reserve is passed over and the seat fills on the second."""
+    families = {"families": ["opus"]}
+    card = {
+        "adapter": "hookstub",
+        "accounts": [{"key": "acct-1", "models": families}, {"key": "acct-2", "models": families}],
+        "logins": [
+            {"name": "first", "state": "signed_in", "account": "acct-1"},
+            {"name": "second", "state": "signed_in", "account": "acct-2"},
+        ],
+    }
+    over = {"label": "week", "pct": 90, "reserve": 20, "resets": "2099-01-01T00:00:00Z"}
+    monkeypatch.setattr(agent, "rpc_tools", AsyncMock(return_value={"tools": [card]}))
+    monkeypatch.setattr(agent, "rpc_gate", AsyncMock(return_value={"accounts": {"acct-1": {"windows": [over]}}}))
+    agent._usage, agent._usage_acct = {}, {}
+    sid = await _held_seat(agent, tmp_path)
+    await _fill(agent, sid)
+    new = agent.sessions[sid]
+    assert (new.login, new.account) == ("hookstub:second", "acct-2"), "the login at its reserve is passed over"
+    assert launched[-1] == {"profile": "second", "model": "opus"} and sid not in agent.unfillable
