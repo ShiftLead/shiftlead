@@ -5,8 +5,9 @@ windows and served under every profile of the account as a polled reading is —
 `usage` event, `usage.json` — with `pct` from that profile's amount. A mixin `HostAgent` inherits.
 
 A node runs the same pass over its own sessions, and its turns reach the home over the link as
-`spend {account, profile, prices, turns, cursors}` (slice 4): the ledger and its cursors are the
-home's, and the account's sums come back to the node in the reply and as `usage {account, sums}`.
+`spend {account, profile, login, prices, turns, cursors}` (slice 4; `login` a switched node's, TD-2070): the
+ledger and its cursors are the home's, and the account's sums come back to the node in the reply and as
+`usage {account, sums}`.
 
 Beside it, once a minute, the **seat pass** (§4.4 *Spend per seat*, TD-830): every profile a live
 session runs under, a subscription's included, read with cursors of its own into `seat_spend.json`
@@ -25,7 +26,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-from sessionorc import adapters, agent_common, link, seats
+from sessionorc import adapters, agent_common, link, logins, seats
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.agent_common import RpcError, _usage_key, log
@@ -87,6 +88,25 @@ def _account_of(name: str, profile: str) -> str | None:
     return None
 
 
+def _login_of(data: dict[str, Any] | None, adapter: str, profile: str) -> str | None:
+    """The login a profile is on this host, `<adapter>:<name>`, where the host is switched and its `logins.yml` has
+    it (§4.9e *A team on a node*): the login read under `profile` as its profile name (`logins.profile_name`) of
+    that adapter's tool; None on a host that is not switched, or for a profile no login there is."""
+    for lk in sorted((data or {}).get("logins") or {}):
+        if logins.split(lk)[0] == adapter and logins.profile_name(data, lk) == profile:
+            return lk
+    return None
+
+
+def _node_logins() -> dict[str, Any] | None:
+    """This host's logins, or None where it is not switched or its file does not read: the spend's `login` is a
+    name beside the account, and a file the person is mid-edit on never stops the pass."""
+    try:
+        return logins.load()
+    except logins.LoginError:
+        return None
+
+
 class SpendMixin:
     async def _refresh_spend(self) -> None:
         """One pass, detached from the tick as the usage poll is (it reads transcripts)."""
@@ -102,14 +122,26 @@ class SpendMixin:
         metered = await asyncio.to_thread(_metered_of, live)
         self._metered = {prof for _, prof in metered}
         self._billing_seen = {p: (time.monotonic(), p in self._metered) for _, p in live}
-        groups: dict[str, dict[str, Any]] = {}  # account key → {account, tool, adapter, profiles: {prof: prices}}
+        # a node's spend names the login beside the account (§4.9e *A team on a node*, §4.4a): the home reads no
+        # node's logins.yml
+        held_logins = await asyncio.to_thread(_node_logins) if self.mode == "node" and metered else None
+        groups: dict[str, dict[str, Any]] = {}  # account key → {account, tool, ad, profiles: {prof: prices}, logins}
         for (name, prof), prices in metered.items():
             ad = adapters.get(name)
             key, account = _usage_key(ad, name, prof)
             g = groups.setdefault(
-                key, {"account": account, "tool": str(getattr(ad, "label", "") or name), "ad": ad, "profiles": {}}
+                key,
+                {
+                    "account": account,
+                    "tool": str(getattr(ad, "label", "") or name),
+                    "ad": ad,
+                    "profiles": {},
+                    "logins": {},
+                },
             )
             g["profiles"][prof] = prices
+            if login := _login_of(held_logins, name, prof):
+                g["logins"][prof] = login
         now = datetime.now().astimezone()  # the home's own clock: its midnight, Monday and first (§4.2a)
         if self.mode == "node":
             node_sums = await self._spend_to_home(groups, now)
@@ -231,6 +263,8 @@ class SpendMixin:
         """One profile's read and send over `mux`; False when the link failed under it, and the
         figure is then this node's to make."""
         head = {"account": key, "label": g["account"], "tool": g["tool"], "profile": prof, "prices": prices}
+        if login := (g.get("logins") or {}).get(prof):
+            head["login"] = login  # `<adapter>:<name>` on a switched node (§4.4a)
 
         async def call(turns: list[dict[str, Any]], cursors: dict[str, int]) -> dict[str, Any]:
             reply = await mux.request("spend", timeout=link.LINK_SILENCE, **head, turns=turns, cursors=cursors)
@@ -293,6 +327,13 @@ class SpendMixin:
         named = self._spend_named.setdefault(host, {}).setdefault(key, set())
         named.add(prof)
         self._spend_node_prices[prof] = prices  # a profile only a node defines is still metered here
+        login = params.get("login")
+        if isinstance(login, str) and logins.valid_name(logins.split(login)[1]) and logins.split(login)[0]:
+            # kept beside the profile, under the host: the login a switched node's profile is (§4.4a)
+            held = acct.setdefault("hosts", {}).setdefault(host, {}).setdefault("logins", {})
+            if held.get(prof) != login:
+                held[prof] = login
+                await self._save_spend()
         window_sums = spend_mod.sums(acct, now)
         self._spend_told[(host, key)] = self._spend_mark(key, window_sums, named)
         h = (acct.get("hosts") or {}).get(host) or {}

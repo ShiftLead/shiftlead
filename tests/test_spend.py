@@ -491,3 +491,63 @@ async def test_two_spend_saves_at_once_both_complete_and_the_file_holds_the_last
     await asyncio.gather(first, agent._save_spend())
     assert agent.spend_store.load() == {"api": {"rows": [1, 2]}}
     assert agent._spend_saved == json.dumps({"api": {"rows": [1, 2]}}, sort_keys=True)
+
+
+# -- the login a node's spend names (§4.4a, §4.9e *A team on a node*; TD-2070) ---------------------------
+
+
+def test_the_login_of_a_profile_is_the_switched_hosts_login_read_under_it():
+    from sessionorc.agent_spend import _login_of
+
+    data = {"logins": {"hookstub:api": {}, "codex:api": {}, "hookstub:work": {}}, "forgotten": {}}
+    assert _login_of(data, "hookstub", "work") == "hookstub:work"
+    assert _login_of(data, "codex", "work") is None, "another tool's profile of that name is not this login"
+    # a hand edit's shared name: each is read under its key, never the bare name
+    assert _login_of(data, "hookstub", "api") is None
+    assert _login_of(data, "hookstub", "hookstub:api") == "hookstub:api"
+    assert _login_of(None, "hookstub", "work") is None, "a host that is not switched names no login"
+
+
+async def test_a_switched_nodes_spend_names_the_login_and_the_home_keeps_it_beside_the_profile(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """The node's pass sends `login` in each `spend`'s head where its `logins.yml` has the profile, none where it is
+    not switched; the home keeps it under the host beside the profile, on disk, and keeps nothing that is not a
+    login's key."""
+    from sessionorc import logins
+
+    await park_ticks(agent)
+    hookstub.billing = {"api": {"billing": "metered", "prices": {"input": 1.0}}}
+    hookstub.accounts = {"api": "key"}
+    at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    hookstub.spend_turns = [_t("u0", at, 0, source="t1", inp=5)]
+    async with LocalClient() as person:
+        w = await person.call("create", name="w", dir=str(tmp_path), adapter="hookstub", profile="api")
+    sent: list[dict] = []
+
+    class Mux:
+        async def request(self, method, timeout=None, **params):
+            sent.append({"method": method, **params})
+            return {"cursors": params.get("cursors") or {}, "seeded": True, "sums": {}}
+
+    monkeypatch.setattr(agent, "mode", "node")
+    monkeypatch.setattr(agent, "_home_mux", Mux())
+    monkeypatch.setattr(agent, "_snapshot_sent", True)
+    await agent._refresh_spend_inner()
+    assert sent and all("login" not in m for m in sent), ("a node that is not switched names none", sent)
+    sent.clear()
+    agent._spend_link.clear()
+    logins.save({"logins": {"hookstub:api": {"account": "hookstub:key"}}, "forgotten": {}}, "test")
+    await agent._refresh_spend_inner()
+    assert sent and {m.get("login") for m in sent} == {"hookstub:api"}, sent
+    # the home's side
+    monkeypatch.setattr(agent, "mode", "home")
+    head = {"account": "hookstub:key", "profile": "api", "prices": {}, "turns": [], "cursors": {}}
+    await agent._take_spend("laptop", head | {"login": "hookstub:api"})
+    assert agent._spend["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:api"}
+    assert agent.spend_store.load()["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:api"}
+    for bad in ("api", 7, ":api", "hookstub:Not A Name"):
+        await agent._take_spend("laptop", head | {"login": bad})
+    assert agent._spend["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:api"}
+    async with LocalClient() as person:
+        await person.call("kill", id=w["id"])
