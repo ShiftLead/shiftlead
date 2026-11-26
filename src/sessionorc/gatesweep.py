@@ -810,12 +810,11 @@ def _entry_texts(text: str) -> list[tuple[dict[str, Any], str]]:
     """Each entry of a joined ledger text with its own text (its heading to the next `## `), in file order. HTML
     comments go first, as `lb.entries` drops them, so a commented-out heading pairs with nothing."""
     text = lb.COMMENT_RE.sub("", text)
-    found = list(lb.HEADING_RE.finditer(text))
-    out = []
-    for e, m in zip(lb.entries(text), found, strict=True):
+    bodies: dict[str, str] = {}
+    for m in lb.HEADING_RE.finditer(text):
         nxt = lb.SECTION_RE.search(text, m.end())
-        out.append((e, text[m.start() : nxt.start() if nxt else len(text)]))
-    return out
+        bodies.setdefault(m.group(1), text[m.start() : nxt.start() if nxt else len(text)])
+    return [(e, bodies[e["id"]]) for e in lb.entries(text) if e["id"] in bodies]
 
 
 def _decision_line(text: str) -> dict[str, Any] | None:
@@ -825,6 +824,8 @@ def _decision_line(text: str) -> dict[str, Any] | None:
     for ln in lb.log_lines(text):
         if ln.get("kind") in DECISION_LINES and str(ln.get("gate") or "").startswith("decision ("):
             last = ln
+        elif ln.get("kind") == "malformed" and "decision (" in str(ln.get("text") or ""):
+            last = ln  # an unreadable line about the gate is newest, and no Go: nothing is owed on a guess
     return last
 
 
@@ -885,8 +886,7 @@ def _decided(value: str, day: str) -> str:
     leading `pending` and then a `,` or a lone `—` after it dropped (§4.4)."""
     rest = value.strip()
     if re.match(r"pending\b", rest, re.I):
-        rest = rest[len("pending") :].lstrip()
-    rest = re.sub(r"^(?:,|—(?=\s|$))\s*", "", rest)
+        rest = re.sub(r"^(?:,|—(?=\s|$))\s*", "", rest[len("pending") :].lstrip())
     return f"{day} — {rest}" if rest else day
 
 
@@ -997,7 +997,11 @@ def sweep(
     except (SweepError, lb.Refused, OSError, subprocess.SubprocessError) as e:
         return None, str(e)
     applied = apply(root, p, today_utc=today_utc, today_local=today_local, by=by)
-    return {**p, "applied": applied + record_pass(root, p["base"], today_utc)}, None
+    try:
+        applied += record_pass(root, p["base"], today_utc)
+    except Exception as e:  # noqa: BLE001 — the record pass never loses the sweep's own writes from the reading
+        applied.append(f"record: not done — {e!r}")
+    return {**p, "applied": applied}, None
 
 
 def summary(got: dict[str, Any]) -> str:

@@ -258,6 +258,32 @@ def test_the_sweep_runs_the_record_pass_after_its_own_writes(monkeypatch):
     assert why is None and got["applied"] == ["lift: one", "record: origin/main 2026-11-26"]
 
 
+def test_a_record_pass_that_raises_keeps_the_sweeps_own_writes(monkeypatch):
+    plan = {"base": "origin/main", "to_file": {}, "to_close": {}, "lifts": []}
+    monkeypatch.setattr(gatesweep, "plan", lambda *a, **k: plan)
+    monkeypatch.setattr(gatesweep, "apply", lambda *a, **k: ["lift: one"])
+
+    def boom(*a):
+        raise KeyError("person")
+
+    monkeypatch.setattr(gatesweep, "record_owed", boom)
+    got, why = gatesweep.SWEEP("r", [], today_utc=UTC, today_local=UTC, by="k")
+    assert why is None and got["applied"] == ["lift: one", "record: not done — KeyError('person')"]
+
+
+def test_an_unreadable_decision_line_newest_owes_nothing(repo):
+    root, put = repo
+    log = [LIFT, '- 2026-11-25: gate lifted: decision (paul) — by paul; answer "Go" and more']
+    put({"docs/ledger/TD-5.md": design(5, *log), "docs/reviews/TD-005.md": record(5, "**Decided:** pending")})
+    assert _owed(root) == {}
+
+
+def test_only_a_leading_pending_drops_the_comma_or_dash_after_it():
+    assert gatesweep.write_record("**Decided:** — x\n**Go by:** p\n", "p", "2026-11-24") == (
+        "**Decided:** 2026-11-24 — — x\n**Go by:** p\n"
+    )
+
+
 def test_a_record_head_is_a_sweep_order_in_words_of_its_own():
     assert reports.sweep_of("record/2026-11-25") == "record"
     assert reports.sweep_of("record/x") is None and reports.sweep_of("record/2026-02-30") is None
