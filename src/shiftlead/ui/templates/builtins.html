@@ -25,7 +25,7 @@
     <div class="note">Five seats stand outside every flow. A set gives each one a model, and every team of a repo that uses the set is served by it.</div>
     <div class="card bseats">{% for s in b.seats %}<div class="bseat">
       <b>{{ s.name }}</b>
-      {% if s.director %}<span class="note">the director answers these</span>{% else %}<span class="bpick"><select class="input setin" data-seat="{{ s.key }}" aria-label="{{ s.name }} model">{% for m in s.options %}<option value="{{ m }}"{% if m == s.model %} selected{% endif %}>{{ m }}</option>{% endfor %}</select> <span class="note">{{ s.on_login }}</span></span>{% endif %}
+      {% if s.director %}<span class="note">the director answers these</span>{% else %}<span class="bpick"><select class="input setin" data-seat="{{ s.key }}" aria-label="{{ s.name }} model">{% for m in s.options %}<option value="{{ m }}"{% if m == s.model %} selected{% endif %}>{{ m }}</option>{% endfor %}</select> <span class="note">{{ s.on_login }}</span>{% for w in s.on_nodes %}<span class="note bnode">{{ w }}</span>{% endfor %}</span>{% endif %}
       <span class="note">{{ s.does }} · acts for {{ s.for }}</span>
     </div>{% endfor %}</div>
   </section>

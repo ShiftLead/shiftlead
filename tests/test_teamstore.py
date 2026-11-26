@@ -674,5 +674,6 @@ def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypat
     a._projected = lambda *_a: {}
     asyncio.run(a.rpc_builtins_show(set="cheap"))
     assert seen["node_marks"] == mark
+    assert seen["set_marks"] == {"cheap": mark}, "every set's marks, for its tab's dot"
     asyncio.run(a.rpc_builtins_show(set=""))
     assert seen["name"] == "default" and seen["node_marks"] is None

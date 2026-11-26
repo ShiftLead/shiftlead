@@ -226,6 +226,20 @@ def set_node_cannot_run(
     return out
 
 
+def _set_node_words(name: str, entry: Mapping[str, Any], marks: Any, director: bool) -> list[str]:
+    """The words of every node mark still standing on a set (§4.9d *The page*: its tab's dot), seat by seat in the
+    page's order; the prompts seat's are not read where the org has a director, as the home's own reading is not."""
+    if not isinstance(marks, Mapping):
+        return []
+    order = list(entry.get("logins") or ())
+    out: list[str] = []
+    for key, _shown, words, _does, _for in builtinstore.SEATS:
+        if director and key == builtinstore.PROMPTS:
+            continue
+        out.extend(set_node_cannot_run(name, words, order, builtinstore.model(entry, key), marks.get(key)).values())
+    return out
+
+
 def _has_director() -> bool:
     """Whether the org has a director, whose seat answers the prompts a prompts seat otherwise would (§4.9d). An
     `org.yml` that cannot be read names none, so the prompts row stays a pick."""
@@ -243,10 +257,13 @@ def builtins_view(
     roots: Iterable[str | Path],
     director: bool | None = None,
     node_marks: Mapping[str, Any] | None = None,
+    set_marks: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`ao builtins show [<set>]` and the Built-in seats page's read (§4.9d *The page*), of the home's logins alone.
     `node_marks` is the home's mark, per seat and node, that a node found no login of the set's list offering the
-    seat's model (`builtins_node_cannot`); each seat's `node_cannot_run` holds the words of those still standing."""
+    seat's model (`builtins_node_cannot`); each seat's `node_cannot_run` holds the words of those still standing.
+    `set_marks` is every set's, by name, so each set's row (the page's tab) also carries `node_cannot_run`, the words
+    of each mark still standing on it."""
     has_director = _has_director() if director is None else director
     every = builtinstore.sets(doc)
     if name not in every:
@@ -286,6 +303,7 @@ def builtins_view(
                 "name": n,
                 "label": e["label"],
                 "cannot_run": builtinstore.cannot_run(n, e, rows, director=has_director),
+                "node_cannot_run": _set_node_words(n, e, (set_marks or {}).get(n), has_director),
             }
             for n, e in every.items()
         ],

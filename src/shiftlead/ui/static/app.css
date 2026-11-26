@@ -1643,6 +1643,7 @@ html:has(.qbar.qwaits):has(.topbar.away) { scroll-padding-top: calc(var(--qbarh,
 .bseat:first-child { border-top: 0; }
 .bpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .bpick .input { width: auto; }
+.bpick .bnode { flex-basis: 100%; }
 @media (max-width: 640px) { .bseat { grid-template-columns: minmax(0, 1fr); } }
 
 /* The Briefs page (§4.5a *Briefs page*, TD-2055) */
