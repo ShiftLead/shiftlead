@@ -5005,7 +5005,7 @@ class TickMixin:
                 doc = settings_mod.load()
                 root = str(s.repo or "")
                 repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
-                with contextlib.suppress(RpcError, OSError):  # unmarked, the next fill is refused as this one was
+                try:
                     await self.rpc_builtins_node_cannot(
                         set=builtinstore.repo_set(doc, repo),
                         seat=BUILTIN_SEAT_KEYS[str(s.builtin)],
@@ -5013,6 +5013,8 @@ class TickMixin:
                         model=str(params.get("seat_model") or ""),
                         logins=list(params["login_list"]),
                     )
+                except (RpcError, OSError) as err:  # unmarked, the next fill is refused as this one was
+                    log.warning("%s: the set's mark for %s was not written: %s", s.id, s.host, err)
         else:
             return False
         log.info("%s: not filled — its node refused the list: %s", s.id, words)
