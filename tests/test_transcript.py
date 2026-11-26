@@ -322,3 +322,8 @@ async def test_a_forgotten_logins_record_is_told_why_it_reads_nothing(agent, tmp
         logins.save(d, "fixture", paths.home())
         with pytest.raises(AgentError, match="its login default is forgotten"):
             await person.call("transcript", id=sid)
+        logins.path(paths.home()).write_text("[unclosed\n", encoding="utf-8")  # unreadable: what it forgot is unknown
+        with pytest.raises(logins.LoginError):
+            logins.load()
+        with pytest.raises(AgentError, match="the tool's file is not on"):  # the plain words stand (TD-2327)
+            await person.call("transcript", id=sid)

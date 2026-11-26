@@ -580,3 +580,38 @@ async def test_forget_and_the_tools_read_count_the_logins_ended_records(agent):
     async with LocalClient() as c:
         got = await c.call("login_forget", login="grind")
     assert got == {"change": "claude-code:grind forgotten", "ended_records": 2}
+
+
+@pytest.mark.integration
+async def test_a_defaults_forget_is_held_by_a_bare_live_record_and_counts_no_shell(agent):
+    """TD-2327, design §4.9e *A record's `profile`*: a record with no `login` or `profile` is on its tool's
+    `default`, so a live one holds Forget of that `default` (TD-2320); and Forget of a `default` counts the ended agent
+    records with no `login` or `profile`, never a shell's, which has no agent and reads no transcript."""
+    from conftest import park_ticks
+
+    from sessionorc import paths
+    from sessionorc.client import AgentError, LocalClient
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    d = _data()
+    d["logins"]["claude-code:default"] = {"folder": "/h/.claude-default"}
+    logins.save(d, "fixture", paths.home())
+    rows = [
+        ("live", "claude-code", "idle", {}),  # bare and live: on claude-code:default
+        ("ended", "claude-code", "exited", {}),  # bare and ended: counted
+        ("sh", "shell", "exited", {}),  # a bare shell: never counted
+        ("grind", "claude-code", "closed", {"profile": "grind"}),  # another login's
+    ]
+    for name, adapter, state, kw in rows:
+        s = Session(id=f"ao-x-{name}", name=name, kind="interactive", adapter=adapter, dir="/w")
+        s.state, s.host = state, agent.host
+        for k, v in kw.items():
+            setattr(s, k, v)
+        agent.sessions[s.id] = s
+    async with LocalClient() as c:
+        with pytest.raises(AgentError, match="claude-code:default cannot be forgotten while ao-x-live use it"):
+            await c.call("login_forget", login="claude-code:default")
+        agent.sessions["ao-x-live"].state = "exited"
+        got = await c.call("login_forget", login="claude-code:default")
+    assert got == {"change": "claude-code:default forgotten", "ended_records": 2}  # live and ended, not the shell
