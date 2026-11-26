@@ -181,8 +181,9 @@ NOT_RESTARTS = ("person", "start", "schedule", "work")
 # a built-in seat's record mark → the seat's key in a built-in set (§4.9d *The store*)
 BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "prompts"}
 # the replays of a built-in seat or the director on a node that a node's refusal of the list makes none of (§4.9d
-# *How each one runs*): rule 3's fill and rule 1's crash and lost-brief replays, which send the launch record's list
-NODE_LIST_REPLAYS = ("fill", "crash", "lost-brief")
+# *How each one runs*): rule 3's fill and rule 1's lost-brief replay, which send the launch record's list; rule 1 makes
+# no crash replay of a seat, whose ending is rule 3's to fill (§6 rule 1)
+NODE_LIST_REPLAYS = ("fill", "lost-brief")
 
 
 def _director(s: Session) -> bool:
@@ -5005,7 +5006,7 @@ class TickMixin:
         return {"profile": "", "login": None, "seat_model": held, "login_list": order}
 
     async def _node_list_refused(self, s: Session, params: Mapping[str, Any], e: Exception) -> bool:
-        """Whether a node refused a built-in seat's or the director's fill, or its crash or lost-brief replay, for its
+        """Whether a node refused a built-in seat's or the director's fill, or its lost-brief replay, for its
         list (§4.9d *How each one runs*, §4.9e *A team on a node*, TD-2068): before anything is made, as *no login
         usable* (a wait) or *no login offers <model>* (*cannot run*, and for a set's seat the home's mark that the set
         cannot run it on that node). Such a refusal is no fill and no restart: the seat is unfillable with the node's

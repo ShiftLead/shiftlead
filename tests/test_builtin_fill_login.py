@@ -534,7 +534,6 @@ async def test_a_seat_neither_built_in_nor_the_director_is_filled_as_before(agen
 NODE_LAUNCH = {"profile": "", "seat_model": "opus", "login_list": ["hookstub:first", "hookstub:second"]}
 
 
-@pytest.mark.parametrize("why", ["crash", "lost-brief"])
 @pytest.mark.parametrize(
     ("words", "word", "marked"),
     [
@@ -543,20 +542,20 @@ NODE_LAUNCH = {"profile": "", "seat_model": "opus", "login_list": ["hookstub:fir
     ],
 )
 async def test_a_nodes_list_refusal_of_a_replay_is_no_restart(
-    agent, tmp_path, launched, rows, monkeypatch, why, words, word, marked
+    agent, tmp_path, launched, rows, monkeypatch, words, word, marked
 ):
-    """§4.9d *How each one runs*: rule 1's crash and lost-brief replays of a built-in seat on a node send its launch
+    """§4.9d *How each one runs*: rule 1's lost-brief replay of a built-in seat on a node sends its launch
     record's list as names, and the node's refusal of that list counts toward no restart ceiling; *no login offers*
     marks the set, and the mark holds the next replay with nothing sent."""
     sid = await _held_seat(agent, tmp_path)
     sent = _on_a_node(agent, monkeypatch, sid, words, **NODE_LAUNCH)
     s = agent.sessions[sid]
     before = list(s.restarts)
-    await agent._replay(s, why, keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
     assert sent and (sent[0]["seat_model"], sent[0]["login_list"]) == ("opus", NODE_LAUNCH["login_list"])
     assert not sent[0].get("login") and s.restarts == before, "nothing was made, so no restart is counted"
     assert agent.unfillable[sid] == word
-    await agent._replay(s, why, keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
     assert len(sent) == (1 if marked else 2), "a marked node is sent nothing; a wait is asked again"
     assert s.restarts == before
 
@@ -570,8 +569,8 @@ async def test_a_replay_on_a_node_of_a_record_no_built_in_seats_counts_the_refus
     s = agent.sessions[sid]
     s.builtin, s.seat = None, None
     _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} opus", **NODE_LAUNCH)
-    await agent._replay(s, "crash", keep_mail=True)
-    assert s.restarts[-1]["why"] == "crash" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    assert s.restarts[-1]["why"] == "lost-brief" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
     assert not agent._host_rec.get("builtins")
 
 
@@ -589,8 +588,8 @@ async def test_a_replays_mark_is_read_against_the_list_it_sends(agent, tmp_path,
         login_list=["hookstub:second"],
     )
     s = agent.sessions[sid]
-    await agent._replay(s, "crash", keep_mail=True)
-    await agent._replay(s, "crash", keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
     assert len(sent) == 1 and sent[0]["login_list"] == ["hookstub:second"] and not s.restarts
 
 
@@ -604,6 +603,6 @@ async def test_a_replay_of_a_launch_record_with_no_list_is_sent_as_before(agent,
         "default": {"node_cannot_run": {"tech-lead": {"a-node": {"model": "opus", "logins": order}}}}
     }
     s = agent.sessions[sid]
-    await agent._replay(s, "crash", keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
     assert len(sent) == 1 and sent[0]["profile"] == "first"
-    assert s.restarts[-1]["why"] == "crash" and "disk is full" in s.restarts[-1]["error"]
+    assert s.restarts[-1]["why"] == "lost-brief" and "disk is full" in s.restarts[-1]["error"]
