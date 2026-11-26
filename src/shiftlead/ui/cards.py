@@ -1280,7 +1280,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             "Resume it, or Forget it"
         )
     elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
-        # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
+        # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled 25 times
         # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is
         # (TD-1422): a plain mark lapses after the hour, a held second trip is the person's
         kind, text = "bad", fill_words(d["restart_ceiling"])

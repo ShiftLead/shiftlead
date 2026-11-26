@@ -231,7 +231,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      words**: *its restart row's Restart, or `ao restart <id>`* is what it writes beside a member it
      puts on the board, and the press is the person's. Restart, not *Resume with changes…*, is a
      supervised member's way back into its team's run (§4.9a *One member back, today*).
-  3. **Seats.** (After the cut-over this rule fills three built-in seats and the director alone, their records written by the home, no manager among them, and `TECHLEAD_FILL_CEILING` (25) bounding a tech lead's fills where `FILL_CEILING` (six) bounds the others': §4.9d *How each one runs*, §4.9e *What decides which shape runs*.) `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
+  3. **Seats.** (After the cut-over this rule fills three built-in seats and the director alone, their records written by the home, no manager among them, and `TECHLEAD_FILL_CEILING` (25) bounding a tech lead's fills where `FILL_CEILING` (25 too, since TD-2256) bounds the others': §4.9d *How each one runs*, §4.9e *What decides which shape runs*.) `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b) — each member of a pool as a seat of its own, its `seat`
      also carrying `pool` and `rank` (§4.9b *A seat as an ordered pool*, TD-1476), so this rule fills a member
      only when mail waits on it — and the tick computes **`seat_due: {at,
@@ -256,7 +256,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      note from a person's session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready with every file it changes in `director.merge_paths`
      (§4.9b *Acting by delegation*), keeping `seat_due: {at, by: watch, ready}` and `seat_filled` keeping
      `{by: watch, ready}` (`ready` the `<repo>#<n>` list), so a fill is once per set of PRs; never raised
-     while the seat has used five of its six `FILL_CEILING` fills in the hour; a fill running when `director.work`
+     while the seat has used all but one of its 25 `FILL_CEILING` fills in the hour; a fill running when `director.work`
      turns off is closed at that tick (`watch` and `groom` are
      `by` words of the director's alone, beside `prompt` and `asks`), §4.9b *The director works for the person*, TD-1910), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
@@ -308,7 +308,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      holds it; and the wait is bounded: idle `SEAT_PR_WAIT` (two hours, `review.bound`'s default),
      it is closed as before, and the PR stands among the repo's open ones — a filing PR among them an order a
      day after it opened (§4.4 *A filing PR nobody holds is a work order*, TD-1804). **The fill ceiling**:
-     `FILL_CEILING` — six fills an hour over all seats sharing a controller (the graph, not the
+     `FILL_CEILING` — 25 fills an hour (Paul, 2026-11-25: six stopped the tech lead on ordinary work and no runaway was ever seen) over all seats sharing a controller (the graph, not the
      team badge), then `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 6 in
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
@@ -321,7 +321,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      to the record any replay creates, as `restarts` is, cleared by a person's Restart; no reader of
      `restarts` sees it, so it is no restart, no chip and no count), and the Inbox row leaves with the
      mark; the seat is filled on the next pass its cause is due, under the same count. A seat that
-     answers a trickle of asks one fill each reaches six in an hour by working, and a mark that
+     answers a trickle of asks one fill each can reach the ceiling in an hour by working, and a mark that
      waited for a person left every later ask waiting with it. **A second trip holds**: a trip whose
      every counted fill was made after the newest `fill_lapsed.at` among the fellows `_fill` counts
      over (the group's, wherever the trip lands; a fill stamped in the lapse's own second is after it, since a
@@ -417,7 +417,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      techlead and auditors (`controllers: [manager]`) are one group whether the manager is
      standing or on call, the manager seat itself is a group of one (its controller is a
      director's, where there is one), and in a person-led team, whose seats have empty
-     `controllers`, every seat is its own group with six fills an hour of its own.
+     `controllers`, every seat is its own group with 25 fills an hour of its own.
      **An extra seat** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no timers*): a
      held record carrying `scale` whose `line` names an `asks` seat carries `seat: {trigger: asks}`. **Up, at
      the send**: mail addressed to the seat (a question, a reader's `ask` carrying `pr`, an `entry` envelope)

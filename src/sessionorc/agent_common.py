@@ -142,10 +142,10 @@ RESTART_PUSHED_CEILING = 6
 # A record a tick restart has just created is not judged crashed for this long (TD-186): the run it
 # replaced may still be ending, and what it reports then is not the new run's.
 RESTART_SETTLE = timedelta(seconds=60)
-# §6 rule 3 (TD-103 slice 3): six fills an hour over all seats sharing a controller, and how long a
-# seat must sit hook-confirmed idle with nothing due before the tick closes it — so a seat just
-# filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
-FILL_CEILING = 6
+# §6 rule 3 (TD-103 slice 3; 25 since TD-2256, six before): 25 fills an hour over all seats sharing a
+# controller, and how long a seat must sit hook-confirmed idle with nothing due before the tick closes it — so a
+# seat just filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
+FILL_CEILING = 25
 # a built-in tech lead's record (`builtin: techlead`), counted alone (§4.9d *How each one runs*, TD-2065; Paul,
 # 2026-11-22: the bound only stops a runaway): every stage's session is fresh and may ask, so it is filled far more
 TECHLEAD_FILL_CEILING = 25

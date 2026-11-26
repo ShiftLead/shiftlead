@@ -5007,7 +5007,7 @@ class TickMixin:
 
     async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
-        the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
+        the fill ceiling: 25 fills an hour over all seats sharing a controller (the graph, never the
         team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`.
         A seat whose ceiling a person's restart cleared (a `{why: person}` entry with no fill after it)
