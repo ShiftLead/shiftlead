@@ -23,7 +23,8 @@ started; once the key is gone it removes the director's records, as Forget does,
 
 Where *Where a seat's session launches* gives a seat another host while its record is ended, the home writes the
 record on that host and marks the old one superseded by it, its mail moved (`seat_moved`); a live or suspended record
-stays where it is until it has ended. Launching a fill on the built-in set's model and login is TD-2068's.
+stays where it is until it has ended. Rule 3's fill launches it on the built-in set's model and first usable login
+(the tick's `_builtin_login`, TD-2068); a seat on a node is launched as before until the node half.
 """
 
 from __future__ import annotations

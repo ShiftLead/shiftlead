@@ -26,6 +26,7 @@ from sessionorc import (
     adapters,
     agent_common,
     branchsweep,
+    builtinstore,
     cachesweep,
     containers,
     diskbook,
@@ -33,6 +34,7 @@ from sessionorc import (
     homesweep,
     hosts,
     link,
+    logins,
     mail,
     naming,
     paths,
@@ -176,6 +178,8 @@ FILLED_FOR = "[shiftlead] you are filled for: "
 # `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
 # person's Restart, and a team's start by a schedule or by rule 8
 NOT_RESTARTS = ("person", "start", "schedule", "work")
+# a built-in seat's record mark → the seat's key in a built-in set (§4.9d *The store*)
+BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "prompts"}
 
 
 def _person_cleared(restarts: list[Any]) -> bool:
@@ -4453,8 +4457,11 @@ class TickMixin:
             # the cause pass never fills an extra seat and the `asks` linger never closes one: the send and the
             # mover fill it, and only the eviction closes it, when a start needs its slot (§6 rule 3, TD-1547)
             return
-        if s.state in ("exited", "closed"):
-            self._unfillable_word(s, now)  # due or not, a question asks whether rule 3 would fill it (TD-1443)
+        ended = s.state in ("exited", "closed")
+        # due or not, a question asks whether rule 3 would fill it (TD-1443), a built-in seat's login too (TD-2068):
+        # one the fill below reads is read there
+        if ended and not self._unfillable_word(s, now) and self._on_set_login(s) and not s.seat_due:
+            await self._builtin_login(s)
         if s.state in ("exited", "closed") and s.seat_due and s.id not in self._send_filling:
             await self._fill(s, now, records)  # a held extra a send is filling is the send's (TD-1547)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
@@ -4839,11 +4846,13 @@ class TickMixin:
 
     def _unfillable_word(self, s: Session, now: datetime) -> str | None:
         """Rule 3's refusal of an ended seat for its own ceiling or its profile's gate, written to `unfillable`
-        for `seat_able` (§4.9b *A seat that cannot answer is routed around*, TD-1443), or None."""
+        for `seat_able` (§4.9b *A seat that cannot answer is routed around*, TD-1443), or None. A built-in seat whose
+        fill picks its login (`_on_set_login`) is not read by its last run's profile: the pick passes over a gated
+        login to the next of its set's list (§4.9d *The login a seat starts on*, TD-2068)."""
         ceiling = s.restart_ceiling if isinstance(s.restart_ceiling, dict) else None
         if ceiling:
             why = "fill ceiling" if ceiling.get("why") == "fill" else "restart ceiling"
-        elif self._profile_gated(s.profile, now, s.team):
+        elif not self._on_set_login(s) and self._profile_gated(s.profile, now, s.team):
             why = "profile gated"
         else:
             return None
@@ -4913,6 +4922,9 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
             return
+        on_login = await self._builtin_login(s)
+        if on_login is None:
+            return  # no login of its set's list can run it now: `unfillable` says why (§4.9d)
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
         seat = s.seat or {}
         tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
@@ -4924,12 +4936,52 @@ class TickMixin:
         said = filled_for(cause)
         if cause and any(e.id == cause.get("ask") and e.handed_entry for e in s.inbox):
             cause = None  # an entry the person handed it fills the seat while it owes, as any seat's (TD-218)
-        await self._replay(s, "fill", mark={"for": "seat_due"} if said else None, closing=said, keep_mail=True)
+        await self._replay(
+            s, "fill", mark={"for": "seat_due"} if said else None, closing=said, keep_mail=True, **on_login
+        )
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if cause and new is not None and new is not s:
             # the fill was made: the cause is remembered on the record that took the seat
             new.seat_filled = [*s.seat_filled, {**{k: v for k, v in cause.items() if k != "at"}, "at": now_iso()}]
             self._save(new)
+
+    def _on_set_login(self, s: Session) -> bool:
+        """Whether a fill of `s` picks its login from its repo's built-in set (`_builtin_login`): after the cut-over, a
+        built-in seat's record on the home's own host."""
+        here = not s.host or s.host == self.host
+        return bool(self._first_shape_off and BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) and here)
+
+    async def _builtin_login(self, s: Session) -> dict[str, Any] | None:
+        """The `create` arguments that put a built-in seat's fill on its login (§4.9d *The login a seat starts on*,
+        §4.9e *The launch on a login*, TD-2068): `{}` for a fill as before — before the cut-over, a record that is no
+        built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the
+        list of the set its repo uses that offers the seat's model, with that model and the list, by
+        `builtinstore.seat`, no team's reserve added. None where nothing is to be filled now, `unfillable` saying why:
+        *no login usable* (the usage gate holds it) or *cannot run* (no login of the list offers the model)."""
+        if not self._on_set_login(s):
+            return {}
+        key = BUILTIN_SEAT_KEYS[str(s.builtin)]
+        doc = settings_mod.load()
+        root = str(s.repo or "")
+        repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), 0, now)
+        got = builtinstore.seat(doc, repo, key, rows)
+        pick = got["now"]
+        if pick["state"] != "usable" or not pick.get("login"):
+            why = "no login usable" if pick["state"] == "waits" else "cannot run"
+            self.unfillable[s.id] = why
+            log.info("%s: not filled — %s in built-in set %s: %s", s.id, why, got["set"], pick.get("why"))
+            return None
+        login = str(pick["login"])
+        return {
+            "login": login,
+            "adapter": logins.split(login)[0],
+            "profile": "",
+            "seat_model": got["model"],
+            "login_list": list(builtinstore.sets(doc)[got["set"]]["logins"]),
+        }
 
     def _seat_prs(self, s: Session, records: list[Session]) -> list[str]:
         """What of its own an idle seat may be waiting on (§6 rule 3, TD-366): an open PR on the branch

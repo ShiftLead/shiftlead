@@ -3,7 +3,8 @@
 and login.
 
 Pure: each function takes the settings document, or the rows a caller read, and neither reads nor writes a file. The
-host agent's `builtins_*` calls make the write. No launch reads `seat` yet: that is the launch path's (§4.9e, TD-1976).
+host agent's `builtins_*` calls make the write. Rule 3's fill of a built-in seat reads `seat` (the tick's
+`_builtin_login`, §4.9e *The launch on a login*, TD-2068).
 """
 
 from __future__ import annotations
