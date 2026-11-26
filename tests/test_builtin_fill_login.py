@@ -436,6 +436,60 @@ async def test_a_directors_fill_on_a_node_sends_its_own_list_and_marks_no_set(
     assert agent.unfillable[sid] == "cannot run" and not agent._host_rec.get("builtins")
 
 
+NIGHT = (
+    SETTINGS
+    + "  night:\n    models: {tech-lead: sonnet}\n    logins: [hookstub:second]\nrepos:\n  repo: {builtins: night}\n"
+)
+
+
+async def test_a_node_fill_sends_the_repos_own_set_and_its_refusal_marks_that_set(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2278 (§4.9d *Where a seat's session launches*): a built-in seat's fill on a node sends the list and model of
+    the set its repo uses, not `default`'s, and the node's *no login offers* marks that set, so its next fill sends
+    nothing there."""
+    sid = await _held_seat(agent, tmp_path, settings=NIGHT)
+    agent.sessions[sid].repo = str(tmp_path / "repo")
+    sent = _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} sonnet")
+    await _fill(agent, sid)
+    assert (sent[0]["seat_model"], sent[0]["login_list"]) == ("sonnet", ["hookstub:second"]), "night's, not default's"
+    sets = agent._host_rec.get("builtins") or {}
+    assert sets["night"]["node_cannot_run"]["tech-lead"]["a-node"]["model"] == "sonnet"
+    assert "default" not in sets, "the repo's set is marked, not default"
+    agent.unfillable.pop(sid, None)
+    await _fill(agent, sid)
+    assert len(sent) == 1 and agent.unfillable[sid] == "cannot run", "the marked set sends nothing again"
+
+
+@pytest.mark.parametrize(("model", "order"), [("sonnet", []), (None, ["hookstub:second"])])
+async def test_a_directors_fill_on_a_node_with_no_list_or_no_model_sends_nothing(
+    agent, tmp_path, launched, rows, monkeypatch, model, order
+):
+    """TD-2278: the director's record on a node with an empty `login_list`, or with no `seat_model`, is *cannot run*
+    with no `create` sent to the node (§4.9e *A team on a node*)."""
+    sid = await _held_seat(agent, tmp_path, "prompts")
+    s = agent.sessions[sid]
+    s.builtin, s.seat_model, s.login_list = None, model, order
+    sent = _on_a_node(agent, monkeypatch, sid, None)
+    await _fill(agent, sid)
+    assert sent == [] and agent.unfillable[sid] == "cannot run"
+
+
+async def test_a_mark_whose_save_fails_leaves_the_fill_a_no_fill(agent, tmp_path, launched, rows, monkeypatch):
+    """TD-2278: a node's *no login offers* whose mark cannot be saved (the home's disk full) still ends the fill as no
+    fill, with nothing counted: the failed write is logged, never raised out of the fill."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} opus")
+
+    def full(_rec):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(agent.host_store, "save", full)
+    before = list(agent.sessions[sid].restarts)
+    await _fill(agent, sid)
+    assert sent and agent.sessions[sid].restarts == before and agent.unfillable[sid] == "cannot run"
+
+
 @pytest.mark.parametrize(("why", "word"), [("fill", "fill ceiling"), ("crash", "restart ceiling")])
 async def test_an_ended_seat_at_its_ceiling_keeps_the_ceilings_word(
     agent, tmp_path, launched, rows, monkeypatch, why, word
