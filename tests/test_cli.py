@@ -3114,7 +3114,7 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
     ):
         assert f"**the answer {outcome}**" in text, outcome
     done = re.search(r"`(ao board edit done [^`]*)`", text).group(1)  # TD-588: no repo's script
-    assert all(f in done for f in ("--line", "--expect", "--why"))
+    assert all(f in done for f in ("--key board:<key>", "--why")) and "--line" not in done  # TD-2316
     assert "the board holds no decided line your lane takes that nobody has claimed" in text
     # TD-1705 step 5: a design's answer reaching a grinder is a Go done or a round carried, never dropped
     assert "**A design's answer**" in text and "never dropping it as not your own" in text

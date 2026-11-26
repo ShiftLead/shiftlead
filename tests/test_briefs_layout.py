@@ -235,3 +235,16 @@ def test_a_designs_go_comes_to_no_designer_and_a_no_gate_go_is_carried_to_an_ite
         "you write no record, and run no `--override`",
     ):
         assert words in para, words
+
+
+def test_no_package_brief_names_a_board_item_by_line_or_replays_the_board():
+    """TD-2316: ledgerboard v3.0 (TD-1881) names a board item by its id and retired `--line`/`--expect`,
+    `board_edit.py replay` and the `ARCHIVE_AT` archive, so a brief that tells a session any of them is refused."""
+    root = Path(str(resources.files("shiftlead") / "briefs"))
+    retired = re.compile(r"--line\b|--expect\b|board_edit\.py replay|replayed onto main's board|ARCHIVE_AT")
+    hits = [
+        f"{p.relative_to(root)}: {m.group(0)}"
+        for p in sorted(root.rglob("*.md"))
+        for m in retired.finditer(p.read_text(encoding="utf-8"))
+    ]
+    assert not hits, hits
