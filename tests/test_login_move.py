@@ -149,6 +149,56 @@ async def test_a_session_on_an_unusable_login_moves_to_the_next_under_the_same_r
 
 
 @pytest.mark.integration
+async def test_a_move_keeps_the_records_mail_scratch_worktree_and_owed_outcomes(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2300: the close keeps the worktree (`reap=False`) and what the session owes (`keep_debt`), and the replay
+    keeps its mail and its scratch (§4.9e *A session moves down the list*, §4.6)."""
+    sid = await _stage_session(agent, tmp_path)
+    old = agent.sessions[sid]
+    assert old.scratch, "the stage's session runs with a scratch"
+    closed: list[dict] = []
+    created: list[dict] = []
+    close, create = agent._close, agent.rpc_create
+
+    async def close_spy(*a, **kw):
+        closed.append(kw)
+        return await close(*a, **kw)
+
+    async def create_spy(**kw):
+        created.append(kw)
+        return await create(**kw)
+
+    monkeypatch.setattr(agent, "_close", close_spy)
+    monkeypatch.setattr(agent, "rpc_create", create_spy)
+    await agent._login_moves(datetime.now(UTC))
+    new = agent.sessions[sid]
+    assert new is not old and new.login == "hookstub:second"
+    assert [(kw.get("reap"), kw.get("keep_debt")) for kw in closed] == [(False, True)], "worktree and debts kept"
+    assert created[-1]["keep_mail"] is True, "the closed run's mail is the new record's"
+    assert created[-1]["scratch"] == old.scratch and new.scratch == old.scratch
+    assert created[-1]["adapter"] == "hookstub"
+
+
+@pytest.mark.integration
+async def test_a_move_to_another_tools_login_launches_that_tool(agent, tmp_path, launched, rows, monkeypatch):
+    """TD-2300: the replay is handed the adapter of the login it moves to, never the old session's tool."""
+    sid = await _stage_session(agent, tmp_path)
+    s = agent.sessions[sid]
+    s.login_list = ["hookstub:first", "othertool:one"]
+    rows["othertool:one"] = _row("acct-9", ["opus"])
+    created: list[dict] = []
+
+    async def create(**kw):
+        created.append(kw)
+        raise RuntimeError("stop at the launch")
+
+    monkeypatch.setattr(agent, "rpc_create", create)
+    await agent._login_moves(datetime.now(UTC))
+    assert [(kw["adapter"], kw["login"]) for kw in created] == [("othertool", "othertool:one")]
+
+
+@pytest.mark.integration
 async def test_an_adapter_without_handoff_moves_with_its_stages_words_alone(
     agent, tmp_path, launched, rows, monkeypatch
 ):
@@ -262,6 +312,8 @@ async def test_a_second_move_hands_over_its_own_handoff_alone(agent, tmp_path, l
     assert agent.sessions[sid].login == "hookstub:third"
     told = launched[-1]["prompt"]
     assert "fixing the race" not in told and told.endswith("later") and told.count("before you stopped") == 1
+    moves = [(m["from"], m["to"]) for m in agent.sessions[sid].login_moves]
+    assert moves == [("hookstub:first", "hookstub:second"), ("hookstub:second", "hookstub:third")], "both moves kept"
 
 
 @pytest.mark.integration
