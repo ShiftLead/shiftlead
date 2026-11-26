@@ -64,8 +64,8 @@
 - [Show the unconstrained design pass](show-the-unconstrained-design-pass.md) — frontend-design on a mockup: render the skill's own pick beside the house-style refinement (TD-1203, 2026-10-28)
 - [Mockup from a static copy](mockup-from-a-static-copy.md) — edit a script-free copy of the live page in Playwright; prefix the mockup's classes, never nest links
 - [Work open asks before idle](work-open-asks-before-idle.md) — never end a turn on a list of open asks; the doorbell never rings a read ask again (TD-1435, 2026-11-06)
-- [Decided in the filing PR](decided-in-the-filing-pr.md) — a decide answered before the filing PR merges: `board_edit.py decide --expect "- [ ] decide …"`, then drop the board item; ledger.py refuses bold paragraph openers
-- [Board changes: close and add](board-changes-close-and-add.md) — a changed decide item is `done` then `add`; never restore the board file; an archiving `done` is its own commit (#3447, 2026-11-11)
+- [Decided in the filing PR](decided-in-the-filing-pr.md) — a decide answered before the filing PR merges: `board_edit.py decide --id <id>`, then drop the board item's file; ledger.py refuses bold paragraph openers
+- [Board changes: close and add](board-changes-close-and-add.md) — a changed decide item is `done` then `add`, by `--id`; never restore an item's file (#3447, 2026-11-11)
 - [Review rounds count once the design holds](review-rounds-count-once-the-design-holds.md) — reads while Paul still reshapes a design are not the capped rounds; round 1 starts when he says it is settled (TD-1953, 2026-11-18)
 - [Review what is written after the last round](review-what-is-written-after-the-last-round.md) — fixes, build entries and board questions written after a READY round get a round of their own (TD-1954 rounds 7–9, 2026-11-21)
 - [Remove a review copy when its review ends](remove-a-review-copy-when-its-review-ends.md) — clones hold ~100k files and filled /tmp's inodes (2026-11-26); rm each once its review is posted

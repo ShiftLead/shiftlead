@@ -6,8 +6,8 @@ metadata:
 ---
 
 When the person answers a held entry's question while its filing PR is still open (TD-1581, 2026-11-10):
-- `board_edit.py decide --line N --expect "<the line's start>" --answer … --by paul --no-commit` lifts the gate in the entry and writes a lifted line to its Log. `--expect` is the line's literal start, `- [ ] decide …`, not the question.
-- Then restore `docs/user_attention.md` to main's copy. The merge gate's `board` row fails a closed line that closes nothing open on main, and the `gates` row passes without the item, since main never held the gate.
+- `board_edit.py decide --id <id> --answer … --by paul --no-commit` (the id from `board_edit.py list`; `--line`/`--expect` were retired with ledgerboard v3.0) lifts the gate in the entry and writes a lifted line to its Log.
+- Then drop the item's file under `docs/user_attention/` from the PR, since main never held it. The merge gate's `board` row fails a closed item that closes nothing open on main, and the `gates` row passes without the item, since main never held the gate.
 
 `ledger.py new` and `ledger.py edit` refuse a paragraph that opens in bold, because it reads as a section of its own (`**X:**` / `**X.**`). Open with plain words, and keep bold for inside a sentence or a list item.
 

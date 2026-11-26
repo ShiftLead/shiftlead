@@ -401,7 +401,7 @@ def test_the_grinder_brief_carries_the_filing_takers_path():
     text = (Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
     start = text.index("**A filing PR** (a `pr:<n>` order marked *filing*")
     path = text[start : text.index("**Out of work**", start)]
-    for step in ("`cadence-stack:`", "`ao td reserve`", "`board_edit.py replay`", "fact-check it always at the head",
+    for step in ("`cadence-stack:`", "`ao td reserve`", "keeping both sides' item files", "fact-check it always at the head",
                  "`ao pr held <n>`", "never a drop that leaves the PR open", "`ao progress done pr:<n> --pr <n>`"):  # fmt: skip
         assert step in path, step
 
@@ -428,9 +428,9 @@ def test_the_grinder_brief_carries_the_gate_sweep_takers_steps_by_head():
     start = text.index("**A PR the gate sweep opens**")
     path = text[start : text.index("**A filing PR** (a `pr:<n>` order marked *filing*", start)]
     for step in ("`sweep/<date>`", "`notices/<repo>-sweep-<date>`", "read as a filing PR", "`read_open`",
-                 "send no second ask", "`cadence-review:`", "Where it names none, you merge it", "`ledger.py lift TD-n", "`board_edit.py replay`",
+                 "send no second ask", "`cadence-review:`", "Where it names none, you merge it", "`ledger.py lift TD-n", "keeping both sides' item files",
                  "**every lift but a live one**", "**a `host-log` gate's lift**", "never re-run",
                  "event_checks.py --json`", "never the exit code", "*impossible*", "never a drop",
                  "*The home's gate sweep (design §4.4, TD-1376) lifts …*", "no staleness test",
-                 "replay refuses", "**A live check's lift**", "*not yet* is never merged"):  # fmt: skip
+                 "edit cannot be re-done", "**A live check's lift**", "*not yet* is never merged"):  # fmt: skip
         assert step in path, step
