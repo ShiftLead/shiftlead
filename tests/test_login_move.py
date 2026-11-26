@@ -344,6 +344,7 @@ async def test_a_move_leaves_its_stage_records_holder_offers_and_counts_as_they_
     got = stage_pass.step(store, store.entry("TD-1"), f, reach)
     after = store.entry("TD-1")
     if launch == "moved":
+        assert agent.sessions[sid].login == "hookstub:second", "the move happened"
         assert got.read and got.act is None and started == [], "its holder is live: the pass takes no act"
         assert (after["holder"], after["offers"], after["counts"]) == (sid, 1, {"build": 2})
     else:
