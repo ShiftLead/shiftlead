@@ -4342,6 +4342,8 @@ class TickMixin:
             else:
                 view = await self._route_act("create", {**params, "host": s.host}, None, s.host)
         except Exception as e:  # noqa: BLE001 — a failed replay is a restart that failed, and counts (§6)
+            if why == "fill" and await self._node_list_refused(s, extra, e):
+                return  # refused before anything was made: no fill, nothing counted (§4.9d *How each one runs*)
             entry["error"] = str(e) or type(e).__name__
             log.warning("%s: the %s restart failed: %s", s.id, why, entry["error"])
             s.restarts = history
@@ -4952,14 +4954,76 @@ class TickMixin:
 
     def _on_set_login(self, s: Session) -> bool:
         """Whether a fill of `s` picks its login from a list (`_builtin_login`): after the cut-over, a built-in seat's
-        record or the director's on the home's own host."""
-        here = not s.host or s.host == self.host
-        return bool(self._first_shape_off and (BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) or _director(s)) and here)
+        record or the director's, on the home's own host or on a node (where the node's own launch picks)."""
+        return bool(self._first_shape_off and (BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) or _director(s)))
+
+    def _node_seat_list(self, s: Session) -> dict[str, Any] | None:
+        """A built-in seat's or the director's fill on a node (§4.9d *Where a seat's session launches*, §4.9e *A team
+        on a node*, TD-2068): the `create` arguments that send the list as names and the seat's model with no login,
+        so the node's own launch takes its first usable login offering the model. None, `unfillable` *cannot run*,
+        where the list is empty, the record names no model, or the home's mark says the set cannot run the seat on
+        that node (`builtins_node_cannot`, read while the set's list and the seat's model are the ones it names)."""
+        if _director(s):
+            order, held, where, marked = list(s.login_list or ()), str(s.seat_model or ""), "the director's list", None
+        else:
+            doc = settings_mod.load()
+            root = str(s.repo or "")
+            repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+            name, key = builtinstore.repo_set(doc, repo), BUILTIN_SEAT_KEYS[str(s.builtin)]
+            entry = builtinstore.sets(doc)[name]
+            order, held, where = list(entry["logins"]), builtinstore.model(entry, key), f"built-in set {name}"
+            sets_rec = self._host_rec.get("builtins") if isinstance(self._host_rec.get("builtins"), dict) else {}
+            marks = ((sets_rec.get(name) or {}).get("node_cannot_run") or {}).get(key) or {}
+            mark = marks.get(s.host) if isinstance(marks, dict) else None
+            stands = (
+                isinstance(mark, dict)
+                and mark.get("model") == held
+                and [str(x) for x in mark.get("logins") or ()] == order
+            )
+            marked = f"no login in its list offers {held} on {s.host}" if stands else None
+        if marked or not order or not held:
+            self.unfillable[s.id] = "cannot run"
+            why = marked or ("its list is empty" if not order else "its record names no model")
+            log.info("%s: not filled on %s — cannot run in %s: %s", s.id, s.host, where, why)
+            return None
+        return {"profile": "", "seat_model": held, "login_list": order}
+
+    async def _node_list_refused(self, s: Session, params: Mapping[str, Any], e: Exception) -> bool:
+        """Whether a node refused a built-in seat's or the director's fill for its list (§4.9d *How each one runs*,
+        §4.9e *A team on a node*, TD-2068): before anything is made, as *no login usable* (a wait) or *no login offers
+        <model>* (*cannot run*, and for a set's seat the home's mark that the set cannot run it on that node). Such a
+        refusal is no fill: the seat is unfillable with the node's words, and nothing is counted. Any other failure is
+        not one, and the caller counts it as a failed fill."""
+        if s.host == self.host or params.get("login") or not params.get("login_list"):
+            return False
+        words = str(e)
+        if teamstore.NO_LOGIN_USABLE in words:
+            self.unfillable[s.id] = "no login usable"
+        elif teamstore.NO_LOGIN_OFFERS in words:
+            self.unfillable[s.id] = "cannot run"
+            if not _director(s):  # the director has no set to mark
+                doc = settings_mod.load()
+                root = str(s.repo or "")
+                repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+                try:
+                    await self.rpc_builtins_node_cannot(
+                        set=builtinstore.repo_set(doc, repo),
+                        seat=BUILTIN_SEAT_KEYS[str(s.builtin)],
+                        host=s.host,
+                        model=str(params.get("seat_model") or ""),
+                        logins=list(params["login_list"]),
+                    )
+                except (RpcError, OSError) as err:  # unmarked, the next fill is refused as this one was
+                    log.warning("%s: the set's mark for %s was not written: %s", s.id, s.host, err)
+        else:
+            return False
+        log.info("%s: not filled — its node refused the list: %s", s.id, words)
+        return True
 
     async def _builtin_login(self, s: Session) -> dict[str, Any] | None:
         """The `create` arguments that put a built-in seat's fill on its login (§4.9d *The login a seat starts on*,
-        §4.9e *The launch on a login*, TD-2068): `{}` for a fill as before — before the cut-over, a record that is no
-        built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the
+        §4.9e *The launch on a login*, TD-2068): `{}` for a fill as before — before the cut-over, or a record that is no
+        built-in seat's; on a node the list as names (`_node_seat_list`) — else the first usable login of the
         list of the set its repo uses that offers the seat's model, with that model and the list, by
         `builtinstore.seat`, no team's reserve added. None where nothing is to be filled now, `unfillable` saying why:
         *no login usable* (the usage gate holds it) or *cannot run* (no login of the list offers the model). The
@@ -4968,6 +5032,8 @@ class TickMixin:
         (§4.9d)."""
         if not self._on_set_login(s):
             return {}
+        if s.host and s.host != self.host:
+            return self._node_seat_list(s)
         doc = settings_mod.load()
         read, gate = await self.rpc_tools(), await self.rpc_gate()
         now = datetime.now(UTC)

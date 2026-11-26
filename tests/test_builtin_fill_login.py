@@ -14,6 +14,7 @@ from conftest import park_ticks
 
 from sessionorc import paths, teamstore
 from sessionorc.adapters import LaunchSpec
+from sessionorc.agent_common import RpcError
 from sessionorc.client import LocalClient
 
 pytestmark = pytest.mark.integration
@@ -324,16 +325,113 @@ async def test_a_directors_record_with_no_model_or_list_is_not_filled_after_the_
     assert agent.unfillable[sid] == "cannot run"
 
 
-async def test_a_built_in_seat_on_a_node_picks_no_login(agent, tmp_path, launched, rows):
-    """TD-2254: a built-in seat's record on a node is launched as before until the node half (§4.9e): its fill reads
-    no set, even where the home's own logins could run it."""
+async def test_a_built_in_seat_on_a_node_sends_its_sets_list_as_names(agent, tmp_path, launched, rows):
+    """TD-2068 (§4.9d *Where a seat's session launches*, §4.9e *A team on a node*): a built-in seat's fill on a node
+    sends the set's list as names and the seat's model with no login, whatever the home's own logins could run, and
+    the node's own launch picks; the home reads none of that node's logins."""
     rows.update({"hookstub:first": _row("acct-1", ["opus"]), "hookstub:second": _row("acct-2", ["opus"])})
     sid = await _held_seat(agent, tmp_path)
     s = agent.sessions[sid]
-    assert await agent._builtin_login(s) != {}, "on the home's own host it picks a login"
+    assert (await agent._builtin_login(s))["login"] == "hookstub:first", "on the home's own host it picks a login"
     s.host = "a-node"
-    assert not agent._on_set_login(s)
-    assert await agent._builtin_login(s) == {}, "on a node the fill is as before"
+    assert agent._on_set_login(s)
+    assert await agent._builtin_login(s) == {
+        "profile": "",
+        "seat_model": "opus",
+        "login_list": ["hookstub:first", "hookstub:second"],
+    }
+    rows.clear()  # the home's own logins are not read for a node
+    assert (await agent._builtin_login(s))["seat_model"] == "opus" and sid not in agent.unfillable
+
+
+async def test_a_node_mark_holds_the_seats_fill_on_that_node_alone(agent, tmp_path, launched, rows):
+    """The home's mark that a node found no login of the set's list offering the seat's model (`builtins_node_cannot`)
+    makes the seat *cannot run* there with nothing sent, while the list and the model are the ones it names; a mark
+    for another node, another model or another list holds nothing."""
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    s.host = "a-node"
+    order = ["hookstub:first", "hookstub:second"]
+    for mark, held in (
+        ({"other-node": {"model": "opus", "logins": order}}, False),
+        ({"a-node": {"model": "sonnet", "logins": order}}, False),
+        ({"a-node": {"model": "opus", "logins": ["hookstub:first"]}}, False),
+        ({"a-node": {"model": "opus", "logins": order}}, True),
+    ):
+        agent.unfillable.pop(sid, None)
+        agent._host_rec["builtins"] = {"default": {"node_cannot_run": {"tech-lead": mark}}}
+        got = await agent._builtin_login(s)
+        assert (got is None) is held, mark
+        assert (agent.unfillable.get(sid) == "cannot run") is held, mark
+
+
+def _on_a_node(agent, monkeypatch, sid: str, refused: str | None) -> list[dict]:
+    """The seat's record moved to a node, its launch record read as the node's, and the node's `create` refused with
+    `refused`'s words (or answered); returns what each `create` the home routed there was handed."""
+    s = agent.sessions[sid]
+    s.host = "a-node"
+    sent: list[dict] = []
+
+    async def route(method, params, _caller, host):
+        sent.append({"method": method, **params})
+        if refused:
+            raise RpcError(refused)
+        return {"id": f"{sid}@{host}"}
+
+    monkeypatch.setattr(agent, "_read_launch", lambda _address: {"name": s.name, "adapter": "hookstub"})
+    monkeypatch.setattr(agent, "_route_act", route)
+    return sent
+
+
+@pytest.mark.parametrize(
+    ("words", "word", "marked"),
+    [
+        (f"{teamstore.NO_LOGIN_USABLE}: every login of the list is at its reserve", "no login usable", False),
+        (f"{teamstore.NO_LOGIN_OFFERS} opus", "cannot run", True),
+    ],
+)
+async def test_a_nodes_list_refusal_is_no_fill_and_counts_nothing(
+    agent, tmp_path, launched, rows, monkeypatch, words, word, marked
+):
+    """§4.9d *How each one runs*: a node that refuses a fill for its list, before anything is made, has made no fill:
+    no `restarts` entry, no fill ceiling spent, and the seat unfillable with the node's words; *no login offers* also
+    marks the set *cannot run* the seat on that node, so the next fill sends nothing there."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, words)
+    before = list(agent.sessions[sid].restarts)
+    await _fill(agent, sid)
+    s = agent.sessions[sid]
+    assert sent and sent[0]["seat_model"] == "opus" and not sent[0].get("login"), "the list went as names"
+    assert sent[0]["login_list"] == ["hookstub:first", "hookstub:second"] and sent[0]["host"] == "a-node"
+    assert s.restarts == before, "no fill was made, so none is counted"
+    assert agent.unfillable[sid] == word
+    marks = ((agent._host_rec.get("builtins") or {}).get("default") or {}).get("node_cannot_run") or {}
+    assert bool(marks.get("tech-lead", {}).get("a-node")) is marked
+    agent.unfillable.pop(sid, None)
+    await _fill(agent, sid)
+    assert len(sent) == (1 if marked else 2), "a marked node is sent nothing; a wait is asked again"
+
+
+async def test_any_other_failed_create_on_a_node_is_a_counted_failed_fill(agent, tmp_path, launched, rows, monkeypatch):
+    sid = await _held_seat(agent, tmp_path)
+    _on_a_node(agent, monkeypatch, sid, "the node's disk is full")
+    await _fill(agent, sid)
+    last = agent.sessions[sid].restarts[-1]
+    assert last["why"] == "fill" and "disk is full" in last["error"]
+
+
+async def test_a_directors_fill_on_a_node_sends_its_own_list_and_marks_no_set(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """The director's fill on a node sends its own record's `seat_model` and `login_list`; its *no login offers* is
+    *cannot run* with no set marked, since the director has none."""
+    sid = await _held_seat(agent, tmp_path, "prompts")
+    s = agent.sessions[sid]
+    s.builtin, s.seat_model, s.login_list = None, "sonnet", ["hookstub:second"]
+    sent = _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} sonnet")
+    await _fill(agent, sid)
+    assert (sent[0]["seat_model"], sent[0]["login_list"]) == ("sonnet", ["hookstub:second"])
+    assert agent.unfillable[sid] == "cannot run" and not agent._host_rec.get("builtins")
 
 
 @pytest.mark.parametrize(("why", "word"), [("fill", "fill ceiling"), ("crash", "restart ceiling")])
