@@ -184,3 +184,70 @@ async def test_an_ended_seat_not_due_says_it_cannot_run_before_a_question_comes(
     s.seat_due = None
     await agent._seat_pass(s, datetime.now(UTC), list(agent.sessions.values()))
     assert agent.unfillable[sid] == "cannot run" and not launched
+
+
+def test_a_login_asks_where_its_unattended_args_lack_the_tools_skip(hookstub, monkeypatch):
+    """§4.9d *How each one runs*, §4.3 `skip_args`: a login's `unattended_args` given without the tool's skip leave its
+    prompts on; none given, the launch passes its own; a tool naming no skip, or with no adapter here, is unread."""
+    monkeypatch.setattr(hookstub, "skip_args", ["--skip"], raising=False)
+    assert teamstore.asks("hookstub", ["--other"]) is True
+    assert teamstore.asks("hookstub", ["--skip", "--other"]) is False
+    assert teamstore.asks("hookstub", None) is False and teamstore.asks("hookstub", []) is False
+    assert teamstore.asks("no-such-tool", ["--other"]) is False
+    monkeypatch.setattr(hookstub, "skip_args", None, raising=False)
+    assert teamstore.asks("hookstub", ["--other"]) is False
+
+
+def test_login_rows_read_asks_from_a_logins_settings(hookstub, monkeypatch):
+    monkeypatch.setattr(hookstub, "skip_args", ["--skip"], raising=False)
+    read = {
+        "tools": [
+            {
+                "adapter": "hookstub",
+                "accounts": [],
+                "logins": [
+                    {"name": "first", "state": "signed_in", "settings": {"unattended_args": ["--other"]}},
+                    {"name": "second", "state": "signed_in", "settings": {"unattended_args": None}},
+                ],
+            }
+        ]
+    }
+    got = teamstore.login_rows(read, {})
+    assert (got["hookstub:first"]["asks"], got["hookstub:second"]["asks"]) == (True, False)
+
+
+def test_an_unasked_pick_passes_over_a_login_that_asks_and_waits_where_all_do():
+    rows = {"a:x": _row("acct-1", ["sonnet"], asks=True), "a:y": _row("acct-2", ["sonnet"])}
+    assert teamstore.pick(["a:x", "a:y"], "sonnet", rows)["login"] == "a:x", "a team's pick reads no asks"
+    assert teamstore.pick(["a:x", "a:y"], "sonnet", rows, unasked=True)["login"] == "a:y"
+    rows["a:y"]["asks"] = True
+    got = teamstore.pick(["a:x", "a:y"], "sonnet", rows, unasked=True)
+    assert got["state"] == "waits" and "leaves its prompts on" in got["why"]
+
+
+@pytest.mark.parametrize(
+    ("builtin", "model", "login"), [("prompts", "sonnet", "second"), ("techlead", "opus", "first")]
+)
+async def test_only_the_prompts_seat_skips_a_login_that_leaves_its_prompts_on(
+    agent, tmp_path, launched, rows, builtin, model, login
+):
+    """The prompts seat answers permission prompts for the person, so nothing above it would answer its own (§4.9d
+    *How each one runs*): its fill passes over a login whose `unattended_args` leave them on. A tech lead's does not."""
+    rows.update({"hookstub:first": _row("acct-1", [model], asks=True), "hookstub:second": _row("acct-2", [model])})
+    sid = await _held_seat(agent, tmp_path, builtin)
+    await _fill(agent, sid)
+    assert agent.sessions[sid].login == f"hookstub:{login}"
+
+
+async def test_a_prompts_seat_whose_every_login_asks_is_not_filled(agent, tmp_path, launched, rows):
+    rows.update(
+        {
+            "hookstub:first": _row("acct-1", ["sonnet"], asks=True),
+            "hookstub:second": _row("acct-2", ["sonnet"], asks=True),
+        }
+    )
+    sid = await _held_seat(agent, tmp_path, "prompts")
+    old = agent.sessions[sid]
+    await _fill(agent, sid)
+    assert agent.sessions[sid] is old and not launched
+    assert agent.unfillable[sid] == "no login usable"

@@ -49,6 +49,7 @@ def test_login_rows_carry_the_accounts_models_and_state():
             "state": "signed_in",
             "account": "acct",
             "pin": None,
+            "asks": False,
             "models": ["opus", "fable"],
             "at_reserve": False,
         }

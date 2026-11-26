@@ -155,11 +155,12 @@ def model(entry: Mapping[str, Any], seat: str) -> str:
 
 def seat(doc: Mapping[str, Any], repo: str, key: str, rows: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """The one reading of a repo's built-in seat (§4.9d *The login a seat starts on*): the repo's `set`, the seat's
-    `model` and teamstore's first-usable-login `pick` on the set's list, with no team's reserve added."""
+    `model` and teamstore's first-usable-login `pick` on the set's list, with no team's reserve added. The prompts
+    seat's pick passes over a login whose `unattended_args` leave its prompts on (§4.9d *How each one runs*)."""
     name = repo_set(doc, repo)
     entry = sets(doc)[name]
     held = model(entry, key)
-    return {"set": name, "model": held, "now": teamstore.pick(entry["logins"], held, rows)}
+    return {"set": name, "model": held, "now": teamstore.pick(entry["logins"], held, rows, unasked=key == PROMPTS)}
 
 
 def cannot_run(

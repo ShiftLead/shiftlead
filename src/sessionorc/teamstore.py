@@ -15,7 +15,7 @@ from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from sessionorc import logins
+from sessionorc import adapters, logins
 from sessionorc import settings as settings_mod
 from sessionorc.store import HostStore
 
@@ -298,7 +298,8 @@ def login_rows(
     read: Mapping[str, Any], accounts: Mapping[str, Any], extra: int = 0, now: datetime | None = None
 ) -> dict[str, dict[str, Any]]:
     """`pick`'s rows from the host's `tools` read and the `gate` reply's `accounts`, by login key: each login's
-    `state`, `account`, `pin`, its account's model `models`, and `at_reserve` with the team's `extra` added."""
+    `state`, `account`, `pin`, `asks` (its `unattended_args` leave its prompts on), its account's model `models`, and
+    `at_reserve` with the team's `extra` added."""
     when = now or datetime.now(UTC)
     out: dict[str, dict[str, Any]] = {}
     for card in read.get("tools") or ():
@@ -311,6 +312,7 @@ def login_rows(
                 "state": lg.get("state"),
                 "account": account,
                 "pin": lg.get("pin"),
+                "asks": asks(str(card.get("adapter")), (lg.get("settings") or {}).get("unattended_args")),
                 "models": list((held.get("models") or {}).get("families") or ()),
                 "at_reserve": bool(account)
                 and _at_reserve(
@@ -321,6 +323,20 @@ def login_rows(
                 ),
             }
     return out
+
+
+def asks(tool: str, args: Any) -> bool:
+    """Whether an unattended launch on a login's `unattended_args` leaves its prompts on (§4.9d *How each one runs*):
+    they are given and lack one of the tool's `skip_args` (§4.3). False where the tool has no adapter here or names
+    no `skip_args`, unread, and where none are given, since the launch then passes its own."""
+    try:
+        skip = getattr(adapters.get(tool), "skip_args", None)
+    except KeyError:
+        return False
+    if not isinstance(skip, (list, tuple)) or not skip:
+        return False
+    given = [str(a) for a in args] if isinstance(args, (list, tuple)) else []
+    return bool(given) and not all(a in given for a in skip)
 
 
 def offers(row: Mapping[str, Any], model: str) -> bool:
@@ -361,13 +377,19 @@ def reasons(order: Iterable[str], rows: Mapping[str, Mapping[str, Any]]) -> dict
     return out
 
 
-def pick(order: Iterable[str], model: str, rows: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+def pick(
+    order: Iterable[str], model: str, rows: Mapping[str, Mapping[str, Any]], *, unasked: bool = False
+) -> dict[str, Any]:
     """The first usable login of `order` that offers `model` (§4.9d *The logins, in order*): `{login, state, why}`,
     `state` `usable`, `waits` (only unusable logins offer it) or `none` (no login offers it). A login on an account an
-    earlier unusable login of the list shares is unusable too, whichever models that earlier login offers."""
+    earlier unusable login of the list shares is unusable too, whichever models that earlier login offers. With
+    `unasked` (the director and a prompts seat, §4.9d *How each one runs*), a login whose row `asks` is passed over as
+    one that leaves its prompts on, and where every login offering the model does, the pick waits."""
     waiting: list[str] = []
     for lk, why in reasons(order, rows).items():
         row = rows.get(lk) or {}
+        if why is None and unasked and row.get("asks"):
+            why = "leaves its prompts on"
         if why is None:
             if offers(row, model):
                 return {"login": lk, "state": "usable", "why": None}
