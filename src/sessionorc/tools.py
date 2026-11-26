@@ -270,6 +270,7 @@ def _login_tree(
                 "account": key,
                 "state": st,
                 "till": None,  # a `limited` login's reset, set by the host agent at each `tools` read (TD-1975)
+                "ended_records": None,  # its ended records, counted by the host agent at each `tools` read (TD-2288)
                 "mismatch": n in settled.mismatch,
                 "warnings": warnings,
                 "note": e.get("note"),

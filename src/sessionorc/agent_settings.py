@@ -166,6 +166,8 @@ class SettingsMixin:
                 if lg.get("state") == "signed_in" and key in caps and not metered:
                     till = caps[key]
                     lg = {**lg, "state": "limited", "till": till.isoformat().replace("+00:00", "Z") if till else None}
+                # the ended records a Forget would leave reading nothing, counted afresh as the gauges are (TD-2288)
+                lg = {**lg, "ended_records": self._login_ended(f"{card.get('adapter')}:{lg.get('name')}")}
                 if lists is not None:
                     held = lists.get(f"{card.get('adapter')}:{lg.get('name')}") or {"teams": [], "sets": []}
                     lg = {**lg, "lists": held}

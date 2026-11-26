@@ -4598,9 +4598,11 @@ class HostAgent(
         an exited or superseded record reads the run it held; a Resumable row with no record passes
         those four instead of `id`. Served here, on the record's host — a node's record reaches its
         node through `read` (`NODE_READS`) — and never copied. A read: never gated (§9 invariant 11)."""
+        login: str | None = None
         if id:
             s = self._get(id)
             adapter, adapter_id, dir, profile = s.adapter, s.adapter_id or "", s.dir, s.profile
+            login = s.login
             if not adapter_id:
                 why = "a shell has no transcript" if not adapters.has_agent(adapter) else "its hook never reported one"
                 raise RpcError(f"{id} carries no tool session id: {why} (design §4.5 screen 9)")
@@ -4617,6 +4619,15 @@ class HostAgent(
         turns = max(1, min(int(turns or 20), TRANSCRIPT_TURNS_MAX))
         t = await asyncio.to_thread(fn, adapter_id, Path(dir), profile, before=before, turns=turns, raw=bool(raw))
         if t is None:
+            try:
+                gone = logins.forgotten_login(await asyncio.to_thread(logins.load), adapter, login, profile)
+            except logins.LoginError:
+                gone = None  # the file is unreadable: what it forgot is unknown, so the plain words stand
+            if gone:  # read nothing on purpose while forgotten (§4.9e *A record's `profile`*, TD-2288)
+                raise RpcError(
+                    f"no transcript for {id or adapter_id}: its login {logins.split(gone)[1]} is forgotten on "
+                    f"{self.host}; adding its folder again gives it back"
+                )
             raise RpcError(f"no transcript for {id or adapter_id}: the tool's file is not on {self.host}")
         return t.to_dict()
 

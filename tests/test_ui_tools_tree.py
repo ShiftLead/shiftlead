@@ -4,6 +4,7 @@ under it, *Not signed in*, and the logins whose account is to be named; before t
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 from fixture_tools_tree import read
@@ -349,3 +350,19 @@ def test_add_whose_shell_opened_carries_a_refused_billing_so_the_page_still_goes
     assert r.json()["billing_error"] == (
         "gemini:work was added, but its billing was not set: a metered login needs a folder of its own"
     )
+
+
+def test_a_login_row_carries_its_ended_records_for_forgets_confirm(monkeypatch):
+    """TD-2288, design §4.5a *Tools page: a login* ⋯: the row carries the read's `ended_records`, which Forget's
+    confirm reads; a row with none (an older host's read) carries 0."""
+    got = read()
+    rows = got["tools"][0]["logins"]
+    rows[0]["ended_records"] = 3
+    text = page(monkeypatch, got)
+    assert f'data-login="claude-code:{rows[0]["name"]}"' in text
+    row = section(text, f'data-login="claude-code:{rows[0]["name"]}"', ">")
+    assert 'data-ended="3"' in row
+    other = section(text, f'data-login="claude-code:{rows[1]["name"]}"', ">")
+    assert 'data-ended="0"' in other
+    js = (Path(app_mod.__file__).parent / "static" / "app.js").read_text()
+    assert "they read nothing until its folder is added again" in js

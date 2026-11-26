@@ -11,7 +11,7 @@
    (`tools_install`), which opens the install shell's Focus. A login's and an account's controls (TD-1974) post
    `/api/tools/login/<verb>` and `/api/tools/account/label`, each its `ao login` / `ao account` verb. #}
 {% macro login_row(c, lg) %}
-      <div class="toollogin row gap wrap" data-login="{{ c.adapter }}:{{ lg.name }}" data-version="{{ lg.version or '' }}" data-label="{{ lg.label or '' }}" data-note="{{ lg.note or '' }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
+      <div class="toollogin row gap wrap" data-login="{{ c.adapter }}:{{ lg.name }}" data-version="{{ lg.version or '' }}" data-label="{{ lg.label or '' }}" data-note="{{ lg.note or '' }}" data-ended="{{ lg.ended_records or 0 }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
         <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
         <span class="mono note toolfolder">{{ lg.shown }}</span>
         {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}

@@ -6356,7 +6356,11 @@
         const f = $("form.toolsettings", row); if (f) { f.hidden = !f.hidden; if (!f.hidden) { const x = $("select, input", f); if (x) x.focus(); } }
         return;
       } else if (what === "forget") {
-        if (!confirm(`Forget ${login}? Its folder stays on disk, and adding that folder again takes back its name.`)) return;
+        // the ended sessions that read nothing once it is forgotten, from the row's count (§4.9e, TD-2288)
+        const n = Number(row.dataset.ended) || 0;
+        const ended = n === 1 ? " 1 ended session ran on this login: it reads nothing until its folder is added again."
+          : n > 1 ? ` ${n} ended sessions ran on this login: they read nothing until its folder is added again.` : "";
+        if (!confirm(`Forget ${login}? Its folder stays on disk, and adding that folder again takes back its name.${ended}`)) return;
         path = "/api/tools/login/forget"; body = { login, version: v };
       } else return;
       b.disabled = true;
