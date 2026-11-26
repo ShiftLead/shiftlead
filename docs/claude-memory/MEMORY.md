@@ -68,4 +68,4 @@
 - [Board changes: close and add](board-changes-close-and-add.md) — a changed decide item is `done` then `add`, by `--id`; never restore an item's file (#3447, 2026-11-11)
 - [Review rounds count once the design holds](review-rounds-count-once-the-design-holds.md) — reads while Paul still reshapes a design are not the capped rounds; round 1 starts when he says it is settled (TD-1953, 2026-11-18)
 - [Review what is written after the last round](review-what-is-written-after-the-last-round.md) — fixes, build entries and board questions written after a READY round get a round of their own (TD-1954 rounds 7–9, 2026-11-21)
-- [Remove a review copy when its review ends](remove-a-review-copy-when-its-review-ends.md) — clones hold ~100k files and filled /tmp's inodes (2026-11-26); rm each once its review is posted
+- [Release a review copy when its review ends](remove-a-review-copy-when-its-review-ends.md) — clones hold ~100k files and filled /tmp's inodes (2026-11-26); once its review is posted, release each by `mv` to `copies/.gone-<name>`, never `rm -rf`
