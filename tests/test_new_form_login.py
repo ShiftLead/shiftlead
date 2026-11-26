@@ -101,7 +101,7 @@ def page(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[tuple[str, dict]] = []
-    state = {"off": True, "refuse": set()}
+    state = {"off": True, "refuse": set(), "last": LAST}
     monkeypatch.setattr(teamstore, "first_shape_off", lambda: state["off"])
 
     class FakeClient:
@@ -120,7 +120,7 @@ def page(tmp_path, monkeypatch):
             if method == "tools":
                 return READ
             if method == "last_login":
-                return LAST
+                return state["last"]
             if method in ("list", "recent_dirs"):
                 return []
             if method == "host":
@@ -185,6 +185,18 @@ def test_start_creates_on_the_picked_or_typed_login_and_refuses_a_profile(page):
     r = c.post("/new", data={**form, "login": "grok:main"}, follow_redirects=False)
     assert r.status_code == 400 and "for after the switch-over" in r.text
     assert len([m for m, _ in calls if m == "create"]) == n, "a refusal creates nothing"
+
+
+def test_a_resumes_form_selects_its_tools_last_login_not_its_first(page):
+    """TD-2304: the form hands `last_login` to the pick (TD-2291). The record's tool's last login is not that tool's
+    first, another tool's line is newer still (put first in the pick), and the record's `profile` names no choice, so
+    only the stored line for the record's tool selects `claude-code:pinned` over `claude-code:main`."""
+    c, _calls, _tmp, state = page
+    state["last"] = {"grok": "grok:main", "claude-code": "claude-code:pinned"}
+    html = c.get("/new", params={"adapter": "claude-code", "prefilled": "1", "profile": "gone"}).text
+    assert '<option value="claude-code:pinned" data-here="1" data-models="sonnet" selected>' in html
+    assert '<option value="claude-code:main" data-here="1" data-models="opus,sonnet,haiku" selected>' not in html
+    assert '<option value="grok:main" data-here="1" data-models="grok-4" selected>' not in html
 
 
 def test_a_host_agent_that_refuses_a_read_still_draws_the_form(page):
