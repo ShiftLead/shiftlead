@@ -1000,7 +1000,23 @@ def _on_login(
         "account": logins.account_of(lk, entry),
         "profile": as_profile,
         "login_list": list(login_list) if login_list else None,
+        "folder": str(entry.get("folder") or ""),
     }
+
+
+def _model_word(adapter: object, family: str, folder: str = "") -> str:
+    """The tool's word for a seat model's family (design §4.9e *The launch on a login*, §4.3 `model_arg`, TD-2068):
+    the adapter's `model_arg`, read against the login's folder, where it declares one; else the family itself, which is
+    Claude Code's alias and Gemini CLI's. A `model_arg` that fails hands the family on, as an undeclared one does."""
+    mapper = getattr(adapter, "model_arg", None)
+    if mapper is None or "model_arg" not in adapters.implements(adapter):
+        return family
+    try:
+        word = mapper(family, Path(folder).expanduser() if folder else None)
+    except (OSError, ValueError) as e:
+        log.warning("model_arg %s: %s", family, e)
+        return family
+    return word if isinstance(word, str) and word else family
 
 
 def _context_bound(bound: Any) -> int | None:

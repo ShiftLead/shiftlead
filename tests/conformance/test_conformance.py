@@ -549,6 +549,22 @@ def test_each_family_is_read_from_the_models_names_it_covers(name):
     assert {f for f, _ in NAMED_MODELS[name]} == set(mod.FAMILIES)
 
 
+@pytest.mark.parametrize("name", AGENTS)
+def test_model_arg_is_the_inverse_of_model_family(name, tmp_path):
+    """§4.3 `model_arg` (TD-2068): the tool's word for each family it offers maps back to that family through
+    `model_family`, with no home, with a home whose cache is missing, and with one whose cache lists other ids."""
+    ad = _declares(name, "model_arg")
+    assert "model_family" in adapters.implements(ad), "model_arg reads model_family's table the other way"
+    mod = sys.modules[type(ad).__module__]
+    (tmp_path / "cached").mkdir()
+    listed = {model: {"info": {}} for _, model in NAMED_MODELS[name]}
+    (tmp_path / "cached" / "models_cache.json").write_text(json.dumps({"models": listed}))
+    for home in (None, tmp_path / "missing", tmp_path / "cached"):
+        for family in mod.FAMILIES:
+            word = ad.model_arg(family, home)
+            assert ad.model_family(word) == family, (family, home, word)
+
+
 # names each tool has run on kmaster (TD-1971), one or more per family
 NAMED_MODELS = {
     "claude-code": [

@@ -73,6 +73,31 @@ def model_family(model: object) -> str | None:
     return family if family in FAMILIES else None
 
 
+# the id each family is launched on where the home's `models_cache.json` names none (§4.9e *The launch on a login*,
+# TD-2068): the newest of each family in that file on kmaster, 2026-11-25. Grok Build refuses a bare family.
+FAMILY_IDS = {"grok": "grok-4.7", "build-fast": "grok-4.7-build-fast"}
+MODELS_CACHE = "models_cache.json"  # under the login's GROK_HOME: `{"models": {<id>: {"info": {"hidden": …}}}}`
+
+
+def _version(model: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in re.findall(r"\d+", model.split("-")[1]))
+
+
+def model_arg(family: str, home: Path | None = None) -> str:
+    """The tool's word for a family (§4.3 `model_arg`): the newest id of that family the home's `models_cache.json`
+    lists and does not hide, else `FAMILY_IDS`' id; a family it does not know is handed back as given."""
+    try:
+        listed = json.loads((home / MODELS_CACHE).read_text()).get("models") if home else None
+    except (OSError, ValueError, AttributeError):
+        listed = None
+    ids = [
+        m
+        for m, v in (listed.items() if isinstance(listed, dict) else ())
+        if model_family(m) == family and not (isinstance(v, dict) and (v.get("info") or {}).get("hidden") is True)
+    ]
+    return max(ids, key=_version) if ids else FAMILY_IDS.get(family, family)
+
+
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -183,7 +208,7 @@ class GrokAdapter:
     implements: frozenset[str] = frozenset(
         {
             *("composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            *("models", "model_family", "new_home", "make_home"),
+            *("models", "model_family", "model_arg", "new_home", "make_home"),
         }
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
@@ -423,6 +448,11 @@ class GrokAdapter:
         """The family a model id maps to through this adapter's table (§4.2b): what the switch-over pins a login to
         where every profile on its folder names one model. None where the table has no such model."""
         return model_family(model)
+
+    def model_arg(self, family: str, home: Path | None = None) -> str:
+        """The id a launch on a login hands `--model` for a family (§4.3, §4.9e): `model_arg`, the inverse of
+        `model_family`."""
+        return model_arg(family, home)
 
     def models(self, home: Path, plan: str | None) -> dict:
         """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` None, since no file of the
