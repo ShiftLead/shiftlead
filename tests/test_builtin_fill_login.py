@@ -390,3 +390,21 @@ async def test_a_seat_filled_on_one_login_is_filled_on_the_next_once_it_is_at_it
         "second",
     )
     assert launched[-1] == {"profile": "second", "model": "opus"}
+
+
+async def test_a_seat_is_filled_from_the_set_its_repo_picked(agent, tmp_path, launched, rows):
+    """§4.9d *The login a seat starts on*: a built-in seat starts on a login of the set its repo uses, read by the
+    repo's name, not the `default` set's, with that set's model and list (TD-2253)."""
+    settings = SETTINGS + (
+        "  night:\n    models: {tech-lead: sonnet}\n    logins: [hookstub:second]\nrepos:\n  repo: {builtins: night}\n"
+    )
+    rows.update(
+        {"hookstub:first": _row("acct-1", ["opus", "sonnet"]), "hookstub:second": _row("acct-2", ["opus", "sonnet"])}
+    )
+    sid = await _held_seat(agent, tmp_path, settings=settings)
+    agent.sessions[sid].repo = str(tmp_path / "repo")
+    await _fill(agent, sid)
+    new = agent.sessions[sid]
+    assert new.login == "hookstub:second", "the repo's set, not default's"
+    assert (new.seat_model, new.login_list) == ("sonnet", ["hookstub:second"])
+    assert launched[-1] == {"profile": "second", "model": "sonnet"}
