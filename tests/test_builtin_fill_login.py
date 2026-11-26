@@ -280,10 +280,12 @@ async def test_a_fill_reads_the_real_logins_and_passes_over_one_at_its_reserve(a
     assert launched[-1] == {"profile": "second", "model": "opus"} and sid not in agent.unfillable
 
 
-async def test_the_directors_record_is_filled_as_before_after_the_cut_over(agent, tmp_path, launched, rows):
-    """TD-2254: only a built-in seat's record picks its login (`_on_set_login`). The director's record has no `builtin`
-    and rule 3 still reaches it after the cut-over (`_rules_reach`), so its fill is launched as before: no login, no
-    model, no `unfillable` word."""
+async def test_a_directors_record_with_no_model_or_list_is_not_filled_after_the_cut_over(
+    agent, tmp_path, launched, rows
+):
+    """TD-2254, TD-2068 slice 8: the director's record has no `builtin`, and rule 3 still reaches it after the cut-over
+    (`_rules_reach`). Its fill picks from its own `seat_model` and `login_list` (§4.9e *The launch on a login*), so a
+    record carrying neither is not launched as before: nothing is filled and it *cannot run*."""
     rows.update({"hookstub:first": _row("acct-1", ["sonnet"]), "hookstub:second": _row("acct-2", ["sonnet"])})
     await park_ticks(agent)
     (paths.home() / "logins.yml").write_text(LOGINS)
@@ -309,9 +311,8 @@ async def test_the_directors_record_is_filled_as_before_after_the_cut_over(agent
     old.seat_due = {"at": datetime.now(UTC).isoformat(), "by": "prompt"}
     await _fill(agent, sid)
     new = agent.sessions[sid]
-    assert new is not old, "the director's record was filled"
-    assert new.login is None and new.seat_model is None and sid not in agent.unfillable
-    assert launched[-1] == {"profile": ""}, "launched as before: no login, no model"
+    assert new is old and not launched, "nothing is launched as before"
+    assert agent.unfillable[sid] == "cannot run"
 
 
 async def test_a_built_in_seat_on_a_node_picks_no_login(agent, tmp_path, launched, rows):
