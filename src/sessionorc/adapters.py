@@ -298,6 +298,12 @@ class Adapter(Protocol):
     #                                                      at all (design §4.3, TD-1491): False where unset, so
     #                                                      §4.7 *Feedback*'s index can say a seat's failed calls
     #                                                      are unseen; read through `marks_errors`
+    #   handoff(transcript: Path) -> list[str] | None     the session's turns as plain text, one string a turn,
+    #                                                      newest last, read from the tool's own transcript file
+    #                                                      (design §4.9e *The handoff is one adapter method*,
+    #                                                      TD-2069): `handoff_turns` over `read_transcript`'s
+    #                                                      entries; None when the file cannot be read. Declared in
+    #                                                      `implements`; an adapter without it hands over nothing
 
 
 # The optional methods an agent adapter declares in `implements` (design §4.3 *The conformance suite*,
@@ -309,6 +315,7 @@ OPTIONAL_METHODS = (
     "conversations",
     "env_signin",
     "find",
+    "handoff",
     "home_env",
     "install_command",
     "identity",
@@ -541,6 +548,76 @@ class Conversation:
 
     def to_dict(self) -> dict:
         return {"id": self.id, "first_at": self.first_at, "last_at": self.last_at, "size": self.size}
+
+
+# The handoff a moved session is told (design §4.9e *The handoff is one adapter method*, TD-2069): the newest
+# characters the core keeps, the heading they go under, and how many of the transcript's turns an adapter reads.
+HANDOFF_CHARS = 24_000
+HANDOFF_HEADING = "Where the session before you stopped"
+HANDOFF_TURNS = 200
+HANDOFF_RESULT = 200  # characters of a tool call's result kept, its first line
+
+
+def _handoff_line(e: TranscriptEntry) -> str | None:
+    """One neutral entry as plain text: a thought is left out (it is the old session's, never what it did)."""
+    if e.kind == "prompt":
+        return f"Prompt:\n{e.text}".rstrip()
+    if e.kind == "text":
+        return e.text.rstrip() or None
+    if e.kind == "tool":
+        line = f"[{e.name}{' failed' if e.error else ''}] {e.call}".rstrip()
+        if e.result:
+            first = e.result.strip().splitlines()[0] if e.result.strip() else ""
+            if first:
+                line += f"\n  -> {first[:HANDOFF_RESULT]}"
+        return line
+    if e.kind == "sidechain":
+        return f"[a subagent ran {e.count} entries]"
+    if e.kind == "compaction":
+        return "[the conversation was compacted here]"
+    return None
+
+
+def handoff_turns(entries: list[TranscriptEntry]) -> list[str]:
+    """Neutral transcript entries as turns of plain text, oldest first (newest last): a turn opens at each
+    prompt, and whatever came before the first prompt is a turn of its own. An empty turn is left out."""
+    turns: list[list[str]] = []
+    for e in entries:
+        if e.kind == "prompt" or not turns:
+            turns.append([])
+        if (line := _handoff_line(e)) is not None:
+            turns[-1].append(line)
+    return [t for t in ("\n".join(lines).strip() for lines in turns) if t]
+
+
+def handoff_text(turns: list[str] | None, limit: int = HANDOFF_CHARS) -> str:
+    """What a moved session is told after its stage's words: the newest turns that fit in `limit` characters,
+    cut at a turn's start, under the heading `HANDOFF_HEADING`; "" with no turns. Where the newest turn alone is
+    longer than `limit`, its last `limit` characters are kept, so a long last turn still hands something over."""
+    kept: list[str] = []
+    size = 0
+    for t in reversed([t for t in turns or [] if t]):
+        more = len(t) + (2 if kept else 0)
+        if size + more > limit:
+            break
+        kept.insert(0, t)
+        size += more
+    if not kept and turns and (newest := [t for t in turns if t]):
+        kept = [newest[-1][-limit:]]
+    return f"{HANDOFF_HEADING}\n\n" + "\n\n".join(kept) if kept else ""
+
+
+def handoff_of(adapter: object, transcript: Path | str | None) -> str:
+    """What `adapter` hands over from the transcript file at `transcript`, cut by `handoff_text`: "" where the
+    adapter does not declare `handoff`, there is no file, or the read fails (design §4.9e, TD-2069), so the new
+    session starts from what its stage is told and the branch."""
+    method = getattr(adapter, "handoff", None)
+    if not transcript or "handoff" not in implements(adapter) or not callable(method):
+        return ""
+    try:
+        return handoff_text(method(Path(transcript)))
+    except (OSError, ValueError):
+        return ""
 
 
 def instant(at: str | None) -> datetime | None:

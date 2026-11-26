@@ -27,9 +27,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from sessionorc.adapters import (
+    HANDOFF_TURNS,
     LaunchSpec,
     Transcript,
     account_match,
+    handoff_turns,
     model_offer,
     plain_name,
     read_version,
@@ -208,7 +210,7 @@ class GrokAdapter:
     implements: frozenset[str] = frozenset(
         {
             *("composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            *("models", "model_family", "model_arg", "new_home", "make_home"),
+            *("models", "model_family", "model_arg", "new_home", "make_home", "handoff"),
         }
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
@@ -345,6 +347,16 @@ class GrokAdapter:
             return transcript_mod.read(p, before=before, turns=turns, raw=raw)
         except OSError:
             return None
+
+    def handoff(self, transcript: Path) -> list[str] | None:
+        """The session's turns as plain text, newest last, read from its transcript file (design §4.9e *The
+        handoff is one adapter method*, TD-2069): its last `HANDOFF_TURNS` turns as neutral entries, each turn
+        written by `handoff_turns`. None when the file cannot be read."""
+        try:
+            got = transcript_mod.read(Path(transcript), turns=HANDOFF_TURNS)
+        except (OSError, ValueError):
+            return None
+        return handoff_turns(got.entries)
 
     def model_in_use(self, session_id: str, cwd: Path, profile: str = "") -> str | None:
         """`summary.json`'s model beside the session's log (design §4.3 *Reads*), so a seat with `model:` unset still
