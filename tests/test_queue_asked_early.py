@@ -238,3 +238,74 @@ def test_a_covering_line_stands_in_an_early_entrys_place():
     later.append({**ledger_row(51, "r#TD-050"), "early": True, "early_line": "once TD-055 closes"})
     got = attach({"needs": [placed]}, lambda e, sec: e.get("key") or e.get("id"), later)["cards"]["r#TD-050"]["needs"]
     assert [m["html"] for m in got] == ["board:k1"], "the line alone, no early item beside it"
+
+
+# TD-2235: an earlier word stands over *asked early* (§4.4 *A question whose entry only waits is asked early*: *with you
+# in <name>*, a press's mark, an *answered — …* keep theirs), on the Queue row and on the *Later* row alike
+
+
+def _waits(tmp_path) -> tuple[str, dict]:
+    """TD-001, gated and blocked by TD-002 in progress: asked early where nothing else stands."""
+    return _one(tmp_path, _gated(1, "the question", "TD-002", Ask="Go ahead?"), _entry(2, "in progress", **GATED))
+
+
+def _later(repos, fleet=(), inbox=()) -> dict:
+    got = ledger_for_you(repos, list(fleet), {}, NOW, list(inbox))
+    return next(x for g in got["groups"] for x in g["rows"] if x["id"] == "TD-001")
+
+
+@pytest.mark.unit
+def test_the_persons_own_session_on_it_reads_with_you_not_asked_early(tmp_path):
+    from test_queue import _rec
+
+    root, r = _waits(tmp_path)
+    assert _row(_read({root: r}), "r#TD-001")["early"], "asked early with nothing else standing"
+    mine = _rec("p", root, "TD-001", state="idle")
+    mine.unattended = False
+    row = _row(_read({root: r}, [mine]), "r#TD-001")
+    assert row["state"] == "with you in p" and not row.get("early")
+    fleet = [{"id": "p", "name": "p", "state": "idle", "unattended": False, "repo": root, "dir": root,
+              "progress": [{"ref": "TD-001", "status": "claimed", "at": NOW.isoformat()}]}]  # fmt: skip
+    assert not _later({root: r}, fleet)["early"], "the Later row keeps its own word too"
+
+
+@pytest.mark.unit
+def test_a_mail_answer_reads_answered_not_asked_early(tmp_path):
+    from test_queue_answered_hold import _asker, _q
+    from test_ui_answered_hold import FLEET, _ask
+
+    root, r = _waits(tmp_path)
+    row = _row(_read({root: r}, [_asker()], [_q()]), "r#TD-001")
+    assert row["state"] == "answered — waiting on designer" and not row.get("early")
+    got = _later({root: r}, FLEET, [_ask("TD-001")])
+    assert got["answered"] is not None and not got["early"]
+
+
+@pytest.mark.unit
+def test_a_press_landing_draws_its_mark_not_asked_early(tmp_path):
+    root, r = _waits(tmp_path)
+    marked = queue.lay_applying(r, {"ledger:r#TD-001": {"t": {"act": "decide", "at": "x"}}}, "r")
+    row = _row(_read({root: marked}), "r#TD-001")
+    assert row["state"] != "asked early" and not row.get("early")
+    got = _later({root: marked})
+    assert got["applying"] and not got["early"]
+
+
+@pytest.mark.unit
+def test_an_open_answered_board_line_reads_answered_not_asked_early(tmp_path):
+    from test_queue_board_hold import _board, _open
+
+    root, r = _waits(tmp_path)
+    r["boards"] = _board(root, _open("TD-001"))
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["answered"]["kind"] == "board" and row["state"].startswith("answered — ") and not row.get("early")
+
+
+@pytest.mark.unit
+def test_the_rails_later_count_leaves_an_early_row_out(tmp_path):
+    from shiftlead.ui.inbox import rail_rows
+
+    row = _early_row(tmp_path)
+    assert not [x for x in rail_rows({}, [], [row]) if x.get("section") == "later"]
+    plain = {**row, "early": False, "early_line": ""}
+    assert [x for x in rail_rows({}, [], [plain]) if x.get("section") == "later"], "a row not early is counted"
