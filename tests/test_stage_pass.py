@@ -228,7 +228,9 @@ class Calls:
 
 def launched(host: str = "") -> stage_start.StageLaunch:
     x = SimpleNamespace(host=host, dir="/r", name="build-td-7")
-    got = SimpleNamespace(launch=x, create_params=lambda controllers: {"name": x.name, "controllers": controllers})
+    got = SimpleNamespace(
+        launch=x, pick=None, create_params=lambda controllers: {"name": x.name, "controllers": controllers}
+    )
     return got  # type: ignore[return-value]
 
 

@@ -3,21 +3,25 @@ one model, one fresh session*, *What a stage's session is told*; §4.8 *Under a 
 
 Its opening prompt is, in order: the mechanics, how the stage is ended, the repo's rules, and the stage's brief with
 its `also`. `start` creates one only while its team is started, the home's started mark read just before the
-create (TD-2065), and no team is marked before the cut-over. The stage's model is carried on `StageLaunch`; launching
-on it, on a login, is TD-2068's.
+create (TD-2065), and no team is marked before the cut-over. On the home's own host a stage's or an audit's session
+is launched on the first usable login of the team's list that offers its model (§4.9e *The launch on a login*,
+TD-2068), as the team's `team_show` reading names it; a team on a node and a job's session are launched as before.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sessionorc import teamstore
+from sessionorc import logins, teamstore
 from sessionorc.client import AgentError, AgentUnavailable
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
+
+log = logging.getLogger(__name__)
 
 ROLE_OF = {"design": "designer", "build": "grinder", "review": "reviewer"}  # `grinder` until the removal build (§4.8)
 STAGE_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "stage.md"
@@ -79,10 +83,13 @@ class Work:
 
 @dataclass(frozen=True)
 class StageLaunch:
-    """A stage's session as it would be created, with the model its stage names (TD-2068 launches on it)."""
+    """A stage's session as it would be created, with the model its stage names. `pick` says where the team's
+    `team_show` reading names the login it starts on: `("stages", <stage key>)` or `("audits", <audit key>)`; None
+    for a launch that reads no team's list (a job's, TD-2068's later slice)."""
 
     launch: teams.Launch
     model: str
+    pick: tuple[str, str] | None = None
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments: a team session's, supervised, so the tick's nudge and context bound reach it
@@ -265,19 +272,53 @@ def launch(
         prompt_from=made,
         unlisted=unlisted,
     )
-    return StageLaunch(x, str(stage["model"]))
+    return StageLaunch(x, str(stage["model"]), ("stages", key))
+
+
+def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
+    """The `create` arguments that put the launch on its login (§4.9e *The launch on a login*): `{}` for a launch
+    as before (a team on a node, whose host picks for itself; a launch with no `pick`; a team the home's reading does
+    not show switched), else the login the team's reading picks with the model and the list, or None when nothing is
+    to start: no login of the list usable (the usage gate holds it) or none offering the model (*cannot run*)."""
+    if got.launch.host or got.pick is None:
+        return {}
+    shown = call("team_show", team=team, entries=False) or {}
+    if not shown.get("switched"):
+        return {}
+    kind, key = got.pick
+    rows = (shown.get("flow") or {}).get("stages") if kind == "stages" else shown.get("audits")
+    row = next(
+        (r for r in rows or () if (r.get("key") if kind == "stages" else flow3.key_of(r.get("name"))) == key), None
+    )
+    if row is None:  # the home's reading of the team's flow names no such stage or audit: nothing to pick from
+        log.warning("team %s: its reading names no %s %r, so no login is picked and nothing starts", team, kind, key)
+        return None
+    now = row.get("now") or {}
+    if now.get("state") != "usable" or not now.get("login"):
+        return None
+    login = str(now["login"])
+    return {
+        "login": login,
+        "adapter": logins.split(login)[0],
+        "profile": "",
+        "seat_model": got.model,
+        "login_list": [str(r["login"]) for r in shown.get("logins") or () if r.get("login")],
+    }
 
 
 def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) -> dict[str, Any] | None:
-    """Create the stage's session, or None: the team is not started, or a live session holds the name. The started
-    mark is read from the home just before the create, so a Wind down during the pass starts nothing after it."""
+    """Create the stage's session, or None: the team is not started, a live session holds the name, or no login of
+    the team's list can start it now (`on_login`). The started mark is read from the home just before the create, so
+    a Wind down during the pass starts nothing after it."""
     if not team_started((call("host") or {}).get("team_marks"), team.name):
         return None
     x = got.launch
     on = {"host": x.host} if x.host else {}
     if call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on).get("verdict") in ("live", "suspended"):
         return None
-    return call("create", **got.create_params([]))
+    if (login := on_login(call, team.name, got)) is None:
+        return None
+    return call("create", **{**got.create_params([]), **login})
 
 
 def holder_of(got: StageLaunch, created: dict[str, Any]) -> str:
