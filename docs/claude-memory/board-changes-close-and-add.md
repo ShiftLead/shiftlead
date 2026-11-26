@@ -9,7 +9,7 @@ A decide item's `Parts:` is part of its item key (ledgerboard SPEC; TD-050's D3,
 
 **Why:** On TD-1551 (PR #3447, 2026-11-11, on the one-file board before ledgerboard v3.0) restoring the board file to re-add an item made the rebase's replay refuse, and an archive folded into the big commit failed the gate; together with board contention they cost four of seven precheck runs. Since v3.0 (TD-1881) each item is its own file and a `done` moves it into `archive/<YYYY-MM>/`, so the archive threshold and the replay are gone (TD-2316).
 
-**An item added and replaced on the same unmerged PR** is the exception (TD-1569, #3465, 2026-11-11): its `done` leaves a closed item with no open one on the base, which the gate's board row refused (*a closed line with no open line it closes*). Drop the first item's file from the branch (it never reached main) and keep only the new `add`, rather than closing it.
+**An item added and replaced on the same unmerged PR** is the exception (TD-1569, #3465, 2026-11-11): its `done` leaves a closed item with no open one on the base, which the gate's board row refuses (*a closed line with no open line it closes*). Drop the first item's file from the branch (it never reached main) and keep only the new `add`, rather than closing it.
 
 Better still, write the end-of-rounds item only after the closing fact-check raises nothing.
 
