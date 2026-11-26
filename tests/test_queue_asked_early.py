@@ -129,6 +129,50 @@ def test_a_held_build_blocked_by_open_work_never_reads_asked_early(tmp_path):
     assert not design["early"] and design["state"] == "" and design["go_builds"] == ["TD-002"]
 
 
+def _held_build(tmp_path) -> tuple:
+    """TD-001 a gated design whose open line names TD-002 in `Parts:`; TD-002 its held build, waiting on a dated
+    TD-004 alone."""
+    from test_queue_held_builds import PART, _ask
+    from test_queue_lift_here import _setup
+
+    root, r = _setup(
+        tmp_path,
+        [
+            _entry(1, "the design", **HELD),
+            _entry(2, "build a", **{**PART, "Blocked_by": "TD-004, decision (paul)"}),
+            _entry(4, "dated", Priority="High", Blocked_by=f"until {LATER}"),
+        ],
+        _ask("TD-002"),
+    )
+    settle.mark_waits(r["ledger"]["entries"], NOW)
+    return root, r
+
+
+@pytest.mark.unit
+def test_a_held_build_whose_work_is_all_waits_reads_its_designs_question_not_asked_early(tmp_path):
+    """TD-2244: a held build whose counted work is all waits keeps *waits on TD-<design>'s question* and is never
+    asked early (§4.4 *A design's question is asked once, on the design*, TD-2026)."""
+    root, r = _held_build(tmp_path)
+    build = _row(_read({root: r}), "r#TD-002")
+    assert build["state"] == "waits on TD-001's question" and not build["early"] and not build["then_yours"]
+
+
+@pytest.mark.unit
+def test_a_held_builds_word_stands_over_an_early_mark(tmp_path, monkeypatch):
+    """TD-2244: `asked` leaves a held build out of its early members; were one marked early anyway, the row's own
+    precedence keeps the design's question as its word (`reading`'s `not held_word`)."""
+    root, r = _held_build(tmp_path)
+    real = queue.asked
+
+    def marked(counted, entries, held):
+        got = real(counted, entries, held)
+        return got._replace(early={**got.early, "r#TD-002": "once TD-004 closes"})
+
+    monkeypatch.setattr(queue, "asked", marked)
+    build = _row(_read({root: r}), "r#TD-002")
+    assert build["state"] == "waits on TD-001's question" and not build["early"]
+
+
 @pytest.mark.unit
 def test_the_persons_own_gated_entry_keeps_the_fact_or_is_a_need(tmp_path):
     root, r = _one(
