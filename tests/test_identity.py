@@ -481,6 +481,12 @@ def test_reads_are_served_on_every_channel_and_raise_nothing():
             assert identity.judge(ch, claim, "list") == identity.Verdict(claim)
 
 
+def test_the_login_last_used_is_a_read_served_on_an_unknown_channel_with_no_alarm():
+    """§4.4a's reads row lists `last_login` (TD-2264): `ao new`'s default login is read on every channel."""
+    v = identity.judge(Channel("unknown"), None, "last_login")
+    assert v == identity.Verdict(None) and v.refusal is None and v.alarm is None
+
+
 def test_a_hook_is_bound_to_its_pane():
     assert identity.judge(X, None, "hook", hook_session="ao-x").refusal is None
     v = identity.judge(X, None, "hook", hook_session="ao-y")

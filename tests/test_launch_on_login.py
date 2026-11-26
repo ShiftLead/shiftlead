@@ -276,6 +276,15 @@ async def test_an_unwritable_or_unreadable_last_login_never_fails_a_create(agent
         assert await person.call("last_login") == {"hookstub": "hookstub:twin"}, "another tool's key is skipped"
 
 
+async def test_an_unparsable_logins_file_reads_as_no_login_last_used(agent):
+    """TD-2264: `last_login` reads against this host's `logins.yml`; one that cannot be parsed holds no login, so a
+    stored line reads as nothing stored rather than failing the read."""
+    (paths.home() / "logins.yml").write_text("logins: [\n")
+    paths.last_login_file().write_text("hookstub hookstub:grind\n")
+    async with LocalClient() as person:
+        assert await person.call("last_login") == {}
+
+
 async def test_a_create_replaces_an_unreadable_last_login(agent, tmp_path, launched):
     """Re-review of #4734: the real write over a file that is not text replaces it rather than failing the create."""
     (paths.home() / "logins.yml").write_text(LOGINS)
