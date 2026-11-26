@@ -1,9 +1,11 @@
 """The handoff a session moved to its next login is told (design §4.9e *The handoff is one adapter method*,
 TD-2069): neutral entries as turns of plain text, newest last, and the newest 24,000 characters of them cut at
-a turn's start, under its heading. The three adapters' own reads are held by the conformance suite."""
+a turn's start, under its heading. The three adapters' own reads are held by the conformance suite, and here
+on what its captured transcripts never carry: more turns than the reader's default, and a line it cannot take."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -106,3 +108,64 @@ def test_an_adapter_with_it_hands_over_its_turns_cut(tmp_path):
     assert handoff_of(_Reads(None), tmp_path / "t.jsonl") == ""
     assert handoff_of(_Reads(OSError("gone")), tmp_path / "t.jsonl") == ""
     assert handoff_of(_Reads(AttributeError("odd line")), tmp_path / "t.jsonl") == ""
+
+
+def test_a_blank_tool_result_keeps_the_call_without_a_result():
+    got = handoff_turns([TranscriptEntry(kind="tool", name="T", call="c", result="\n  \n\n")])
+    assert got == ["[T] c"]
+
+
+def test_a_thought_alone_before_the_first_prompt_makes_no_empty_turn():
+    got = handoff_turns(
+        [TranscriptEntry(kind="thought", text="warming up", lines=1), TranscriptEntry(kind="prompt", text="go")]
+    )
+    assert got == ["Prompt:\ngo"]
+
+
+# Each adapter's own read (design §4.9e, TD-2069, TD-2295): a line its transcript reader writes for one prompt,
+# and a line that reader cannot take, which the conformance suite's captured transcripts never carry.
+def _claude_prompt(i: int) -> dict:
+    return {
+        "type": "user",
+        "message": {"role": "user", "content": f"ask {i}"},
+        "timestamp": f"2026-11-26T00:{i:02d}:00Z",
+    }
+
+
+def _gemini_prompt(i: int) -> dict:
+    return {"id": f"u{i}", "timestamp": f"2026-11-26T00:{i:02d}:00Z", "type": "user", "content": [{"text": f"ask {i}"}]}
+
+
+def _grok_prompt(i: int) -> dict:
+    up = {"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": f"ask {i}"}}
+    return {"timestamp": i, "method": "session/update", "params": {"sessionId": "s", "update": up}}
+
+
+_READS = {
+    "claude-code": (_claude_prompt, {"type": "user", "message": 3}),
+    "gemini": (
+        _gemini_prompt,
+        {"id": "a", "type": "gemini", "content": "", "toolCalls": [{"name": "x", "status": []}]},
+    ),
+    "grok": (_grok_prompt, {"params": {"update": {"sessionUpdate": []}}}),
+}
+
+
+def _write(path: Path, records: list[dict]) -> Path:
+    path.write_text("".join(json.dumps(r) + "\n" for r in records))
+    return path
+
+
+@pytest.mark.parametrize("name", sorted(_READS))
+def test_an_adapters_handoff_reads_past_the_readers_default_of_20_turns(name, tmp_path):
+    prompt, _bad = _READS[name]
+    t = _write(tmp_path / "t.jsonl", [prompt(i) for i in range(25)])
+    got = adapters.get(name).handoff(t)
+    assert got == [f"Prompt:\nask {i}" for i in range(25)]
+
+
+@pytest.mark.parametrize("name", sorted(_READS))
+def test_an_adapters_handoff_of_a_line_its_reader_cannot_take_is_none(name, tmp_path):
+    prompt, bad = _READS[name]
+    t = _write(tmp_path / "t.jsonl", [prompt(0), bad])
+    assert adapters.get(name).handoff(t) is None
