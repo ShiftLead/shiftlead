@@ -66,7 +66,7 @@ def test_a_failing_model_arg_hands_the_family_on():
         implements = frozenset({"model_arg"})
 
         def model_arg(self, family, home=None):
-            raise ValueError("boom")
+            raise TypeError("boom")
 
     assert _model_word(Broken(), "opus") == "opus"
 

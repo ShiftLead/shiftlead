@@ -1013,7 +1013,7 @@ def _model_word(adapter: object, family: str, folder: str = "") -> str:
         return family
     try:
         word = mapper(family, Path(folder).expanduser() if folder else None)
-    except (OSError, ValueError) as e:
+    except Exception as e:  # an adapter's bug never fails the create: the family is the fallback (review of #4744)
         log.warning("model_arg %s: %s", family, e)
         return family
     return word if isinstance(word, str) and word else family
