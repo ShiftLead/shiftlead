@@ -337,10 +337,13 @@ class LinkMixin:
     async def _take_settings(self, doc: Any) -> None:
         """The home's `settings.yml`, whole (§4.4a *Settings, replicated*, TD-147): written as this
         node's own file, which its tick, `gate` and `settings` read as the home reads its own —
-        offline included, until the next dial sends it again. A hand edit here is overwritten."""
+        offline included, until the next dial sends it again. A hand edit here is overwritten. One frame is saved at a
+        time, in the order the frames came (TD-1870): the link serves each in a task of its own, which reaches the lock
+        before its first await, so the lock's queue is the frames' order and an older file never lands last."""
         if self.mode == "home" or not isinstance(doc, dict):
             return
-        await asyncio.to_thread(settings_mod.save, doc)
+        async with self._settings_take_lock:
+            await asyncio.to_thread(settings_mod.save, doc)
         log.info("settings.yml replicated from the home")
 
     async def _act(self, params: dict[str, Any]) -> dict[str, Any]:
