@@ -5,6 +5,7 @@ marked `moving` no other rule acts on it, a failed launch leaves it ended, and a
 
 from __future__ import annotations
 
+import subprocess
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
@@ -14,7 +15,9 @@ from conftest import park_ticks
 from sessionorc import adapters, agent_common, paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.client import LocalClient
-from shiftlead.stage_read import holder_on
+from shiftlead import stage_pass
+from shiftlead.stage_read import EntryFacts, EntryLedger, holder_on
+from shiftlead.stagerecord import StageStore, new_record
 
 LOGINS = """logins:
   hookstub:first: {folder: /c/first, account: acct-1}
@@ -273,3 +276,76 @@ async def test_a_close_that_fails_after_it_closed_marks_the_record(agent, tmp_pa
     monkeypatch.setattr(agent, "_close", close)
     await agent._login_moves(datetime.now(UTC))
     assert s.moving is None and s.closed_for["why"] == "login-move"
+
+
+def _state_store(tmp_path) -> StageStore:
+    """A `shiftlead/state` branch in a scratch repo and its bare origin, as the stage pass writes its records."""
+    origin, root = tmp_path / "state.git", tmp_path / "state"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    for args in (
+        ("config", "user.email", "t@example.com"),
+        ("config", "user.name", "t"),
+        ("remote", "add", "origin", str(origin)),
+        ("commit", "-q", "--allow-empty", "-m", "init"),
+        ("push", "-q", "origin", "main"),
+    ):
+        subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=True)
+    store = StageStore(root)
+    store.ensure_branch()
+    return store
+
+
+FLOW = {
+    "format": 3,
+    "name": "f",
+    "stages": [
+        {"name": "build", "does": "build", "model": "opus", "takes": "any", "work-pushed": "review"},
+        {"name": "review", "does": "review", "model": "opus", "ship": "merge"},
+    ],
+}
+ENTRY = "## TD-1: An entry\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** It matters.\n"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("launch", ["moved", "failed"])
+async def test_a_move_leaves_its_stage_records_holder_offers_and_counts_as_they_were(
+    agent, tmp_path, launched, rows, monkeypatch, launch
+):
+    """TD-2296, design §4.9e *A session moves down the list*: "A move spends no offer, no limit and nothing of the
+    total cap". The stage pass that next reads the record finds its holder live under the same id and takes no act;
+    a move whose launch failed is the control, its holder lost and offered again, so the reading is one that bites."""
+    store = _state_store(tmp_path)
+    sid = await _stage_session(agent, tmp_path)
+    store.put_entry({**new_record("TD-1", "f", "build", team="t", holder=sid), "counts": {"build": 2}}, "test")
+    if launch == "failed":
+        monkeypatch.setattr(agent, "rpc_create", AsyncMock(side_effect=RuntimeError("no launch")))
+    await agent._login_moves(datetime.now(UTC))
+    started: list[str] = []
+    reach = stage_pass.Reach(
+        gate=lambda pr, head: {"verdict": "pass", "failed": []},
+        land=lambda pr, head: None,
+        start=lambda key, work: started.append(key) or "s2",
+        claim=lambda holder, tid: None,
+        end=lambda sid: None,
+    )
+    f = EntryFacts(
+        tid="TD-1",
+        person="paul",
+        team="t",
+        now=datetime.now(UTC),
+        doc=FLOW,
+        ledger=EntryLedger("open"),
+        text=ENTRY,
+        session=agent.sessions[sid],
+        may_start=True,
+        within_size=True,
+    )
+    got = stage_pass.step(store, store.entry("TD-1"), f, reach)
+    after = store.entry("TD-1")
+    if launch == "moved":
+        assert got.read and got.act is None and started == [], "its holder is live: the pass takes no act"
+        assert (after["holder"], after["offers"], after["counts"]) == (sid, 1, {"build": 2})
+    else:
+        assert got.act is not None and got.act.name == "offer-again"
+        assert after["holder"] != sid and after["offers"] == 2, "a lost holder is offered again, an offer spent"
