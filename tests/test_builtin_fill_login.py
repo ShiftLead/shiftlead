@@ -365,9 +365,10 @@ async def test_a_node_mark_holds_the_seats_fill_on_that_node_alone(agent, tmp_pa
         assert (agent.unfillable.get(sid) == "cannot run") is held, mark
 
 
-def _on_a_node(agent, monkeypatch, sid: str, refused: str | None) -> list[dict]:
-    """The seat's record moved to a node, its launch record read as the node's, and the node's `create` refused with
-    `refused`'s words (or answered); returns what each `create` the home routed there was handed."""
+def _on_a_node(agent, monkeypatch, sid: str, refused: str | None, **launch) -> list[dict]:
+    """The seat's record moved to a node, its launch record read as the node's (with `launch` added), and the node's
+    `create` refused with `refused`'s words (or answered); returns what each `create` the home routed there was
+    handed."""
     s = agent.sessions[sid]
     s.host = "a-node"
     sent: list[dict] = []
@@ -378,7 +379,7 @@ def _on_a_node(agent, monkeypatch, sid: str, refused: str | None) -> list[dict]:
             raise RpcError(refused)
         return {"id": f"{sid}@{host}"}
 
-    monkeypatch.setattr(agent, "_read_launch", lambda _address: {"name": s.name, "adapter": "hookstub"})
+    monkeypatch.setattr(agent, "_read_launch", lambda _address: {"name": s.name, "adapter": "hookstub", **launch})
     monkeypatch.setattr(agent, "_route_act", route)
     return sent
 
@@ -527,3 +528,47 @@ async def test_a_seat_neither_built_in_nor_the_director_is_filled_as_before(agen
     s.builtin, s.seat = None, {"trigger": "team"}
     assert agent._first_shape_off and not agent._on_set_login(s)
     assert await agent._builtin_login(s) == {}
+
+
+NODE_LAUNCH = {"profile": "", "seat_model": "opus", "login_list": ["hookstub:first", "hookstub:second"]}
+
+
+@pytest.mark.parametrize("why", ["crash", "lost-brief"])
+@pytest.mark.parametrize(
+    ("words", "word", "marked"),
+    [
+        (f"{teamstore.NO_LOGIN_USABLE}: every login of the list is at its reserve", "no login usable", False),
+        (f"{teamstore.NO_LOGIN_OFFERS} opus", "cannot run", True),
+    ],
+)
+async def test_a_nodes_list_refusal_of_a_replay_is_no_restart(
+    agent, tmp_path, launched, rows, monkeypatch, why, words, word, marked
+):
+    """§4.9d *How each one runs*: rule 1's crash and lost-brief replays of a built-in seat on a node send its launch
+    record's list as names, and the node's refusal of that list counts toward no restart ceiling; *no login offers*
+    marks the set, and the mark holds the next replay with nothing sent."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, words, **NODE_LAUNCH)
+    s = agent.sessions[sid]
+    before = list(s.restarts)
+    await agent._replay(s, why, keep_mail=True)
+    assert sent and (sent[0]["seat_model"], sent[0]["login_list"]) == ("opus", NODE_LAUNCH["login_list"])
+    assert not sent[0].get("login") and s.restarts == before, "nothing was made, so no restart is counted"
+    assert agent.unfillable[sid] == word
+    await agent._replay(s, why, keep_mail=True)
+    assert len(sent) == (1 if marked else 2), "a marked node is sent nothing; a wait is asked again"
+    assert s.restarts == before
+
+
+async def test_a_replay_on_a_node_of_a_record_no_built_in_seats_counts_the_refusal(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """A team's stage session on a node (slice 11's launch) is no built-in seat: its replay refused for the list is a
+    failed restart that counts, as before."""
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    s.builtin, s.seat = None, None
+    _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} opus", **NODE_LAUNCH)
+    await agent._replay(s, "crash", keep_mail=True)
+    assert s.restarts[-1]["why"] == "crash" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
+    assert not agent._host_rec.get("builtins")
