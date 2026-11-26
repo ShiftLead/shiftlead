@@ -3,7 +3,8 @@ its reader and writer, the name rules, an entry's version, retired keys, and the
 reads into accounts.
 
 Data, no tool name: a login is `{folder, label, note, account, billing, prices, extra_args, unattended_args,
-permission_wait, pin}` under `<tool>:<name>` (a name is unique per tool on a host, §4.2b *Terms used below*);
+permission_wait, pin}` under `<tool>:<name>` (a name is unique on its host across every tool, a forgotten login's
+among them, §4.2b *Terms used below*, **Names are fixed**, TD-2232);
 `accounts:` holds each account's label by key; `forgotten:` each forgotten
 login's folder and account by `<tool>:<name>`. The file holds no secret and no identity: which login is which account
 is each login's `account`, and an identity's `match` is compared only in the host agent's memory (`Memory`).
@@ -182,7 +183,8 @@ def account_of(lk: str, entry: Mapping[str, Any]) -> str:
 
 def profile_name(data: Mapping[str, Any], lk: str) -> str:
     """The name a login is read under as a profile, and written as a record's `profile` (§4.9e *A record's
-    profile*): its bare name, or its key where another tool's login on this host shares that name."""
+    profile*): its bare name, or its key where another tool's login on this host shares that name — only a file edited
+    by hand holds such a pair, since nothing shiftlead writes makes one (a name is unique on its host, TD-2232)."""
     name = split(lk)[1]
     return name if sum(split(other)[1] == name for other in data["logins"]) == 1 else lk
 
@@ -199,15 +201,37 @@ def retired(data: Mapping[str, Any], reserve_keys: Iterable[str] = ()) -> set[st
     return (named | set(reserve_keys)) - live_keys(data)
 
 
-def name_taken(data: Mapping[str, Any], tool: str, name: str, tools: Iterable[str] = ()) -> str | None:
-    """Why `name` cannot be a new login of `tool` here, or None (§4.2b *Terms used below*, *The tools shell*): a name
-    is unique per tool, and the login's tools shell id may not be one another login's shell or an install shell of
-    `tools` (the registered adapters) already has — one fold, or a hyphenated adapter name meeting another's."""
+def name_holder(data: Mapping[str, Any], tool: str, name: str, skip: str | None = None) -> tuple[str, bool] | None:
+    """The key of another tool's login on this host whose bare name is `name`, live first and then forgotten, skipping
+    `skip`, with whether it is forgotten; None where no other tool's login has it (§4.2b **Names are fixed**, §4.9e *A
+    record's `profile`*, TD-2232)."""
+    for forgotten, where in ((False, data["logins"]), (True, data.get("forgotten") or {})):
+        for lk in sorted(where):
+            other, n = split(lk)
+            if lk != skip and n == name and other != tool:
+                return lk, forgotten
+    return None
+
+
+def name_taken(
+    data: Mapping[str, Any], tool: str, name: str, tools: Iterable[str] = (), skip: str | None = None
+) -> str | None:
+    """Why `name` cannot be a new login of `tool` here, or None (§4.2b *Terms used below*, **Names are fixed**, *The
+    tools shell*, TD-2232): a name is unique on its host across every tool, a forgotten login's staying taken, and the
+    login's tools shell id may not be one another login's shell or an install shell of `tools` (the registered
+    adapters) already has — one fold, or a hyphenated adapter name meeting another's. `skip` is a key passed over (a
+    take-back's own forgotten key)."""
     if not valid_name(name):
         return f"{name!r} is not a login name: at most 24 letters, digits, '-' and '_', the first a letter or digit"
     lk = key(tool, name)
     if lk in data["logins"]:
         return f"{lk} is a login on this host already"
+    held = name_holder(data, tool, name, skip)
+    if held:
+        other, forgotten = held
+        if forgotten:
+            return f"{name} is the forgotten login {other}'s name, kept for its own folder: give another name"
+        return f"{name} is {other}'s name on this host: a login's name is unique on its host"
     sid = naming.tools_id(tool, name)
     for other in data["logins"]:
         if naming.tools_id(*split(other)) == sid:
@@ -584,10 +608,11 @@ def add(
 ) -> tuple[str, str]:
     """`ao login add <tool> [--path] [--name] [--account]` (§4.2b *Controls and verbs*, *Where it lives*): `folder` a
     login of `tool`, named `name`. A folder already a login's is refused; a forgotten login's folder takes back its old
-    name and account, and a different `name` is refused; a forgotten login's name is refused any other folder, so a
-    record never resolves to another folder. `account` names the login's account up front (`account_key`); `same`
-    compares two folders; `suggested` is the base of a name to suggest where none is given (`<tool>-<display>`), a
-    suffix added where it is taken. Returns the new login's key and the change's words."""
+    name and account, and a different `name` is refused; a name is unique on its host across every tool, and a
+    forgotten login's name, of any tool, is refused any other folder, so a record never resolves to another folder
+    (§4.2b *Terms used below*, **Names are fixed**, TD-2232). `account` names the login's account up front
+    (`account_key`); `same` compares two folders; `suggested` is the base of a name to suggest where none is given
+    (`<tool>-<display>`), a suffix added where it is taken. Returns the new login's key and the change's words."""
     folder = Path(folder)
     for lk, e in sorted(data["logins"].items()):
         if split(lk)[0] == tool and same(Path(str(e.get("folder") or "")).expanduser(), folder):
@@ -603,14 +628,14 @@ def add(
             raise LoginError(f"{folder} was the login {back[0]}: it takes back its name, {old}, and no other")
         name = old
     if not name and suggested:
-        taken = {split(k)[1] for k in (*data["logins"], *data["forgotten"]) if split(k)[0] == tool}
+        taken = {split(k)[1] for k in (*data["logins"], *data["forgotten"])}
         name = suggest(suggested, taken)
     if not name:
         raise LoginError("name the new login (--name): its tool records no display name to suggest one from")
     lk = key(tool, name)
     if not back and lk in data["forgotten"]:
         raise LoginError(f"{lk} is a forgotten login's name, kept for its own folder: give another name")
-    why = name_taken(data, tool, name, tools)
+    why = name_taken(data, tool, name, tools, skip=lk)
     if why:
         raise LoginError(why)
     entry: dict[str, Any] = {"folder": str(folder)}

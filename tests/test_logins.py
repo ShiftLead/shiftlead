@@ -19,11 +19,11 @@ def test_names_follow_the_rules():
     assert len(logins.suggest("x" * 24, ["x" * 24])) <= 24
 
 
-def test_a_name_is_unique_per_tool_and_its_tools_shell_id_on_the_host():
+def test_a_name_is_unique_on_the_host_across_tools_and_its_tools_shell_id_too():
     data = logins.empty()
     data["logins"]["claude-code:paul"] = {"folder": "/f"}
     assert "already" in logins.name_taken(data, "claude-code", "paul")
-    assert logins.name_taken(data, "grok", "paul") is None  # another tool's login may share the name
+    assert "claude-code:paul's name on this host" in logins.name_taken(data, "grok", "paul")  # TD-2232
     assert "tools shell would be claude-code:paul's" in logins.name_taken(data, "claude-code", "Paul")
     assert "tools shell would be claude-code:paul's" in logins.name_taken(data, "claude", "code-paul")
     assert "install shell" in logins.name_taken(logins.empty(), "install", "grok", tools=["grok"])

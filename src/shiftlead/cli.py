@@ -5679,6 +5679,7 @@ def cmd_switch_over_check(args: argparse.Namespace) -> int:
         blockers.append(switchover.Blocker("the org", str(org_error), "mend org.yml, or run the check on the home"))
     else:
         plans, more = switchover.teams(org, answers, host, made, hosts.local_host().repos(), node_made=node_made)
+        more += switchover.node_name_blockers(made, node_made, plans)
         builtins, sets = switchover.builtin_set(answers, made, plans, host, director=org.director is not None)
         blockers += more + sets
         if org.director is not None:  # the profile it launches on today: its own, else the profiles file's default

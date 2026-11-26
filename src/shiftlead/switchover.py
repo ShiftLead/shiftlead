@@ -171,12 +171,15 @@ def host_logins(
     blockers: list[Blocker] = []
     folders: dict[tuple[str, Path], list[tuple[Profile, bool]]] = {}
     tools: dict[str, Any] = {}
+    passed: list[tuple[str, str]] = []  # profiles that make no login, by (name, adapter): their names stay taken
     for p in profiles.values():
         if p.adapter == "shell":
+            passed.append((p.name, p.adapter))
             continue
         try:
             adapter = tools[p.adapter] if p.adapter in tools else adapter_of(p.adapter)
         except (KeyError, ValueError):
+            passed.append((p.name, p.adapter))
             continue
         tools[p.adapter] = adapter
         default = getattr(adapter, "default_home", None)
@@ -260,7 +263,7 @@ def host_logins(
             )
         )
 
-    blockers += _name_blockers(where, made)
+    blockers += _name_blockers(where, made, passed)
     blockers += _identity_blockers(where, made)
     return made, blockers
 
@@ -311,9 +314,15 @@ def node_logins(
     return out, blockers
 
 
-def _name_blockers(where: str, made: Iterable[Login]) -> list[Blocker]:
+def _name_blockers(where: str, made: Iterable[Login], passed: Iterable[tuple[str, str]] = ()) -> list[Blocker]:
+    """The answers' names that break §4.2b's rules on one host: not a login name; two logins of one tool folding to
+    one name; two logins of any tools with one name; and a login named as a profile of the host that made no login
+    (`passed`, `(name, adapter)`: a `shell` profile, an unregistered adapter's) of another adapter — a name is unique on
+    its host across every tool (§4.2b **Names are fixed**, §4.9e *A record's `profile`*, TD-2232)."""
     out: list[Blocker] = []
     seen: dict[str, Login] = {}
+    named: dict[str, Login] = {}
+    others = list(passed)
     for login in made:
         if not logins.valid_name(login.name):
             out.append(
@@ -337,6 +346,59 @@ def _name_blockers(where: str, made: Iterable[Login]) -> list[Blocker]:
             )
         else:
             seen[fold] = login
+        first = named.setdefault(login.name, login)
+        if first is not login and first.tool != login.tool:
+            out.append(
+                Blocker(
+                    where,
+                    f"{login.found} and {first.found} would both be named {login.name!r}: a login's name is unique "
+                    "on its host",
+                    "give one of them another name in the answers file",
+                )
+            )
+        for prof, adapter in others:
+            if prof == login.name and adapter != login.tool:
+                out.append(
+                    Blocker(
+                        where,
+                        f"{login.found} would be named {login.name!r}, the name of this host's {adapter} profile "
+                        f"{prof}, which makes no login: a login's name is unique on its host",
+                        "give one of them another name in the answers file",
+                    )
+                )
+    return out
+
+
+def node_name_blockers(
+    made: Iterable[Login], node_made: Mapping[str, Iterable[Login]], plans: Iterable[TeamPlan]
+) -> list[Blocker]:
+    """A container node's login of one tool named as a home login of another tool that a team on that node lists
+    (`plans`: the answers' `teams.<t>.logins`), which `ao host up` would add to the node under the home's name: a
+    login's name is unique on its host (§4.9e *Blockers*, *A record's `profile`*, TD-2232). `made` is the home's
+    logins, `node_made` each container node's (`node_logins`)."""
+    home = {lg.key: lg for lg in made}
+    out: list[Blocker] = []
+    seen: set[tuple[str, str, str]] = set()
+    for plan in plans:
+        on = node_made.get(plan.host)
+        if on is None:
+            continue
+        on = list(on)
+        for lk in plan.logins:
+            listed = home.get(lk)
+            if listed is None:
+                continue
+            for lg in on:
+                if lg.name == listed.name and lg.tool != listed.tool and (plan.host, lg.key, lk) not in seen:
+                    seen.add((plan.host, lg.key, lk))
+                    out.append(
+                        Blocker(
+                            f"host {plan.host}",
+                            f"{lg.found} would be named {lg.name!r}, the name of the home login {lk} that team "
+                            f"{plan.name} on this node lists: a login's name is unique on its host",
+                            "give one of them another name in the answers file",
+                        )
+                    )
     return out
 
 
