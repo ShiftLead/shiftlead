@@ -1881,7 +1881,15 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        if not login and seat_model and login_list and not held and isinstance(login_list, list):
+        if (
+            not login
+            and seat_model
+            and login_list
+            and not held
+            and not resume
+            and adapter != "shell"
+            and isinstance(login_list, list)
+        ):
             # a list and a model with no login: this host picks on its own logins, as the home's pick does there,
             # and the launch runs the picked login's tool (§4.9e *A team on a node*, TD-2068)
             login = await self._pick_here([str(x) for x in login_list], str(seat_model), str(team or ""))

@@ -350,3 +350,16 @@ async def test_a_create_whose_list_has_no_login_for_it_makes_nothing(
                 **_params(tmp_path, "w", seat_model="opus", login_list=["hookstub:grind", "hookstub:spare"]),
             )
     assert not launched and not agent.sessions
+
+
+@pytest.mark.parametrize("given", [{"adapter": "shell"}, {"resume": "abc"}], ids=["shell", "resume"])
+async def test_a_shell_or_a_resume_given_a_list_is_refused_not_picked(agent, tmp_path, launched, monkeypatch, given):
+    """A shell has no login, and a resume keeps its own conversation's tool: neither picks (review of slice 10)."""
+    (paths.home() / "logins.yml").write_text(TWO_TOOLS)
+    _rows(monkeypatch, hookstub__grind={})
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="ride a launch on a login"):
+            await person.call(
+                "create", **{**_params(tmp_path, "w", seat_model="opus", login_list=["hookstub:grind"]), **given}
+            )
+    assert not launched and not agent.sessions
