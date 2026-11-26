@@ -5,7 +5,8 @@ Its opening prompt is, in order: the mechanics, how the stage is ended, the repo
 its `also`. `start` creates one only while its team is started, the home's started mark read just before the
 create (TD-2065), and no team is marked before the cut-over. On the home's own host a stage's or an audit's session
 is launched on the first usable login of the team's list that offers its model (§4.9e *The launch on a login*,
-TD-2068), as the team's `team_show` reading names it; a team on a node and a job's session are launched as before.
+TD-2068), as the team's `team_show` reading names it, and a job's on its repo's built-in set's (`on_login` reading
+`builtins_show`); a team or a job on a node is launched as before.
 """
 
 from __future__ import annotations

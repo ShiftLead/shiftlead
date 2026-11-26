@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import brief as brief_mod
-from sessionorc import naming, teamstore
+from sessionorc import logins, naming, teamstore
 from sessionorc.models import REVIEW_BOUND
 
 # The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`), kept in `sessionorc.models` since the
@@ -298,19 +298,34 @@ def director_create(org: orgmod.Org) -> dict[str, Any] | None:
     `director.brief` names (relative to the org file), whose `{org}` is the Org block the home reads from the repo
     registry at each fill (`brief.org_block`), each repo named with its project heading. Raises `TeamError` for a
     profile that is unknown, runs a shell, or does not skip prompts (`ask`, `all`, §4.2a): nothing above the
-    director would answer its own."""
+    director would answer its own. After the cut-over (§4.9e *The launch on a login*, TD-2068) the director has no
+    profile: the record carries `director.model` and `director.logins` as its `seat_model` and `login_list`, which its
+    fill picks from (the host agent reads no `org.yml`), skipping a login that leaves its prompts on (§4.9d); a
+    director naming no model or no logins is refused, as is one naming a profile."""
     d = org.director
     if d is None:
         return None
     where = f"director {d.name}"
     profile = d.profile or ""
     adapter = profiles.DEFAULT_ADAPTER
-    try:  # the default profile too: one that asks is no director's either
-        p = profiles.get(profile or None)
-    except (KeyError, ValueError) as e:
+    on_login: dict[str, Any] = {}
+    p: Any = None
+    if teamstore.first_shape_off():
         if profile:
-            raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
-        p = None  # no profiles file and no default: the tool's own default, which skips
+            raise TeamError(f"{where}: profiles went at the switch-over: name its model and logins (design §4.9e)")
+        if not d.model or not d.logins:
+            raise TeamError(f"{where}: names no model or no logins, which its launch picks from (design §4.9e)")
+        adapter, name = logins.split(d.logins[0])
+        if not adapter or not name:
+            raise TeamError(f"{where}: login {d.logins[0]!r} is not <tool>:<name> (design §4.9e)")
+        on_login = {"seat_model": d.model, "login_list": list(d.logins)}
+    else:
+        try:  # the default profile too: one that asks is no director's either
+            p = profiles.get(profile or None)
+        except (KeyError, ValueError) as e:
+            if profile:
+                raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+            p = None  # no profiles file and no default: the tool's own default, which skips
     if p is not None:
         adapter = p.adapter or adapter
         if adapter == profiles.SHELL_ADAPTER:
@@ -349,6 +364,7 @@ def director_create(org: orgmod.Org) -> dict[str, Any] | None:
         "supervised": True,
         "seat": {"trigger": orgmod.DIRECTOR_TRIGGER},
         "held": True,
+        **on_login,
     }
 
 

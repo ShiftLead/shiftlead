@@ -1855,7 +1855,7 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        on_login = await asyncio.to_thread(_on_login, login, adapter, profile, seat_model, login_list)
+        on_login = await asyncio.to_thread(_on_login, login, adapter, profile, seat_model, login_list, held=bool(held))
         if on_login is not None:
             profile, account = on_login["profile"], on_login["account"]
             login, login_list = on_login["login"], on_login["login_list"]
