@@ -266,7 +266,7 @@ def test_a_switched_host_answers_a_profile_by_a_logins_name(tmp_path):
     assert "claude-code:grind" not in got, "each login once, under the name a launch writes"
     assert got["sh"].adapter == "shell", "a profile with no login of its name is answered as today"
     api = got["api"]
-    assert api.metered and api.prices == {"input": 3.0, "output": 15.0} and api.account == "claude-code:api"
+    assert api.metered and api.prices == {"input": 3.0, "output": 15.0} and api.account == "api"
     assert "twin" not in got and got["gemini:twin"].adapter == "gemini", "a name two tools share is read by key"
     assert len([p for p in got.values() if p.adapter != "shell"]) == 4, "the profile named grind is the login"
 

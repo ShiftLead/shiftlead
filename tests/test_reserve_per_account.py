@@ -560,3 +560,30 @@ async def test_a_clear_is_taken_on_a_window_the_account_stopped_reporting_and_a_
         assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"week": 20}}
         await person.call("set_settings", profile="pa", reserves={"5h": None})  # a clear of nothing set is no error
     assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"week": 20}}
+
+
+@pytest.mark.integration
+async def test_a_login_s_usage_key_is_its_account_s_and_the_gate_reads_its_reserve(agent, tmp_path):
+    """TD-2239 (§4.2b *An account per key, unchanged*): a profile read from a login keys its usage and its reserve
+    as `<adapter>:<account>`, the account's own key, under a named account and under its own — never with the tool
+    twice."""
+    from sessionorc import agent_common, logins
+    from shiftlead.adapters.claude_code import ClaudeCodeAdapter
+
+    await park_ticks(agent)
+    data = logins.empty()
+    for name, account in (("paul", None), ("grind", "paul"), ("solo", None)):
+        (tmp_path / name).mkdir()
+        logins.add(data, "claude-code", tmp_path / name, name, account)
+    logins.save(data, "test", paths.home())
+    adapter = ClaudeCodeAdapter()
+    assert agent_common._usage_key(adapter, "claude-code", "grind") == ("claude-code:paul", "paul")
+    assert agent_common._usage_key(adapter, "claude-code", "solo") == ("claude-code:solo", "solo")
+    assert agent._account_key("grind") == "claude-code:paul"
+    for lk in ("claude-code:grind", "claude-code:solo"):  # the key a login's launches read (`logins.account_of`)
+        name = logins.split(lk)[1]
+        assert agent_common._usage_key(adapter, "claude-code", name)[0] == logins.account_of(lk, data["logins"][lk])
+    settings_mod.save({"usage_gate": {"claude-code:paul": {"5h": 30}, "claude-code:solo": {"week": 7}}})
+    whole = settings_mod.load()
+    assert agent._gate_reserves(whole, "grind") == agent._gate_reserves(whole, "paul") == {"5h": 30}
+    assert agent._gate_reserves(whole, "solo") == {"week": 7}

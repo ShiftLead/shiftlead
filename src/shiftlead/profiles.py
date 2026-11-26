@@ -219,7 +219,7 @@ def _login_profile(lk: str, entry: dict) -> Profile:
     return Profile(
         name=name,
         adapter=tool,
-        account=logins.account_of(lk, entry),
+        account=_bare_account(tool, logins.account_of(lk, entry)),
         model=str(entry["pin"]) if entry.get("pin") else None,
         config_dir=Path(str(folder)).expanduser() if folder else None,
         permission_wait=int(wait) if isinstance(wait, int) and not isinstance(wait, bool) else DEFAULT_PERMISSION_WAIT,
@@ -228,6 +228,13 @@ def _login_profile(lk: str, entry: dict) -> Profile:
         billing=str(billing),
         prices={str(k): float(v) for k, v in prices.items() if k in PRICE_KINDS and isinstance(v, int | float)},
     )
+
+
+def _bare_account(tool: str, acct: str) -> str:
+    """A login's account in the shape a profile of `profiles.yml` holds it, the name after the tool, so the
+    `<adapter>:<account>` every reader composes is the account's own key (§4.2b *An account per key, unchanged*,
+    TD-2239); a hand-written bare name is kept as written."""
+    return acct.removeprefix(f"{tool}:")
 
 
 def _args(value: object) -> list[str]:
