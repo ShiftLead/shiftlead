@@ -10,11 +10,13 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+from _stubs import HookFedStub
 from conftest import park_ticks
 
 from sessionorc import adapters, agent_common, paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.client import LocalClient
+from sessionorc.models import MailEntry
 from shiftlead import stage_pass
 from shiftlead.stage_read import EntryFacts, EntryLedger, holder_on
 from shiftlead.stagerecord import StageStore, new_record
@@ -102,10 +104,10 @@ def rows(agent, monkeypatch):
     return held
 
 
-async def _stage_session(agent, tmp_path, *, unattended: bool = True) -> str:
+async def _stage_session(agent, tmp_path, *, unattended: bool = True, extra: str = "") -> str:
     """A stage's session as the stage pass launches it: supervised, on its list's first login, with its model."""
     await park_ticks(agent)
-    (paths.home() / "logins.yml").write_text(LOGINS)
+    (paths.home() / "logins.yml").write_text(LOGINS.replace("accounts: {}", extra + "accounts: {}"))
     (tmp_path / "repo").mkdir(exist_ok=True)
     async with LocalClient() as person:
         sid = (
@@ -350,3 +352,86 @@ async def test_a_move_leaves_its_stage_records_holder_offers_and_counts_as_they_
     else:
         assert got.act is not None and got.act.name == "offer-again"
         assert after["holder"] != sid and after["offers"] == 2, "a lost holder is offered again, an offer spent"
+
+
+async def _owe(agent, sid: str) -> str:
+    """`sid` asks the person, the person answers and `sid` reads it: `sid` owes an outcome on it (§4.10)."""
+    async with LocalClient(caller=sid) as me:
+        q = (await me.call("msg", to="person", text="which way?", kind="ask"))["entry"]
+    async with LocalClient() as person:
+        await person.call("msg", reply_to=q["id"], kind="reply", text="the left one")
+    async with LocalClient(caller=sid) as me:
+        await me.call("inbox")
+    assert q["id"] in agent.sessions[sid].owed()
+    return q["id"]
+
+
+@pytest.mark.integration
+async def test_a_move_keeps_the_sessions_mail_scratch_worktree_and_the_outcome_it_owes(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2300, design §4.9e *A session moves down the list*, §4.6, §4.10 *Outcomes*: the move closes the old run
+    without reaping its worktree or settling what it owes, and replays it with its mail and its scratch."""
+    sid = await _stage_session(agent, tmp_path)
+    qid = await _owe(agent, sid)
+    old = agent.sessions[sid]
+    old.state = "limited"
+    unread = MailEntry(id="m-u1", from_="ao-x-tl", to=[sid], at=datetime.now(UTC).isoformat(), kind="note", text="hi")
+    old.inbox.append(unread)
+    scratch = old.scratch
+    assert scratch, "the stage's session has a scratch to keep"
+    closes: list[dict] = []
+    close = agent._close
+
+    async def spy(*a, **kw):
+        closes.append(kw)
+        return await close(*a, **kw)
+
+    monkeypatch.setattr(agent, "_close", spy)
+    await agent._login_moves(datetime.now(UTC))
+    new = agent.sessions[sid]
+    assert new is not old and new.login == "hookstub:second", "the move happened"
+    assert "m-u1" in [e.id for e in new.inbox], "its mail is the new record's"
+    assert new.scratch == scratch, "its scratch is handed on, not made again"
+    assert len(closes) == 1 and closes[0]["reap"] is False, "the close leaves the worktree for the replay"
+    assert closes[0]["keep_debt"] is True
+    assert qid in new.owed(), "the outcome it owes rides the move"
+    assert next(e for e in agent.person_inbox if e.id == qid).owes
+
+
+class _OtherStub(HookFedStub):
+    name = "hookstub2"
+
+
+@pytest.mark.integration
+async def test_a_move_to_another_tools_login_launches_that_tool(agent, tmp_path, launched, rows, monkeypatch):
+    """TD-2300: a list may name logins of two tools; the move launches the one `to` is a login of."""
+    other = _OtherStub()
+    monkeypatch.setitem(adapters._REGISTRY, other.name, other)
+    tools: list[str] = []
+
+    def launch(*, profile, resume, prompt, unattended, cwd, name="", **kw):
+        tools.append(other.name)
+        return LaunchSpec(argv=["bash", "--norc"])
+
+    monkeypatch.setattr(other, "launch", launch)
+    rows["hookstub:second"]["state"] = rows["hookstub:third"]["state"] = "limited"
+    rows["hookstub2:fourth"] = _row("acct-4", ["opus"])
+    sid = await _stage_session(agent, tmp_path, extra="  hookstub2:fourth: {folder: /c/fourth, account: acct-4}\n")
+    agent.sessions[sid].login_list = [*ORDER, "hookstub2:fourth"]
+    await agent._login_moves(datetime.now(UTC))
+    new = agent.sessions[sid]
+    assert (new.adapter, new.login) == ("hookstub2", "hookstub2:fourth") and tools == ["hookstub2"]
+
+
+@pytest.mark.integration
+async def test_a_second_move_adds_to_the_list_of_moves(agent, tmp_path, launched, rows):
+    """TD-2300: `login_moves` keeps every move, not the last alone."""
+    sid = await _stage_session(agent, tmp_path)
+    await agent._login_moves(datetime.now(UTC))
+    rows["hookstub:second"]["state"] = "limited"
+    agent.sessions[sid].state = "limited"
+    agent.sessions[sid].restarts[-1]["at"] = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    await agent._login_moves(datetime.now(UTC))
+    moves = [(m["from"], m["to"]) for m in agent.sessions[sid].login_moves]
+    assert moves == [("hookstub:first", "hookstub:second"), ("hookstub:second", "hookstub:third")]
