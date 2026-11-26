@@ -274,3 +274,66 @@ async def test_a_fill_reads_the_real_logins_and_passes_over_one_at_its_reserve(a
     new = agent.sessions[sid]
     assert (new.login, new.account) == ("hookstub:second", "acct-2"), "the login at its reserve is passed over"
     assert launched[-1] == {"profile": "second", "model": "opus"} and sid not in agent.unfillable
+
+
+async def test_the_directors_record_is_filled_as_before_after_the_cut_over(agent, tmp_path, launched, rows):
+    """TD-2254: only a built-in seat's record picks its login (`_on_set_login`). The director's record has no `builtin`
+    and rule 3 still reaches it after the cut-over (`_rules_reach`), so its fill is launched as before: no login, no
+    model, no `unfillable` word."""
+    rows.update({"hookstub:first": _row("acct-1", ["sonnet"]), "hookstub:second": _row("acct-2", ["sonnet"])})
+    await park_ticks(agent)
+    (paths.home() / "logins.yml").write_text(LOGINS)
+    (tmp_path / "repo").mkdir(exist_ok=True)
+    async with LocalClient() as person:
+        sid = (
+            await person.call(
+                "create",
+                name="director-t",
+                dir=str(tmp_path / "repo"),
+                adapter="hookstub",
+                unattended=True,
+                supervised=True,
+                held=True,
+                prompt="the director's brief",
+                seat={"trigger": "prompt"},
+            )
+        )["id"]
+    (paths.home() / "settings.yml").write_text(SETTINGS)
+    agent._read_cut_over()
+    old = agent.sessions[sid]
+    assert not old.builtin and agent._rules_reach(old), "rule 3 reaches the director's record after the cut-over"
+    old.seat_due = {"at": datetime.now(UTC).isoformat(), "by": "prompt"}
+    await _fill(agent, sid)
+    new = agent.sessions[sid]
+    assert new is not old, "the director's record was filled"
+    assert new.login is None and new.seat_model is None and sid not in agent.unfillable
+    assert launched[-1] == {"profile": ""}, "launched as before: no login, no model"
+
+
+async def test_a_built_in_seat_on_a_node_picks_no_login(agent, tmp_path, launched, rows):
+    """TD-2254: a built-in seat's record on a node is launched as before until the node half (§4.9e): its fill reads
+    no set, even where the home's own logins could run it."""
+    rows.update({"hookstub:first": _row("acct-1", ["opus"]), "hookstub:second": _row("acct-2", ["opus"])})
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    assert await agent._builtin_login(s) != {}, "on the home's own host it picks a login"
+    s.host = "a-node"
+    assert not agent._on_set_login(s)
+    assert await agent._builtin_login(s) == {}, "on a node the fill is as before"
+
+
+@pytest.mark.parametrize(("why", "word"), [("fill", "fill ceiling"), ("crash", "restart ceiling")])
+async def test_an_ended_seat_at_its_ceiling_keeps_the_ceilings_word(
+    agent, tmp_path, launched, rows, monkeypatch, why, word
+):
+    """TD-2254: rule 3's pass reads an ended, not due seat's login only where its own ceiling does not refuse it, so a
+    seat at its fill or restart ceiling whose set also cannot run it keeps the ceiling's word in `unfillable`."""
+    rows.update({"hookstub:first": _row("acct-1", ["sonnet"]), "hookstub:second": _row("acct-2", ["sonnet"])})
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    monkeypatch.setattr(agent, "_builtin_hold", lambda *a, **kw: None)
+    monkeypatch.setattr(agent, "_seat_due", lambda *a, **kw: None)
+    s.seat_due = None
+    s.restart_ceiling = {"at": datetime.now(UTC).isoformat(), "count": 6, "why": why}
+    await agent._seat_pass(s, datetime.now(UTC), list(agent.sessions.values()))
+    assert agent.unfillable[sid] == word and not launched
