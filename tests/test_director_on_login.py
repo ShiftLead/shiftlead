@@ -239,7 +239,7 @@ def _director_session(**kw):
 
 
 @pytest.mark.unit
-def test_the_passs_graph_on_another_model_writes_the_director_again_and_on_the_keys_asks_nothing(tmp_path, monkeypatch):
+def test_the_pass_graph_on_another_model_writes_the_director_again_and_on_the_keys_asks_nothing(tmp_path, monkeypatch):
     monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
     org = _org(tmp_path, monkeypatch, {"model": "opus", "logins": ORDER})
     old = _director_session(state="closed", seat_model="sonnet", login_list=ORDER)
