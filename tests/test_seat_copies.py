@@ -286,3 +286,22 @@ def test_a_review_clone_is_no_git_work_and_a_closed_seats_scratch_holding_one_is
     named = {str(s): ("ao-x", time.time() - 2 * DAY)}
     kept = scratch.sweep(root, str(home), named, 24, time.time(), lambda _p: False, [])
     assert not s.exists(), kept
+
+
+# -- the briefs and the note name the release the pass knows (TD-2324) -------------------------------------------------
+
+
+def test_every_brief_with_the_copies_rule_gives_the_release_by_the_passs_own_prefix():
+    """A brief that tells a seat to keep a copy under `copies/<name>` also tells it to release a finished one by
+    renaming it with `scratch.GONE`'s prefix, the name the hourly pass removes with no age test (design §4.6 *A seat
+    releases its own*): changing the prefix without the briefs, or dropping the sentence from one, fails here."""
+    from importlib import resources
+
+    root = Path(str(resources.files("shiftlead") / "briefs"))
+    rule = "$SHIFTLEAD_SCRATCH/copies/<name>"
+    gone = f"$SHIFTLEAD_SCRATCH/copies/{scratch.GONE}<name>"
+    release = f"release it yourself by a rename, never an `rm -rf`: `mv {rule} {gone}`"
+    briefs = [p for p in sorted(root.rglob("*.md")) if rule in p.read_text(encoding="utf-8")]
+    assert briefs, "no shipped brief gives the copies rule"
+    missing = [p.name for p in briefs if release not in p.read_text(encoding="utf-8")]
+    assert not missing, f"briefs giving the copies rule without the release rename: {missing}"
