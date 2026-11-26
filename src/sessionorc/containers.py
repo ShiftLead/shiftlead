@@ -49,7 +49,8 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, cadence, hosts, identity, paths, yamltext
+from sessionorc import adapters, builtinstore, cadence, hosts, identity, logins, paths, teamstore, yamltext
+from sessionorc import settings as settings_mod
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 INSIDE = "/shiftlead"  # the node's volume, inside
@@ -600,8 +601,9 @@ def check_image(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
         )
 
 
-def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
-    """The agent onto the node's volume at the home's version, and the node's own configuration."""
+def provision(n: ContainerNode, r: Runner, cid: str, user: str, *, out: dict[str, Any] | None = None) -> Path:
+    """The agent onto the node's volume at the home's version, and the node's own configuration. After the cut-over
+    what was done to the node's `logins.yml` is logged and, given `out`, kept there as `logins`."""
     wheel = newest_wheel()
     wheels = n.node_dir / "wheels"
     wheels.mkdir(parents=True, exist_ok=True)
@@ -627,7 +629,12 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
             f"{INSIDE_WHEELS}/{wheel.name}",
         )
     )
-    write_node_config(n)
+    added = write_node_config(n)
+    if added is not None:
+        for line in [*(f"login {lk} added to {n.name}, not signed in" for lk in added["added"]), *added["passed"]]:
+            r.log(line)
+        if out is not None:
+            out["logins"] = added
     ship_cadence(n, r, cid, user)
     if n.env_file.is_file():
         cp = r.run(exec_cmd(cid, user, "sh", "-c", "command -v gh", env_file=n.env_file), check=False)
@@ -703,10 +710,12 @@ def _remove_tree(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
-def write_node_config(n: ContainerNode) -> None:
-    """The node's `hosts.yml` and `profiles.yml` under `/shiftlead/home`: it is a node of this home,
-    dials the mounted link socket, and runs the home's profiles with each `config_dir` under
-    `/shiftlead/profiles/<profile>/` — logged in once by hand inside, and kept."""
+def write_node_config(n: ContainerNode) -> dict[str, Any] | None:
+    """The node's `hosts.yml` and, before the cut-over, `profiles.yml` under `/shiftlead/home`: it is a node of this
+    home, dials the mounted link socket, and runs the home's profiles with each `config_dir` under
+    `/shiftlead/profiles/<profile>/` — logged in once by hand inside, and kept. After the cut-over no profile is
+    written, and the node's `logins.yml` gains each login its lists name that it lacks (`node_logins`), whose result
+    is returned; before it, None."""
     home_dir = n.node_dir / "home"
     home_dir.mkdir(parents=True, exist_ok=True)
     local = {"name": n.name, "vscode_host": n.name}
@@ -722,6 +731,11 @@ def write_node_config(n: ContainerNode) -> None:
             sort_keys=False,
         )
     )
+    if teamstore.first_shape_off():  # the marker, or where settings.yml does not read the home's last reading of it
+        (n.node_dir / "profiles").mkdir(exist_ok=True)
+        if (settings := settings_mod.read()) is None:
+            return {"added": [], "passed": [f"no login added to {n.name}: settings.yml cannot be read"]}
+        return node_logins(n, settings)
     src = paths.home() / "profiles.yml"
     try:
         doc = yamltext.load(src.read_text(encoding="utf-8")) or {}
@@ -740,6 +754,77 @@ def write_node_config(n: ContainerNode) -> None:
         node_doc["default"] = doc["default"]
     (home_dir / "profiles.yml").write_text(yaml.safe_dump(node_doc, sort_keys=False))
     (n.node_dir / "profiles").mkdir(exist_ok=True)
+    return None
+
+
+def listed_on(doc: dict[str, Any], node: str) -> list[str]:
+    """Each login the lists of what runs on `node` name, once, in order (§4.2b *On a node*, §4.9e *A container node's
+    `logins.yml`*): each switched team on that host, its list, by team name; then the built-in set of each such
+    team's repo."""
+    teams = doc.get("teams")
+    out: list[str] = []
+    repos: list[str] = []
+    for team in sorted((t for t in teams if isinstance(t, str)), key=str.casefold) if isinstance(teams, dict) else ():
+        entry = teams[team]
+        if not isinstance(entry, dict) or not teamstore.switched(doc, team) or entry.get("host") != node:
+            continue
+        held = entry.get("logins")
+        out += [lk for lk in held if isinstance(lk, str)] if isinstance(held, list) else []
+        repos.append(str(entry["repo"]))
+    sets = builtinstore.sets(doc)
+    for repo in repos:
+        out += sets[builtinstore.repo_set(doc, repo)]["logins"]
+    return list(dict.fromkeys(out))
+
+
+def node_logins(n: ContainerNode, doc: dict[str, Any]) -> dict[str, Any]:
+    """After the cut-over, the node's `logins.yml` gains each login `listed_on` it that it lacks (§4.9e *A container
+    node's `logins.yml`*, TD-2070): under the home's key, with the home login's `account` key and `billing`, its
+    folder `/shiftlead/profiles/<name>`, not signed in. It removes and changes none it has. A node with no file is
+    given an empty one first, as a host made after the switch-over starts. Passed over, each with a line: a login
+    whose bare name another tool's login on the node has, live or forgotten (`logins.name_holder`), one forgotten on
+    the node under the same key, whose take-back is the node's own, and none the home holds, whose account it cannot
+    copy. `{added: [keys], passed: [lines]}`."""
+    node_home = n.node_dir / "home"
+    passed: list[str] = []
+    try:
+        home_data = logins.load() or logins.empty()
+        if not logins.switched(node_home):
+            logins.save(logins.empty(), "made by ao host up", home=node_home)
+    except logins.LoginError as e:
+        return {"added": [], "passed": [f"no login added to {n.name}: {e}"]}
+    added: list[str] = []
+
+    def change(data: dict[str, Any]) -> str | None:
+        for lk in listed_on(doc, n.name):
+            if lk in data["logins"]:
+                continue
+            tool, name = logins.split(lk)
+            if lk in data["forgotten"]:
+                passed.append(f"{lk} is forgotten on {n.name}: take it back there to use it")
+                continue
+            if (held := logins.name_holder(data, tool, name)) is not None:
+                passed.append(
+                    f"{name} is {held[0]}'s name on this node: a login's name is unique on its host, so list another "
+                    "login for the team"
+                )
+                continue
+            src = home_data["logins"].get(lk)
+            if src is None:
+                passed.append(f"{lk} is no login of {hosts.local_host().name}: nothing to copy to {n.name}")
+                continue
+            entry: dict[str, Any] = {"folder": f"{INSIDE_PROFILES}/{name}", "account": logins.account_of(lk, src)}
+            if src.get("billing"):
+                entry["billing"] = src["billing"]
+            data["logins"][lk] = entry
+            added.append(lk)
+        return f"ao host up added {', '.join(added)}" if added else None
+
+    try:
+        logins.update(change, home=node_home)
+    except logins.LoginError as e:
+        return {"added": [], "passed": [f"no login added to {n.name}: {e}"]}
+    return {"added": added, "passed": passed}
 
 
 def agent_pid(r: Runner, cid: str, user: str) -> int | None:
@@ -806,7 +891,8 @@ def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dic
     check_image(n, r, cid, user)
     node_hosts = n.node_dir / "home" / "hosts.yml"
     config_was = node_hosts.read_text(encoding="utf-8") if node_hosts.is_file() else None
-    wheel = provision(n, r, cid, user)
+    told: dict[str, Any] = {}
+    wheel = provision(n, r, cid, user, out=told)
     reconfigured = config_was is not None and node_hosts.read_text(encoding="utf-8") != config_was
     pid = agent_pid(r, cid, user)
     restarted = False
@@ -836,6 +922,7 @@ def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dic
         "restarted": restarted,
         "build": build_id(wheel),
         "pid": pid,
+        **told,  # after the cut-over, `logins`: what was added to the node's logins.yml and what was passed over
     }
 
 

@@ -14,7 +14,7 @@ import pytest
 import yaml
 from conftest import wait_for_sync
 
-from sessionorc import containers, paths
+from sessionorc import containers, logins, paths
 from sessionorc.client import LocalClient
 from sessionorc.containers import ContainerError, ContainerNode, Runner
 
@@ -359,6 +359,87 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     assert "--remove-existing-container" in up and "--build-no-cache" in up
     start = r2.execs("shiftlead-agent serve")
     assert start and "--env-file" in start[0]
+
+
+CUT_OVER = """cut_over: '2026-11-26'
+teams:
+  cm-grind: {repo: contractmatch, host: contractmatch, flow: build, logins: [claude-code:grind, claude-code:spare,
+    claude-code:clash, claude-code:gone, gemini:absent]}
+  home-team: {repo: shiftlead, host: kmaster, flow: build, logins: [claude-code:homeonly]}
+  old-shape: {host: contractmatch, logins: [claude-code:unswitched]}
+builtins: {default: {logins: [claude-code:seat, claude-code:grind]}, other: {logins: [claude-code:homeonly]}}
+repos: {shiftlead: {builtins: other}}
+"""
+HOME_LOGINS = """logins:
+  claude-code:grind: {folder: /h/grind, account: acct-1, billing: metered, label: the home's own words}
+  claude-code:spare: {folder: /h/spare}
+  claude-code:clash: {folder: /h/clash}
+  claude-code:gone: {folder: /h/gone}
+  claude-code:seat: {folder: /h/seat, account: acct-2}
+  claude-code:homeonly: {folder: /h/homeonly}
+accounts: {}
+forgotten: {}
+"""
+
+
+def test_after_the_cut_over_host_up_adds_the_logins_a_nodes_lists_name_and_touches_none_it_has(home):
+    """TD-2070, design §4.9e *A container node's `logins.yml`*, §4.2b *On a node*: after the cut-over `ao host up`
+    writes no profile; it adds each login a switched team on the node lists, and the built-in set of that team's repo,
+    that the node lacks, under the home's key with its account and billing and a folder under `/shiftlead/profiles/`,
+    not signed in; it keeps what the node has, and passes over a name another tool's login there has (live or
+    forgotten), a key forgotten there, and a login the home does not hold, saying so."""
+    (home / "settings.yml").write_text(CUT_OVER)
+    (home / "logins.yml").write_text(HOME_LOGINS)
+    n = containers.node("contractmatch")
+    node_home = n.node_dir / "home"
+    node_home.mkdir(parents=True)
+    (node_home / "logins.yml").write_text(
+        "logins:\n  claude-code:spare: {folder: /shiftlead/profiles/spare, label: mine}\n"
+        "  gemini:clash: {folder: /shiftlead/profiles/clash}\n"
+        "accounts: {}\nforgotten:\n  claude-code:gone: {folder: /shiftlead/profiles/gone}\n"
+    )
+    out = containers.host_up("contractmatch", Fake())
+    assert out["logins"]["added"] == ["claude-code:grind", "claude-code:seat"]
+    assert out["logins"]["passed"] == [
+        "clash is gemini:clash's name on this node: a login's name is unique on its host, so list another login for "
+        "the team",
+        "claude-code:gone is forgotten on contractmatch: take it back there to use it",
+        "gemini:absent is no login of kmaster: nothing to copy to contractmatch",
+    ]
+    got = logins.load(node_home)
+    assert got["logins"]["claude-code:grind"] == {
+        "folder": "/shiftlead/profiles/grind",
+        "account": "acct-1",
+        "billing": "metered",
+    }, "the account key and billing copied, nothing else of the home's"
+    assert got["logins"]["claude-code:seat"] == {"folder": "/shiftlead/profiles/seat", "account": "acct-2"}
+    assert got["logins"]["claude-code:spare"] == {"folder": "/shiftlead/profiles/spare", "label": "mine"}, "kept"
+    assert "claude-code:homeonly" not in got["logins"] and "claude-code:unswitched" not in got["logins"]
+    assert not (node_home / "profiles.yml").exists(), "no profile is written after the cut-over"
+    again = containers.host_up("contractmatch", Fake())
+    assert again["logins"]["added"] == [] and logins.load(node_home) == got, "re-provisioning adds only the missing"
+
+
+def test_after_the_cut_over_a_node_with_no_logins_file_is_given_one_and_before_it_none(home):
+    n = containers.node("contractmatch")
+    before = containers.host_up("contractmatch", Fake())
+    assert "logins" not in before and not logins.switched(n.node_dir / "home")
+    assert (n.node_dir / "home" / "profiles.yml").is_file(), "before the cut-over the profiles are written as today"
+    (n.node_dir / "home" / "profiles.yml").unlink()
+    (home / "settings.yml").write_text(CUT_OVER)
+    (home / "logins.yml").write_text(HOME_LOGINS)
+    out = containers.host_up("contractmatch", Fake())
+    assert out["logins"]["added"] == [
+        "claude-code:grind",
+        "claude-code:spare",
+        "claude-code:clash",
+        "claude-code:gone",
+        "claude-code:seat",
+    ]
+    assert set(logins.load(n.node_dir / "home")["logins"]) == set(out["logins"]["added"])
+    (n.node_dir / "home" / "logins.yml").write_text("logins: [broken\n")
+    told = containers.host_up("contractmatch", Fake())["logins"]
+    assert told["added"] == [] and told["passed"][0].startswith("no login added to contractmatch: ")
 
 
 def _pinned_node(monkeypatch, tmp_path, *, resolves=True):

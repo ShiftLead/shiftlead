@@ -159,3 +159,16 @@ def test_wind_down_and_force_are_one_or_the_other(world):
     with pytest.raises(SystemExit):
         run("rebuild", "cm", "--wind-down", "--force")
     assert world["touched"] == []
+
+
+@pytest.mark.unit
+def test_host_up_prints_each_login_it_added_and_each_it_passed_over():
+    """TD-2070: `ao host up`'s words after the cut-over, a line for each login added to the node and each passed over;
+    none before it."""
+    from shiftlead.cli import _node_login_words
+
+    assert _node_login_words({}) == ""
+    got = _node_login_words({"logins": {"added": ["claude-code:grind"], "passed": ["clash is gemini:clash's name"]}})
+    assert (
+        got == "\n  login claude-code:grind added, not signed in: sign in inside once\n  clash is gemini:clash's name"
+    )
