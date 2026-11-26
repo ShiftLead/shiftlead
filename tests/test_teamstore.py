@@ -722,7 +722,8 @@ def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypat
     body = SimpleNamespace(builtins_view=lambda **kw: seen.update(kw) or {"set": kw["name"]})
     a = _agent_on(monkeypatch, body)
     mark = {"sweeper": {"n": {"model": "haiku", "logins": []}}}
-    a._host_rec = {"builtins": {"cheap": {"node_cannot_run": mark}}}
+    other = {"tech-lead": {"m": {"model": "opus", "logins": []}}}
+    a._host_rec = {"builtins": {"cheap": {"node_cannot_run": mark}, "default": {"node_cannot_run": other}}}
 
     async def tools():
         return {}
@@ -734,6 +735,6 @@ def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypat
     a._projected = lambda *_a: {}
     asyncio.run(a.rpc_builtins_show(set="cheap"))
     assert seen["node_marks"] == mark
-    assert seen["set_marks"] == {"cheap": mark}, "every set's marks, for its tab's dot"
+    assert seen["set_marks"] == {"cheap": mark, "default": other}, "every set's marks, for its tab's dot"
     asyncio.run(a.rpc_builtins_show(set=""))
-    assert seen["name"] == "default" and seen["node_marks"] is None
+    assert seen["name"] == "default" and seen["node_marks"] == other
