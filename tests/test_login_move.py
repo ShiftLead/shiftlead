@@ -5,18 +5,23 @@ marked `moving` no other rule acts on it, a failed launch leaves it ended, and a
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import subprocess
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
 from _stubs import HookFedStub
-from conftest import park_ticks
+from conftest import kill_private_server, park_ticks, private_socket_name, wait_for
 
-from sessionorc import adapters, agent_common, paths, teamstore
+from sessionorc import adapters, agent_common, hosts, paths, teamstore
 from sessionorc.adapters import LaunchSpec
+from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
-from sessionorc.models import MailEntry
+from sessionorc.models import MailEntry, Session
+from sessionorc.store import SessionStore
+from sessionorc.tmux import Tmux
 from shiftlead import stage_pass
 from shiftlead.stage_read import EntryFacts, EntryLedger, holder_on
 from shiftlead.stagerecord import StageStore, new_record
@@ -529,3 +534,64 @@ async def test_a_tick_moves_a_session_at_its_line_before_the_usage_gate_pauses_i
     assert new is not old and new.login == "hookstub:second", "moved in the tick"
     assert old.gated is None and new.gated is None, "never marked by the gate"
     assert "pause now" not in [text for _, text in typed], "no pause line typed"
+
+
+@pytest.mark.integration
+async def test_a_host_agent_that_starts_on_a_stored_mark_clears_it_on_disk(tmp_path, monkeypatch):
+    """TD-2302, design §4.9e *A mark is never left standing*: a host agent started on a store holding a record marked
+    `moving` (a move its restart cut off) clears the mark and saves the record, so the next start reads none."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    paths.ensure_layout()
+    mark = {"at": datetime.now(UTC).isoformat(), "from": "hookstub:first", "to": "hookstub:second"}
+    s = Session(id="ao-w-move", name="w", kind="interactive", adapter="hookstub", dir=str(tmp_path), state="closed")
+    s.host, s.moving = hosts.local_host().name, mark
+    SessionStore().save(s)
+    tmux = Tmux(socket_name=private_socket_name())
+    a = HostAgent(tmux=tmux)
+    assert a.sessions["ao-w-move"].moving == mark, "the record comes back marked"
+    task = asyncio.create_task(a.serve(paths.socket_path()))
+    try:
+        assert await wait_for(lambda: paths.socket_path().exists(), timeout=5.0, step=0.05)
+        assert a.sessions["ao-w-move"].moving is None
+        assert SessionStore().load("ao-w-move").moving is None, "the cleared mark is saved"
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
+        kill_private_server(tmux)
+
+
+@pytest.mark.integration
+async def test_a_moves_mark_is_saved_before_the_old_session_is_closed(agent, tmp_path, launched, rows, monkeypatch):
+    """TD-2302, design §4.9e: the mark is on disk before the handoff is read and the old session closed, so a restart
+    in between finds it (and clears it) rather than a record that reads no move."""
+    sid = await _stage_session(agent, tmp_path)
+    seen: dict[str, object] = {}
+
+    def handoff(ad, path):
+        seen["handoff"] = agent.store.load(sid).moving
+        return HANDOFF
+
+    close = agent._close
+
+    async def closing(*a, **kw):
+        seen["close"] = agent.store.load(sid).moving
+        return await close(*a, **kw)
+
+    monkeypatch.setattr(adapters, "handoff_of", handoff)
+    monkeypatch.setattr(agent, "_close", closing)
+    await agent._login_moves(datetime.now(UTC))
+    want = {"from": "hookstub:first", "to": "hookstub:second"}
+    for at in ("handoff", "close"):
+        assert isinstance(seen[at], dict) and {k: seen[at][k] for k in want} == want, at
+    assert agent.sessions[sid].login == "hookstub:second" and agent.store.load(sid).moving is None
+
+
+@pytest.mark.unit
+def test_a_failed_move_counts_toward_the_ceiling_and_a_launched_one_does_not():
+    """TD-2302, design §4.9e and §6 rule 1: a `login-move` entry counts only when its launch failed."""
+    now = datetime.now(UTC)
+    at = now.isoformat()
+    failed = {"why": "login-move", "at": at, "error": "no launch"}
+    assert agent_common._counted([failed], now) == [failed]
+    assert agent_common._counted([{"why": "login-move", "at": at}], now) == []
