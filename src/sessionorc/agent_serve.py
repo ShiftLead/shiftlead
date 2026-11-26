@@ -19,6 +19,7 @@ from sessionorc import (
     agent_common,
     identity,
     link,
+    logins,
     mail,
     modes,
     naming,
@@ -190,6 +191,17 @@ class ServeMixin:
         lines = p.read_text().splitlines() if p.is_file() else []
         lines = [str(directory)] + [ln for ln in lines if ln != str(directory)]
         p.write_text("\n".join(lines[:20]) + "\n")
+
+    def _remember_login(self, login: str) -> None:
+        """The person's create on a login is the last used for its tool on this host (§4.9e *The launch on a login*,
+        TD-2068): `last_login`, one `<tool> <key>` line per tool, newest first."""
+        p = paths.last_login_file()
+        tool = logins.split(login)[0]
+        try:
+            lines = p.read_text().splitlines() if p.is_file() else []
+        except UnicodeDecodeError:  # an unreadable file is nothing stored: this write replaces it
+            lines = []
+        p.write_text("\n".join([f"{tool} {login}", *(ln for ln in lines if ln.split(" ", 1)[0] != tool)]) + "\n")
 
     # -- streaming -------------------------------------------------------------------------------
 

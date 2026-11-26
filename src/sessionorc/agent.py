@@ -47,6 +47,7 @@ from sessionorc import (
     identity,
     ledgerboard,
     link,
+    logins,
     mail,
     naming,
     paths,
@@ -1343,6 +1344,27 @@ class HostAgent(
         p = paths.recent_dirs_file()
         return p.read_text().splitlines() if p.is_file() else []
 
+    async def rpc_last_login(self) -> dict[str, str]:
+        """The login last used on this host for each tool, `{tool: key}` (§4.9e *The launch on a login*, TD-2068):
+        what `_remember_login` wrote, less a login this host's `logins.yml` no longer holds, which is nothing
+        stored."""
+        p = paths.last_login_file()
+        try:
+            data = logins.load()
+        except logins.LoginError:
+            data = None
+        held = set((data or {}).get("logins") or {})
+        try:
+            lines = p.read_text().splitlines() if p.is_file() else []
+        except (OSError, UnicodeDecodeError):  # an unreadable file is nothing stored, never a failed read
+            lines = []
+        got: dict[str, str] = {}
+        for line in lines:
+            tool, _, key = line.partition(" ")
+            if tool and key in held and key.partition(":")[0] == tool and tool not in got:
+                got[tool] = key
+        return got
+
     async def rpc_repos(self, omit: list[str] | None = None) -> dict[str, dict[str, Any]]:
         """The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), keyed by the
         checkout's path: what the team card's Repo facet, the rollup and the Repo page draw, with
@@ -2237,6 +2259,11 @@ class HostAgent(
                 for held in {holder.adapter_id, holder.context_id} - {s.adapter_id, s.context_id}:
                     self._drop_context(held, holder)
             self._remember_dir(directory)
+            if s.by_person and s.login:  # the person's own pick, never a team's or a seat's (§4.9e)
+                try:
+                    self._remember_login(s.login)
+                except (OSError, ValueError) as e:  # the session exists: its create stands, the default unwritten
+                    log.warning("create %s: could not remember its login: %s", s.id, e)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
             elif (keep_mail or starting is not None) and isinstance(holder, Session):

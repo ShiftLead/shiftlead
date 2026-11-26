@@ -175,7 +175,8 @@ reach:                                        # §4.5b *The setting*: the person
   without it, and a registered repo that lacks what *The seams*, below, require is unserved until it has
   it ([ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), TD-1009). Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
-  ones per host in `~/.shiftlead/recent_dirs`.
+  ones per host in `~/.shiftlead/recent_dirs`, and the login the person last started a session on, per tool, in
+  `~/.shiftlead/last_login` (§4.9e *The launch on a login*).
 - Per repo: `.shiftlead.yml` (checked in). A repo's `.agentorc.yml`, its name while the project was
   `agentorc`, is read by nothing; `ao org check` names a registered checkout that holds only it (TD-553):
 

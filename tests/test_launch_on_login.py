@@ -233,3 +233,52 @@ async def test_a_held_seat_on_a_login_holds_its_login_fields(agent, tmp_path, la
         ["hookstub:grind"],
         "grind",
     )
+
+
+async def test_the_persons_create_on_a_login_is_the_last_used_for_its_tool(agent, tmp_path, launched):
+    """§4.9e *The launch on a login*: the host agent remembers, per tool, the login of the last create the person made
+    on one (`last_login`, beside `recent_dirs`); a team's or a seat's launch writes nothing, and a stored login this
+    host's `logins.yml` no longer holds reads as nothing stored."""
+    (paths.home() / "logins.yml").write_text(LOGINS)
+    async with LocalClient() as person:
+        assert await person.call("last_login") == {}, "nothing stored yet"
+        await person.call("create", **_params(tmp_path, "mine", login="grind"))
+        await person.call("create", **_params(tmp_path, "team", login="hookstub:twin", supervised=True, team="t"))
+        await person.call(
+            "create",
+            **_params(tmp_path, "seat", login="hookstub:twin", supervised=True, held=True, seat={"trigger": "asks"}),
+        )
+        assert await person.call("last_login") == {"hookstub": "hookstub:grind"}, "a team's or a seat's writes none"
+        await person.call("create", **_params(tmp_path, "cc", adapter="claude-code", login="claude-code:twin"))
+        await person.call("create", **_params(tmp_path, "again", login="hookstub:twin"))
+        assert await person.call("last_login") == {"hookstub": "hookstub:twin", "claude-code": "claude-code:twin"}
+        (paths.home() / "logins.yml").write_text(LOGINS.replace("  hookstub:twin: {folder: /c/t1}\n", ""))
+        assert await person.call("last_login") == {"claude-code": "claude-code:twin"}, "a login gone is none stored"
+
+
+async def test_an_unwritable_or_unreadable_last_login_never_fails_a_create(agent, tmp_path, launched, monkeypatch):
+    """Review of #4734: `last_login` is a convenience file. A create whose write of it fails stands (the write is
+    after the record is saved, as `recent_dirs`' is), and a file that cannot be read, or a line whose key is another
+    tool's, reads as nothing stored."""
+    (paths.home() / "logins.yml").write_text(LOGINS)
+
+    def refuse(self, login):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(type(agent), "_remember_login", refuse)
+    async with LocalClient() as person:
+        sid = (await person.call("create", **_params(tmp_path, "mine", login="grind")))["id"]
+        assert agent.sessions[sid].login == "hookstub:grind", "the create stood"
+        paths.last_login_file().write_bytes(b"\xff\xfe not text")
+        assert await person.call("last_login") == {}, "an unreadable file is nothing stored"
+        paths.last_login_file().write_text("claude-code hookstub:grind\nnospace\nhookstub hookstub:twin\n")
+        assert await person.call("last_login") == {"hookstub": "hookstub:twin"}, "another tool's key is skipped"
+
+
+async def test_a_create_replaces_an_unreadable_last_login(agent, tmp_path, launched):
+    """Re-review of #4734: the real write over a file that is not text replaces it rather than failing the create."""
+    (paths.home() / "logins.yml").write_text(LOGINS)
+    paths.last_login_file().write_bytes(b"\xff\xfe not text")
+    async with LocalClient() as person:
+        await person.call("create", **_params(tmp_path, "mine", login="grind"))
+        assert await person.call("last_login") == {"hookstub": "hookstub:grind"}

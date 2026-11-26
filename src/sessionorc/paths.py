@@ -199,6 +199,12 @@ def recent_dirs_file() -> Path:
     return home() / "recent_dirs"
 
 
+def last_login_file() -> Path:
+    """The login last used on this host for each tool (design §4.9e *The launch on a login*, TD-2068): written on a
+    create the person makes, read as `ao new`'s and the + New form's default."""
+    return home() / "last_login"
+
+
 def ensure_layout() -> None:
     for d in (sessions_dir(), events_dir(), runs_dir(), attachments_dir(), waits_dir()):
         d.mkdir(parents=True, exist_ok=True)
