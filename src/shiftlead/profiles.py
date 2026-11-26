@@ -156,6 +156,9 @@ def _adapter_rules(profiles: dict[str, Profile]) -> None:
             raise ValueError(f"profiles.yml: {p.name} is metered, but {p.adapter} reports no spend")
 
 
+DEFAULT = "default"  # the placeholder profile's name: the tool's own home, for a record with no `profile`
+
+
 def profiles_file() -> Path:
     return paths.home() / "profiles.yml"
 
@@ -164,9 +167,13 @@ def load(path: Path | None = None, *, with_logins: bool = True) -> tuple[dict[st
     """Return (profiles by name, default profile name); on a switched host the logins too (`_from_logins`), but for
     a reader of `profiles.yml` itself (the switch-over's, the Settings page's profile cards), `with_logins=False`."""
     path = path or profiles_file()
-    kept = _from_logins(path.parent) if with_logins else {}
+    data = logins.load(path.parent) if with_logins else None
+    kept = _from_logins(data)
+    # the placeholder `default` stands only while no login of any tool, live or forgotten, holds the name (§4.9e
+    # *A forgotten login's records*, TD-2287): a forgotten `default` is unknown, never the tool's own home
+    placeholder = {} if DEFAULT in _names(data) else {DEFAULT: Profile(name=DEFAULT)}
     if not path.is_file():
-        return {"default": Profile(name="default"), **kept}, "default"
+        return {**placeholder, **kept}, DEFAULT
     data = yamltext.load(path.read_text(encoding="utf-8")) or {}
     out: dict[str, Profile] = {}
     for name, raw in (data.get("profiles") or {}).items():
@@ -188,25 +195,43 @@ def load(path: Path | None = None, *, with_logins: bool = True) -> tuple[dict[st
         )
     _metered_dirs(out)
     _adapter_rules(out)
-    if not out:
-        out["default"] = Profile(name="default")
-    default = data.get("default") or next(iter(out))
+    declared = bool(out)
+    if not declared:
+        out.update(placeholder)
+    default = data.get("default") or next(iter(out), DEFAULT)
     out.update(kept)
-    if default not in out:
+    if (declared or data.get("default")) and default not in out:
         raise ValueError(f"profiles.yml: default {default!r} is not a declared profile ({sorted(out)})")
     return out, default
 
 
-def _from_logins(home: Path) -> dict[str, Profile]:
+def _from_logins(data: dict | None) -> dict[str, Profile]:
     """The host's logins as profiles by name (§4.9e *A record's profile*), each once, so a reader that walks every
     profile counts each login once: under its bare name, the name a launch writes on a record, or under its key
     (`<tool>:<name>`) where two tools' logins share that name, which only a file edited by hand holds, since nothing
     shiftlead writes makes one (TD-2232); none where the host is not switched. A `logins.yml` that
-    does not read raises, as a `profiles.yml` that does not read does (`LoginError` is a `ValueError`)."""
-    data = logins.load(home)
+    does not read raises, as a `profiles.yml` that does not read does (`LoginError` is a `ValueError`): `data` is
+    `logins.load`'s."""
     if data is None:
         return {}
     return {logins.profile_name(data, lk): _login_profile(lk, entry) for lk, entry in sorted(data["logins"].items())}
+
+
+def _names(data: dict | None) -> set[str]:
+    """Every bare name a login of any tool holds on this host, live or forgotten (a name is unique across tools,
+    TD-2232); none where the host is not switched."""
+    if data is None:
+        return set()
+    return {logins.split(lk)[1] for lk in (*data["logins"], *(data.get("forgotten") or {}))}
+
+
+def _forgotten_default(path: Path | None) -> bool:
+    """Whether the name `default` is a forgotten login's (any tool's) on the host `path`'s `profiles.yml` is on."""
+    try:
+        data = logins.load((path or profiles_file()).parent)
+    except ValueError:
+        return False
+    return DEFAULT in {logins.split(lk)[1] for lk in (data or {}).get("forgotten") or {}}
 
 
 def _login_profile(lk: str, entry: dict) -> Profile:
@@ -275,4 +300,6 @@ def get(name: str | None, path: Path | None = None) -> Profile:
     try:
         return profiles[key]
     except KeyError:
+        if not name and key == DEFAULT and _forgotten_default(path):
+            raise KeyError(f"`{DEFAULT}` is a forgotten login's name: add its folder again, or name a login") from None
         raise KeyError(f"unknown profile {key!r}; known: {sorted(profiles)}") from None

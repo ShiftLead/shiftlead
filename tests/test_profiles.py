@@ -316,3 +316,68 @@ def test_the_profiles_file_s_default_may_name_a_login(tmp_path):
     (tmp_path / "profiles.yml").write_text("default: grind\nprofiles:\n  sh: {adapter: shell}\n")
     got, default = profiles.load(tmp_path / "profiles.yml")
     assert default == "grind" and got["grind"].account == "acct-1"
+
+
+# §4.9e *A forgotten login's records* (TD-2287): a forgotten name is unknown, `default` among them, and the
+# placeholder `default` stands only while no login of any tool, live or forgotten, holds that name
+FORGOT_DEFAULT = (
+    "logins:\n  claude-code:grind: {folder: /c/grind}\naccounts: {}\n"
+    "forgotten:\n  {tool}:default: {folder: /c/d}\n  claude-code:old: {folder: /c/old}\n"
+)
+
+
+@pytest.mark.parametrize("pfile", [None, "sh_only", "no_profiles"])
+@pytest.mark.parametrize("name", ["default", "old"])
+def test_a_forgotten_login_is_unknown_to_every_reader_default_among_them(tmp_path, pfile, name):
+    (tmp_path / "logins.yml").write_text(FORGOT_DEFAULT.replace("{tool}", "claude-code"))
+    if pfile == "sh_only":
+        (tmp_path / "profiles.yml").write_text("profiles:\n  sh: {adapter: shell}\n")
+    elif pfile == "no_profiles":
+        (tmp_path / "profiles.yml").write_text("profiles: {}\n")
+    path = tmp_path / "profiles.yml"
+    with pytest.raises(KeyError):
+        profiles.get(name, path)
+    assert profiles.account_of(name, "claude-code", path) is None
+    assert name not in {p["name"] for p in profiles.for_adapter("claude-code", path)}
+    assert "grind" in {p["name"] for p in profiles.for_adapter("claude-code", path)}, "the live login reads on"
+
+
+@pytest.mark.parametrize("pfile", [None, "profiles: {}\n"])
+def test_a_launch_with_no_profile_on_a_forgotten_default_is_refused_by_name(tmp_path, pfile):
+    (tmp_path / "logins.yml").write_text(FORGOT_DEFAULT.replace("{tool}", "claude-code"))
+    if pfile:
+        (tmp_path / "profiles.yml").write_text(pfile)
+    got, default = profiles.load(tmp_path / "profiles.yml")
+    assert default == "default" and "default" not in got, "a profiles file declaring none loads without raising"
+    for none in (None, ""):
+        with pytest.raises(KeyError, match="`default` is a forgotten login's name: add its folder again, or name a"):
+            profiles.get(none, tmp_path / "profiles.yml")
+    with pytest.raises(KeyError, match="unknown profile 'default'"):
+        profiles.get("default", tmp_path / "profiles.yml")
+
+
+def test_another_tools_forgotten_default_withholds_the_placeholder(tmp_path):
+    (tmp_path / "logins.yml").write_text(FORGOT_DEFAULT.replace("{tool}", "gemini"))
+    got, _ = profiles.load(tmp_path / "profiles.yml")
+    assert "default" not in got
+    assert profiles.account_of(None, "claude-code", tmp_path / "profiles.yml") is None
+
+
+def test_a_live_login_named_default_is_the_default(tmp_path):
+    (tmp_path / "logins.yml").write_text("logins:\n  claude-code:default: {folder: /c/d, account: a}\n")
+    assert str(profiles.get(None, tmp_path / "profiles.yml").config_dir) == "/c/d"
+
+
+def test_a_host_with_no_logins_and_no_profiles_file_keeps_the_placeholder(tmp_path):
+    got = profiles.get(None, tmp_path / "profiles.yml")
+    assert got.name == "default" and got.config_dir is None
+    (tmp_path / "logins.yml").write_text(FORGOT_DEFAULT.replace("{tool}", "claude-code"))
+    got, _ = profiles.load(tmp_path / "profiles.yml", with_logins=False)
+    assert got["default"].config_dir is None, "a reader of the profiles file itself always gets the placeholder"
+
+
+def test_an_explicit_default_naming_no_profile_still_raises_beside_a_forgotten_default(tmp_path):
+    (tmp_path / "logins.yml").write_text(FORGOT_DEFAULT.replace("{tool}", "claude-code"))
+    (tmp_path / "profiles.yml").write_text("default: nope\nprofiles: {}\n")
+    with pytest.raises(ValueError, match="default 'nope' is not a declared profile"):
+        profiles.load(tmp_path / "profiles.yml")
