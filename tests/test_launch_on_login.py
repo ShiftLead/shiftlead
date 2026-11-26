@@ -105,6 +105,56 @@ def test_claude_codes_launch_runs_the_model_given_over_the_profiles_pin(tmp_path
     assert given.argv.count("--model") == 1
 
 
+def _pinned_login(tmp_path: Path, monkeypatch, tool: str) -> None:
+    """A home whose `logins.yml` holds `<tool>:grind`, pinned to `pinned`, and the launch's working directory."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "logins.yml").write_text(
+        "logins:\n  " + tool + ":grind: {folder: " + str(tmp_path / "cfg") + ", pin: pinned}\n"
+    )
+    (tmp_path / "w").mkdir()
+
+
+def _the_model(spec: LaunchSpec) -> str:
+    assert spec.argv.count("--model") == 1, spec.argv
+    return spec.argv[spec.argv.index("--model") + 1]
+
+
+@pytest.mark.unit
+def test_geminis_launch_runs_the_model_given_over_the_logins_pin(tmp_path, monkeypatch):
+    from test_gemini_adapter import rooted
+
+    from shiftlead.adapters import gemini
+
+    _pinned_login(tmp_path, monkeypatch, "gemini")
+    machine = tmp_path / "etc" / "gemini-settings.json"  # the machine layer, installed: never this machine's own
+    monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
+    monkeypatch.setattr(gemini, "_lstat", rooted())
+    machine.parent.mkdir()
+    machine.write_text(gemini.write_layer().read_text())
+    ad = gemini.GeminiAdapter(binary="/opt/gemini")
+    kw = {"profile": "grind", "resume": None, "prompt": None, "unattended": True, "cwd": tmp_path / "w"}
+    assert _the_model(ad.launch(**kw)) == "pinned"
+    assert _the_model(ad.launch(**kw, model="given")) == "given", "a launch on a login runs the seat model (§4.9e)"
+
+
+@pytest.mark.unit
+def test_groks_launch_runs_the_model_given_over_the_logins_pin(tmp_path, monkeypatch):
+    from shiftlead.adapters import grok
+
+    _pinned_login(tmp_path, monkeypatch, "grok")
+    binary = tmp_path / "bin" / "grok"
+    binary.parent.mkdir()
+    binary.write_text("#!/bin/sh\n")
+    (tmp_path / "person").mkdir()  # the launch home's source: never the developer's (TD-1836)
+    monkeypatch.setattr(grok, "PERSON_HOME", tmp_path / "person")
+    monkeypatch.setattr(grok, "MANAGED_SETTINGS", tmp_path / "etc" / "managed-settings.json")
+    ad = grok.GrokAdapter(binary=str(binary), hook_cmd="/venv/bin/shiftlead-hook")
+    kw = {"profile": "grind", "resume": None, "prompt": None, "unattended": True, "cwd": tmp_path / "w"}
+    assert _the_model(ad.launch(**kw)) == "pinned"
+    assert _the_model(ad.launch(**kw, model="given")) == "given", "a launch on a login runs the seat model (§4.9e)"
+
+
 @pytest.fixture
 def launched(hookstub, monkeypatch):
     """The stub adapter's launch, recording what each was handed."""
