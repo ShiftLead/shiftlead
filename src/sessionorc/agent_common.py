@@ -950,22 +950,35 @@ def _scale(scale: Any) -> dict[str, Any] | None:
 
 
 def _on_login(
-    login: Any, adapter: str, profile: str, seat_model: Any, login_list: Any, home: Path | None = None
+    login: Any,
+    adapter: str,
+    profile: str,
+    seat_model: Any,
+    login_list: Any,
+    home: Path | None = None,
+    *,
+    held: bool = False,
 ) -> dict[str, Any] | None:
     """A create's launch on a login (design §4.9e *The launch on a login*, TD-2068), resolved in this host's
     `logins.yml`: `{login, account, profile, login_list}`, the login's key, its account, the name it is read under as
     a profile and the list as given; None for a launch with no login. Refused, before anything is made: a seat model or
-    a list with no login, a login this host does not hold, and a profile or an adapter that is not the login's."""
-    if not login:
-        if seat_model or login_list:
-            raise RpcError("seat_model and login_list ride a launch on a login: name the login (design §4.9e)")
-        return None
+    a list with no login, a login this host does not hold, and a profile or an adapter that is not the login's. A
+    `held` record (the director's, written with no session) keeps a seat model and a list with no login: its fill
+    picks the login from them (§4.9d *How each one runs*)."""
     if seat_model is not None and (not isinstance(seat_model, str) or not seat_model.strip()):
         raise RpcError(f"seat_model is a model family's name, not {seat_model!r} (design §4.9e)")
     if login_list is not None and (
         not isinstance(login_list, list) or not all(isinstance(x, str) and x for x in login_list)
     ):
         raise RpcError(f"login_list is the logins' keys in order, not {login_list!r} (design §4.9e)")
+    if not login:
+        if (seat_model or login_list) and not held:
+            raise RpcError("seat_model and login_list ride a launch on a login: name the login (design §4.9e)")
+        if not (seat_model and login_list):
+            if seat_model or login_list:
+                raise RpcError("a held record on a login list names its seat_model and its login_list (design §4.9e)")
+            return None
+        return {"login": None, "account": None, "profile": profile, "login_list": list(login_list)}
     try:
         data = logins.load(home)
     except logins.LoginError as e:

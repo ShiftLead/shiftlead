@@ -182,6 +182,11 @@ NOT_RESTARTS = ("person", "start", "schedule", "work")
 BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "prompts"}
 
 
+def _director(s: Session) -> bool:
+    """The director's record (§4.9d *How each one runs*): a seat on `prompt` with no `builtin`, whatever its state."""
+    return (s.seat or {}).get("trigger") == "prompt" and not s.builtin
+
+
 def _person_cleared(restarts: list[Any]) -> bool:
     """A person's restart cleared this seat's fill ceiling and no fill has come since (§6 rule 2, TD-1422):
     a `{why: person}` entry with no `fill` entry after it. Its next fill goes past the count, once."""
@@ -4946,10 +4951,10 @@ class TickMixin:
             self._save(new)
 
     def _on_set_login(self, s: Session) -> bool:
-        """Whether a fill of `s` picks its login from its repo's built-in set (`_builtin_login`): after the cut-over, a
-        built-in seat's record on the home's own host."""
+        """Whether a fill of `s` picks its login from a list (`_builtin_login`): after the cut-over, a built-in seat's
+        record or the director's on the home's own host."""
         here = not s.host or s.host == self.host
-        return bool(self._first_shape_off and BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) and here)
+        return bool(self._first_shape_off and (BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) or _director(s)) and here)
 
     async def _builtin_login(self, s: Session) -> dict[str, Any] | None:
         """The `create` arguments that put a built-in seat's fill on its login (§4.9d *The login a seat starts on*,
@@ -4957,30 +4962,45 @@ class TickMixin:
         built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the
         list of the set its repo uses that offers the seat's model, with that model and the list, by
         `builtinstore.seat`, no team's reserve added. None where nothing is to be filled now, `unfillable` saying why:
-        *no login usable* (the usage gate holds it) or *cannot run* (no login of the list offers the model)."""
+        *no login usable* (the usage gate holds it) or *cannot run* (no login of the list offers the model). The
+        director's fill picks from its own record's `seat_model` and `login_list`, which the home writes from
+        `org.yml`'s `director:` (this host reads no `org.yml`), passing over a login that leaves its prompts on
+        (§4.9d)."""
         if not self._on_set_login(s):
             return {}
-        key = BUILTIN_SEAT_KEYS[str(s.builtin)]
         doc = settings_mod.load()
-        root = str(s.repo or "")
-        repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
         read, gate = await self.rpc_tools(), await self.rpc_gate()
         now = datetime.now(UTC)
         rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), 0, now)
-        got = builtinstore.seat(doc, repo, key, rows)
-        pick = got["now"]
+        if _director(s):
+            order, held, where = list(s.login_list or ()), str(s.seat_model or ""), "the director's list"
+            pick = (
+                teamstore.pick(order, held, rows, unasked=True)
+                if order and held
+                else {"login": None, "state": "none", "why": "its record names no model or no logins"}
+            )
+        else:
+            root = str(s.repo or "")
+            repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+            got = builtinstore.seat(doc, repo, BUILTIN_SEAT_KEYS[str(s.builtin)], rows)
+            order, held, where = (
+                list(builtinstore.sets(doc)[got["set"]]["logins"]),
+                got["model"],
+                f"built-in set {got['set']}",
+            )
+            pick = got["now"]
         if pick["state"] != "usable" or not pick.get("login"):
             why = "no login usable" if pick["state"] == "waits" else "cannot run"
             self.unfillable[s.id] = why
-            log.info("%s: not filled — %s in built-in set %s: %s", s.id, why, got["set"], pick.get("why"))
+            log.info("%s: not filled — %s in %s: %s", s.id, why, where, pick.get("why"))
             return None
         login = str(pick["login"])
         return {
             "login": login,
             "adapter": logins.split(login)[0],
             "profile": "",
-            "seat_model": got["model"],
-            "login_list": list(builtinstore.sets(doc)[got["set"]]["logins"]),
+            "seat_model": held,
+            "login_list": order,
         }
 
     def _seat_prs(self, s: Session, records: list[Session]) -> list[str]:

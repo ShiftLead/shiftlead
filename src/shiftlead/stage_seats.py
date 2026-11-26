@@ -20,6 +20,9 @@ is the package's director brief with the Org block's place naming the repo inste
 The director's record is the org's: where `org.yml` has `director:` and no record holds the seat, the home writes it
 exactly as a first-shape Start does (`teamrun.write_director`), held for rule 3's `prompt` fill whatever teams are
 started; once the key is gone it removes the director's records, as Forget does, when no session of them is live.
+After the cut-over the record carries `director.model` and `director.logins` as its `seat_model` and `login_list`, which
+its fill picks from (TD-2068); an ended record that carries others (one written before the cut-over, or before the key
+changed) is written again in place, its mail kept, and a live one when its session has ended.
 
 Where *Where a seat's session launches* gives a seat another host while its record is ended, the home writes the
 record on that host and marks the old one superseded by it, its mail moved (`seat_moved`); a live or suspended record
@@ -37,6 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import brief as brief_mod
+from sessionorc import teamstore
 from sessionorc.models import Session
 from shiftlead import org as orgmod
 from shiftlead import repoconfig, stage_start, teamrun, teams
@@ -298,12 +302,50 @@ def write_prompts(
 _DIRECTOR = threading.Lock()
 
 
-def _director_in(graph: Mapping[str, Session]) -> bool:
-    """Whether the pass's snapshot holds a director record (`teamrun.is_director`'s reading, on a `Session`)."""
+def _director_in(graph: Mapping[str, Session], want: tuple[str, list[str]] | None = None) -> bool:
+    """Whether the pass's snapshot holds a director record (`teamrun.is_director`'s reading, on a `Session`) that
+    carries what the key gives (`_launch_of`), where it gives one."""
     return any(
-        (s.seat or {}).get("trigger") == orgmod.DIRECTOR_TRIGGER and not (s.team or s.builtin or s.superseded_by)
+        (s.seat or {}).get("trigger") == orgmod.DIRECTOR_TRIGGER
+        and not (s.team or s.builtin or s.superseded_by)
+        and not _stale(s.seat_model, s.login_list, want)
         for s in graph.values()
     )
+
+
+def _launch_of(org: orgmod.Org) -> tuple[str, list[str]] | None:
+    """The model and the ordered logins the director's record carries after the cut-over (§4.9e *The launch on a
+    login*), from `org.yml`'s `director:`; None before it, or where the key gives no model or no logins (which
+    `teams.director_create` refuses)."""
+    d = getattr(org, "director", None)
+    model, order = getattr(d, "model", None), getattr(d, "logins", None)
+    if d is None or not model or not order or not teamstore.first_shape_off():
+        return None
+    return str(model), list(order)
+
+
+def _stale(seat_model: Any, login_list: Any, want: tuple[str, list[str]] | None) -> bool:
+    """Whether a director record carries another model or list than the key gives."""
+    return want is not None and (str(seat_model or ""), list(login_list or ())) != want
+
+
+def _rewrite_director(call: Callable[..., Any], org: orgmod.Org, record: Mapping[str, Any]) -> list[str]:
+    """Write the ended director record again in place, on the key's model and logins, its mail kept (a held
+    `create` over an ended record of the name supersedes it, §6 rule 3)."""
+    name = record.get("name") or record["id"]
+    try:
+        params = teams.director_create(org)
+    except teams.TeamError as e:
+        return [f"{name}: the org's director seat not written again — {e}"]
+    if params is None:
+        return []
+    try:
+        Path(params["dir"]).mkdir(parents=True, exist_ok=True)
+        call("create", **params, keep_mail=True)
+    except Exception as e:  # noqa: BLE001 — one not written is a log line and the next pass's to try again
+        log.warning("the director record %s could not be written again: %s", record.get("id"), e)
+        return []
+    return [f"{name}: written again on the org's model and logins"]
 
 
 def write_director(
@@ -318,10 +360,15 @@ def write_director(
     if org is None:
         return []
     wanted = getattr(org, "director", None) is not None
-    if graph is not None and _director_in(graph) == wanted:
+    want = _launch_of(org) if wanted else None
+    if graph is not None and _director_in(graph, want) == wanted:
         return []
     with _DIRECTOR:
         if wanted:
+            for r in (call("list") or ()) if want is not None else ():
+                ended = r.get("state") in ("exited", "closed")
+                if teamrun.is_director(r) and ended and _stale(r.get("seat_model"), r.get("login_list"), want):
+                    return _rewrite_director(call, org, r)
             return teamrun.write_director(call, org)
         gone = []
         for r in call("list") or ():

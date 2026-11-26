@@ -25,6 +25,7 @@ roles:
 place:
   sam-grind: devenv                   # a repo-defined team that lands on a node (§4.9 *Where a repo's team lands*)
 director: {profile: grind}            # optional: the org's one seat of no team, answering prompts (§4.9b)
+                                      # after the cut-over: {model: opus, logins: ["claude-code:paul"]} (§4.9e)
 ```
 
 A repo's `.shiftlead.yml` may carry `teams:` of its own (teams on that repo, `repo:` unsaid), and
@@ -103,10 +104,13 @@ DIRECTOR_GRANT = "permit"  # its grant (§4.8), which only the director seat hol
 class DirectorDef:
     """The org's director seat (design §4.9b *The director seat*, §5 `org.yml` `director:`, TD-642): one per
     org, the first seat of no team and no project, trigger `prompt`, holding `permit`. `profile` the profile
-    it launches on (the role's precedence where unsaid), `brief` a file overriding the package's `director.md`."""
+    it launches on (the role's precedence where unsaid), `brief` a file overriding the package's `director.md`. After
+    the cut-over (§4.9e *The launch on a login*) `model` and the ordered `logins` stand in for `profile`."""
 
     profile: str | None = None
     brief: str | None = None
+    model: str | None = None
+    logins: list[str] = field(default_factory=list)
     name: str = DIRECTOR_NAME
 
 
@@ -870,7 +874,7 @@ ENTRY_TYPES = ("debt", "feature")
 # the ledger's `Priority:` values, the Add entry form's **Priority** pick (§4.9, TD-851)
 ENTRY_PRIORITIES = ("high", "medium", "low")
 TECHLEAD_KEYS = ("name", "profile", "brief", "context")
-DIRECTOR_KEYS = ("profile", "brief")
+DIRECTOR_KEYS = ("profile", "brief", "model", "logins")
 TECHLEAD_ROLE = "techlead"
 # `anchor:` on a team is retired (design §4.9b *No anchor seat*, §4.9 *A definition written before
 # TD-722*, TD-757): kept among the keys so `anchor: false`, which says what is now true, is passed over;
@@ -1047,8 +1051,14 @@ def _director(raw: Any, key: str) -> DirectorDef:
     director on the defaults."""
     raw = _mapping(raw, key)
     _no_stray(raw, DIRECTOR_KEYS, key)
+    order = raw.get("logins")
+    if order is not None and (not isinstance(order, list) or not all(isinstance(x, str) and x for x in order)):
+        raise ValueError(f"{key}.logins is the logins' keys in order, <tool>:<name> each (design §4.9e)")
     return DirectorDef(
-        profile=_opt_str(raw.get("profile"), f"{key}.profile"), brief=_opt_str(raw.get("brief"), f"{key}.brief")
+        profile=_opt_str(raw.get("profile"), f"{key}.profile"),
+        brief=_opt_str(raw.get("brief"), f"{key}.brief"),
+        model=_opt_str(raw.get("model"), f"{key}.model"),
+        logins=list(order or ()),
     )
 
 
