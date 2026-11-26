@@ -379,3 +379,61 @@ def test_ao_builtins_show_says_what_the_page_says_of_a_nodes_mark(capsys):
     out = capsys.readouterr().out
     assert "sets: default (cannot run a seat)" in out
     assert "    default cannot run the sweeper: no login in its list offers haiku on n" in out
+
+
+def test_a_standing_prompts_mark_draws_nothing_under_a_director_and_draws_without_one():
+    """§4.9d *The page*, TD-2285: a node's mark on the prompts seat that names its model and its set's list stands,
+    so without a director its set's tab and the prompts row draw it, and under a director, whose seat answers what a
+    prompts seat would, neither does."""
+    doc = _doc(builtins={"default": {"models": {"prompts": "haiku"}, "logins": ["c:one"]}})
+    rows = {"c:one": _row()}
+    marks = {"prompts": {"n": {"model": "haiku", "logins": ["c:one"]}}}
+    words = "default cannot run the prompts seat: no login in its list offers haiku on n"
+
+    def read(director: bool):
+        view = team_show.builtins_view(
+            name="default",
+            doc=doc,
+            rows=rows,
+            roots=[],
+            director=director,
+            node_marks=marks,
+            set_marks={"default": marks},
+        )
+        tab = setmod.builtins_page({**view, "tools": {"tools": []}})["tabs"][0]["dot"]
+        row = next(s for s in view["seats"] if s["key"] == "prompts")["node_cannot_run"]
+        return view["sets"][0]["node_cannot_run"], tab, row
+
+    assert read(False) == ([words], words, {"n": words}), "the mark stands for the prompts seat"
+    assert read(True) == ([], "", {}), "the director's: no dot and no node's words"
+
+
+def test_a_set_marked_for_two_seats_carries_both_lines_in_the_pages_order():
+    doc = _doc(builtins={"default": {"models": {"tech-lead": "opus", "sweeper": "haiku"}, "logins": ["c:one"]}})
+    marks = {
+        "sweeper": {"n": {"model": "haiku", "logins": ["c:one"]}},
+        "tech-lead": {"n": {"model": "opus", "logins": ["c:one"]}},
+    }
+    view = team_show.builtins_view(
+        name="default", doc=doc, rows={"c:one": _row()}, roots=[], director=False, set_marks={"default": marks}
+    )
+    assert view["sets"][0]["node_cannot_run"] == [
+        "default cannot run the tech lead: no login in its list offers opus on n",
+        "default cannot run the sweeper: no login in its list offers haiku on n",
+    ]
+
+
+def test_a_set_the_homes_own_logins_cannot_run_is_dotted_and_flagged(capsys):
+    """§4.9d *The page*: the home's own *cannot run* draws its set's tab dot and flags it in `ao builtins show`, with
+    no node's mark beside it."""
+    from shiftlead import cli
+
+    doc = _doc(builtins={"default": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]}})
+    view = team_show.builtins_view(
+        name="default", doc=doc, rows={"c:one": _row(models=("opus",))}, roots=[], director=False
+    )
+    own = view["sets"][0]["cannot_run"]
+    assert own and not view["sets"][0]["node_cannot_run"]
+    assert setmod.builtins_page({**view, "tools": {"tools": []}})["tabs"][0]["dot"] == "; ".join(own)
+    cli._builtins_show_prose(view)
+    assert "sets: default (cannot run a seat)" in capsys.readouterr().out
