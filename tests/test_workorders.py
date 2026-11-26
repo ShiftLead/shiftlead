@@ -847,7 +847,13 @@ def test_a_sweep_pr_is_one_medium_order_at_once_keyed_on_sweep_since_whatever_it
                _sweep(checks="pending"), _sweep(branch=notices, sweep="notices"),
                _sweep(filing=True, filing_head="abc", created=(T0 - 30 * HOUR).isoformat())):  # fmt: skip
         (o,) = workorders.red_prs([pr], [], T0, {}, HOUR, filing_after=HOUR)[0]
-        assert (o["id"], o["sweep"], o["sweep_since"], o["priority"]) == ("pr:1950", True, T0.isoformat(), "Medium")
+        # the mark carries its kind, `sweep_of`'s (TD-2222), so a reader picks its words by it
+        assert (o["id"], o["sweep"], o["sweep_since"], o["priority"]) == (
+            "pr:1950",
+            pr["sweep"],
+            T0.isoformat(),
+            "Medium",
+        )
         assert o["context"] == "https://github.com/o/r/pull/1950 · the gate sweep's board items"
         assert "lift" not in o and "filing" not in o
     for pr in (_sweep(draft=True), _sweep(fork=True), _sweep(sweep=None)):
