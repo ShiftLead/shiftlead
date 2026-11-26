@@ -409,3 +409,14 @@ async def test_a_seat_is_filled_from_the_set_its_repo_picked(agent, tmp_path, la
     assert new.login == "hookstub:second", "the repo's set, not default's"
     assert (new.seat_model, new.login_list) == ("sonnet", ["hookstub:second"])
     assert launched[-1] == {"profile": "second", "model": "sonnet"}
+
+
+async def test_a_seat_neither_built_in_nor_the_director_is_filled_as_before(agent, tmp_path, launched, rows):
+    """TD-2254, TD-2068 slice 8: after the cut-over only a built-in seat's record and the director's pick a login
+    (`_on_set_login`); a manager on call's record (a `team` seat, no `builtin`) is launched as before."""
+    rows.update({"hookstub:first": _row("acct-1", ["opus"]), "hookstub:second": _row("acct-2", ["opus"])})
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    s.builtin, s.seat = None, {"trigger": "team"}
+    assert agent._first_shape_off and not agent._on_set_login(s)
+    assert await agent._builtin_login(s) == {}
