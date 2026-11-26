@@ -3502,6 +3502,21 @@ def ledger_for_you(
                 else ""
             )
             builds = list(go.get(me_q) or ())
+            # the gate's own pair on a held question with no answers of its own (§4.5 screen 6, TD-2172, built by
+            # TD-2186): `Go | Not yet`, no default, Go its lift — the sweep's line's answers, pressed by index
+            pair = queue_mod.gate_pair(
+                {**e, "repo": name},
+                fact=fact,
+                held=me_q in held_of,
+                builds=builds,
+                boards=boards,
+                refs_open=linked,
+            )
+            if pair:
+                pairs = [(a, "") for a in queue_mod.GATE_PAIR]
+                answers = [a for a, _ in pairs]
+                heads = mail_mod.form_heads(answers)
+                ok = False
             lift_item = bool(
                 not owner
                 and applying is None
@@ -3536,6 +3551,9 @@ def ledger_for_you(
                     "heads": heads,
                     "ask": str(e.get("ask") or ""),  # its one sentence on a card (§4.10)
                     "default": answers[d] if ok and not heads[d] else "",
+                    # the gate's own pair (TD-2186): each button's title says what it does to the hold
+                    "gate_pair": pair,
+                    "reask_days": queue_mod.REASK_DAYS,
                     "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
                     # what the row's controls read, as a Queue row carries them (§4.5 screen 12 *any open row*, TD-905)
                     "page": str(e.get("for_page") or ""),
@@ -3598,6 +3616,7 @@ def ledger_for_you(
                     early=False,
                     early_line="",
                     lift_item=False,
+                    gate_pair=False,
                 )
         groups.append(
             {
