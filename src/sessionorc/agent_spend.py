@@ -230,17 +230,16 @@ class SpendMixin:
     # -- a node's turns (§4.4 *Usage*, §4.4a; TD-151 slice 4) --------------------------------------
 
     async def _spend_to_home(self, groups: dict[str, dict[str, Any]], now: datetime) -> dict[str, Any]:
-        """A node's pass: the ledger and its cursors are the home's, so each metered profile's turns
-        go home as `spend {account, profile, prices, turns, cursors}` and the reply's cursors are the
-        ones read from next. The first call on each link is a read (no turns, no cursors): the
-        cursors the home holds for this host, whether the profile is seeded there, and the account's
-        sums. While a profile is not seeded, only the cursors travel — the home takes them as the
-        ends — plus the turns of transcripts it already holds a cursor for (a shared directory's
-        known transcript keeps counting); a long batch goes in pieces (`spend.pieces`). Offline, or
-        when a send fails, the account's figure is the home's last sums plus this node's own turns
-        past its last acknowledged cursors (`spend.figure`), written nowhere. Returns each account's
-        window sums, which the caller makes each profile's reading from with this node's replica of
-        the amounts, as the home does."""
+        """A node's pass: the ledger and its cursors are the home's, so each metered profile's turns go home as `spend
+        {account, profile, login, prices, turns, cursors}` (`login` only where this node is switched and a login there
+        is the profile, §4.4a) and the reply's cursors are the ones read from next. The first call on each link is a
+        read (no turns, no cursors): the cursors the home holds for this host, whether the profile is seeded there, and
+        the account's sums. While a profile is not seeded, only the cursors travel — the home takes them as the ends —
+        plus the turns of transcripts it already holds a cursor for (a shared directory's known transcript keeps
+        counting); a long batch goes in pieces (`spend.pieces`). Offline, or when a send fails, the account's figure is
+        the home's last sums plus this node's own turns past its last acknowledged cursors (`spend.figure`), written
+        nowhere. Returns each account's window sums, which the caller makes each profile's reading from with this node's
+        replica of the amounts, as the home does."""
         mux = self._home_mux if self._snapshot_sent else None
         out: dict[str, Any] = {}
         for key, g in groups.items():
