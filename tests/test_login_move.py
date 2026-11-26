@@ -161,23 +161,40 @@ async def test_an_adapter_without_handoff_moves_with_its_stages_words_alone(
     assert launched[-1]["prompt"] == "the stage's words"
 
 
+CASES = ["usable", "no-later", "interactive", "suspended", "exited", "superseded", "moving", "ceiling", "scheduled"]
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("case", ["usable", "no-later", "interactive", "suspended", "exited"], ids=lambda c: c)
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c)
 async def test_what_does_not_move(agent, tmp_path, launched, rows, case):
+    """§4.9e *A session moves down the list*: `_movable` passes over each of these; the record stays the host's, in
+    the state the case set, on its login (TD-2299: a moved session leaves its old record marked as it was)."""
     sid = await _stage_session(agent, tmp_path, unattended=case != "interactive")
     s = agent.sessions[sid]
+    now = datetime.now(UTC)
+    mark = None
     if case == "usable":
         rows["hookstub:first"]["state"] = "signed_in"
     elif case == "no-later":
         rows["hookstub:second"]["state"] = "limited"
         rows["hookstub:third"]["at_reserve"] = True
     elif case == "suspended":
-        s.suspended = True
+        s.suspended = {"at": now.isoformat(), "by": "person", "why": "an identity alarm"}
     elif case == "exited":
         s.state = "exited"
-    count = len(launched)
-    await agent._login_moves(datetime.now(UTC))
-    assert agent.sessions[sid] is s and s.login == "hookstub:first" and s.moving is None
+    elif case == "superseded":
+        s.superseded_by = "ao-x-later"
+    elif case == "moving":
+        mark = {"at": now.isoformat(), "from": "hookstub:first", "to": "hookstub:second"}
+        s.moving = mark
+    elif case == "ceiling":
+        s.restart_ceiling = {"at": now.isoformat(), "count": 3}
+    elif case == "scheduled":
+        s.state = "scheduled"
+    state, count = s.state, len(launched)
+    await agent._login_moves(now)
+    assert agent.sessions.get(sid) is s and s.state == state, "the same record, in the state the case set"
+    assert s.login == "hookstub:first" and s.moving == mark
     assert len(launched) == count and s.login_moves == [], "it waits where it is"
 
 
@@ -222,6 +239,7 @@ async def test_a_mark_with_no_live_session_ten_minutes_on_is_cleared(
     at = (datetime.now(UTC) - timedelta(minutes=minutes)).isoformat()
     s.moving, s.state = {"at": at, "from": "hookstub:first", "to": "hookstub:second"}, state
     await agent._login_moves(datetime.now(UTC))
+    assert agent.sessions[sid] is s and s.state == state, "the host still holds the same record, in the same state"
     assert (s.moving is None) == cleared
 
 
