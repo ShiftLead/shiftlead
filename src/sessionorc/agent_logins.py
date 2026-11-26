@@ -244,8 +244,8 @@ class LoginsMixin:
 
     async def rpc_login_forget(self, login: str = "", version: str | None = None, caller: Any = None) -> dict[str, Any]:
         """`ao login forget <login>`, **Forget this login**: moved to `forgotten:`, its folder left on disk; refused,
-        naming them, while a live session runs on it or, on the home, a team's or built-in set's list or a team's
-        schedule names it. A node cannot read those lists, so it is not refused for them (§4.2b *On a node*)."""
+        naming them, while a live session runs on it or, on the home, a team's or built-in set's list, a team's
+        schedule or the director's record names it. A node cannot read those lists, so it is not refused for them (§4.2b *On a node*)."""
         agent_common.person_only(caller, "forget a login", SECTION, self._graph())
 
         forgot: list[str] = []
