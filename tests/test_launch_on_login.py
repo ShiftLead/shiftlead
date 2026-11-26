@@ -122,10 +122,17 @@ def _the_model(spec: LaunchSpec) -> str:
 
 @pytest.mark.unit
 def test_geminis_launch_runs_the_model_given_over_the_logins_pin(tmp_path, monkeypatch):
-    from shiftlead.adapters.gemini import GeminiAdapter
+    from test_gemini_adapter import rooted
+
+    from shiftlead.adapters import gemini
 
     _pinned_login(tmp_path, monkeypatch, "gemini")
-    ad = GeminiAdapter(binary="/opt/gemini")
+    machine = tmp_path / "etc" / "gemini-settings.json"  # the machine layer, installed: never this machine's own
+    monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
+    monkeypatch.setattr(gemini, "_lstat", rooted())
+    machine.parent.mkdir()
+    machine.write_text(gemini.write_layer().read_text())
+    ad = gemini.GeminiAdapter(binary="/opt/gemini")
     kw = {"profile": "grind", "resume": None, "prompt": None, "unattended": True, "cwd": tmp_path / "w"}
     assert _the_model(ad.launch(**kw)) == "pinned"
     assert _the_model(ad.launch(**kw, model="given")) == "given", "a launch on a login runs the seat model (§4.9e)"
