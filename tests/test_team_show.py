@@ -355,3 +355,18 @@ def test_a_team_on_a_node_cannot_run_while_the_homes_mark_names_its_list_and_flo
         "t", _doc(), {"claude:a": _row(["opus", "fable", "sonnet"])}, HEAD, "home", FLOW, (), node_mark=mark
     )
     assert here["cannot_run"] is None, "a team on the home's own host is read from its logins"
+
+
+def test_a_node_teams_mark_goes_once_its_flow_asks_no_stage_or_audit_for_the_model():
+    """§4.9d *A team on a node*, TD-2269: an edited flow, under its name, that asks no longer for the marked model
+    reads no mark; one whose audit still asks for it keeps it, and a flow not read leaves it standing."""
+    mark = {"model": "opus", "logins": ["claude:a", "claude:b"], "flow": "build", "at": _TWO_HOURS_AGO}
+    stages = [{**FLOW["stages"][0], "model": "sonnet"}, FLOW["stages"][1]]
+    edited = {**FLOW, "stages": stages}
+    got = team_show.view("t", _doc(host="node1"), {}, HEAD, "home", edited, (), node_mark=mark)
+    assert got["cannot_run"] is None
+    on_audit = {**edited, "audits": [{**FLOW["audits"][0], "model": "opus"}]}
+    kept = team_show.view("t", _doc(host="node1"), {}, HEAD, "home", on_audit, (), node_mark=mark)
+    assert kept["cannot_run"] == "t cannot run build: no login in its list offers opus on node1"
+    unread = team_show.view("t", _doc(host="node1"), {}, HEAD, "home", None, (), node_mark=mark)
+    assert unread["cannot_run"] == "t cannot run build: no login in its list offers opus on node1"
