@@ -709,7 +709,7 @@ class GeminiAdapter:
         written by `handoff_turns`. None when the file cannot be read."""
         try:
             got = transcript_mod.read(Path(transcript), turns=HANDOFF_TURNS)
-        except (OSError, ValueError):
+        except (OSError, ValueError, AttributeError, KeyError, TypeError):  # a malformed line is no handoff
             return None
         return handoff_turns(got.entries)
 

@@ -105,3 +105,4 @@ def test_an_adapter_with_it_hands_over_its_turns_cut(tmp_path):
     assert handoff_of(ad, None) == ""
     assert handoff_of(_Reads(None), tmp_path / "t.jsonl") == ""
     assert handoff_of(_Reads(OSError("gone")), tmp_path / "t.jsonl") == ""
+    assert handoff_of(_Reads(AttributeError("odd line")), tmp_path / "t.jsonl") == ""

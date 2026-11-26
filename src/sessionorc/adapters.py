@@ -616,7 +616,7 @@ def handoff_of(adapter: object, transcript: Path | str | None) -> str:
         return ""
     try:
         return handoff_text(method(Path(transcript)))
-    except (OSError, ValueError):
+    except Exception:  # noqa: BLE001 — an adapter's failed read hands over nothing, never fails the move
         return ""
 
 
