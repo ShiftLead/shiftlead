@@ -857,10 +857,11 @@ def red_pr_rows(
                 lifts = f"lifts {e['entry']} {e.get('gate') or ''}".strip() if e.get("entry") else ""
                 parts = [f"{repo} #{n}", f"lift {_age(since, at)}".strip(), lifts, str(e.get("author") or "")]
             elif e.get("sweep"):
-                # the gate sweep's board PR, an order whatever its checks: its board items in their place (TD-1854)
+                # the gate sweep's board PR, or its record PR, an order whatever its checks: its words in their place
+                # by the mark's value (TD-1854, TD-2225)
                 since = str(e.get("sweep_since") or "")
-                sweep = workorders_mod.SWEEP_CONTEXT
-                parts = [f"{repo} #{n}", f"sweep {_age(since, at)}".strip(), sweep, str(e.get("author") or "")]
+                word, sweep = workorders_mod.sweep_words(e)
+                parts = [f"{repo} #{n}", f"{word} {_age(since, at)}".strip(), sweep, str(e.get("author") or "")]
             else:
                 since = str(e.get("red_since") or "")
                 word = "red" if e.get("checks") == "red" else "conflicting"
@@ -883,7 +884,7 @@ def red_pr_rows(
                     "age": _age(since, at),
                     "text": text,
                     "find": " ".join(x for x in (repo, f"#{n}", "red PR", str(e.get("title") or ""), text) if x),
-                    **({"sweep": True} if e.get("sweep") else {}),
+                    **({"sweep": e["sweep"]} if e.get("sweep") else {}),  # the mark's value, never True (TD-2225)
                 }
             )
     return out

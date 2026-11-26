@@ -2211,12 +2211,14 @@ def _repo_line(r: dict[str, Any]) -> str:
         # the gate sweep's lift and sweep PRs, counted apart, an unserved repo's the person's (TD-1450, TD-1854)
         gates = [*reds, *teamrun.person_pr_orders(r)]
         lifts = [e for e in gates if e.get("lift")]
-        sweeps = [e for e in gates if e.get("sweep")]
+        sweeps = [e for e in gates if e.get("sweep") and e.get("sweep") != "record"]
+        records = [e for e in gates if e.get("sweep") == "record"]  # the sweep's record PRs, counted apart (TD-2225)
         filings = [e for e in reds if e.get("filing")]  # and a filing PR's, apart from the red ones (TD-1811)
         n = len(reds) - len(syncs) - len([e for e in reds if e.get("lift") or e.get("sweep")]) - len(filings)
         decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
         decided += f", {len(lifts)} lift PR{'' if len(lifts) == 1 else 's'} to take" if lifts else ""
         decided += f", {len(sweeps)} sweep PR{'' if len(sweeps) == 1 else 's'} to take" if sweeps else ""
+        decided += f", {len(records)} record PR{'' if len(records) == 1 else 's'} to take" if records else ""
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         decided += f", {len(filings)} filing PR{'' if len(filings) == 1 else 's'} nobody holds" if filings else ""
         orders = [*orders, *reds]
@@ -2641,8 +2643,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 said = f" · red since {e.get('red_since') or '?'}: {why}"
                 if e.get("lift"):  # a lift PR, at its entry's priority (§4.4, TD-1450, TD-1854)
                     said = f" · lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
-                if e.get("sweep"):  # the gate sweep's board PR (§4.4, TD-1854)
-                    said = f" · sweep since {e.get('sweep_since') or '?'}: {workorders.SWEEP_CONTEXT}"
+                if e.get("sweep"):  # the gate sweep's board PR or its record PR (§4.4, TD-1854, TD-2225)
+                    word, what = workorders.sweep_words(e)
+                    said = f" · {word} since {e.get('sweep_since') or '?'}: {what}"
                 if e.get("filing"):  # a filing PR nobody holds, after the red and lift ones (§4.4, TD-1811)
                     said = f" · filing, open since {str(e.get('filing_since') or '?')[:10]}: nobody holds it"
                 prio = str(e.get("priority") or "High")
@@ -2651,7 +2654,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
             for e in teamrun.person_pr_orders(r):
                 said = f"lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
                 if e.get("sweep"):
-                    said = f"sweep since {e.get('sweep_since') or '?'}: {workorders.SWEEP_CONTEXT}"
+                    word, what = workorders.sweep_words(e)
+                    said = f"{word} since {e.get('sweep_since') or '?'}: {what}"
                 print(f"  the person's · {e['id']}  {e.get('title') or ''} · {said}")
             lifts = _lifts(r)
             for kind in ("pickable", "design", "live-check"):

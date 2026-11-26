@@ -256,11 +256,13 @@ def test_a_sync_lift_and_sweep_pr_each_ask_for_a_job_on_their_own_stamp_and_kind
         ),
         red(2, lift=True, lift_since="2026-11-21T00:00:00Z", red_since=None, reason="kept off a lift"),
         red(3, sweep=True, sweep_since="2026-11-20T00:00:00Z", red_since=None),
+        red(4, sweep="record", sweep_since="2026-11-19T00:00:00Z", red_since=None),  # TD-2225
     ]
     assert pr_objects(orders, {}, {}) == {
         "pr-1": PrObject("2026-11-22T00:00:00Z", "sync", "src/x.py is not in the lock"),
         "pr-2": PrObject("2026-11-21T00:00:00Z", "lift"),
         "pr-3": PrObject("2026-11-20T00:00:00Z", "sweep"),
+        "pr-4": PrObject("2026-11-19T00:00:00Z", "record"),
     }
 
 

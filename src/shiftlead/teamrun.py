@@ -1955,7 +1955,8 @@ def red_prs(
                     "author": str(p.get("author") or ""),
                     "word": word,
                     "failing": [],
-                    "what": workorders_mod.lift_context(p) if word == "lift" else workorders_mod.SWEEP_CONTEXT,
+                    # a record PR's words are its own, picked by the mark's value (§4.4, TD-2225)
+                    "what": workorders_mod.lift_context(p) if word == "lift" else workorders_mod.sweep_words(p)[1],
                     "live": bool(word == "lift" and (reports_mod.lift_of(p.get("branch")) or ("", "", False))[2]),
                     f"{word}_since": since,
                     "since": since,

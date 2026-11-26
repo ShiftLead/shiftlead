@@ -605,6 +605,19 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "1 sync PR to land, 1 lift PR to take, 1 sweep PR to take, 1 red PR nobody holds: 6 pickable" in out
     row = "pickable     pr:1951  Medium  grinders     Gate sweep 2026-11-15 · sweep since 2026-11-15T09:00:00Z"
     assert f"{row}: the gate sweep's board items" in out
+    # the sweep's record PR, a sweep order in words of its own, counted apart (§4.4, TD-2225)
+    record = {"id": "pr:1960", "title": "reviews: record pass 2026-11-16 — 2 records", "for_page": "pickable",
+              "pickable": "yes", "work_order": True, "pr_order": True, "priority": "Medium", "pr": 1960,
+              "sweep": "record", "sweep_since": "2026-11-16T09:00:00Z"}  # fmt: skip
+    reading[str(repo)]["pr_orders"] = {"orders": [sync, red, lift, sweep, record], "told": {}}
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    counts = "1 lift PR to take, 1 sweep PR to take, 1 record PR to take, 1 red PR nobody holds: 7 pickable"
+    assert counts in out
+    row = (
+        "pr:1960  Medium  grinders     reviews: record pass 2026-11-16 — 2 records · record since 2026-11-16T09:00:00Z"
+    )
+    assert f"{row}: the gate sweep's record of designs' Go" in out
 
 
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
@@ -709,13 +722,16 @@ def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch
     lift = {"id": "pr:1950", "title": "TD-1: lift until 2026-11-20", "pr": 1950, "lift": True,
             "lift_since": "2026-11-15T09:00:00Z", "entry": "TD-1", "gate": "until 2026-11-20"}  # fmt: skip
     sweep = {"id": "pr:1951", "title": "Gate sweep", "pr": 1951, "sweep": True, "sweep_since": "2026-11-15T10:00:00Z"}
+    record = {"id": "pr:1960", "title": "Record", "pr": 1960, "sweep": "record", "sweep_since": "2026-11-16T10:00:00Z"}
     gated = json.loads(json.dumps(original))
-    gated[str(repo)]["pr_orders"] = {"orders": [], "person": [lift, sweep]}
+    gated[str(repo)]["pr_orders"] = {"orders": [], "person": [lift, sweep, record]}
     reading.clear()
     reading.update(gated)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
-    assert "1 lift PR to take, 1 sweep PR to take: 0 pickable" in out
+    assert "1 lift PR to take, 1 sweep PR to take, 1 record PR to take: 0 pickable" in out
+    said = "record since 2026-11-16T10:00:00Z: the gate sweep's record of designs' Go"
+    assert f"  the person's · pr:1960  Record · {said}" in out  # its own words (TD-2225)
     said = "lift since 2026-11-15T09:00:00Z: lifts TD-1 until 2026-11-20"
     assert f"  the person's · pr:1950  TD-1: lift until 2026-11-20 · {said}" in out
     said = "sweep since 2026-11-15T10:00:00Z: the gate sweep's board items"
@@ -728,6 +744,7 @@ def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch
     assert [(e["id"], e["for_page"], e["pickable"]) for e in got["person_orders"]] == [
         ("pr:1950", "unserved", "no"),
         ("pr:1951", "unserved", "no"),
+        ("pr:1960", "unserved", "no"),
     ]
     reading.clear()
     reading.update(json.loads(json.dumps(original)))
