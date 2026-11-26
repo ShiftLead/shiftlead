@@ -309,3 +309,39 @@ def test_the_rails_later_count_leaves_an_early_row_out(tmp_path):
     assert not [x for x in rail_rows({}, [], [row]) if x.get("section") == "later"]
     plain = {**row, "early": False, "early_line": ""}
     assert [x for x in rail_rows({}, [], [plain]) if x.get("section") == "later"], "a row not early is counted"
+
+
+@pytest.mark.unit
+def test_its_own_event_gate_alone_is_its_line_and_its_card_waits(tmp_path):
+    gated = _entry(1, "the question", **GATED, Blocked_by="event (live), decision (paul)")
+    event = '**Event (live):** The build is live.\ncheck: file-contains r@promote/live docs/x.md "y"\n\n'
+    root, r = _one(tmp_path, gated + event)
+    q = _read({root: r})
+    row = _row(q, "r#TD-001")
+    assert row["state"] == "asked early" and row["early_line"] == "once its event lands"
+    assert _card(q, "r#TD-001")["status"] == "waiting", "an early member's own event gate waits as its date does"
+
+
+@pytest.mark.unit
+def test_a_member_that_only_waits_keeps_lift_the_hold_under_an_open_decided_line(tmp_path):
+    from test_queue_board_hold import _open, _setup
+
+    entries = [_gated(1, "the question", "TD-002"), _entry(2, "in progress", **GATED)]
+    root, r = _setup(tmp_path, entries, _open("TD-001"))
+    settle.mark_waits(r["ledger"]["entries"], NOW)
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["state"] == "answered — waiting on a pick" and not row["then_yours"]
+    assert row["lift_here"] is True, "its counted work is all waits, so no fact takes its Lift (TD-1926, TD-2172)"
+
+
+@pytest.mark.unit
+def test_an_early_queue_row_draws_its_word_teal(tmp_path):
+    from shiftlead.ui.app import templates
+    from shiftlead.ui.queue import queue_view
+
+    root, r = _one(tmp_path, _gated(1, "the question", "TD-002"), _entry(2, "in progress", **GATED))
+    view = queue_view(_read({root: r}), NOW)
+    c = next(c for g in ("in_progress", "waiting", "up_next") for c in view.get(g) or () if c["id"] == "r#TD-002")
+    html = str(templates.env.get_template("queue_card.html").module.card(c))
+    row = html[html.index('data-qid="r#TD-001"') :]
+    assert '<span class="qstate s-waiting">asked early</span>' in row, "teal: its need no test reads (TD-2184)"
