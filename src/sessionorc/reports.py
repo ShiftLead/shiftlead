@@ -379,11 +379,13 @@ SYNC_PIN = cadence.PIN
 LIFT_PREFIX = "lift/"  # every lift PR's head branch: lift/TD-n/<event name> | until-<date> (`gatesweep.LIFT_BRANCH`)
 SWEEP_PREFIX = "sweep/"  # the gate sweep's PR on its own repo's board: sweep/<UTC date>
 NOTICES_PREFIX = "notices/"  # its PR on another repo's board: notices/<slug>-sweep-<UTC date>
+RECORD_PREFIX = "record/"  # its PR of designs' Go on their review records: record/<UTC date> (TD-2222)
 LIFT_RE = re.compile(r"lift/(TD-\d+)/([a-z0-9-]+)")
 LIVE_GATE_RE = re.compile(r"live(?:-\d+|-td\d+)?")  # the names §4.9b reserves to a live check
 UNTIL_RE = re.compile(r"until-(\d{4}-\d\d-\d\d)")
 SWEEP_HEAD_RE = re.compile(r"sweep/(\d{4}-\d\d-\d\d)")
 NOTICES_HEAD_RE = re.compile(r"notices/[A-Za-z0-9._-]+-sweep-(\d{4}-\d\d-\d\d)")
+RECORD_HEAD_RE = re.compile(r"record/(\d{4}-\d\d-\d\d)")
 
 
 def _calendar(day: str) -> bool:
@@ -421,9 +423,11 @@ def lift_day(branch: str | None) -> str | None:
 
 def sweep_of(branch: str | None) -> str | None:
     """A sweep PR's kind from its head branch (§4.4, TD-1854): `sweep` for `sweep/<date>` (its own repo's
-    board), `notices` for `notices/<slug>-sweep-<date>` (another repo's sweep's items here), each matched
-    whole with a calendar date; None for any other branch (`sweep/cleanup`, the ledger's own notices heads)."""
-    for kind, rx in (("sweep", SWEEP_HEAD_RE), ("notices", NOTICES_HEAD_RE)):
+    board), `notices` for `notices/<slug>-sweep-<date>` (another repo's sweep's items here), `record` for
+    `record/<date>` (designs' Go on their review records, §4.4 *The same pass records a design's Go*, TD-2222),
+    each matched whole with a calendar date; None for any other branch (`sweep/cleanup`, `record/x`, the
+    ledger's own notices heads)."""
+    for kind, rx in (("sweep", SWEEP_HEAD_RE), ("notices", NOTICES_HEAD_RE), ("record", RECORD_HEAD_RE)):
         if (m := rx.fullmatch(branch or "")) and _calendar(m[1]):
             return kind
     return None

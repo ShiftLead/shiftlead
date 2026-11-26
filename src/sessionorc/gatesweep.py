@@ -24,7 +24,12 @@ branch names and idempotence rules so a by-hand sweep and the home never write t
   `@name` in the PR body in a code span), each said in the run's lines. Every `gh` call names its repo
   (`--repo`, from the clone's origin) where the origin names one, never the remote `gh` would infer.
 
-`due`, `lift_branch` and `summary` are pure; the rest shells out and is called in a thread."""
+- **The record pass** (§4.4 *The same pass records a design's Go*, TD-2222), after the lifts and the board PR:
+  every lifted design whose review record is owed the Go (`record_owed`) gets it in one PR on `record/<UTC date>`,
+  opened and never merged; nothing while an earlier `record/` PR is open or the day's branch was written, and a
+  record a closed record PR names is held for the re-ask window.
+
+`due`, `lift_branch`, `write_record`, `is_go` and `summary` are pure; the rest shells out and is called in a thread."""
 
 from __future__ import annotations
 
@@ -785,6 +790,198 @@ def _apply_own(
     return said
 
 
+# ── the record pass (§4.4 *The same pass records a design's Go*, TD-2222) ─────────────────────────────────
+
+RECORD_BRANCH = reports.RECORD_PREFIX  # the record PR's branch: record/<UTC date> (`reports.sweep_of`)
+REVIEWS = "docs/reviews"  # a design's review record, docs/reviews/TD-<n>.md (cadence §4.8)
+GO_ANSWERS = ("go", "go ahead", "yes")  # the answers the presses that give a design its Go log, case-folded
+DECISION_LINES = ("gate-added", "gate-lifted", "gate-reassigned", "kept-waiting")  # about the decision gate
+DATE_HEAD = re.compile(r"\d{4}-\d{2}-\d{2}")  # `review_stats.py`'s `DATE_RE`, read at the line's start (`match`)
+DEFAULT_MARK = " (default)"
+RECORD_LINE = re.compile(r"^- record: (TD-\d+) — ", re.M)  # a record PR body's line for each record
+
+
+def review_path(tid: str) -> str:
+    """The review record of `tid` in the repo's own form: three-digit ids as `TD-NNN` (`TD-058`)."""
+    return f"{REVIEWS}/TD-{int(tid.removeprefix('TD-')):03d}.md"
+
+
+def _entry_texts(text: str) -> list[tuple[dict[str, Any], str]]:
+    """Each entry of a joined ledger text with its own text (its heading to the next `## `), in file order. HTML
+    comments go first, as `lb.entries` drops them, so a commented-out heading pairs with nothing."""
+    text = lb.COMMENT_RE.sub("", text)
+    found = list(lb.HEADING_RE.finditer(text))
+    out = []
+    for e, m in zip(lb.entries(text), found, strict=True):
+        nxt = lb.SECTION_RE.search(text, m.end())
+        out.append((e, text[m.start() : nxt.start() if nxt else len(text)]))
+    return out
+
+
+def _decision_line(text: str) -> dict[str, Any] | None:
+    """The newest Log line, in the Log's order, about the entry's decision gate (`DECISION_LINES` naming
+    `decision (…)`), as ledgerboard's `LOG_SHAPES` read it; None where the Log has none."""
+    last = None
+    for ln in lb.log_lines(text):
+        if ln.get("kind") in DECISION_LINES and str(ln.get("gate") or "").startswith("decision ("):
+            last = ln
+    return last
+
+
+def is_go(line: dict[str, Any] | None) -> bool:
+    """Whether a decision gate's Log line is a Go's lift: an answer's lift (never an override's) whose label,
+    case-folded and its ` (default)` mark dropped, is one of `GO_ANSWERS`."""
+    if not line or line.get("kind") != "gate-lifted" or line.get("via") != "answer":
+        return False
+    label = str(line.get("label") or "").strip()
+    label = label[: -len(DEFAULT_MARK)] if label.lower().endswith(DEFAULT_MARK) else label
+    return label.strip().casefold() in GO_ANSWERS
+
+
+def _head(record: str, key: str) -> re.Match[str] | None:
+    return re.search(rf"^\*\*{re.escape(key)}:\*\*[ \t]*(.*)$", record, re.M)
+
+
+def record_owed(root: Path | str, base: str | None = None) -> list[dict[str, Any]]:
+    """The design-first entries of `root`'s ledger and archive at `base` (its `origin/<default>`) whose review
+    record is owed the Go (§4.4 *The same pass records a design's Go*, TD-2222): the newest Log line about the
+    decision gate is a Go's lift (`is_go`) and the record's `**Go by:**` reads `pending` or is missing, or its
+    `**Decided:**` holds no date at its start. Each `{id, path, person, date, line}`: the person who answered
+    (the delegate form's person), the lift line's date as the Log wrote it, and the line. A record with no
+    `**Decided:**` line is `{id, path, skipped: why}`, named in the run log and never written."""
+    base = base or ledger_mod.default_ref(root)
+    if base is None:
+        raise SweepError("no origin/<default>")
+    io = ledger_mod.git_io(root, base, "docs")
+    if io is None:
+        raise SweepError(f"{base}'s tree could not be listed")
+    _, text, archive, faults = ledger_mod.read_pair(LEDGER, io)
+    if text is None:
+        raise SweepError(ledger_mod.fault_words(LEDGER, faults) if faults else f"no {LEDGER} on {base}")
+    out: list[dict[str, Any]] = []
+    for e, body in _entry_texts(text) + _entry_texts(archive or ""):
+        if lb.first_word(e["fields"].get("kind")).lower() != "design-first":
+            continue
+        path = review_path(e["id"])
+        record = io[1](path)
+        if record is None:
+            continue
+        line = _decision_line(body)
+        if not is_go(line):
+            continue
+        assert line is not None
+        decided, go = _head(record, "Decided"), _head(record, "Go by")
+        if decided is None:
+            out.append({"id": e["id"], "path": path, "skipped": "its record has no **Decided:** line"})
+            continue
+        go_owed = go is None or go[1].strip().lower() == "pending"
+        if go_owed or not DATE_HEAD.match(decided[1].strip()):
+            out.append({"id": e["id"], "path": path, "person": line["by"], "date": line["date"], "line": line["text"]})
+    return out
+
+
+def _decided(value: str, day: str) -> str:
+    """A `Decided:` value with no date at its start, given `day` at its start: what it held after is kept, a
+    leading `pending` and then a `,` or a lone `—` after it dropped (§4.4)."""
+    rest = value.strip()
+    if re.match(r"pending\b", rest, re.I):
+        rest = rest[len("pending") :].lstrip()
+    rest = re.sub(r"^(?:,|—(?=\s|$))\s*", "", rest)
+    return f"{day} — {rest}" if rest else day
+
+
+def write_record(record: str, person: str, day: str) -> str:
+    """`record` with its header given the Go (§4.4): `Go by:` the person where it reads `pending` (one naming
+    anyone else is left), added after `Source:`, else `Verdict:`, else `Decided:` where it is missing; a
+    `Decided:` with no date at its start gets `day` there. Nothing else changes."""
+    if (go := _head(record, "Go by")) is not None:
+        if go[1].strip().lower() == "pending":
+            record = record[: go.start()] + f"**Go by:** {person}" + record[go.end() :]
+    else:
+        after = _head(record, "Source") or _head(record, "Verdict") or _head(record, "Decided")
+        if after is not None:
+            record = record[: after.end()] + f"\n**Go by:** {person}" + record[after.end() :]
+    if (d := _head(record, "Decided")) is not None and not DATE_HEAD.match(d[1].strip()):
+        record = record[: d.start()] + f"**Decided:** {_decided(d[1], day)}" + record[d.end() :]
+    return record
+
+
+def _remote_has(root: Path | str, branch: str) -> bool:
+    cp = _git(root, "ls-remote", "--heads", "origin", branch)
+    if cp.returncode != 0:
+        raise SweepError(_words(cp, "git ls-remote"))
+    return bool(cp.stdout.strip())
+
+
+def _held_by_records(root: Path | str, today_utc: date) -> dict[str, int]:
+    """Each record a `record/` PR closed unmerged within the re-ask window (`lb.SWEEP_REASK_DAYS`) names in its
+    body's `- record: TD-<n>` lines, by id, with that PR's number: the person's no for that window, read as
+    `_held_by_notices` reads a closed notices PR's lines. A PR whose date the forge did not give holds them too."""
+    held: dict[str, int] = {}
+    for q in prs(root, "--search", '"- record:" in:body', extra=("body", "closedAt")):
+        if reports.sweep_of(q["head"]) != "record" or q["state"] != "closed":
+            continue
+        try:
+            day = date.fromisoformat(q["closedAt"][:10]) if q["closedAt"] else None
+        except ValueError:
+            day = None
+        if day is None or (today_utc - day).days <= lb.SWEEP_REASK_DAYS:
+            for tid in RECORD_LINE.findall(q["body"]):
+                held.setdefault(tid, q["number"])
+    return held
+
+
+def record_pass(root: Path | str, base: str, today_utc: date) -> list[str]:
+    """The record pass on `root` (§4.4 *The same pass records a design's Go*): every owed record in one PR on
+    `record/<UTC date>`, from a worktree of its own, opened and never merged. Nothing while an earlier `record/`
+    PR is open, nor where `record/<that day>` is on the remote or a PR has had that head; a record a closed
+    record PR holds is left for the window. Its lines say what it wrote, skipped or why it wrote nothing."""
+    try:
+        owed = record_owed(root, base)
+    except (SweepError, lb.Refused, ValueError, OSError, subprocess.SubprocessError) as e:
+        return [f"record: not done — {e}"]
+    said = [f"record {o['id']}: skipped — {o['skipped']}" for o in owed if o.get("skipped")]
+    owed = [o for o in owed if not o.get("skipped")]
+    if not owed:
+        return said
+    branch = f"{RECORD_BRANCH}{today_utc.isoformat()}"
+    try:
+        if earlier := [q for q in prs(root, state="open") if reports.sweep_of(q["head"]) == "record"]:
+            return [*said, f"record: an earlier record PR #{earlier[0]['number']} is open — {len(owed)} wait for it"]
+        if _remote_has(root, branch) or prs(root, "--head", branch):
+            return [*said, f"record: {branch} was written today already — {len(owed)} wait for tomorrow"]
+        held = _held_by_records(root, today_utc)
+    except (SweepError, OSError, subprocess.SubprocessError) as e:
+        return [*said, f"record: not done — {e}"]
+    said += [
+        f"record {o['id']}: held — record PR #{held[o['id']]} was closed unmerged" for o in owed if o["id"] in held
+    ]
+    owed = [o for o in owed if o["id"] not in held]
+    if not owed:
+        return said
+    try:
+        with Tree(root, base, branch) as tree:
+            for o in owed:
+                f = tree / o["path"]
+                f.write_text(write_record(f.read_text(), o["person"], o["date"]))
+            # no ledger id: the merge gate's `ledger` row refuses a title naming one on a PR touching no ledger file
+            subject = f"reviews: record pass {today_utc.isoformat()} — {len(owed)} records"
+            body = "\n".join(
+                [
+                    "The home's record pass (design §4.4 *The same pass records a design's Go*, TD-2222) writes the Go "
+                    "of each lifted design on its review record.",
+                    "",
+                    *[f"- record: {o['id']} — {o['line']}" for o in owed],
+                    "",
+                    "Check each record against its entry's newest decision gate line on the base before merging.",
+                ]
+            )
+            url = _ship(root, tree, branch, base.removeprefix("origin/"), subject, body)
+    except (SweepError, OSError, subprocess.SubprocessError) as e:
+        return [*said, f"record: not done — {e}"]
+    return [*said, f"record: opened {url} — {len(owed)} records"]
+
+
 def sweep(
     root: Path | str,
     others: list[Path | str],
@@ -799,7 +996,8 @@ def sweep(
         p = plan(root, others, today_utc=today_utc, today_local=today_local, host=host)
     except (SweepError, lb.Refused, OSError, subprocess.SubprocessError) as e:
         return None, str(e)
-    return {**p, "applied": apply(root, p, today_utc=today_utc, today_local=today_local, by=by)}, None
+    applied = apply(root, p, today_utc=today_utc, today_local=today_local, by=by)
+    return {**p, "applied": applied + record_pass(root, p["base"], today_utc)}, None
 
 
 def summary(got: dict[str, Any]) -> str:

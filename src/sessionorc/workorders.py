@@ -914,6 +914,14 @@ def is_filing_order(
 
 
 SWEEP_CONTEXT = "the gate sweep's board items"  # a sweep order's words beside its URL (§4.4, TD-1854)
+# a record order's: a sweep order whose `sweep` mark reads `record` (§4.4 *The same pass records a Go*, TD-2222)
+RECORD_CONTEXT = "the gate sweep's record of designs' Go"
+
+
+def sweep_words(pr: dict[str, Any]) -> tuple[str, str]:
+    """A sweep order's `(word, context)` by its `sweep` mark's value: `("record", RECORD_CONTEXT)` for a record PR,
+    else `("sweep", SWEEP_CONTEXT)` (TD-2222). Its key words (`sweep`, `sweep_since`) stay the sweep's."""
+    return ("record", RECORD_CONTEXT) if pr.get("sweep") == "record" else ("sweep", SWEEP_CONTEXT)
 
 
 def lift_context(pr: dict[str, Any]) -> str:
@@ -943,8 +951,8 @@ def pr_note(pr: dict[str, Any]) -> str:
         since = pr.get("lift_since")
         return f"lift PR #{pr['number']} has been open since {since}: {lift_context(pr)} — take it or say why"
     if is_sweep_order(pr):
-        since = pr.get("sweep_since")
-        return f"sweep PR #{pr['number']} has been open since {since}: {SWEEP_CONTEXT} — take it or say why"
+        since, (word, what) = pr.get("sweep_since"), sweep_words(pr)
+        return f"{word} PR #{pr['number']} has been open since {since}: {what} — take it or say why"
     if filing_row(pr):
         return f"filing PR #{pr['number']} has been open since {pr.get('created')}: merge it or say why"
     why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
@@ -960,14 +968,15 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
     (TD-1450, TD-1854) is marked `lift`, with `lift_since`, its `entry` and `gate`; its priority is its entry's,
     from `priorities` (the repo's ledger, by id, lower-case as the reading keeps it), High where it is not there,
     and its `Context` the URL and the gate. A sweep PR's (TD-1854) is marked `sweep`, with `sweep_since`,
-    Medium, its `Context` the URL and *the gate sweep's board items*."""
+    Medium, its `Context` the URL and *the gate sweep's board items*; a record PR's (TD-2222) the same, its mark
+    `record` and its `Context` *the gate sweep's record of designs' Go* (`sweep_words`)."""
     failing = list(pr.get("failing") or [])
     sync = is_sync_order(pr)
     lift = not sync and is_lift_order(pr)
     sweep = not sync and not lift and is_sweep_order(pr)
     filing = not sync and not lift and not sweep and filing_row(pr)
     since = str(pr.get("created") or "")
-    why = sync_reason(pr) if sync else lift_context(pr) if lift else SWEEP_CONTEXT if sweep else ""
+    why = sync_reason(pr) if sync else lift_context(pr) if lift else sweep_words(pr)[1] if sweep else ""
     if filing:
         why = f"filing, open since {since[:10]}, nobody holds it: review and merge it, or close it if superseded"
     tid, gate, _ = (reports.lift_of(pr.get("branch")) or ("", "", False)) if lift else ("", "", False)
@@ -1004,7 +1013,8 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
             else {}
         ),
         **({"lift": True, "lift_since": pr.get("lift_since"), "entry": tid, "gate": gate} if lift else {}),
-        **({"sweep": True, "sweep_since": pr.get("sweep_since")} if sweep else {}),
+        # the mark's value, `sweep_of`'s (sweep, notices, record: each truthy), so a reader picks its words by it
+        **({"sweep": pr.get("sweep") or True, "sweep_since": pr.get("sweep_since")} if sweep else {}),
         **({"filing": True, "filing_since": since} if filing else {}),
     }
 
