@@ -614,6 +614,15 @@ def test_each_adapter_names_skip_args_and_a_login_lacking_them_asks(adapter):
     assert switchover._asks(adapter, ["--other"]) is True
 
 
+def test_a_two_word_skip_asks_where_the_args_hold_only_one_of_its_words():
+    """TD-2257: Gemini's skip is two words, `--approval-mode yolo`; a login whose `unattended_args` hold one word and
+    not the other leaves its prompts on, so the check counts it among a director list's asking logins."""
+    adapter = gemini.GeminiAdapter()
+    assert len(adapter.skip_args) == 2, "Gemini's skip is two words"
+    assert switchover._asks(adapter, ["--approval-mode", "default"]) is True
+    assert switchover._asks(adapter, [adapter.skip_args[-1]]) is True
+
+
 # -- the answers file `--answers` writes (§4.9e *The answers file*) ----------------------------------------------------
 
 

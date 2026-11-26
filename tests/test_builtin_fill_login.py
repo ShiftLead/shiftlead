@@ -202,6 +202,15 @@ def test_a_login_asks_where_its_unattended_args_lack_the_tools_skip(hookstub, mo
     assert teamstore.asks("hookstub", ["--other"]) is False
 
 
+def test_a_two_word_skip_asks_where_the_args_hold_only_one_of_its_words(hookstub, monkeypatch):
+    """TD-2257: a tool whose skip is two words (Gemini's `--approval-mode yolo`) asks where a login's
+    `unattended_args` hold one word and not the other: the login leaves its prompts on (§4.9d)."""
+    monkeypatch.setattr(hookstub, "skip_args", ["--approval-mode", "yolo"], raising=False)
+    assert teamstore.asks("hookstub", ["--approval-mode", "default"]) is True
+    assert teamstore.asks("hookstub", ["yolo"]) is True
+    assert teamstore.asks("hookstub", ["--approval-mode", "yolo", "--other"]) is False
+
+
 def test_login_rows_read_asks_from_a_logins_settings(hookstub, monkeypatch):
     monkeypatch.setattr(hookstub, "skip_args", ["--skip"], raising=False)
     read = {
