@@ -453,3 +453,79 @@ async def test_a_second_move_adds_to_the_list_of_moves(agent, tmp_path, launched
     await agent._login_moves(datetime.now(UTC))
     moves = [(m["from"], m["to"]) for m in agent.sessions[sid].login_moves]
     assert moves == [("hookstub:first", "hookstub:second"), ("hookstub:second", "hookstub:third")]
+
+
+@pytest.mark.integration
+async def test_the_move_reads_the_projected_accounts_and_its_teams_reserve(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2301, design §4.9e and §6 *Usage gate*: the rows a move reads are the pick's own, handed the gate's accounts
+    as projected to now and the extra reserve of the session's team."""
+    sid = await _stage_session(agent, tmp_path)
+    (paths.home() / "settings.yml").write_text("teams:\n  t: {reserve: 15}\n")
+    raw = {"acct-1": {"windows": [{"label": "5h", "pct": 40}]}}
+    projected = {"acct-1": {"windows": [{"label": "5h", "pct": 90, "projected": True}]}}
+    monkeypatch.setattr(agent, "rpc_gate", AsyncMock(return_value={"accounts": raw}))
+    handed: list = []
+
+    def project(accounts, doc, now):
+        handed.append(accounts)
+        return projected
+
+    def login_rows(read, accounts, extra, now):
+        handed.append((accounts, extra))
+        return rows
+
+    monkeypatch.setattr(agent, "_projected", project)
+    monkeypatch.setattr(teamstore, "login_rows", login_rows)
+    await agent._login_moves(datetime.now(UTC))
+    assert handed == [raw, (projected, 15)], "the projected accounts and the team's reserve"
+    assert agent.sessions[sid].login == "hookstub:second"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("case", "want"), [("stage", "hookstub:second"), ("prompts", "hookstub:third"), ("director", "hookstub:third")]
+)
+async def test_the_director_and_a_prompts_seat_pass_over_a_login_that_asks(agent, tmp_path, launched, rows, case, want):
+    """TD-2301, design §4.9d and §4.9e: a session on the director's record or the prompts seat's is moved past a
+    login that asks, to the next that does not; any other session moves to the first usable one, asking or not."""
+    rows["hookstub:second"]["asks"] = True
+    sid = await _stage_session(agent, tmp_path)
+    s = agent.sessions[sid]
+    if case == "prompts":
+        s.builtin = "prompts"
+    elif case == "director":
+        s.seat = {"trigger": "prompt"}
+    await agent._login_moves(datetime.now(UTC))
+    assert agent.sessions[sid].login == want
+
+
+@pytest.mark.integration
+async def test_a_tick_moves_a_session_at_its_line_before_the_usage_gate_pauses_it(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2301, design §6 *Usage gate* and §4.9e: in one tick the move runs before the gate, so a session whose login
+    is at its line and has a usable one below is moved, its old record never marked `gated` and nothing typed into
+    it; the gate reads the new record's login, which is under its line."""
+    sid = await _stage_session(agent, tmp_path)
+    old = agent.sessions[sid]
+    old.state, old.pause_prompt = "working", "pause now"
+    rows["hookstub:first"]["state"] = "signed_in"
+    rows["hookstub:first"]["at_reserve"] = True
+    monkeypatch.setattr(agent, "_gate_reserves", lambda whole, profile: {"5h": 30})
+    over = [{"label": "5h", "pct": 95}]
+    monkeypatch.setattr(agent, "_gate_windows", lambda profile, now, whole: over if profile == "first" else [])
+    typed: list[tuple[str, str]] = []
+
+    async def submit(sid, adapter, text):
+        typed.append((sid, text))
+        return ("", 0)
+
+    monkeypatch.setattr(agent, "_submit", submit)
+    assert old.profile == "first", "the gate reads the old record's login as over its line"
+    await agent.tick()
+    new = agent.sessions[sid]
+    assert new is not old and new.login == "hookstub:second", "moved in the tick"
+    assert old.gated is None and new.gated is None, "never marked by the gate"
+    assert "pause now" not in [text for _, text in typed], "no pause line typed"
