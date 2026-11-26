@@ -62,7 +62,7 @@ const typedIn = el({ parentElement: typedField, disabled: true });
 const model = el(), models = el();
 const host = select([opt("home"), opt("node-a")], 0);
 const role = select([opt("", { interactive: "1" }), opt("worker")], 0);
-const team = select([opt(""), opt("t", { lines: JSON.stringify([{ role: "worker", line: "w" }]), dirs: "[]" })], 0);
+const team = select([opt(""), opt("t", { lines: JSON.stringify([{ role: "worker", line: "w" }]), dirs: '["/r"]', roles: "worker" })], 0);
 const repo = select([opt("/r", { name: "r" }), opt("", { other: "1" })], 0);
 const linePick = select([], -1);
 const els = {
@@ -119,6 +119,8 @@ async function run() {
   team.selectedIndex = 1; role.value = "worker"; role.dispatchEvent(new Event("change"));
   for (let i = 0; i < 6; i++) await tick();
   out.member = read();
+  host.selectedIndex = 1; host.dispatchEvent(new Event("change")); for (let i = 0; i < 6; i++) await tick();
+  out.member_away = read();
   console.log(JSON.stringify(out));
 }
 run().catch((e) => { console.error(e); process.exit(1); });
@@ -158,3 +160,6 @@ def test_the_login_pick_follows_the_host_the_shell_and_a_member_line(tmp_path):
     assert got["member"]["disabled"] is True and got["member"]["model_disabled"] is True
     assert got["member"]["typed"]["disabled"] is True
     assert got["member"]["value"] == "claude-code:second", "a member's login is its team's list's, never the line's"
+    # …and on another host, *a login typed below* picked: the typed field shown but locked, so not required
+    assert got["member_away"]["value"] == "" and got["member_away"]["disabled"] is True
+    assert got["member_away"]["typed"] == {"shown": True, "disabled": True, "required": False}
