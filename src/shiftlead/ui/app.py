@@ -503,6 +503,7 @@ from .queue import (
     filter_chips,
     item_start,
     items_n,
+    line_early,
     line_holds,
     picks_query,
     queue_picks,
@@ -2680,7 +2681,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
             def fy_holds(b: dict[str, Any], home: str = "") -> dict[str, Any]:
                 cov = covered(b, fy_entries)
-                return {**b, "covers": cov, **line_holds(b, cov, home, fy_entries, None)}
+                # a line covering only members asked early is drawn early in their place, as the Queue and the Inbox
+                # draw it (§4.4 *A question whose entry only waits is asked early*, TD-2172, TD-2185)
+                early = line_early(b, fy_entries)
+                marks = {"early": True, "early_line": early} if early else {}
+                return {**b, "covers": cov, **line_holds(b, cov, home, fy_entries, None), **marks}
 
             for sec, lines in (("needs", boards), ("coming", hz.get("ahead") or [])):
                 for b in lines:
