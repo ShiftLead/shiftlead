@@ -24,7 +24,7 @@ accounts: {}
 forgotten: {}
 """
 ORDER = ["hookstub:first", "hookstub:second", "hookstub:third"]
-HANDOFF = "## Where the session before you stopped\n\nfixing the race"
+HANDOFF = f"{adapters.HANDOFF_HEADING}\n\nfixing the race"
 
 
 def _row(account: str, models: list[str], **kw) -> dict:
@@ -227,3 +227,49 @@ async def test_a_host_agent_that_starts_clears_every_mark(agent, tmp_path, launc
     s.moving, s.state = {"at": datetime.now(UTC).isoformat(), "from": "hookstub:first", "to": "x"}, "closed"
     agent._clear_moving()
     assert s.moving is None and holder_on(s, "TD-1", datetime.now(UTC)).lost
+
+
+@pytest.mark.unit
+def test_an_unasked_move_passes_over_a_login_that_asks():
+    rows = {lk: _row(f"acct-{i}", ["opus"]) for i, lk in enumerate(ORDER, 1)}
+    rows["hookstub:first"]["state"] = "limited"
+    rows["hookstub:second"]["asks"] = True
+    assert teamstore.next_login(ORDER, "hookstub:first", "opus", rows) == "hookstub:second"
+    assert teamstore.next_login(ORDER, "hookstub:first", "opus", rows, unasked=True) == "hookstub:third"
+
+
+@pytest.mark.integration
+async def test_an_unsupervised_session_is_never_moved(agent, tmp_path, launched, rows):
+    sid = await _stage_session(agent, tmp_path)
+    s = agent.sessions[sid]
+    s.supervised = False
+    await agent._login_moves(datetime.now(UTC))
+    assert agent.sessions[sid] is s and s.state == "limited" and s.login == "hookstub:first"
+
+
+@pytest.mark.integration
+async def test_a_second_move_hands_over_its_own_handoff_alone(agent, tmp_path, launched, rows, monkeypatch):
+    sid = await _stage_session(agent, tmp_path)
+    await agent._login_moves(datetime.now(UTC))
+    rows["hookstub:second"]["state"] = "limited"
+    monkeypatch.setattr(adapters, "handoff_of", lambda ad, path: f"{adapters.HANDOFF_HEADING}\n\nlater")
+    agent.sessions[sid].state = "limited"
+    agent.sessions[sid].restarts[-1]["at"] = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    await agent._login_moves(datetime.now(UTC))
+    assert agent.sessions[sid].login == "hookstub:third"
+    told = launched[-1]["prompt"]
+    assert "fixing the race" not in told and told.endswith("later") and told.count("before you stopped") == 1
+
+
+@pytest.mark.integration
+async def test_a_close_that_fails_after_it_closed_marks_the_record(agent, tmp_path, launched, rows, monkeypatch):
+    sid = await _stage_session(agent, tmp_path)
+    s = agent.sessions[sid]
+
+    async def close(*a, **kw):
+        s.state = "closed"
+        raise RuntimeError("push failed")
+
+    monkeypatch.setattr(agent, "_close", close)
+    await agent._login_moves(datetime.now(UTC))
+    assert s.moving is None and s.closed_for["why"] == "login-move"

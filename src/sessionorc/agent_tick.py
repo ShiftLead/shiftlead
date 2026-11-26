@@ -4285,11 +4285,12 @@ class TickMixin:
 
     def _movable(self, s: Session) -> bool:
         """Whether `s` is one the tick may move down its login list (§4.9e *A session moves down the list*): an
-        unattended session on this host launched on a login with its `seat_model` and `login_list`, running, and not
-        superseded, suspended, already moving or at its restart ceiling. An interactive session is never moved
-        (invariant 5)."""
+        unattended, supervised session on this host launched on a login with its `seat_model` and `login_list`,
+        running, and not superseded, suspended, already moving or at its restart ceiling. An interactive session is
+        never moved (invariant 5)."""
         return bool(
             s.unattended
+            and s.supervised  # a replay reads its launch record, which only a supervised create writes
             and s.host == self.host
             and s.seat_model
             and s.login
@@ -4333,7 +4334,10 @@ class TickMixin:
             if team not in rows:
                 extra = settings_mod.team_extra(doc, team) if team else 0
                 rows[team] = teamstore.login_rows(read, accounts, extra, now)
-            to = teamstore.next_login(list(s.login_list or ()), str(s.login), str(s.seat_model), rows[team])
+            unasked = _director(s) or s.builtin == "prompts"  # these pass over a login that asks (§4.9d)
+            to = teamstore.next_login(
+                list(s.login_list or ()), str(s.login), str(s.seat_model), rows[team], unasked=unasked
+            )
             if to:
                 await self._move_login(s, to)
 
@@ -4359,6 +4363,8 @@ class TickMixin:
             self._mark_closed(s, "login-move")
         except Exception as e:  # noqa: BLE001 — a close that failed moves nothing; the next tick reads it again
             log.warning("%s: the close before its move to %s failed: %s", s.id, to, e)
+            if s.state == "closed":  # a close that failed after it marked the record: ended, its holder lost
+                self._mark_closed(s, "login-move")
             s.moving = None
             self._save(s)
             await self._push_changes()
@@ -4454,6 +4460,8 @@ class TickMixin:
                 # the launch record keeps the prompt as this create hands it, so a stored prompt carries
                 # the last fill's line: it goes, whatever replays now, and a fill's own is added
                 params["prompt"] = params["prompt"].split(f"\n\n{FILLED_FOR}", 1)[0]
+                # and so does a move's handoff (§4.9e): the next replay hands over its own, or none
+                params["prompt"] = params["prompt"].split(f"\n\n{adapters.HANDOFF_HEADING}\n\n", 1)[0]
                 if closing:
                     params["prompt"] = f"{params['prompt']}\n\n{closing}"
             if s.host == self.host:

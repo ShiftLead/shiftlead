@@ -406,11 +406,14 @@ def pick(
     return {"login": None, "state": "none", "why": f"no login in its list offers {model}"}
 
 
-def next_login(order: Iterable[str], current: str, model: str, rows: Mapping[str, Mapping[str, Any]]) -> str | None:
+def next_login(
+    order: Iterable[str], current: str, model: str, rows: Mapping[str, Mapping[str, Any]], *, unasked: bool = False
+) -> str | None:
     """Where a running session on `current` moves (§4.9e *A session moves down the list*, TD-2069): None while
     `current` is still usable, or where it is not in `order`; else the first login after it in `order` that is usable
     and offers `model`, by `reasons`, so one on an account an unusable login above it shares is passed over. None where
-    none is, and the session waits where it is. Never a login above `current`: a session does not move back up."""
+    none is, and the session waits where it is. Never a login above `current`: a session does not move back up. With
+    `unasked` (the director and a prompts seat), a login whose row `asks` is passed over, as `pick` passes it over."""
     listed = list(order)
     if current not in listed:
         return None
@@ -418,7 +421,8 @@ def next_login(order: Iterable[str], current: str, model: str, rows: Mapping[str
     if why.get(current) is None:
         return None
     for lk in listed[listed.index(current) + 1 :]:
-        if why.get(lk) is None and offers(rows.get(lk) or {}, model):
+        row = rows.get(lk) or {}
+        if why.get(lk) is None and offers(row, model) and not (unasked and row.get("asks")):
             return lk
     return None
 
