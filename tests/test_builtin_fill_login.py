@@ -66,8 +66,11 @@ def rows(agent, monkeypatch):
     return held
 
 
-async def _held_seat(agent, tmp_path, builtin: str = "techlead", settings: str = SETTINGS) -> str:
-    """A built-in seat's record as the home writes it, held, before any login: then the marker, and the seat due."""
+async def _held_seat(
+    agent, tmp_path, builtin: str = "techlead", settings: str = SETTINGS, *, adapter: str = "hookstub", **launch
+) -> str:
+    """A built-in seat's record as the home writes it, held, before any login: then the marker, and the seat due.
+    `adapter` and `launch` (a `profile`) are its last launch's, which a fill replays."""
     await park_ticks(agent)
     (paths.home() / "logins.yml").write_text(LOGINS)
     (tmp_path / "repo").mkdir(exist_ok=True)
@@ -77,7 +80,8 @@ async def _held_seat(agent, tmp_path, builtin: str = "techlead", settings: str =
                 "create",
                 name=f"{builtin}-t",
                 dir=str(tmp_path / "repo"),
-                adapter="hookstub",
+                adapter=adapter,
+                **launch,
                 unattended=True,
                 supervised=True,
                 held=True,
@@ -337,3 +341,52 @@ async def test_an_ended_seat_at_its_ceiling_keeps_the_ceilings_word(
     s.restart_ceiling = {"at": datetime.now(UTC).isoformat(), "count": 6, "why": why}
     await agent._seat_pass(s, datetime.now(UTC), list(agent.sessions.values()))
     assert agent.unfillable[sid] == word and not launched
+
+
+@pytest.mark.parametrize(
+    ("adapter", "launch"),
+    [("shell", {}), ("hookstub", {"profile": "oldprof"})],
+    ids=["another-tool", "an-older-profile"],
+)
+async def test_a_seat_whose_last_launch_is_not_the_logins_is_filled_on_it(
+    agent, tmp_path, launched, rows, adapter, launch
+):
+    """A fill replays the record's last launch, and a launch on a login refuses an adapter or a profile not the
+    login's (§4.9e *The launch on a login*): the fill's own arguments put the login's tool and its profile in their
+    place (TD-2252)."""
+    (paths.home() / "profiles.yml").write_text("profiles:\n  oldprof: {adapter: hookstub}\n")
+    rows.update({"hookstub:first": _row("acct-1", ["opus"]), "hookstub:second": _row("acct-2", ["opus"])})
+    sid = await _held_seat(agent, tmp_path, adapter=adapter, **launch)
+    old = agent.sessions[sid]
+    assert (old.adapter, old.profile or "") == (adapter, launch.get("profile", ""))
+    await _fill(agent, sid)
+    new = agent.sessions[sid]
+    assert new is not old and not any(e.get("error") for e in new.restarts), "the fill was made"
+    assert (new.login, new.adapter, new.profile) == ("hookstub:first", "hookstub", "first")
+    assert launched[-1] == {"profile": "first", "model": "opus"}
+
+
+async def test_a_seat_filled_on_one_login_is_filled_on_the_next_once_it_is_at_its_reserve(
+    agent, tmp_path, launched, rows
+):
+    """A fill on a login writes the login's name as the record's profile, so the next fill's replay names it: on
+    another login that is no profile of its own, and the fill puts the next login's in its place (TD-2252)."""
+    rows.update({"hookstub:first": _row("acct-1", ["opus"]), "hookstub:second": _row("acct-2", ["opus"])})
+    sid = await _held_seat(agent, tmp_path)
+    await _fill(agent, sid)
+    first = agent.sessions[sid]
+    assert (first.login, first.profile) == ("hookstub:first", "first")
+    async with LocalClient() as person:
+        await person.call("kill", id=sid)
+    rows["hookstub:first"]["at_reserve"] = True
+    agent.sessions[sid].seat_due = {"at": datetime.now(UTC).isoformat(), "by": "asks"}
+    await _fill(agent, sid)
+    second = agent.sessions[sid]
+    assert second is not first and not any(e.get("error") for e in second.restarts), "the second fill was made"
+    assert (second.login, second.account, second.adapter, second.profile) == (
+        "hookstub:second",
+        "acct-2",
+        "hookstub",
+        "second",
+    )
+    assert launched[-1] == {"profile": "second", "model": "opus"}
