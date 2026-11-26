@@ -241,3 +241,48 @@ def test_a_future_dated_file_does_not_keep_a_copy(seat, no_holds):
     os.utime(c / "pkg" / "a.py", (ahead, ahead))
     _release(root, home, time.time() + DAY + 60)
     assert not c.exists()
+
+
+def _review_clone(s: Path, name: str) -> Path:
+    """A review copy made as the briefs make one: a clone of a worktree, detached at the commit under review, that
+    commit given a remote-tracking ref (§4.6 *Where a session's working files go*)."""
+    src = s.parent / f"wt-{name}"
+    src.mkdir()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
+    subprocess.run([*git, "init", "-q", str(src)], check=True)
+    (src / "a.py").write_text("x")
+    subprocess.run([*git, "-C", str(src), "add", "a.py"], check=True)
+    subprocess.run([*git, "-C", str(src), "commit", "-q", "-m", "a"], check=True)
+    sha = subprocess.run(["git", "-C", str(src), "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+    dest = s / scratch.COPIES_DIR / name
+    subprocess.run(["git", "clone", "-q", str(src), str(dest)], check=True)
+    subprocess.run(["git", "-C", str(dest), "checkout", "-q", "--detach", sha.stdout.strip()], check=True)
+    subprocess.run(["git", "-C", str(dest), "update-ref", "refs/remotes/origin/review", sha.stdout.strip()], check=True)
+    shutil.rmtree(src)
+    return dest
+
+
+@pytest.mark.unit
+def test_a_copy_its_seat_renames_to_gone_goes_on_the_next_pass_however_fresh(seat, no_holds):
+    """TD-2313: a seat releases a finished copy by a rename an unattended seat is allowed (`mv` to
+    `copies/.gone-<name>`), and the next hourly pass removes it with no age test."""
+    root, home, s = seat
+    c = _review_clone(s, "rv1")
+    other = _review_clone(s, "rv2")
+    copies = s / scratch.COPIES_DIR
+    os.rename(c, copies / f"{scratch.GONE}rv1")
+    _release(root, home, time.time())
+    assert not (copies / f"{scratch.GONE}rv1").exists()
+    assert other.exists(), "a copy its seat did not release still waits its quiet day"
+
+
+@pytest.mark.unit
+def test_a_review_clone_is_no_git_work_and_a_closed_seats_scratch_holding_one_is_reclaimed(seat, no_holds):
+    """TD-2313: a review clone made the briefs' way holds no git work, so a closed seat's scratch holding one goes
+    once its record has been ended `scratch_keep_hours`."""
+    root, home, s = seat
+    c = _review_clone(s, "rv")
+    assert not scratch.git_work(c)
+    named = {str(s): ("ao-x", time.time() - 2 * DAY)}
+    kept = scratch.sweep(root, str(home), named, 24, time.time(), lambda _p: False, [])
+    assert not s.exists(), kept
