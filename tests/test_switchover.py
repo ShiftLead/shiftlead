@@ -212,6 +212,17 @@ def test_check_exits_nonzero_while_a_blocker_to_cure_beforehand_stands(home, tmp
     assert "no blockers" in out and "none: the org defines no team" in out
 
 
+def test_the_check_reads_the_profiles_file_and_no_login_beside_it(home, tmp_path, capsys):
+    """`cmd_switch_over_check` plans logins from `profiles.yml` alone (`with_logins=False`, TD-2234): a login
+    already in `logins.yml` beside it is not a profile the check would make a login of."""
+    a = tmp_path / "a"
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n")
+    (home / "logins.yml").write_text(f"logins:\n  claude-code:lgzq: {{folder: {tmp_path / 'lgzq'}}}\n")
+    answers(home, {"hosts": {"h": {"logins": {f"claude-code:{a}": {"name": "p"}}}}})
+    assert cli.main(["switch-over", "check"]) == 0
+    assert "lgzq" not in capsys.readouterr().out
+
+
 def test_the_check_names_each_team_with_what_the_answers_give_it(home, tmp_path, capsys):
     a = tmp_path / "a"
     (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n")
@@ -999,6 +1010,16 @@ def test_a_container_nodes_logins_come_from_its_own_profiles_read_at_its_directo
     doc = {"hosts": {"cm": {"logins": {"claude-code:/shiftlead/profiles/p": {"name": "paul"}}}}}
     named, blockers = switchover.node_logins(doc, nodes=nodes, salt=SALT, adapter_of=lambda _n: Spy(tmp_path))
     assert [m.key for m in named["cm"]] == ["claude-code:paul"] and blockers == []
+
+
+def test_a_container_nodes_logins_come_from_its_profiles_file_and_no_login_beside_it(tmp_path):
+    """`node_logins` reads a node's `profiles.yml` itself (`with_logins=False`, TD-2234): a `logins.yml` beside it in
+    the node's home makes no login of its own."""
+    root = tmp_path / "nodes" / "cm"
+    nodes = {"cm": Node(root, "profiles:\n  p: {config_dir: /shiftlead/profiles/p}\n")}
+    (root / "home" / "logins.yml").write_text("logins:\n  claude-code:lgzq: {folder: /shiftlead/profiles/lgzq}\n")
+    made, blockers = switchover.node_logins(None, nodes=nodes, salt=SALT, adapter_of=lambda _n: Fake(tmp_path / "d"))
+    assert [m.name for m in made["cm"]] == ["p"] and blockers == []
 
 
 def test_a_node_with_no_profiles_makes_no_login_and_one_that_does_not_parse_blocks(tmp_path):

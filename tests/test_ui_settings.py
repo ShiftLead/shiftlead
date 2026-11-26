@@ -854,6 +854,27 @@ def test_a_malformed_profiles_yml_is_a_note_on_the_settings_page(client, subproc
         bad.unlink()
 
 
+def test_the_settings_page_s_profile_cards_hold_no_login(client, subprocess_agent, monkeypatch):
+    """`settings_profiles` reads `profiles.yml` itself (`with_logins=False`, TD-2234): on a switched host the
+    profile cards are the file's profiles, never a login answered as one."""
+    home = subprocess_agent.home
+    (home / "profiles.yml").write_text("default: grind\nprofiles:\n  grind: {}\n")
+    (home / "logins.yml").write_text(f"logins:\n  claude-code:lgzq: {{folder: {home / 'lgzq'}}}\n")
+    real, seen = setmod.profile_cards, []
+
+    def cards(profiles, default):
+        seen.append(sorted(profiles))
+        return real(profiles, default)
+
+    monkeypatch.setattr(setmod, "profile_cards", cards)
+    try:
+        assert client.get("/settings").status_code == 200
+        assert seen and seen[-1] == ["grind"], seen
+    finally:
+        (home / "logins.yml").unlink()
+        (home / "profiles.yml").unlink()
+
+
 def test_schedule_card_offers_the_profiles_and_their_windows():
     """`schedule_card` (TD-1346): every profile offered, a metered one disabled with the reason; the window
     pick is the `labels` the read answered, a text field where none; off, the picks hold the default and its
