@@ -203,6 +203,15 @@ def test_a_held_builds_word_stands_over_an_early_mark(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_asked_leaves_a_held_build_out_of_its_early_members(tmp_path):
+    """TD-2259: `asked`'s own skip (`q in held`) keeps a held build out of its early members, which the Inbox's
+    entries are stamped from directly (`early_line`), with no row precedence over them."""
+    root, r = _held_build(tmp_path)
+    got = ledger_for_you({root: r}, [], {}, now=NOW)["entries"]["r#TD-002"]
+    assert got["early_line"] == "", "a held build's question is its design's, never asked early"
+
+
+@pytest.mark.unit
 def test_the_persons_own_gated_entry_keeps_the_fact_or_is_a_need(tmp_path):
     root, r = _one(
         tmp_path,
