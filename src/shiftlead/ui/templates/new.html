@@ -3,8 +3,8 @@
 {% block icon %}page-new{% endblock %}
 {% block body %}
 {% from "file_link.html" import file_link %}
-{#- a pick's file (§4.5a New session **the form**: each of Host, Project and Profile ends its
-    note with its file and **Open file**, the Settings page's; no button under `open_in: none`) -#}
+{#- a pick's file (§4.5a New session **the form**: each of Host, Project and Profile — after the cut-over Login —
+    ends its note with its file and **Open file**, the Settings page's; no button under `open_in: none`) -#}
 {%- set files = files | default({}) %}{% set shell_pick = shell_pick | default(":shell") %}
 {% macro fromfile(name, path, key="") -%}
 from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key }}</span>{% endif %}
@@ -74,10 +74,27 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
           the tool is picked** — every profile names its adapter, so there is no Adapter field to
           disagree with it; a shell is the one adapter with no profile, so it closes the list. An
           empty pick lets the role's `profile` apply (design §4.9 precedence), else the default. -#}
+      {%- if on_login | default(false) %}
+      {#- after the cut-over **Profile** is a **Login** pick (§4.5a New session **the form**, §4.9e *A session the
+          person starts*, TD-2068): the home's own host's logins, each *<tool>:<name> · <account>*, the login last
+          used first; on another host a typed *<tool>:<name>*, since the home reads no node's logins (§4.9e *Not
+          here*); the list ends with the shell. **Model** is optional: empty, the login's pin else the tool's
+          default stands. -#}
+      {%- set login_opts = login_opts | default([]) %}
+      <div class="field" id="loginfield"><label>Login</label>
+        <select class="input" name="login" id="login">{% for o in login_opts %}<option value="{{ o.key }}" data-here="1" data-models="{{ o.models | join(',') }}"{% if o.key == prefill.login and prefill.adapter != "shell" %} selected{% endif %}>{{ o.key }} · {{ o.account }}</option>{% endfor %}<option value="" data-typed="1"{% if login_opts %} hidden{% endif %}{% if not login_opts and prefill.adapter != "shell" %} selected{% endif %}>a login typed below</option><option value="{{ shell_pick }}" data-adapter="shell"{% if prefill.adapter == "shell" %} selected{% endif %}>shell (no agent)</option></select>
+        <div id="typedfield"{% if login_opts %} hidden{% endif %}><input class="input mono" name="login_typed" id="logintyped" placeholder="<tool>:<name>, as that host's logins.yml names it"{% if login_opts %} disabled{% endif %}></div>
+        <span class="note" id="loginnote">{% if logins_why | default("") %}⚠ {{ logins_why }}: type the login · {% endif %}the login the session runs on, the one last used first — {{ fromfile("logins.yml", files.logins) }}; the list ends with <i>shell (no agent)</i></span>
+        <label>Model (optional)</label>
+        <input class="input mono" name="model" id="model" list="loginmodels" placeholder="the login's pin, else the tool's default">
+        <datalist id="loginmodels"></datalist>
+      </div>
+      {%- else %}
       <div class="field"><label>Profile</label>
         <select class="input" name="profile" id="profile"><option value=""{% if not prefill.profile and prefill.adapter != "shell" %} selected{% endif %}>the role's, else {{ default_profile }} (default)</option>{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == prefill.profile and prefill.adapter != "shell" %} selected{% endif %}>{{ p.label }}</option>{% endfor %}<option value="{{ shell_pick }}" data-adapter="shell"{% if prefill.adapter == "shell" %} selected{% endif %}>shell (no agent)</option></select>
         <span class="note">tool · account · model the session starts with — {{ fromfile("profiles.yml", files.profiles) }}; the list ends with <i>shell (no agent)</i></span>
       </div>
+      {%- endif %}
       {# design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-160, built by TD-173):
          picking one narrows the Directory list to the team's checkouts, filters Role to its roles
          plus `plain`, ticks its live manager under Controllers, starts a role under you, and says

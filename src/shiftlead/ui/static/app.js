@@ -7314,7 +7314,9 @@
     // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
     // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
     const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
-    const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile");
+    // after the cut-over the pick is **Login** (§4.9e *A session the person starts*, TD-2068): the same tool pick
+    const herechoice = $("#herechoice"), inuse = $("#hereinuse"), profSel = $("#profile") || $("#login");
+    const onLogin = !!$("#login"), typedIn = $("#logintyped"), modelIn = $("#model"), modelList = $("#loginmodels");
     // Profile is the one tool pick (§4.5a New session **the form**, TD-284): its last choice is the shell
     const isShell = () => !!profSel && !!profSel.selectedOptions[0] && profSel.selectedOptions[0].dataset.adapter === "shell";
     // the Host pick (TD-284 slice 3): every reading about a place is the picked host's (§4.4a *The New
@@ -7450,7 +7452,26 @@
     function applyShell() {
       const sh = isShell();
       for (const f of ["#rolefield", "#lanefield", "#newchips"]) { const el = $(f); if (el) el.hidden = sh; }
+      applyLogin();
       applyMode();
+    }
+    // the **Login** pick on the picked host (§4.5a New session **the form**, TD-2068): the home's own logins here,
+    // a typed `<tool>:<name>` on another host, since the home reads no node's logins; **Model** suggests the
+    // families the picked login offers, and a shell or a member line takes neither
+    let loginLocked = false;
+    function applyLogin() {
+      if (!onLogin) return;
+      const a = away(), here = [...profSel.options].filter((x) => x.dataset.here);
+      const typed = [...profSel.options].find((x) => x.dataset.typed);
+      for (const x of here) { x.hidden = a; x.disabled = a; }
+      if (typed) typed.hidden = !a && here.length > 0;
+      const cur = profSel.selectedOptions[0];
+      if (!cur || cur.hidden) profSel.value = a || !here.length ? "" : here[0].value;
+      const o = profSel.selectedOptions[0], isTyped = !!(o && o.dataset.typed);
+      profSel.disabled = loginLocked;
+      if (typedIn) { typedIn.parentElement.hidden = !isTyped; typedIn.disabled = !isTyped || loginLocked; typedIn.required = !typedIn.disabled; }
+      if (modelIn) modelIn.disabled = isShell() || loginLocked;
+      if (modelList) modelList.innerHTML = ((o && o.dataset.models) || "").split(",").filter(Boolean).map((m) => `<option value="${esc(m)}">`).join("");
     }
     if (profSel) profSel.addEventListener("change", () => { applyShell(); check(); });
     let seq = 0;
@@ -7585,7 +7606,9 @@
     function lockLine(on) {
       // a kept member is the line's (§4.9): named and filled from it alone, so its fields are drawn locked
       for (const el of [nm, laneIn, promptIn]) if (el) el.readOnly = on;
-      if (profSel) profSel.disabled = on;
+      // after the cut-over a member's login is picked from its team's list at launch: the pick is locked
+      if (onLogin) { loginLocked = !!(memberLines().length && !underMe); applyLogin(); }
+      else if (profSel) profSel.disabled = on;
     }
     function memberNote() {
       if (!mnote) return;
@@ -7606,7 +7629,7 @@
       lineGot = got;
       if (!got.why) {
         nm.value = got.name || nm.value;
-        if (profSel) profSel.value = [...profSel.options].some((x) => x.value === got.profile) ? got.profile : "";
+        if (profSel && !onLogin) profSel.value = [...profSel.options].some((x) => x.value === got.profile) ? got.profile : "";
         if (laneIn) laneIn.value = (got.lane || []).join(", ");
         if (promptIn) promptIn.value = got.prompt || "";
         tickGrants(got.grants || []);
@@ -7712,7 +7735,7 @@
       applyRepo(false);
       dir.dispatchEvent(new Event("change"));  // the occupancy, the roles, the chips, the name, the team line
     }
-    if (hostSel) hostSel.addEventListener("change", () => { gate(); loadRepos(); });
+    if (hostSel) hostSel.addEventListener("change", () => { gate(); applyLogin(); loadRepos(); });
     // The Directory list's suggestions: the registered repos and recent directories, which a Team pick
     // narrows to its checkouts and *none* restores
     const datalist = $("#recent");
