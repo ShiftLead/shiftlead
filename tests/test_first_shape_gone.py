@@ -133,6 +133,8 @@ def test_the_form_drops_a_role_s_own_reader_after_the_marker(form, monkeypatch, 
     monkeypatch.setitem(NODE_FILES, ".shiftlead.yml", role)
     monkeypatch.setattr(teamstore, "first_shape_off", lambda: is_off)
     data = {"name": "a1", "dir": "/srv/node/alpha", "role": "hunter", "host": "node1"}
+    if is_off:  # after the cut-over the form names a login: a node's is typed (§4.9e, TD-2068)
+        data["login_typed"] = "claude-code:main"
     r = c.post("/new", data=data, follow_redirects=False)
     assert r.status_code == 303, r.text
     made = next(p for m, p in calls if m == "create")
