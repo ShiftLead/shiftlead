@@ -27,6 +27,7 @@ from sessionorc import (
     hosts,
     link,
     logins,
+    mail,
     naming,
     teamstore,
 )
@@ -1225,7 +1226,44 @@ class SettingsMixin:
             entries=entries,
             here=hosts.local_host().name,
             roots=hosts.local_host().repos(),
+            node_mark=((self._host_rec.get("teams") or {}).get(name) or {}).get("node_cannot_run"),
         )
+
+    async def rpc_team_node_cannot(
+        self, team: str = "", model: str = "", logins: Any = None, flow: str = "", caller: Any = None
+    ) -> dict[str, Any]:
+        """A node reported that no login of a team's list offers `model` (§4.9d *A team on a node*, §4.9e, TD-2068):
+        the home marks the team *cannot run*, naming the model, on its host record beside its started mark, with the
+        list and the flow it was read against; `team_show` reads it while both are unchanged (`node_cannot_run`). The
+        home's stage pass's own call: refused at a node, from a session, before the cut-over and for a team not
+        switched."""
+        rule = "(design §4.9d A team on a node)"
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: team_node_cannot is the home's {rule}")
+        if not mail.is_person(caller):
+            raise RpcError(f"team_node_cannot is the home's own call, never a session's {rule}")
+        name = str(team or "")
+        doc = settings_mod.load()
+        if not teamstore.cut_over(doc) or not teamstore.switched(doc, name):
+            raise RpcError(f"no switched team {name!r} {rule}")
+        if not isinstance(model, str) or not model.strip():
+            raise RpcError(f"team_node_cannot names the model no login offers {rule}")
+        if not isinstance(logins, list) or not all(isinstance(x, str) for x in logins):
+            raise RpcError(f"team_node_cannot takes the list it was read against, as login keys {rule}")
+        mark = {"model": model, "logins": list(logins), "flow": str(flow or ""), "at": now_iso()}
+        teams = self._host_rec.setdefault("teams", {})
+        before = copy.deepcopy(teams.get(name))
+        teams.setdefault(name, {})["node_cannot_run"] = mark
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:  # the record in memory is put back, so it never says what the file does not
+            if before is None:
+                teams.pop(name, None)
+            else:
+                teams[name] = before
+            raise
+        log.info("team %s cannot run on its node: no login of its list offers %s", name, model)
+        return {"team": name, **mark}
 
     async def _rekey_teams(self, flow: str, renames: dict[str, str]) -> None:
         """A flow save's renamed stages, carried to the numbers of each team on that flow (§4.9d, TD-2060)."""

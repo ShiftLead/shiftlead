@@ -261,6 +261,10 @@ def test_team_show_reads_this_hosts_logins_with_the_teams_reserve(agent, monkeyp
     monkeypatch.setattr("sessionorc.agent_settings.home_call", lambda name: SimpleNamespace(call=call))
     assert asyncio.run(agent.rpc_team_show(team="a")) == {"team": "a"}
     assert seen["rows"]["claude:x"]["at_reserve"] is True and seen["head"]["word"] == "stopped"
+    assert seen["node_mark"] is None
+    agent._host_rec = {"teams": {"a": {"node_cannot_run": {"model": "opus"}}}}
+    asyncio.run(agent.rpc_team_show(team="a"))
+    assert seen["node_mark"] == {"model": "opus"}, "the home's mark of a team on a node reaches the read"
 
 
 def test_after_the_cut_over_a_switched_teams_head_reads_its_started_mark(agent):
@@ -565,3 +569,36 @@ def test_a_tech_lead_record_not_removed_refuses_the_delete_and_keeps_the_team(ag
     with pytest.raises(RpcError, match="not deleted: its tech lead's record ao-s-techlead-a@node was not removed"):
         asyncio.run(a.rpc_team_delete(team="a", version=ts.version(settings_mod.load(), "a")))
     assert "a" in settings_mod.load()["teams"] and not dropped, "the state branch's copy is kept too"
+
+
+def test_team_node_cannot_marks_a_team_on_its_host_record_and_is_the_homes_own(agent, monkeypatch):
+    """§4.9d *A team on a node*, TD-2068: the stage pass's mark that the team's node found no login of its list offering
+    a model, kept beside the started mark with the list and the flow it was read against; refused from a session, at
+    a node, for a team not switched and without a model or a list."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+
+    async def go():
+        await a.rpc_team_mark(team="a", started=True)
+        got = await a.rpc_team_node_cannot(team="a", model="opus", logins=["claude-code:x"], flow="build")
+        mark = a._host_rec["teams"]["a"]["node_cannot_run"]
+        assert {k: mark[k] for k in ("model", "logins", "flow")} == {
+            "model": "opus",
+            "logins": ["claude-code:x"],
+            "flow": "build",
+        }
+        assert got["team"] == "a" and a.host_saves[-1]["teams"]["a"]["node_cannot_run"] == mark
+        assert a._host_rec["teams"]["a"]["started"], "the started mark stands beside it"
+        for kw, words in (
+            ({"caller": "s-1"}, "never a session's"),
+            ({"team": "zz"}, "no switched team"),
+            ({"model": " "}, "names the model"),
+            ({"logins": "claude-code:x"}, "as login keys"),
+        ):
+            with pytest.raises(RpcError, match=words):
+                await a.rpc_team_node_cannot(**{"team": "a", "model": "opus", "logins": [], "flow": "build", **kw})
+        a.mode = "node"
+        with pytest.raises(RpcError, match="is a node of"):
+            await a.rpc_team_node_cannot(team="a", model="opus", logins=[], flow="build")
+
+    asyncio.run(go())

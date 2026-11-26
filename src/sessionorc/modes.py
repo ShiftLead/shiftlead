@@ -188,8 +188,11 @@ PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"
 # `witness_press` (§4.4 *The home keeps a log of what it witnesses*, TD-1386) joins it: a press is witnessed at
 # the home alone, and the call names no `id` for `PERSON_NODE_BOUND` to bound. `seat_moved` (§4.9d *How each one
 # runs*, TD-2065): the home's stage pass marks a built-in seat's old record superseded and moves its mail, which the
-# home holds for every host.
-HOME_ONLY = frozenset({"host_branch", "host_files", "host_occupancy", "host_worktrees", "witness_press", "seat_moved"})
+# home holds for every host. `team_node_cannot` (§4.9d *A team on a node*, TD-2068): the home's stage pass marks a team
+# on a node *cannot run* on the home's host record.
+HOME_ONLY = frozenset(
+    {"host_branch", "host_files", "host_occupancy", "host_worktrees", "witness_press", "seat_moved", "team_node_cannot"}
+)
 
 
 def offline_refusal(

@@ -280,14 +280,16 @@ def launch(
 
 def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     """The `create` arguments that put the launch on its login (§4.9e *The launch on a login*): `{}` for a launch
-    as before (a team on a node, whose host picks for itself; a launch with no `pick`; a team the home's reading does
+    as before (a job's on a node; a launch with no `pick`; a team the home's reading does
     not show switched; a job's before the cut-over), else the login the reading picks with the model and the list —
     the team's, or for a job the built-in set's (`on_set`, §4.9d *The login a seat starts on*, no team's reserve
     added) — or None when nothing is to start: no login of the list usable (the usage gate holds it) or none offering
     the model (*cannot run*)."""
-    if got.launch.host or got.pick is None:
+    if got.pick is None:
         return {}
     kind, key = got.pick
+    if got.launch.host:  # a built-in seat's or a job's on a node is launched as before until its slice
+        return {} if kind == "builtins" else on_node(call, team, got)
     if kind == "builtins":
         shown = call("builtins_show", set=got.on_set or builtinstore.DEFAULT) or {}
         if not shown.get("cut_over"):
@@ -320,6 +322,38 @@ def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     }
 
 
+def on_node(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
+    """A team on a node (§4.9e *A team on a node*, TD-2068): the launch goes with the team's list as names and the
+    model, and the node's own pick takes the login (`create` with no login). `{}` for a team the home's reading does
+    not show switched, None for one the home has marked *cannot run* (the node found no login of this list offering
+    a model, `team_node_cannot`) or whose list is empty."""
+    shown = call("team_show", team=team, entries=False) or {}
+    if not shown.get("switched"):
+        return {}
+    listed = [str(r["login"]) for r in shown.get("logins") or () if r.get("login")]
+    if shown.get("cannot_run") or not listed:
+        log.info("team %s: nothing starts on its node — %s", team, shown.get("cannot_run") or "its list is empty")
+        return None
+    return {"profile": "", "seat_model": got.model, "login_list": listed}
+
+
+def _node_refused(call: Any, team: str, got: StageLaunch, sent: Mapping[str, Any], e: AgentError) -> bool:
+    """Whether a node's `create` was refused for its list (§4.9e *A team on a node*): *no login usable* is a wait, and
+    *no login offers <model>* marks the team *cannot run* at the home, naming the model, until its list or its flow
+    changes. Nothing else is: the caller raises it."""
+    words = str(e)
+    if teamstore.NO_LOGIN_USABLE in words:
+        log.info("team %s: its node holds the launch waiting — %s", team, words)
+        return True
+    if teamstore.NO_LOGIN_OFFERS not in words:
+        return False
+    shown = call("team_show", team=team, entries=False) or {}
+    flow = str((shown.get("flow") or {}).get("name") or "")
+    call("team_node_cannot", team=team, model=got.model, logins=list(sent["login_list"]), flow=flow)
+    log.warning("team %s cannot run %s on its node: %s", team, flow, words)
+    return True
+
+
 def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) -> dict[str, Any] | None:
     """Create the stage's session, or None: the team is not started, a live session holds the name, or no login of
     the team's list can start it now (`on_login`). The started mark is read from the home just before the create, so
@@ -332,7 +366,17 @@ def start(call: Any, org: orgmod.Org, team: orgmod.TeamDef, got: StageLaunch) ->
         return None
     if (login := on_login(call, team.name, got)) is None:
         return None
-    return call("create", **{**got.create_params([]), **login})
+    try:
+        return call("create", **{**got.create_params([]), **login})
+    except AgentError as e:
+        if (
+            x.host
+            and login.get("login_list")
+            and not login.get("login")
+            and _node_refused(call, team.name, got, login, e)
+        ):
+            return None
+        raise
 
 
 def holder_of(got: StageLaunch, created: dict[str, Any]) -> str:
