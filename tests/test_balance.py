@@ -223,6 +223,22 @@ def test_a_host_record_that_cannot_be_read_is_empty(tmp_path):
     assert HostStore(p).load() == {"teams": {"a": {"balance": {"since": "x"}}}}
 
 
+def test_a_sets_node_mark_survives_a_new_store_and_a_save(tmp_path):
+    """TD-2276, §5 and §4.9d *Where a seat's session launches*: each built-in set's `node_cannot_run` is kept on the
+    home's `host` record across a restart, so the next save (a tick's `last_tick`) writes it again; a set entry that is
+    not a table is dropped, as the keys beside it are."""
+    from sessionorc.store import HostStore
+
+    p = tmp_path / "host.json"
+    mark = {"default": {"node_cannot_run": {"sweeper": {"node1": {"model": "haiku", "logins": ["claude-code:a"]}}}}}
+    HostStore(p).save({"teams": {}, "builtins": {**mark, "odd": 3}})
+    rec = HostStore(p).load()
+    assert rec["builtins"] == mark
+    rec["last_tick"] = "2026-11-26T00:00:00Z"
+    HostStore(p).save(rec)
+    assert HostStore(p).load()["builtins"] == mark and json.loads(p.read_text())["builtins"] == mark
+
+
 async def test_a_mark_is_saved_with_no_repo_and_a_repo_the_home_does_not_read_is_not_the_teams(
     agent, tmp_path, monkeypatch
 ):
