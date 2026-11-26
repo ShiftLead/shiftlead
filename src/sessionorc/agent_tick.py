@@ -180,6 +180,9 @@ FILLED_FOR = "[shiftlead] you are filled for: "
 NOT_RESTARTS = ("person", "start", "schedule", "work")
 # a built-in seat's record mark → the seat's key in a built-in set (§4.9d *The store*)
 BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "prompts"}
+# the replays of a built-in seat or the director on a node that a node's refusal of the list makes none of (§4.9d
+# *How each one runs*): rule 3's fill and rule 1's crash and lost-brief replays, which send the launch record's list
+NODE_LIST_REPLAYS = ("fill", "crash", "lost-brief")
 
 
 def _director(s: Session) -> bool:
@@ -4319,6 +4322,14 @@ class TickMixin:
         address = self._address(s)
         read: dict[str, Any] | None = None
         renamed: str | None = None
+        params: dict[str, Any] = {}
+        if why in NODE_LIST_REPLAYS and why != "fill" and s.host != self.host and self._on_set_login(s):
+            sent: dict[str, Any] = {}
+            with contextlib.suppress(Exception):  # an unreadable launch record fails below, as before
+                sent = self._read_launch(address)
+            # a launch record sending the list as names (§4.9e): the set's mark for what it sends holds it
+            if sent.get("login_list") and not sent.get("login") and self._node_seat_list(s, sent) is None:
+                return  # nothing sent, nothing counted (§4.9d *How each one runs*)
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
             if held:
@@ -4342,8 +4353,8 @@ class TickMixin:
             else:
                 view = await self._route_act("create", {**params, "host": s.host}, None, s.host)
         except Exception as e:  # noqa: BLE001 — a failed replay is a restart that failed, and counts (§6)
-            if why == "fill" and await self._node_list_refused(s, extra, e):
-                return  # refused before anything was made: no fill, nothing counted (§4.9d *How each one runs*)
+            if why in NODE_LIST_REPLAYS and await self._node_list_refused(s, params, e):
+                return  # refused before anything was made: no fill or restart, nothing counted (§4.9d)
             entry["error"] = str(e) or type(e).__name__
             log.warning("%s: the %s restart failed: %s", s.id, why, entry["error"])
             s.restarts = history
@@ -4957,12 +4968,14 @@ class TickMixin:
         record or the director's, on the home's own host or on a node (where the node's own launch picks)."""
         return bool(self._first_shape_off and (BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) or _director(s)))
 
-    def _node_seat_list(self, s: Session) -> dict[str, Any] | None:
+    def _node_seat_list(self, s: Session, sent: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
         """A built-in seat's or the director's fill on a node (§4.9d *Where a seat's session launches*, §4.9e *A team
         on a node*, TD-2068): the `create` arguments that send the list as names and the seat's model with no login,
         so the node's own launch takes its first usable login offering the model. None, `unfillable` *cannot run*,
         where the list is empty, the record names no model, or the home's mark says the set cannot run the seat on
-        that node (`builtins_node_cannot`, read while the set's list and the seat's model are the ones it names)."""
+        that node (`builtins_node_cannot`, read while the set's list and the seat's model are the ones it names). A
+        replay's check passes `sent`, its launch record, whose list and model are what it sends and so what a mark
+        is read against."""
         if _director(s):
             order, held, where, marked = list(s.login_list or ()), str(s.seat_model or ""), "the director's list", None
         else:
@@ -4972,6 +4985,8 @@ class TickMixin:
             name, key = builtinstore.repo_set(doc, repo), BUILTIN_SEAT_KEYS[str(s.builtin)]
             entry = builtinstore.sets(doc)[name]
             order, held, where = list(entry["logins"]), builtinstore.model(entry, key), f"built-in set {name}"
+            if sent is not None:
+                order, held = [str(x) for x in sent.get("login_list") or ()], str(sent.get("seat_model") or "")
             sets_rec = self._host_rec.get("builtins") if isinstance(self._host_rec.get("builtins"), dict) else {}
             marks = ((sets_rec.get(name) or {}).get("node_cannot_run") or {}).get(key) or {}
             mark = marks.get(s.host) if isinstance(marks, dict) else None
@@ -4986,15 +5001,17 @@ class TickMixin:
             why = marked or ("its list is empty" if not order else "its record names no model")
             log.info("%s: not filled on %s — cannot run in %s: %s", s.id, s.host, where, why)
             return None
-        return {"profile": "", "seat_model": held, "login_list": order}
+        # `login` None: a login a launch record kept from an earlier launch is never sent with the list
+        return {"profile": "", "login": None, "seat_model": held, "login_list": order}
 
     async def _node_list_refused(self, s: Session, params: Mapping[str, Any], e: Exception) -> bool:
-        """Whether a node refused a built-in seat's or the director's fill for its list (§4.9d *How each one runs*,
-        §4.9e *A team on a node*, TD-2068): before anything is made, as *no login usable* (a wait) or *no login offers
-        <model>* (*cannot run*, and for a set's seat the home's mark that the set cannot run it on that node). Such a
-        refusal is no fill: the seat is unfillable with the node's words, and nothing is counted. Any other failure is
-        not one, and the caller counts it as a failed fill."""
-        if s.host == self.host or params.get("login") or not params.get("login_list"):
+        """Whether a node refused a built-in seat's or the director's fill, or its crash or lost-brief replay, for its
+        list (§4.9d *How each one runs*, §4.9e *A team on a node*, TD-2068): before anything is made, as *no login
+        usable* (a wait) or *no login offers <model>* (*cannot run*, and for a set's seat the home's mark that the set
+        cannot run it on that node). Such a refusal is no fill and no restart: the seat is unfillable with the node's
+        words, and nothing is counted. Any other failure is not one, and the caller counts it as before; so is any
+        refusal of a record that is no built-in seat's or the director's."""
+        if s.host == self.host or not self._on_set_login(s) or params.get("login") or not params.get("login_list"):
             return False
         words = str(e)
         if teamstore.NO_LOGIN_USABLE in words:
