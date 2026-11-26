@@ -134,13 +134,14 @@ async def test_a_press_on_an_early_answer_is_written(agent, repo, tmp_path, monk
     keep_ledger(agent, monkeypatch)
     await park_ticks(agent)
 
+    FAR = "2999-12-01"  # the home's refusal reads the real clock (`counted_work`'s `today`), so no near date
     asks = {"Answers": "Go (default) | Not yet"}
     _, r = _one(
         tmp_path / "read",
         _gated(1, "the question", "TD-002", "TD-003", **asks),
-        _entry(2, "a gated blocker", Priority="High", Blocked_by=f"until {LATER}, decision (paul)"),
+        _entry(2, "a gated blocker", Priority="High", Blocked_by=f"until {FAR}, decision (paul)"),
         _gated(3, "a gated blocker with builds", "TD-004", **asks),
-        _entry(4, "a build", Priority="High", Blocked_by=f"until {LATER}"),
+        _entry(4, "a build", Priority="High", Blocked_by=f"until {FAR}"),
     )
     entries = r["ledger"]["entries"]
     by = {e["id"]: e for e in entries}
