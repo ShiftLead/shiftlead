@@ -109,8 +109,8 @@ def launch(
         )
     except ValueError as e:
         raise teams.TeamError(f"{where}: {e}") from None
-    # no member's or role's profile: as a job's, a run starts on the package's default adapter until a login is
-    # chosen for it (TD-2068), never a shell
+    # no member's or role's profile: on the home's own host a run starts on the team's login that `stage_start.start`
+    # picks for the audit's model (TD-2068); on a node, on the package's default adapter, never a shell
     x = teams.Launch(
         name=session,
         role=role.name,
@@ -127,4 +127,4 @@ def launch(
         prompt_from=made,
         unlisted=unlisted,
     )
-    return StageLaunch(x, str(audit["model"]))
+    return StageLaunch(x, str(audit["model"]), ("audits", flow3.key_of(audit["name"])))

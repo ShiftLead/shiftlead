@@ -9,8 +9,9 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
+from sessionorc import teamstore
 from sessionorc.client import AgentError
-from shiftlead import flow3, repoconfig, stage_start, teams
+from shiftlead import flow3, repoconfig, stage_audit_start, stage_start, teams
 
 pytestmark = pytest.mark.unit
 
@@ -175,7 +176,7 @@ def test_a_start_reads_the_teams_mark_from_the_home_just_before_the_create(world
             return _answers.get(method, {"id": "new"})
 
         assert stage_start.start(call, org, team, got) == want
-        assert calls == (["host", "name_check", "create"] if want else ["host"])
+        assert calls == (["host", "name_check", "team_show", "create"] if want else ["host"])
 
 
 def test_a_started_team_creates_it_supervised_unless_the_name_is_held(world, monkeypatch):
@@ -189,8 +190,8 @@ def test_a_started_team_creates_it_supervised_unless_the_name_is_held(world, mon
         return {"verdict": "free"} if method == "name_check" else {"id": "new"}
 
     assert stage_start.start(call, org, team, got) == {"id": "new"}
-    assert [m for m, _ in calls] == ["host", "name_check", "create"]
-    assert calls[2][1]["supervised"] is True and calls[2][1]["lane"] == ["TD-7"]
+    assert [m for m, _ in calls] == ["host", "name_check", "team_show", "create"]
+    assert calls[3][1]["supervised"] is True and calls[3][1]["lane"] == ["TD-7"]
     assert stage_start.start(lambda *_a, **_k: {"verdict": "live"}, org, team, got) is None
 
 
@@ -288,3 +289,97 @@ def test_a_standard_brief_that_cannot_be_read_fails_the_flows_briefs(world, monk
     monkeypatch.setattr(flow3, "STANDARD_DIR", world[2] / "nowhere")
     with pytest.raises(OSError):
         stage_start.briefs(org, team, builtin("build"), host="h", here="h")
+
+
+# --- the launch on a login (design §4.9e *The launch on a login*, TD-2068) ---------------------------------------
+
+ORDER = ["claude-code:main", "claude-code:spare", "gemini:g"]
+
+
+def _rows(**change):
+    """`teamstore.pick`'s rows: every login signed in on its own account and offering opus, unless changed."""
+    rows = {lk: {"state": "signed_in", "account": f"a-{i}", "models": ["opus", "sonnet"]} for i, lk in enumerate(ORDER)}
+    for lk, row in change.items():
+        rows[lk.replace("_", ":", 1)] = {**rows[lk.replace("_", ":", 1)], **row}
+    return rows
+
+
+def _shown(rows, *, switched=True, audits=()):
+    """The team's `team_show` reading as the home answers it: each stage's and audit's `now` the pick of the list."""
+    return {
+        "switched": switched,
+        "flow": {"stages": [{"key": "build", "now": teamstore.pick(ORDER, "opus", rows)}]},
+        "audits": [{"name": n, "now": teamstore.pick(ORDER, m, rows)} for n, m in audits],
+        "logins": [{"login": lk} for lk in ORDER],
+    }
+
+
+def _start(world, monkeypatch, shown, got=None):
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+    got = got or made(world, builtin("build"), "build")
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **kw):
+        calls.append((method, kw))
+        return {"name_check": {"verdict": "free"}, "team_show": shown}.get(method, {"id": "new"})
+
+    return stage_start.start(call, org, team, got), calls
+
+
+def test_a_stage_starts_on_the_first_usable_login_of_the_teams_list_with_the_model_and_the_list(world, monkeypatch):
+    made_, calls = _start(world, monkeypatch, _shown(_rows()))
+    assert made_ == {"id": "new"}
+    assert calls[2] == ("team_show", {"team": "t", "entries": False})
+    create = calls[3][1]
+    assert (create["login"], create["adapter"], create["profile"]) == ("claude-code:main", "claude-code", "")
+    assert create["seat_model"] == "opus" and create["login_list"] == ORDER
+
+
+def test_a_list_whose_first_login_is_at_its_reserve_starts_the_stage_on_the_second(world, monkeypatch):
+    _, calls = _start(world, monkeypatch, _shown(_rows(**{"claude-code_main": {"at_reserve": True}})))
+    assert calls[-1][0] == "create" and calls[-1][1]["login"] == "claude-code:spare"
+
+
+def test_a_login_of_another_tool_starts_the_session_on_that_tool(world, monkeypatch):
+    rows = _rows(**{"claude-code_main": {"state": "limited"}, "claude-code_spare": {"models": ["sonnet"]}})
+    _, calls = _start(world, monkeypatch, _shown(rows))
+    assert (calls[-1][1]["login"], calls[-1][1]["adapter"]) == ("gemini:g", "gemini")
+
+
+def test_no_usable_login_or_none_offering_the_model_starts_nothing(world, monkeypatch):
+    """None usable: the usage gate holds the launch; none offering the model: the team *cannot run*. Either way
+    nothing is created, and the next pass asks again."""
+    waits = _rows(**{lk.replace(":", "_", 1): {"state": "limited"} for lk in ORDER})
+    none = _rows(**{lk.replace(":", "_", 1): {"models": ["sonnet"]} for lk in ORDER})
+    for rows in (waits, none):
+        made_, calls = _start(world, monkeypatch, _shown(rows))
+        assert made_ is None and [m for m, _ in calls] == ["host", "name_check", "team_show"]
+
+
+def test_a_stage_the_reading_does_not_name_starts_nothing(world, monkeypatch):
+    shown = {**_shown(_rows()), "flow": {"stages": []}}
+    made_, calls = _start(world, monkeypatch, shown)
+    assert made_ is None and "create" not in [m for m, _ in calls]
+
+
+def test_a_team_on_a_node_a_launch_with_no_pick_and_a_team_not_switched_launch_as_before(world, monkeypatch):
+    org, team, _ = world
+    on_node = stage_start.launch(org, team, builtin("build"), "build", stage_start.Work("TD-7"), host="n", here="h")
+    no_pick = replace(made(world, builtin("build"), "build"), pick=None)
+    for got, shown in ((on_node, _shown(_rows())), (no_pick, _shown(_rows())), (None, {"switched": False})):
+        made_, calls = _start(world, monkeypatch, shown, got)
+        assert made_ == {"id": "new"}
+        assert "login" not in calls[-1][1] and "seat_model" not in calls[-1][1]
+        assert ("team_show" in [m for m, _ in calls]) is (got is None)
+
+
+def test_an_audits_run_starts_on_the_login_the_reading_picks_for_the_audits_model(world, monkeypatch):
+    org, team, root = world
+    monkeypatch.setattr(teams, "_person", lambda *_a: ([], False))
+    doc = {**builtin("build"), "audits": [{"name": "Docs audit", "does": "docs", "model": "sonnet", "every": "1d"}]}
+    got = stage_audit_start.launch(org, team, doc, "Docs audit", host="h", here="h")
+    assert got.pick == ("audits", flow3.key_of("Docs audit"))
+    rows = _rows(**{"claude-code_main": {"models": ["opus"]}})
+    _, calls = _start(world, monkeypatch, _shown(rows, audits=[("Docs audit", "sonnet")]), got)
+    assert (calls[-1][1]["login"], calls[-1][1]["seat_model"]) == ("claude-code:spare", "sonnet")
