@@ -294,3 +294,25 @@ def test_a_login_s_argument_list_that_is_not_a_list_is_none(tmp_path):
     (tmp_path / "logins.yml").write_text("logins:\n  claude-code:odd: {extra_args: 5, unattended_args: '--a --b'}\n")
     got = profiles.get("odd", tmp_path / "profiles.yml")
     assert got.extra_args == [] and got.unattended_args == []
+
+
+def test_a_login_s_unknown_billing_reads_as_a_subscription(tmp_path):
+    """TD-2238: a hand-edited `billing` that is neither kind is read as a subscription, never carried as written."""
+    (tmp_path / "logins.yml").write_text("logins:\n  claude-code:odd: {folder: /c/o, billing: weekly}\n")
+    got = profiles.get("odd", tmp_path / "profiles.yml")
+    assert got.billing == "subscription" and not got.metered
+
+
+def test_a_subscription_login_s_prices_are_not_read(tmp_path):
+    """TD-2238: prices are a metered login's alone; a subscription login's hand-written prices are dropped."""
+    (tmp_path / "logins.yml").write_text("logins:\n  claude-code:flat: {folder: /c/f, prices: {input: 3}}\n")
+    got = profiles.get("flat", tmp_path / "profiles.yml")
+    assert got.billing == "subscription" and got.prices == {}
+
+
+def test_the_profiles_file_s_default_may_name_a_login(tmp_path):
+    """TD-2238: on a switched host `profiles.yml`'s `default` may name a profile only `logins.yml` holds."""
+    (tmp_path / "logins.yml").write_text(LOGINS)
+    (tmp_path / "profiles.yml").write_text("default: grind\nprofiles:\n  sh: {adapter: shell}\n")
+    got, default = profiles.load(tmp_path / "profiles.yml")
+    assert default == "grind" and got["grind"].account == "acct-1"
