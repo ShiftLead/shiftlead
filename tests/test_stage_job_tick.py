@@ -179,7 +179,7 @@ def test_the_reach_starts_a_review_stages_session_where_the_record_stands_at_one
 
 def test_a_job_starts_on_the_set_its_repo_picked(monkeypatch, tmp_path):
     """TD-2258, design §4.9d *A repo uses one set*: with the real `builtinstore`, a job of repo `r`, which names the
-    set `night`, launches on that set's model with `on_set` naming it, and a job of a repo naming none on `default`'s."""
+    set `night`, launches on that set's model with `on_set` naming it, and one of a repo naming none on `default`'s."""
     org = type("Org", (), {"teams": {"t": object()}})()
     seen: list[tuple] = []
 
