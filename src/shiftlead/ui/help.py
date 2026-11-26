@@ -193,9 +193,10 @@ HELP: tuple[Help, ...] = (
         "Resume with changes…",
         "the ending banner",
         (
-            "Opens the New session form filled in from this record: its name, directory, tool, profile, role and "
-            "team, and Unattended as the record had it. Press it to bring a finished session back with "
-            "something changed, unattended again or under another profile. Nothing starts until the form's Start,"
+            "Opens the New session form filled in from this record: its name, directory, tool, profile (its login "
+            "after the switch-over), role and team, and Unattended as the record had it. Press it to bring a "
+            "finished session back with something changed, unattended again or under another profile or login. "
+            "Nothing starts until the form's Start,"
             " and a changed name starts a record beside this one rather than in its place."
         ),
     ),

@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from markupsafe import Markup
 
 from sessionorc import board as board_mod
-from sessionorc import gitinfo, hosts, mail, naming, paths, teamstore, workorders
+from sessionorc import gitinfo, hosts, logins, mail, naming, paths, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import settings as settings_mod
@@ -2922,6 +2922,67 @@ def tool_profile(profs: Mapping[str, profiles_mod.Profile], default: str, adapte
     return next((k for k, p in profs.items() if p.adapter == adapter), "")
 
 
+def login_options(read: Mapping[str, Any] | None, last: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """The **Login** pick's choices after the cut-over (§4.5a New session **the form**, §4.9e *A session the person
+    starts*, TD-2068): each login of the home's own host's `tools` read as `<tool>:<name> · <account>`, with the model
+    families its account offers, narrowed by its pin. The login on `last_login`'s newest line comes first — the login
+    last used for any tool, since the form has no tool pick — and the rest keep the read's order."""
+    opts: list[dict[str, Any]] = []
+    for card in (read or {}).get("tools") or ():
+        tool = str(card.get("adapter") or "")
+        accounts = {str(a.get("key")): a for a in card.get("accounts") or ()}
+        for lg in card.get("logins") or ():
+            acct = accounts.get(str(lg.get("account"))) or {}
+            families = [str(f) for f in ((acct.get("models") or {}).get("families") or ())]
+            pin = lg.get("pin")
+            opts.append(
+                {
+                    "key": f"{tool}:{lg.get('name')}",
+                    "name": str(lg.get("name")),
+                    "account": str(acct.get("label") or lg.get("account") or "no account"),
+                    "models": [f for f in families if f == pin] if pin else families,
+                }
+            )
+    newest = next((str(v) for v in (last or {}).values()), None)
+    return sorted(opts, key=lambda o: o["key"] != newest)
+
+
+def login_prefill(opts: list[dict[str, Any]], login: str, profile: str, adapter: str = "") -> str:
+    """The Login pick's choice on a form filled in (Resume with changes…, §4.5a): the `login` asked for, else the
+    login a record's `profile` names — its key, or its bare name where one login has it (§4.9e *A record's
+    `profile`*) — else the newest login of the record's tool, so a Resume never lands on another tool's login, else
+    the first choice, the login last used; empty where there is none."""
+    keys = [o["key"] for o in opts]
+    for want in (login, profile):
+        if want in keys:
+            return want
+        bare = [o["key"] for o in opts if want and o["name"] == want]
+        if len(bare) == 1:
+            return bare[0]
+    return next((k for k in keys if k.rpartition(":")[0] == adapter), keys[0] if keys else "")
+
+
+def form_login(login: str, model: str, adapter: str, on_login: bool) -> dict[str, Any]:
+    """The form's launch on a login (§4.9e *A session the person starts*, TD-2068), as `ao new --login` reads it:
+    after the cut-over the Login pick's `<tool>:<name>` and the optional Model, the login's tool the adapter;
+    before it neither is taken, and a shell takes neither. Refusals are the create's words, a 400."""
+    login, model = login.strip(), model.strip()
+    if adapter == "shell":
+        if login or model:
+            raise HTTPException(400, "a shell takes no login and no model (design §4.9e)")
+        return {}
+    if not on_login:
+        if login or model:
+            raise HTTPException(400, "a login and a model are for after the switch-over: pick a profile (design §4.9e)")
+        return {}
+    tool, _, name = login.rpartition(":")
+    if not tool or not name:
+        raise HTTPException(
+            400, f"a login is <tool>:<name>, not {login!r} (design §4.9e)" if login else "name a login (design §4.9e)"
+        )
+    return {"login": login, "adapter": tool, **({"seat_model": model} if model else {})}
+
+
 async def chip_build(call: Any, info: Any = None) -> dict[str, str] | None:
     """The top bar's **build** chip on every page (§4.5a, TD-539): `build_chip` over `info`, the
     page's own `host` answer, read here when it holds none. Any failure is no chip, never a page
@@ -3177,8 +3238,23 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the opening prompt **Start session** would have sent (§4.5a *Inbox row: ledger entry*, TD-678)
         prompt: str = "",
         press: str = "",  # `start`: the landing is **Start session**'s, and the warning says so
+        login: str = "",  # after the cut-over, the Login pick's choice (§4.9e, TD-2068)
     ):
         profs, default = profiles_mod.load()
+        # after the cut-over the Profile pick is a **Login** pick over the home's own host's logins (§4.9e *A session
+        # the person starts*, TD-2068); a host agent that does not serve the read leaves it to a typed login
+        on_login = await asyncio.to_thread(teamstore.first_shape_off)
+        logins_why, login_opts = "", []
+        if on_login:
+            try:
+                read = await call("tools")
+            except HTTPException as e:
+                read, logins_why = None, f"the host agent did not serve its logins: {e.detail}"
+            try:  # an agent that keeps no last login: none stored, the read's order
+                last = await call("last_login") if read is not None else {}
+            except HTTPException:
+                last = {}
+            login_opts = login_options(read, last)
         # registered repos (design §5 *Repos*: the home's roster and agent-cadence's, or `repos_registry`) first,
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
@@ -3222,9 +3298,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "files": {
                     "hosts": str(hosts.hosts_file()),
                     "profiles": str(profiles_mod.profiles_file()),
+                    "logins": str(logins.path()),  # the pick's file after the cut-over (TD-2068)
                     "org": str(orgmod.org_file()),
                 },
                 "control_holders": control_holders,
+                "on_login": on_login,
+                "login_opts": login_opts,
+                "logins_why": logins_why,
                 # design §4.5a New session **Grants** checkboxes: the grants a record may hold
                 # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
                 # the one-line warning the row asks for.
@@ -3255,6 +3335,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "why": why,
                     "prompt": prompt,
                     "press": press,
+                    "login": login_prefill(login_opts, login, profile, adapter if prefilled == "1" else "")
+                    if on_login
+                    else "",
+                    # another host's record: its login typed, as its profile names it (§4.9e *A record's `profile`*)
+                    "login_typed": (login or (profile if ":" in profile else f"{adapter}:{profile}"))
+                    if on_login and away_host(host) and (login or profile) and adapter != "shell"
+                    else "",
                 },
             },
         )
@@ -3376,6 +3463,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         host: str = Form(""),
         line: str = Form(""),
         keep: str = Form(""),
+        # after the cut-over the Login pick, a login typed for a node, and the optional Model (§4.9e, TD-2068)
+        login: str = Form(""),
+        login_typed: str = Form(""),
+        model: str = Form(""),
     ):
         if team.strip() and line.strip() and unattended == "on" and not resume.strip():  # a Resume is the record's
             # a Role a member line names under a Team pick starts **a member** (§4.5a New session
@@ -3392,8 +3483,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # picker was prefilled from the repo's or preset's `controllers:` when the page loaded, so
         # what is ticked is what was meant — a person unticking the default is a decision.
         refs = [r.strip() for r in lane.split(",") if r.strip()]
-        if profile == SHELL_PICK:  # *shell (no agent)*, the Profile list's last choice
-            adapter, profile = "shell", ""
+        if profile == SHELL_PICK or login == SHELL_PICK:  # *shell (no agent)*, the pick's last choice
+            adapter, profile, login = "shell", "", ""
+        # after the cut-over the session starts on a login (§4.9e *A session the person starts*, TD-2068): the Login
+        # pick's, or the one typed for a node; the role's profile is dropped and the login's tool is the adapter
+        on_login = await asyncio.to_thread(teamstore.first_shape_off)
+        if on_login and adapter != "shell" and profile.strip():
+            raise HTTPException(400, "profiles went at the switch-over: name a login (design §4.9e)")
+        launch = form_login(login.strip() or login_typed, model, adapter, on_login)
+        adapter = launch.pop("adapter", adapter)
         preset = brief = ledger = made_from = cfg = None
         away = away_host(host)
         if adapter != "shell":
@@ -3439,7 +3537,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
         # `review:` wins, else the team's reader, as `ao new --team` fills it. The Controllers
         # picker was ticked with the team's live manager when the team was picked.
-        profile = profile or (preset.profile if preset else None) or ""
+        profile = "" if launch else profile or (preset.profile if preset else None) or ""
         adapter = adapter or profile_adapter(profile)
         review = await asyncio.to_thread(role_review, preset)
         if team.strip() and adapter != "shell":
@@ -3490,6 +3588,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             **stop_fields(until, unattended == "on"),
             **start_fields(at, unattended == "on"),
             **elsewhere,
+            **launch,
         )
         if s.get("state") != "scheduled":  # a scheduled start starts nothing yet, so it is no press (§4.4)
             await witness_press("new-session", team.strip(), dir.strip())  # no team: the home names the repo

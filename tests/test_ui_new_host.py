@@ -131,7 +131,8 @@ def test_the_page_passes_the_picked_host_on_every_read():
         assert "${hq()}" in line, api
     assert "|| away()" not in js and "away() ||" not in js  # nothing is skipped for another host now
     assert (
-        "fetch(`/api/repos?host=" in js and 'hostSel.addEventListener("change", () => { gate(); loadRepos(); })' in js
+        "fetch(`/api/repos?host=" in js
+        and 'hostSel.addEventListener("change", () => { gate(); applyLogin(); loadRepos(); })' in js
     )
 
 
