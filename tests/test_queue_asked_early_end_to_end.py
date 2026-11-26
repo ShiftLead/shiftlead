@@ -25,6 +25,7 @@ from test_queue_asked_early import LATER, _gated, _one
 from test_queue_board_hold import _read, _worker
 from test_ui_queue import client
 
+from sessionorc import queue
 from sessionorc.client import LocalClient
 from shiftlead.ui.app import ledger_for_you, templates
 from shiftlead.ui.queue import attach, card_index, queue_view, split_later
@@ -118,7 +119,11 @@ def test_an_in_progress_card_takes_nothing_from_its_early_items(tmp_path):
 
 
 async def test_a_press_on_an_early_answer_is_written(agent, repo, tmp_path, monkeypatch):  # noqa: F811
-    """No 409: the home's stale refusal reads the fact alone, so an answer to TD-001 lands as a decided line."""
+    """No 409: the home's stale refusal reads the fact alone, so an answer to an early member lands as a decided line.
+    The entries are TD-2172's case read from a ledger as the home reads it (`blocked_ids`, `gates` marked), so TD-001
+    and TD-003 are asked early before the press: TD-001 on gated blockers alone, TD-003 on the open build TD-004, which
+    carries no gate of the person's and so is counted work. A refusal reading every counted wait (`counted.work` or
+    `counted.wide`) in place of the fact refuses the press on TD-003, or on both."""
     shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
     root = str(repo)
 
@@ -129,22 +134,29 @@ async def test_a_press_on_an_early_answer_is_written(agent, repo, tmp_path, monk
     keep_ledger(agent, monkeypatch)
     await park_ticks(agent)
 
-    def gated(n: int, *blockers: str, **kw) -> dict:
-        return {"id": f"TD-{n:03d}", "title": f"entry {n}", "for_page": "for-you", "priority": "high",
-                "blocked_by": [*blockers, "decision (paul)"], **kw}  # fmt: skip
-
-    entries = [
-        gated(1, "TD-002", "TD-003", answers=["Go", "Not yet"], default=0),
-        gated(2, f"until {LATER}"),
-        gated(3, "TD-004"),
-        {"id": "TD-004", "title": "a build", "for_page": "waiting", "blocked_by": [f"until {LATER}"]},
-    ]
+    asks = {"Answers": "Go (default) | Not yet"}
+    _, r = _one(
+        tmp_path / "read",
+        _gated(1, "the question", "TD-002", "TD-003", **asks),
+        _entry(2, "a gated blocker", Priority="High", Blocked_by=f"until {LATER}, decision (paul)"),
+        _gated(3, "a gated blocker with builds", "TD-004", **asks),
+        _entry(4, "a build", Priority="High", Blocked_by=f"until {LATER}"),
+    )
+    entries = r["ledger"]["entries"]
+    by = {e["id"]: e for e in entries}
+    assert by["TD-001"]["blocked_ids"] == ["TD-002", "TD-003"] and by["TD-003"]["blocked_ids"] == ["TD-004"]
     agent._repos = {root: {"name": "repo", "root": root, "ledger": {"entries": entries}, "work_orders": {"orders": []}}}
+    opens = agent._open_work()[0]
+    counted = queue.counted_work(opens, queue.item_resolver({"repo": ""}), {})
+    got = queue.asked(counted, opens, {})
+    assert {"repo#TD-001", "repo#TD-003"} <= set(got.early) and not got.fact, "both asked early, neither the fact"
+    assert counted.work.get("repo#TD-003") == ["repo#TD-004"], "TD-003's build is counted work"
     async with LocalClient() as me:
-        got = await me.call("ledger_decide", repo=root, id="TD-001", answer=0)
-    assert got["decided"] == "Go"
-    it = origin_item(repo, got["key"])
-    assert it.kind == "decide" and it.context == "TD-001" and it.decided[0] == "Go"
+        for n in ("TD-001", "TD-003"):
+            got = await me.call("ledger_decide", repo=root, id=n, answer=0)
+            assert got["decided"] == "Go", n
+            it = origin_item(repo, got["key"])
+            assert it.kind == "decide" and it.context == n and it.decided[0] == "Go"
 
 
 @pytest.mark.unit
