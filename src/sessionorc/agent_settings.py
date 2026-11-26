@@ -1133,6 +1133,11 @@ class SettingsMixin:
                 doc=doc,
                 rows=rows,
                 roots=hosts.local_host().repos(),
+                node_marks=(
+                    ((self._host_rec.get("builtins") or {}).get(str(set or builtinstore.DEFAULT)) or {}).get(
+                        "node_cannot_run"
+                    )
+                ),
             )
             return {**view, "tools": read}
         except ValueError as e:  # a set of no such name
@@ -1264,6 +1269,54 @@ class SettingsMixin:
             raise
         log.info("team %s cannot run on its node: no login of its list offers %s", name, model)
         return {"team": name, **mark}
+
+    async def rpc_builtins_node_cannot(
+        self,
+        set: str = "",  # noqa: A002
+        seat: str = "",
+        host: str = "",
+        model: str = "",
+        logins: Any = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """A node reported that no login of a built-in set's list offers a seat's `model` (§4.9d *Where a seat's
+        session launches*, §4.9e *A team on a node*, TD-2068): the home marks the set *cannot run* that seat on that
+        node, on its host record's `builtins` entry, with the list it was read against; `builtins_show` reads it while
+        the list and the seat's model are unchanged. The home's stage pass's own call: refused at a node, from a
+        session, before the cut-over, and for a set or a seat of no such name."""
+        rule = "(design §4.9d Where a seat's session launches)"
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: builtins_node_cannot is the home's {rule}")
+        if not mail.is_person(caller):
+            raise RpcError(f"builtins_node_cannot is the home's own call, never a session's {rule}")
+        name, key, where = str(set or ""), str(seat or ""), str(host or "")
+        doc = settings_mod.load()
+        if not teamstore.cut_over(doc):
+            raise RpcError(f"{teamstore.BEFORE} {rule}")
+        if name not in builtinstore.sets(doc):
+            raise RpcError(f"no built-in set {name!r} {rule}")
+        if key not in builtinstore.SEAT_KEYS:
+            raise RpcError(f"{key!r} is not a built-in seat: {', '.join(builtinstore.SEAT_KEYS)} {rule}")
+        if not where or where == self.host:
+            raise RpcError(f"builtins_node_cannot names the node whose logins offer none {rule}")
+        if not isinstance(model, str) or not model.strip():
+            raise RpcError(f"builtins_node_cannot names the model no login offers {rule}")
+        if not isinstance(logins, list) or not all(isinstance(x, str) for x in logins):
+            raise RpcError(f"builtins_node_cannot takes the list it was read against, as login keys {rule}")
+        mark = {"model": model, "logins": list(logins), "at": now_iso()}
+        sets_rec = self._host_rec.setdefault("builtins", {})
+        before = copy.deepcopy(sets_rec.get(name))
+        sets_rec.setdefault(name, {}).setdefault("node_cannot_run", {}).setdefault(key, {})[where] = mark
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:  # the record in memory is put back, so it never says what the file does not
+            if before is None:
+                sets_rec.pop(name, None)
+            else:
+                sets_rec[name] = before
+            raise
+        log.info("built-in set %s cannot run %s on %s: no login of its list offers %s", name, key, where, model)
+        return {"set": name, "seat": key, "host": where, **mark}
 
     async def _rekey_teams(self, flow: str, renames: dict[str, str]) -> None:
         """A flow save's renamed stages, carried to the numbers of each team on that flow (§4.9d, TD-2060)."""

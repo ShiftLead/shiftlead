@@ -199,6 +199,22 @@ def node_cannot_run(team: str, flow: str, order: list[str], mark: Mapping[str, A
     return f"{team} cannot run {flow}: no login in its list offers {mark['model']} on {host}"
 
 
+def set_node_cannot_run(
+    name: str, words: str, order: list[str], model: str, marks: Mapping[str, Any] | None
+) -> dict[str, str]:
+    """A built-in set's seat on a node *cannot run* while the home's mark for that node stands (§4.9d *Where a seat's
+    session launches*, §4.9e, TD-2068): `{node: words}`, a mark written for another list or another model read as
+    none, so a changed list or a changed seat model clears it."""
+    out: dict[str, str] = {}
+    for host, mark in (marks or {}).items() if isinstance(marks, Mapping) else ():
+        if not isinstance(mark, Mapping) or mark.get("model") != model:
+            continue
+        if [str(x) for x in mark.get("logins") or ()] != order:
+            continue
+        out[str(host)] = f"{name} cannot run {words}: no login in its list offers {model} on {host}"
+    return out
+
+
 def _has_director() -> bool:
     """Whether the org has a director, whose seat answers the prompts a prompts seat otherwise would (§4.9d). An
     `org.yml` that cannot be read names none, so the prompts row stays a pick."""
@@ -215,8 +231,11 @@ def builtins_view(
     rows: Mapping[str, Mapping[str, Any]],
     roots: Iterable[str | Path],
     director: bool | None = None,
+    node_marks: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """`ao builtins show [<set>]` and the Built-in seats page's read (§4.9d *The page*), of the home's logins alone."""
+    """`ao builtins show [<set>]` and the Built-in seats page's read (§4.9d *The page*), of the home's logins alone.
+    `node_marks` is the home's mark, per seat and node, that a node found no login of the set's list offering the
+    seat's model (`builtins_node_cannot`); each seat's `node_cannot_run` holds the words of those still standing."""
     has_director = _has_director() if director is None else director
     every = builtinstore.sets(doc)
     if name not in every:
@@ -242,6 +261,7 @@ def builtins_view(
                 "director": by_director,
                 "now": None if by_director else teamstore.pick(order, model, rows, unasked=key == builtinstore.PROMPTS),
                 "cannot_run": next((c for c in cannot if c.startswith(f"{name} cannot run {words}:")), None),
+                "node_cannot_run": set_node_cannot_run(name, words, order, model, (node_marks or {}).get(key)),
             }
         )
     return {

@@ -288,16 +288,72 @@ def test_a_job_whose_set_has_no_usable_login_starts_nothing(world, monkeypatch, 
     assert made_ is None and "create" not in [m for m, _ in calls]
 
 
-def test_a_job_before_the_cut_over_or_on_a_node_launches_as_before(world, monkeypatch):
+def test_a_job_before_the_cut_over_launches_as_before(world, monkeypatch):
+    before, calls = _start_job(world, monkeypatch, _set_shown(cut_over=None), made(world, BOARD, on_set="cheap"))
+    assert before == {"id": "new"} and "seat_model" not in calls[-1][1]
+
+
+def _job_on_node(world):
     org, team, _ = world
-    before, _ = _start_job(world, monkeypatch, _set_shown(cut_over=None), made(world, BOARD, on_set="cheap"))
-    assert before == {"id": "new"}
-    on_node = stage_job_start.launch(
-        org, team, builtin("build-review"), BOARD, "sonnet", host="n", here="h", on_set="c"
+    return stage_job_start.launch(org, team, builtin("build-review"), BOARD, "sonnet", host="n", here="h", on_set="c")
+
+
+def test_a_job_on_a_node_sends_its_sets_list_as_names_and_the_seats_model_and_no_login(world, monkeypatch):
+    """§4.9d *Where a seat's session launches*, §4.9e *A team on a node*: the home does not read a node's logins, so the
+    node's own pick takes the login from the set's list."""
+    made_, calls = _start_job(world, monkeypatch, _set_shown(state="none", login=None), _job_on_node(world))
+    assert made_ == {"id": "new"} and ("builtins_show", {"set": "c"}) in calls
+    create = calls[-1][1]
+    assert create["host"] == "n" and (create["seat_model"], create["login_list"], create["profile"]) == (
+        "sonnet",
+        SET_ORDER,
+        "",
     )
-    made_, calls = _start_job(world, monkeypatch, _set_shown(), on_node)
-    assert made_ == {"id": "new"} and "builtins_show" not in [m for m, _ in calls]
-    assert "login" not in calls[-1][1] and "seat_model" not in calls[-1][1]
+    assert "login" not in create, "the home's own reading of its logins is not the node's"
+
+
+def test_a_job_on_a_node_the_home_marked_or_with_no_list_starts_nothing(world, monkeypatch):
+    marked = _set_shown()
+    marked["seats"][0]["node_cannot_run"] = {"n": "c cannot run the board answers: no login in its list offers sonnet"}
+    elsewhere = _set_shown()
+    elsewhere["seats"][0]["node_cannot_run"] = {"m": "on another node"}
+    for shown, starts in ((marked, False), ({**_set_shown(), "order": []}, False), (elsewhere, True)):
+        made_, calls = _start_job(world, monkeypatch, shown, _job_on_node(world))
+        assert (made_ == {"id": "new"}) is starts and ("create" in [m for m, _ in calls]) is starts
+
+
+def test_a_job_before_the_cut_over_on_a_node_launches_as_before(world, monkeypatch):
+    made_, calls = _start_job(world, monkeypatch, _set_shown(cut_over=None), _job_on_node(world))
+    assert made_ == {"id": "new"} and "seat_model" not in calls[-1][1] and "login" not in calls[-1][1]
+
+
+@pytest.mark.parametrize(
+    ("words", "marked"),
+    [
+        ("n: no login usable on n for sonnet: claude-code:main: limited (design §4.9e)", False),
+        ("n: no login offers sonnet on n (design §4.9e)", True),
+    ],
+    ids=["waits", "none-offers"],
+)
+def test_a_nodes_refusal_of_a_job_starts_nothing_and_none_offering_marks_the_sets_seat(
+    world, monkeypatch, words, marked
+):
+    """*No login usable* is a wait; *no login offers <model>* marks the set *cannot run* the seat on that node, with the
+    list it was read against (§4.9e *A team on a node*: a built-in seat launched on a node is the same)."""
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **kw):
+        calls.append((method, kw))
+        if method == "create":
+            raise stage_start.AgentError(words)
+        return {"name_check": {"verdict": "free"}, "builtins_show": _set_shown()}.get(method, {})
+
+    assert stage_start.start(call, org, team, _job_on_node(world)) is None
+    got = [kw for m, kw in calls if m == "builtins_node_cannot"]
+    want = [{"set": "c", "seat": "board-answers", "host": "n", "model": "sonnet", "logins": SET_ORDER}]
+    assert got == (want if marked else []) and not [m for m, _ in calls if m == "team_node_cannot"]
 
 
 def test_a_seat_the_sets_reading_does_not_name_starts_nothing(world, monkeypatch):

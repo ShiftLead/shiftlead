@@ -602,3 +602,77 @@ def test_team_node_cannot_marks_a_team_on_its_host_record_and_is_the_homes_own(a
             await a.rpc_team_node_cannot(team="a", model="opus", logins=[], flow="build")
 
     asyncio.run(go())
+
+
+def test_builtins_node_cannot_marks_a_sets_seat_on_a_node_and_is_the_homes_own(agent, monkeypatch):
+    """§4.9d *Where a seat's session launches*, TD-2068: the stage pass's mark that a node found no login of a built-in
+    set's list offering a seat's model, per seat and node, on the host record's `builtins` entry with the list it was
+    read against; refused from a session, at a node, for the home itself, and for an unknown set or seat."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    ok = {"set": "default", "seat": "sweeper", "host": "n", "model": "haiku", "logins": ["claude-code:x"]}
+
+    async def go():
+        got = await a.rpc_builtins_node_cannot(**ok)
+        await a.rpc_builtins_node_cannot(**{**ok, "host": "m", "model": "opus"})
+        marks = a._host_rec["builtins"]["default"]["node_cannot_run"]["sweeper"]
+        assert {k: marks["n"][k] for k in ("model", "logins")} == {"model": "haiku", "logins": ["claude-code:x"]}
+        assert marks["m"]["model"] == "opus", "each node's mark is its own"
+        assert got["host"] == "n" and a.host_saves[-1]["builtins"]["default"]["node_cannot_run"]["sweeper"] == marks
+        for kw, words in (
+            ({"caller": "s-1"}, "never a session's"),
+            ({"set": "zz"}, "no built-in set"),
+            ({"seat": "zz"}, "is not a built-in seat"),
+            ({"host": ""}, "names the node"),
+            ({"host": "home"}, "names the node"),
+            ({"model": " "}, "names the model"),
+            ({"logins": "claude-code:x"}, "as login keys"),
+        ):
+            with pytest.raises(RpcError, match=words):
+                await a.rpc_builtins_node_cannot(**{**ok, **kw})
+        a.mode = "node"
+        with pytest.raises(RpcError, match="is a node of"):
+            await a.rpc_builtins_node_cannot(**ok)
+
+    asyncio.run(go())
+
+
+def test_builtins_node_cannot_puts_the_record_back_on_a_failed_save_and_waits_for_the_cut_over(agent, monkeypatch):
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    ok = {"set": "default", "seat": "sweeper", "host": "n", "model": "haiku", "logins": ["claude-code:x"]}
+
+    def refuse(rec):
+        raise OSError("disk full")
+
+    async def go():
+        a.host_store = SimpleNamespace(save=refuse)
+        with pytest.raises(OSError):
+            await a.rpc_builtins_node_cannot(**ok)
+        assert not (a._host_rec.get("builtins") or {}).get("default"), "the record says nothing the file does not"
+        monkeypatch.setattr("sessionorc.agent_settings.teamstore.cut_over", lambda _doc: None)
+        with pytest.raises(RpcError):
+            await a.rpc_builtins_node_cannot(**ok)
+
+    asyncio.run(go())
+
+
+def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypatch):
+    seen = {}
+    body = SimpleNamespace(builtins_view=lambda **kw: seen.update(kw) or {"set": kw["name"]})
+    a = _agent_on(monkeypatch, body)
+    mark = {"sweeper": {"n": {"model": "haiku", "logins": []}}}
+    a._host_rec = {"builtins": {"cheap": {"node_cannot_run": mark}}}
+
+    async def tools():
+        return {}
+
+    async def gate():
+        return {"accounts": {}}
+
+    a.rpc_tools, a.rpc_gate = tools, gate
+    a._projected = lambda *_a: {}
+    asyncio.run(a.rpc_builtins_show(set="cheap"))
+    assert seen["node_marks"] == mark
+    asyncio.run(a.rpc_builtins_show(set=""))
+    assert seen["name"] == "default" and seen["node_marks"] is None

@@ -112,7 +112,9 @@ reach:                                        # §4.5b *The setting*: the person
   started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped, a
   flow switch under way (§4.9d *When it runs*), and, for a team on a node, `node_cannot_run: {model, logins, flow,
   at}`, the node's word that no login of the list offers a model, which a changed list or flow clears (§4.9d *A team
-  on a node*). All but the running settings are written by the team page's own calls
+  on a node*); beside the teams, under `builtins`, each set's `node_cannot_run: {<seat>: {<node>: {model, logins,
+  at}}}`, a node's word that no login of the set's list offers that seat's model, which a changed list or seat model
+  clears (§4.9d *Where a seat's session launches*). All but the running settings are written by the team page's own calls
   (`team_new`, `team_delete`, `team_switch`, `team_set`), never by `set_settings`.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
