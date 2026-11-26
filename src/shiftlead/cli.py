@@ -25,7 +25,7 @@ import yaml
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
-from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, teamstore, workorders
+from sessionorc import hosts, ledgerboard, logins, naming, paths, promote, reports, teamstore, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import notify as notify_mod
@@ -781,9 +781,53 @@ def _team_defaults(args: argparse.Namespace, defaults: dict[str, Any]) -> str:
     return ""
 
 
+NO_PROFILE = "profiles went at the switch-over: name a login"
+
+
+def _last_login(tool: str, host: str | None) -> str | None:
+    """The login last used for `tool` on the host (§4.9e *The launch on a login*): the one the host agent remembers
+    from the person's last create on a login (`last_login`); None where none is stored, or the stored one is no longer
+    in its `logins.yml`. A node's is not read from here yet (the node half), so `--host` of another host has none."""
+    if host and host != hosts.local_host().name:
+        return None
+    got = call_sync("last_login") or {}
+    return str(got[tool]) if isinstance(got, dict) and got.get(tool) else None
+
+
+def _new_login(args: argparse.Namespace, defaults: dict[str, Any]) -> dict[str, Any]:
+    """`ao new`'s launch on a login (§4.7 *ao new*, §4.9e *The launch on a login*, TD-2068): after the cut-over a
+    session the person starts takes `--login <tool>:<name>`, else the login last used for its tool (`--adapter`) on its
+    host, and `--model` (else the login's pin or the tool's default stands); `--profile` is refused. The role's profile
+    is dropped and the login's tool is the adapter. Before the cut-over `--login` and `--model` are refused, and a
+    shell refuses both."""
+    login, model = getattr(args, "login", None), getattr(args, "model", None)
+    if args.adapter == "shell":
+        if login or model:
+            raise AgentError("a shell takes no login and no model (design §4.9e)")
+        return {}
+    if not teamstore.first_shape_off():
+        if login or model:
+            raise AgentError("--login and --model are for after the switch-over: name a profile (design §4.9e)")
+        return {}
+    if args.profile:
+        raise AgentError(f"{NO_PROFILE} (ao new --login <tool>:<name>, design §4.9e)")
+    login = login or _last_login(args.adapter, getattr(args, "host", None))
+    if not login:
+        raise AgentError(
+            f"no {args.adapter} login was used here yet: name one (ao new --login <tool>:<name>, design §4.9e)"
+        )
+    tool, name = logins.split(login) if ":" in login else ("", "")
+    if not tool or not name:
+        raise AgentError(f"--login is <tool>:<name>, not {login!r} (design §4.9e)")
+    defaults.pop("profile", None)
+    args.adapter = tool
+    return {"login": login, **({"seat_model": model} if model else {})}
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     defaults = _launch_defaults(args)
     reader = _team_defaults(args, defaults)
+    on_login = _new_login(args, defaults)
     s = call_sync(
         "create",
         name=args.name,
@@ -800,6 +844,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         **_stop(args),
         **teams.gate_prompts(bool(args.unattended)),
         **({"host": args.host} if getattr(args, "host", None) else {}),  # sent only when set (§4.4 skew rule)
+        **on_login,
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
@@ -6086,7 +6131,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name")
     p.add_argument("-d", "--dir", help="directory (default: cwd)")
     p.add_argument("-a", "--adapter", default="claude-code")
-    p.add_argument("-p", "--profile", help="tool · account · model profile name")
+    p.add_argument("-p", "--profile", help="tool · account · model profile name (before the switch-over)")
+    p.add_argument("--login", help="the login it runs on, <tool>:<name> (after the switch-over; else the last used)")
+    p.add_argument("--model", help="the model family it runs (after the switch-over; else the login's pin)")
     p.add_argument("--repo", help="repo root when dir is a worktree")
     p.add_argument(
         "-w",
