@@ -822,6 +822,8 @@ def node_logins(n: ContainerNode, doc: dict[str, Any]) -> dict[str, Any]:
 
     try:
         logins.update(change, home=node_home)
+        # readable by the container's user, as the home's `hosts.yml` beside it is: `save` writes through a 0600 temp
+        logins.path(node_home).chmod(0o644)
     except logins.LoginError as e:
         return {"added": [], "passed": [f"no login added to {n.name}: {e}"]}
     return {"added": added, "passed": passed}

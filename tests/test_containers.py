@@ -416,6 +416,7 @@ def test_after_the_cut_over_host_up_adds_the_logins_a_nodes_lists_name_and_touch
     assert got["logins"]["claude-code:spare"] == {"folder": "/shiftlead/profiles/spare", "label": "mine"}, "kept"
     assert "claude-code:homeonly" not in got["logins"] and "claude-code:unswitched" not in got["logins"]
     assert not (node_home / "profiles.yml").exists(), "no profile is written after the cut-over"
+    assert (node_home / "logins.yml").stat().st_mode & 0o777 == 0o644, "the container's user reads it"
     again = containers.host_up("contractmatch", Fake())
     assert again["logins"]["added"] == [] and logins.load(node_home) == got, "re-provisioning adds only the missing"
 
