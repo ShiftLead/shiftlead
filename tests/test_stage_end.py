@@ -411,6 +411,36 @@ def test_the_call_hands_each_route_the_counts_it_read(monkeypatch, tmp_path, tid
     assert seen["counts"] == want
 
 
+def test_the_call_hands_an_entrys_end_the_callers_record_and_spend_reader(monkeypatch, tmp_path):
+    seen = {}
+
+    class _Flow(_NoRoute):
+        def flow(self, team):
+            return "format: 3\nname: t\nstages: []\n"
+
+    monkeypatch.setattr(stage_end, "StageStore", _Flow)
+    monkeypatch.setattr(stage_end, "_person_of", lambda root: "paul")
+    monkeypatch.setattr(stage_end, "end", lambda *a, **k: seen.update(k) or {"entry": "TD-7"})
+    session = {"model": "claude-opus-5-5", "tool": "claude-code"}
+
+    def spent():
+        return {"claude-opus-5-5": {"turns": 3}}
+
+    stage_end.call(
+        root=str(tmp_path),
+        directory=str(tmp_path),
+        team="t",
+        tid="TD-7",
+        caller=ME,
+        outcome="work-pushed",
+        reason="",
+        session=session,
+        spent=spent,
+    )
+    assert seen["session"] is session, "the caller's record fields reach the entry's row's run (§4.9c)"
+    assert seen["spent"] is spent, "the caller's spend reader reaches the entry's row's run (§4.9c)"
+
+
 def test_a_repeated_ship_is_answered_as_the_first_with_its_changed_counts_ignored():
     store = _store("review", branch="td7-thing", pr=9)
     facts = Fake(_pr())
@@ -565,8 +595,13 @@ def test_a_session_on_a_node_ends_its_stage_with_its_own_worktrees_facts(monkeyp
         "created": "2026-11-25T10:00:00Z",
         "person_asks": 2,
     }
-    agent._seats = {"days": {}}
-    assert got["spent"]() == {}, "the node's session's spend is read by its bare id from the home's seat ledger"
+    mine = {"claude-opus-5-5": {"turns": 3, "figure": 1.5}}
+    theirs = {"claude-sonnet-4-6": {"turns": 9, "figure": 4.0}}
+    agent._seats = {"days": {"2026-11-25": {ME: {"models": mine}, "somebody-else": {"models": theirs}}}}
+    spent = got["spent"]()
+    assert set(spent) == {"claude-opus-5-5"} and spent["claude-opus-5-5"]["turns"] == 3, (
+        "the node's session's spend is read by its bare id from the home's seat ledger, and no other session's"
+    )
     assert agent.reported == [(f"{ME}@node", {"ref": "TD-7", "status": "done", "caller": f"{ME}@node"})]
 
 
