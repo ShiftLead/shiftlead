@@ -4292,7 +4292,9 @@ class TickMixin:
         """One restart by the tick (§6): the record's launch record handed to `create` again — here,
         or at its node — the attempt appended to `restarts` and the list carried onto the new record,
         so the count survives the restart it counts. A replay that fails keeps its entry with `error`
-        and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for).
+        and counts all the same, save a node's refusal of a built-in seat's or the director's list before anything
+        is made (`_node_list_refused`), which writes no entry and counts toward no ceiling (§4.9d *How each one
+        runs*). `mark` adds to the entry (rule 8's `ids`, what a start was for).
         `closing` is a line the prompt ends with, after it is filled again or stored (a manager on
         call's cause, `filled_for`, TD-410); no other replay adds one.
         `held` writes the record alone, `closed` with no pane (`create` with `held`), for rule 3 to

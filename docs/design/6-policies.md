@@ -100,7 +100,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
   live session — is not retried silently: it counts toward the ceiling as any restart does, keeping
   its `why` and carrying the error text as `error` on the entry, so an unrepairable record reaches
-  the Inbox row within three ticks rather than never. **Each supervised session's pass is
+  the Inbox row within three ticks rather than never. The one exception is a node's refusal of the list of a
+  built-in seat or of the director, as *no login usable* or *no login offers* its model, before anything is made:
+  it is no restart and no fill, writes no entry and counts toward no ceiling, the seat drawn unfillable in the
+  node's words (§4.9d *How each one runs*). **Each supervised session's pass is
   isolated**: one session's exception is logged and the tick goes on to the next (the stop-time
   policy guards only its send today). **The restarts run at the home** (§4.4a: policies that start
   run at the home), so a member on an unreachable host is left as it is until its link returns —

@@ -1458,7 +1458,8 @@ class Session:
     # `wanted` (rule 2) or `fill` (rule 3), `done: [{ref, pr}]` and `left: [ref]` what the run it
     # replaced reported `done` since its `created` and what it claimed and did not close (§4.9a,
     # TD-249: the new record keeps none of the old one's `progress`), and `error` the text of a
-    # replay that failed, which counts all the same, and `said` a `wanted` one's own why (rule 9's
+    # replay that failed, which counts all the same (save a node's refusal of a built-in seat's or the director's
+    # list, which writes no entry, §4.9d *How each one runs*), and `said` a `wanted` one's own why (rule 9's
     # note, TD-468) — carried across the tick's own supersede so the count survives the restart it
     # counts, and empty on any other create (a
     # person's Resume starts it again; a person's Restart leaves the one entry `{at, why: person}`,
