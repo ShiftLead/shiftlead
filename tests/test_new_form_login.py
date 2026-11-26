@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from sessionorc import teamstore
+from sessionorc.client import AgentError
 from shiftlead.ui import app as uiapp
 
 pytestmark = pytest.mark.unit
@@ -100,7 +101,7 @@ def page(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[tuple[str, dict]] = []
-    state = {"off": True}
+    state = {"off": True, "refuse": set()}
     monkeypatch.setattr(teamstore, "first_shape_off", lambda: state["off"])
 
     class FakeClient:
@@ -112,6 +113,8 @@ def page(tmp_path, monkeypatch):
 
         async def call(self, method, **params):
             calls.append((method, params))
+            if method in state["refuse"]:
+                raise AgentError(f"unknown method {method}")
             if method == "create":
                 return {"id": "ao-r-w", "name": "w", "state": "idle"}
             if method == "tools":
@@ -182,3 +185,45 @@ def test_start_creates_on_the_picked_or_typed_login_and_refuses_a_profile(page):
     r = c.post("/new", data={**form, "login": "grok:main"}, follow_redirects=False)
     assert r.status_code == 400 and "for after the switch-over" in r.text
     assert len([m for m, _ in calls if m == "create"]) == n, "a refusal creates nothing"
+
+
+def test_a_host_agent_that_refuses_a_read_still_draws_the_form(page):
+    """TD-2292: a refused `tools` leaves the form to a typed login, with the warning; a refused `last_login` keeps the
+    Login pick in the read's order, with no warning. Neither is an error page."""
+    c, _calls, _tmp, state = page
+    state["refuse"] = {"tools"}
+    r = c.get("/new")
+    assert r.status_code == 200, r.text
+    assert "⚠ the host agent did not serve its logins" in r.text and 'name="login_typed"' in r.text
+    assert 'id="typedfield" hidden' not in r.text, "no pick to choose from: the typed field is shown"
+    state["refuse"] = {"last_login"}
+    r = c.get("/new")
+    assert r.status_code == 200, r.text
+    assert "<label>Login</label>" in r.text and "did not serve its logins" not in r.text
+    assert '<option value="claude-code:main" data-here="1" data-models="opus,sonnet,haiku" selected>' in r.text
+
+
+def test_a_nodes_record_fills_the_typed_login_and_this_hosts_leaves_it_empty(page):
+    """TD-2292: Resume with changes… on another host's record types its login, as its profile names it (§4.9e *A
+    record's `profile`*): a bare name under the record's tool; the same record on this host fills the pick instead."""
+    c, _calls, _tmp, _state = page
+    params = {"profile": "grind", "adapter": "claude-code", "prefilled": "1"}
+    away = c.get("/new", params={**params, "host": "node1"}).text
+    assert 'id="logintyped" value="claude-code:grind"' in away
+    assert (
+        'id="logintyped" value="grok:x"' in c.get("/new", params={**params, "host": "node1", "profile": "grok:x"}).text
+    )
+    here = c.get("/new", params=params).text
+    assert 'id="logintyped" value=""' in here
+
+
+def test_a_start_on_a_login_under_a_role_naming_a_profile_sends_no_profile(page):
+    """TD-2292: a role's `profile:` is dropped on a launch on a login (§4.9e *A session the person starts*): the
+    `create` names the login alone, which the host agent would refuse beside a profile that is not its own."""
+    c, calls, tmp_path, _state = page
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {profile: work}}\n")
+    data = {"name": "w", "dir": str(tmp_path), "role": "grinder", "prompt": "go", "login": "claude-code:main"}
+    r = c.post("/new", data=data, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    made = [p for m, p in calls if m == "create"][-1]
+    assert (made["login"], made["profile"]) == ("claude-code:main", "")
