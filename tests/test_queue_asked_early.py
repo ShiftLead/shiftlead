@@ -109,6 +109,35 @@ def test_its_own_date_and_an_open_blocker_read_and_one_more(tmp_path):
 
 
 @pytest.mark.unit
+def test_the_first_wait_is_the_lowest_key_even_where_a_gated_blocker_is_added_after_the_open_ones(tmp_path):
+    """TD-2237: `counted_work` adds a gated blocker that itself waits after `open_work`'s ids, then sorts each
+    member's ids by key, so a gated TD-002 is named before an open TD-003."""
+    root, r = _one(
+        tmp_path,
+        _gated(1, "the question", "TD-002", "TD-003"),
+        _gated(2, "a gated blocker that waits", "TD-004"),
+        _entry(3, "in progress", Priority="High"),
+        _entry(4, "dated", Priority="High", Blocked_by=f"until {LATER}"),
+    )
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["state"] == "asked early" and row["early_line"] == "once TD-002 and 1 more close"
+
+
+@pytest.mark.unit
+def test_a_gated_blocker_with_its_own_date_and_open_work_is_named_by_its_id(tmp_path):
+    """TD-2237: a gated blocker is named by its date only where that date is its only wait; with open work beside
+    it, the line names the blocker itself."""
+    root, r = _one(
+        tmp_path,
+        _gated(1, "the question", "TD-002"),
+        _entry(2, "gated, dated and blocked", **GATED, Blocked_by=f"TD-003, until {LATER}, decision (paul)"),
+        _entry(3, "in progress", Priority="High"),
+    )
+    row = _row(_read({root: r}), "r#TD-001")
+    assert row["state"] == "asked early" and row["early_line"] == "once TD-002 closes"
+
+
+@pytest.mark.unit
 def test_a_held_build_blocked_by_open_work_never_reads_asked_early(tmp_path):
     from test_queue_held_builds import PART, _ask
     from test_queue_lift_here import _setup
