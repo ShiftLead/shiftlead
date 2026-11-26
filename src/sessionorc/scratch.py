@@ -388,8 +388,9 @@ def seat_note(spell: dict[str, Any]) -> str:
         f"Your scratch holds {_count(spell.get('inodes')):,} files, over the {SEAT_BUDGET:,} a seat may keep "
         "(design §4.6 *A live seat's rebuildable copies*)."
         + (f" The largest entries in it: {largest}." if largest else "")
-        + " Move a copy you still need under $SHIFTLEAD_SCRATCH/copies/, and remove what you no longer need;"
-        " test runs go by themselves within two hours."
+        + " Move a copy you still need under $SHIFTLEAD_SCRATCH/copies/, release a finished one by renaming it to"
+        " $SHIFTLEAD_SCRATCH/copies/.gone-<name> (the next hourly pass removes it), and remove what you no longer"
+        " need; test runs go by themselves within two hours."
     )
 
 
