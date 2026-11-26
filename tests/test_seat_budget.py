@@ -132,6 +132,7 @@ def test_the_note_names_the_count_the_largest_and_what_to_do():
     assert got.startswith("Your scratch holds 260,000 files, over the 250,000 a seat may keep")
     assert "The largest entries in it: pytest-of-k (180,000), review (50,000)." in got
     assert "under $SHIFTLEAD_SCRATCH/copies/" in got and "test runs go by themselves within two hours" in got
+    assert "release a finished one by renaming it to $SHIFTLEAD_SCRATCH/copies/.gone-<name>" in got
 
 
 # -- the hourly pass and the home, end to end -------------------------------------------------------------------------
