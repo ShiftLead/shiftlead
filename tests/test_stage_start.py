@@ -383,3 +383,16 @@ def test_an_audits_run_starts_on_the_login_the_reading_picks_for_the_audits_mode
     rows = _rows(**{"claude-code_main": {"models": ["opus"]}})
     _, calls = _start(world, monkeypatch, _shown(rows, audits=[("Docs audit", "sonnet")]), got)
     assert (calls[-1][1]["login"], calls[-1][1]["seat_model"]) == ("claude-code:spare", "sonnet")
+
+
+def test_a_stage_whose_name_is_not_its_key_finds_its_pick_by_key(world, monkeypatch):
+    """`design-wise`'s *First read* is keyed `first-read`, the key the team's reading draws each stage under."""
+    org, team, _ = world
+    doc = builtin("design-wise")
+    got = stage_start.launch(org, team, doc, "first-read", stage_start.Work("TD-7"), host="h", here="h")
+    assert got.pick == ("stages", "first-read")
+    rows = _rows(**{"claude-code_main": {"state": "limited"}})
+    model = next(s["model"] for s in doc["stages"] if s["name"] == "First read")
+    shown = {**_shown(rows), "flow": {"stages": [{"key": "first-read", "now": teamstore.pick(ORDER, model, rows)}]}}
+    _, calls = _start(world, monkeypatch, shown, got)
+    assert (calls[-1][1]["login"], calls[-1][1]["seat_model"]) == ("claude-code:spare", model)

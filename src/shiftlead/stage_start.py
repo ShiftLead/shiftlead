@@ -10,6 +10,7 @@ TD-2068), as the team's `team_show` reading names it; a team on a node and a job
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ from sessionorc import logins, teamstore
 from sessionorc.client import AgentError, AgentUnavailable
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
+
+log = logging.getLogger(__name__)
 
 ROLE_OF = {"design": "designer", "build": "grinder", "review": "reviewer"}  # `grinder` until the removal build (§4.8)
 STAGE_TEMPLATE = Path(__file__).resolve().parent / "briefs" / "stage.md"
@@ -287,7 +290,10 @@ def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     row = next(
         (r for r in rows or () if (r.get("key") if kind == "stages" else flow3.key_of(r.get("name"))) == key), None
     )
-    now = (row or {}).get("now") or {}
+    if row is None:  # the home's reading of the team's flow names no such stage or audit: nothing to pick from
+        log.warning("team %s: its reading names no %s %r, so no login is picked and nothing starts", team, kind, key)
+        return None
+    now = row.get("now") or {}
     if now.get("state") != "usable" or not now.get("login"):
         return None
     login = str(now["login"])
