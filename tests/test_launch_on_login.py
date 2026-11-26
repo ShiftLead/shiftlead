@@ -56,6 +56,7 @@ def test_a_login_resolves_to_its_key_account_and_profile_name(tmp_path):
         "account": "acct-1",
         "profile": "grind",
         "login_list": ["hookstub:grind", "hookstub:twin"],
+        "folder": "/c/grind",
     }
     twin = _on_login("hookstub:twin", "hookstub", "hookstub:twin", None, None, tmp_path)
     assert (twin["account"], twin["profile"], twin["login_list"]) == ("hookstub:twin", "hookstub:twin", None)

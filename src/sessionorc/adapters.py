@@ -316,6 +316,7 @@ OPTIONAL_METHODS = (
     "links",
     "mail",
     "make_home",
+    "model_arg",
     "model_family",
     "models",
     "new_home",

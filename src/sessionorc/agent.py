@@ -196,6 +196,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _grants,  # noqa: F401
     _is_branch_claim,  # noqa: F401
     _lane,  # noqa: F401
+    _model_word,
     _new_done,  # noqa: F401
     _older,  # noqa: F401
     _oldest_first,  # noqa: F401
@@ -2075,7 +2076,11 @@ class HostAgent(
                     cwd=directory,
                     name=name,
                     **handed_context,
-                    **({"model": str(seat_model)} if on_login is not None and seat_model else {}),
+                    **(
+                        {"model": _model_word(ad, str(seat_model), on_login.get("folder") or "")}
+                        if on_login is not None and seat_model
+                        else {}
+                    ),
                 )
             except (KeyError, ValueError, OSError) as e:  # OSError: the start context's file (TD-339)
                 raise RpcError(str(e).strip('"')) from None
