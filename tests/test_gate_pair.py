@@ -347,3 +347,29 @@ async def test_a_late_go_press_where_the_pair_is_no_longer_offered_is_refused(ag
             await me.call("ledger_decide", repo=root, id=tid, answer=0)
     assert git(repo, "ls-remote", "origin", "main") == before, f"nothing written: {why}"
     assert "**Blocked by:** decision (paul)" in _origin(repo, f"docs/ledger/{tid}.md"), why
+
+
+async def test_a_late_go_press_covered_by_a_line_on_another_repos_board_is_refused(agent, repo, monkeypatch):
+    """TD-2255: a line on another registered repo's board that names the entry by its qualified ref
+    (`own/repo#TD-191`) covers it, linked through `refs_open`, the index from the first repo's `remote`. The pair is
+    not offered then, so a Go from a page drawn before the line is refused (*has no answer 0*) and writes nothing."""
+    root = await _home(agent, repo, monkeypatch)
+    agent._repos[root]["remote"] = "git@github.com:own/repo.git"
+    by = {e["id"]: e for e in agent._repos[root]["ledger"]["entries"]}
+    assert agent._gate_pair("repo", by["TD-191"]), "with no line anywhere, TD-191 is offered the pair"
+    line = {"kind": "decide", "key": "board:0123abcd", "refs": ["own/repo#TD-191"],
+            "context": "own/repo#TD-191 decision (paul)", "text": "Ship TD-191?"}  # fmt: skip
+    agent._repos["/elsewhere/other"] = {
+        "name": "other",
+        "root": "/elsewhere/other",
+        "ledger": {"entries": []},
+        "boards": {"boards": [{"items": [line]}]},
+        "work_orders": {"orders": []},
+    }
+    assert not agent._gate_pair("repo", by["TD-191"]), "the other board's open line covers it"
+    before = git(repo, "ls-remote", "origin", "main")
+    async with LocalClient() as me:
+        with pytest.raises(AgentError, match="TD-191 has no answer 0"):
+            await me.call("ledger_decide", repo=root, id="TD-191", answer=0)
+    assert git(repo, "ls-remote", "origin", "main") == before, "nothing written"
+    assert "**Blocked by:** decision (paul)" in _origin(repo, "docs/ledger/TD-191.md")
