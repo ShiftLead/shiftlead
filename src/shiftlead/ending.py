@@ -14,7 +14,9 @@ from typing import Any
 from sessionorc.models import tokens_short, turn_stamp
 
 # the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c), rule 3's and a
-# sit-out's (§4.9c) — rule 8's start closes nothing
+# sit-out's (§4.9c), a move down the login list (§4.9e), a lost brief's replay (rule 1), an extra's three ends
+# (§4.9 *closed back to held*), the host cap's (§4.9), a retired anchor seat's (§4.9b) and a stage act's three (§4.9c,
+# `stage_start.end`) — rule 8's start closes nothing; every `why` the tick writes has its words (TD-2298)
 TICK_WHY = {
     "finished": "team finished",
     "wanted": "for a restart",
@@ -23,6 +25,16 @@ TICK_WHY = {
     "sit_out": "flow sat it out",
     "seat": "seat done",
     "cache": "cache lapsed",
+    "login-move": "to move to another login",
+    "lost-brief": "brief lost",
+    "extra_held": "extra back to held",
+    "out_of_work": "out of work, back to held",
+    "extra_dropped": "extra dropped",
+    "host_full": "host full",
+    "retired": "anchor seat retired",
+    "its stage record no longer names it": "stage record moved on",
+    "its audit's run record no longer names it": "audit record moved on",
+    "its job record no longer names it": "job record moved on",
 }
 
 
