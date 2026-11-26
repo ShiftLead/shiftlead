@@ -1138,6 +1138,11 @@ class SettingsMixin:
                         "node_cannot_run"
                     )
                 ),
+                set_marks={
+                    str(n): e.get("node_cannot_run")
+                    for n, e in (self._host_rec.get("builtins") or {}).items()
+                    if isinstance(e, dict)
+                },
             )
             return {**view, "tools": read}
         except ValueError as e:  # a set of no such name

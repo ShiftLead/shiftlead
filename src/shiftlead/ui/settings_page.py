@@ -610,6 +610,7 @@ def builtins_page(show: Mapping[str, Any]) -> dict[str, Any]:
                 **s,
                 "options": list(dict.fromkeys([*listed, *([s["model"]] if s.get("model") else [])])),
                 "on_login": words,
+                "on_nodes": list((s.get("node_cannot_run") or {}).values()),  # each node the set's mark names
             }
         )
     name = str(show.get("set"))
@@ -620,7 +621,11 @@ def builtins_page(show: Mapping[str, Any]) -> dict[str, Any]:
         "title": show.get("label") or name,
         "name_beside": name if show.get("label") else None,
         "label": show.get("label") or "",
-        "tabs": [{"name": x["name"], "dot": "; ".join(x.get("cannot_run") or ())} for x in show.get("sets") or ()],
+        # a set's dot is the home's reading and the home's marks of a node's report (§4.9d *The page*)
+        "tabs": [
+            {"name": x["name"], "dot": "; ".join([*(x.get("cannot_run") or ()), *(x.get("node_cannot_run") or ())])}
+            for x in show.get("sets") or ()
+        ],
         "seats": seats,
         "models": dict(show.get("stored_models") or {}),
         "logins": rows,

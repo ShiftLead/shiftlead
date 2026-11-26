@@ -205,6 +205,50 @@ def test_a_seat_reads_the_homes_node_marks_while_the_list_and_the_model_are_unch
     assert all(s["node_cannot_run"] == {} for s in plain["seats"])
 
 
+def test_a_sets_tab_carries_its_standing_node_marks_and_the_page_draws_them(monkeypatch):
+    """§4.9d *The page*, TD-2068: a node's mark draws its set's tab dot, as the home's own *cannot run* does, and the
+    seat's row names the node; a mark for another list, and the prompts seat's under a director, draw nothing."""
+    from fastapi.testclient import TestClient
+
+    from shiftlead.ui import app as app_mod
+
+    doc = _doc(
+        builtins={
+            "default": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]},
+            "cheap": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]},
+        }
+    )
+    rows = {"c:one": _row()}
+    sweeper = {"sweeper": {"n": {"model": "haiku", "logins": ["c:one"]}}}
+    set_marks = {
+        "default": sweeper,
+        "cheap": {"sweeper": {"n": {"model": "haiku", "logins": ["c:two"]}}, "prompts": sweeper["sweeper"]},
+    }
+    view = team_show.builtins_view(
+        name="default", doc=doc, rows=rows, roots=[], director=True, node_marks=sweeper, set_marks=set_marks
+    )
+    sets = {x["name"]: x for x in view["sets"]}
+    words = "default cannot run the sweeper: no login in its list offers haiku on n"
+    assert sets["default"]["node_cannot_run"] == [words] and sets["cheap"]["node_cannot_run"] == []
+    page = setmod.builtins_page({**view, "tools": {"tools": []}})
+    tabs = {x["name"]: x["dot"] for x in page["tabs"]}
+    assert tabs["default"] == words and not tabs["cheap"]
+    assert next(s for s in page["seats"] if s["key"] == "sweeper")["on_nodes"] == [words]
+    director = team_show.builtins_view(
+        name="cheap", doc=doc, rows=rows, roots=[], director=True, node_marks=set_marks["cheap"]
+    )
+    assert next(s for s in director["seats"] if s["key"] == "prompts")["node_cannot_run"] == {}, "the director's"
+
+    async def call(method, **params):
+        return {**view, "tools": {"tools": []}} if method == "builtins_show" else {}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        text = c.get("/builtins/default").text
+    assert f'<span class="note bnode">{words}</span>' in text
+    assert f'aria-label="cannot run" title="{words}"' in text
+
+
 def test_a_model_pick_under_a_director_keeps_the_stored_prompts_model_and_adds_no_package_model():
     doc = _doc(builtins={"default": {"models": {"prompts": "opus"}, "logins": []}})
     got = team_show.builtins_view(name="default", doc=doc, rows={}, roots=[], director=True)
@@ -317,3 +361,21 @@ def test_a_page_opened_at_a_node_lists_the_homes_logins_and_models(monkeypatch):
     assert "tools" not in asked
     assert "homelogin" in text and "homemodel" in text
     assert "nodelogin" not in text and "nodemodel" not in text
+
+
+def test_ao_builtins_show_says_what_the_page_says_of_a_nodes_mark(capsys):
+    """`ao builtins show` prints what the page shows (§4.9d *The page*): a set marked on a node is flagged, and the
+    seat's line is followed by the node's words."""
+    from shiftlead import cli
+
+    doc = _doc(builtins={"default": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]}})
+    marks = {"sweeper": {"n": {"model": "haiku", "logins": ["c:one"]}}}
+    rows = {"c:one": _row(models=["opus", "sonnet", "haiku"])}
+    view = team_show.builtins_view(
+        name="default", doc=doc, rows=rows, roots=[], director=False, node_marks=marks, set_marks={"default": marks}
+    )
+    assert not view["sets"][0]["cannot_run"], "the home's own logins run every seat"
+    cli._builtins_show_prose(view)
+    out = capsys.readouterr().out
+    assert "sets: default (cannot run a seat)" in out
+    assert "    default cannot run the sweeper: no login in its list offers haiku on n" in out
