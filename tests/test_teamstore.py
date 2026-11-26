@@ -635,3 +635,44 @@ def test_builtins_node_cannot_marks_a_sets_seat_on_a_node_and_is_the_homes_own(a
             await a.rpc_builtins_node_cannot(**ok)
 
     asyncio.run(go())
+
+
+def test_builtins_node_cannot_puts_the_record_back_on_a_failed_save_and_waits_for_the_cut_over(agent, monkeypatch):
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    ok = {"set": "default", "seat": "sweeper", "host": "n", "model": "haiku", "logins": ["claude-code:x"]}
+
+    def refuse(rec):
+        raise OSError("disk full")
+
+    async def go():
+        a.host_store = SimpleNamespace(save=refuse)
+        with pytest.raises(OSError):
+            await a.rpc_builtins_node_cannot(**ok)
+        assert not (a._host_rec.get("builtins") or {}).get("default"), "the record says nothing the file does not"
+        monkeypatch.setattr("sessionorc.agent_settings.teamstore.cut_over", lambda _doc: None)
+        with pytest.raises(RpcError):
+            await a.rpc_builtins_node_cannot(**ok)
+
+    asyncio.run(go())
+
+
+def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypatch):
+    seen = {}
+    body = SimpleNamespace(builtins_view=lambda **kw: seen.update(kw) or {"set": kw["name"]})
+    a = _agent_on(monkeypatch, body)
+    mark = {"sweeper": {"n": {"model": "haiku", "logins": []}}}
+    a._host_rec = {"builtins": {"cheap": {"node_cannot_run": mark}}}
+
+    async def tools():
+        return {}
+
+    async def gate():
+        return {"accounts": {}}
+
+    a.rpc_tools, a.rpc_gate = tools, gate
+    a._projected = lambda *_a: {}
+    asyncio.run(a.rpc_builtins_show(set="cheap"))
+    assert seen["node_marks"] == mark
+    asyncio.run(a.rpc_builtins_show(set=""))
+    assert seen["name"] == "default" and seen["node_marks"] is None
