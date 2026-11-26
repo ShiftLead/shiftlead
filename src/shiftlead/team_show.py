@@ -226,7 +226,7 @@ def builtins_view(
                 "for": acts_for,
                 "model": None if by_director else model,
                 "director": by_director,
-                "now": None if by_director else teamstore.pick(order, model, rows),
+                "now": None if by_director else teamstore.pick(order, model, rows, unasked=key == builtinstore.PROMPTS),
                 "cannot_run": next((c for c in cannot if c.startswith(f"{name} cannot run {words}:")), None),
             }
         )
