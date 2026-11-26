@@ -212,7 +212,7 @@ def test_the_name_is_checked_on_the_node_the_session_lands_on(world, monkeypatch
         return {"verdict": "free"}
 
     stage_start.start(call, org, team, got)
-    assert seen == [("host", None), ("name_check", "node"), ("create", "node")]
+    assert seen == [("host", None), ("name_check", "node"), ("team_show", None), ("create", "node")]
 
 
 @pytest.mark.parametrize("head", ["---\r\nkind: build\r\n---\r\n", "--- \nkind: build\n---\n"])
@@ -363,15 +363,78 @@ def test_a_stage_the_reading_does_not_name_starts_nothing(world, monkeypatch):
     assert made_ is None and "create" not in [m for m, _ in calls]
 
 
-def test_a_team_on_a_node_a_launch_with_no_pick_and_a_team_not_switched_launch_as_before(world, monkeypatch):
-    org, team, _ = world
-    on_node = stage_start.launch(org, team, builtin("build"), "build", stage_start.Work("TD-7"), host="n", here="h")
+def test_a_launch_with_no_pick_and_a_team_not_switched_launch_as_before(world, monkeypatch):
     no_pick = replace(made(world, builtin("build"), "build"), pick=None)
-    for got, shown in ((on_node, _shown(_rows())), (no_pick, _shown(_rows())), (None, {"switched": False})):
+    for got, shown in ((no_pick, _shown(_rows())), (None, {"switched": False})):
         made_, calls = _start(world, monkeypatch, shown, got)
         assert made_ == {"id": "new"}
         assert "login" not in calls[-1][1] and "seat_model" not in calls[-1][1]
         assert ("team_show" in [m for m, _ in calls]) is (got is None)
+
+
+def _on_node(world):
+    org, team, _ = world
+    return stage_start.launch(org, team, builtin("build"), "build", stage_start.Work("TD-7"), host="n", here="h")
+
+
+def test_a_team_on_a_node_sends_its_list_as_names_and_the_model_and_no_login(world, monkeypatch):
+    """§4.9e *A team on a node*: the home does not read a node's logins, so the node's own pick takes the login."""
+    made_, calls = _start(world, monkeypatch, _shown(_rows()), _on_node(world))
+    create = calls[-1][1]
+    assert made_ == {"id": "new"} and calls[-1][0] == "create" and create["host"] == "n"
+    assert (create["seat_model"], create["login_list"], create["profile"]) == ("opus", ORDER, "")
+    assert "login" not in create
+
+
+def test_a_team_on_a_node_the_home_marked_cannot_run_or_with_no_list_starts_nothing(world, monkeypatch):
+    for shown in (
+        {**_shown(_rows()), "cannot_run": "t cannot run f: no login in its list offers opus on n"},
+        {**_shown(_rows()), "logins": []},
+    ):
+        made_, calls = _start(world, monkeypatch, shown, _on_node(world))
+        assert made_ is None and "create" not in [m for m, _ in calls]
+
+
+@pytest.mark.parametrize(
+    ("words", "marked"),
+    [
+        ("n: no login usable on n for opus: claude-code:main: limited (design §4.9e)", False),
+        ("n: no login offers opus on n (design §4.9e)", True),
+    ],
+    ids=["waits", "none-offers"],
+)
+def test_a_nodes_refusal_for_its_list_starts_nothing_and_none_offering_marks_the_team(
+    world, monkeypatch, words, marked
+):
+    """*No login usable* is a wait, the next pass asking again; *no login offers <model>* marks the team *cannot run* at
+    the home, naming the model, with the list and the flow it was read against."""
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+    shown = {**_shown(_rows()), "flow": {**_shown(_rows())["flow"], "name": "f"}}
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **kw):
+        calls.append((method, kw))
+        if method == "create":
+            raise AgentError(words)
+        return {"name_check": {"verdict": "free"}, "team_show": shown}.get(method, {})
+
+    assert stage_start.start(call, org, team, _on_node(world)) is None
+    marks = [kw for m, kw in calls if m == "team_node_cannot"]
+    assert marks == ([{"team": "t", "model": "opus", "logins": ORDER, "flow": "f"}] if marked else [])
+
+
+def test_any_other_refusal_of_a_nodes_create_is_raised(world, monkeypatch):
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+
+    def call(method, **kw):
+        if method == "create":
+            raise AgentError("n: bad params: unexpected keyword seat_model")
+        return {"name_check": {"verdict": "free"}, "team_show": _shown(_rows())}.get(method, {})
+
+    with pytest.raises(AgentError, match="bad params"):
+        stage_start.start(call, org, team, _on_node(world))
 
 
 def test_an_audits_run_starts_on_the_login_the_reading_picks_for_the_audits_model(world, monkeypatch):

@@ -104,9 +104,11 @@ def view(
     *,
     director: bool = False,
     rounds: Mapping[str, str] | None = None,
+    node_mark: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The reply, from what was read. A team not switched has no flow or logins to show yet. `rounds` is when each
-    audit, by key, next comes round (`audit_rounds`); one not read is drawn with none."""
+    audit, by key, next comes round (`audit_rounds`); one not read is drawn with none. A team on a node is *cannot
+    run* where `node_mark` stands (`node_cannot_run`)."""
     teams = doc.get("teams")
     entry: Mapping[str, Any] = (teams.get(team) if isinstance(teams, Mapping) else None) or {}
     switched = teamstore.switched(doc, team)
@@ -180,9 +182,21 @@ def view(
     out["logins"] = [_login_row(lk, rows, set(models), on_node, whys[lk]) for lk in order]
     if on_node:
         out["note"] = NODE_NOTE
+        out["cannot_run"] = node_cannot_run(team, name, order, node_mark, str(entry.get("host") or ""))
     elif good:
         out["cannot_run"] = teamstore.cannot_run(team, name, models, order, rows)
     return out
+
+
+def node_cannot_run(team: str, flow: str, order: list[str], mark: Mapping[str, Any] | None, host: str) -> str | None:
+    """A team on a node *cannot run* while the home's mark stands (§4.9d *A team on a node*, §4.9e, TD-2068): the node
+    reported that no login of the list offers a model, and the mark holds until the team's list or its flow changes,
+    so a mark written for another list or flow is read as none."""
+    if not isinstance(mark, Mapping) or not mark.get("model"):
+        return None
+    if str(mark.get("flow") or "") != flow or [str(x) for x in mark.get("logins") or ()] != order:
+        return None
+    return f"{team} cannot run {flow}: no login in its list offers {mark['model']} on {host}"
 
 
 def _has_director() -> bool:
@@ -329,9 +343,11 @@ def call(
     here: str,
     roots: Iterable[str | Path],
     entries: bool = True,
+    node_mark: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The `team_show` RPC's body, in a thread of the host agent. A state branch that cannot be read costs the entries
-    and the team's own copy of its flow, said in `unread`, and never the rest of the read."""
+    """The `team_show` RPC's body, in a thread of the host agent. `node_mark` is the home's *cannot run* mark of a
+    team on a node (§4.9d *A team on a node*), as the host record keeps it. A state branch that cannot be read costs
+    the entries and the team's own copy of its flow, said in `unread`, and never the rest of the read."""
     where = [Path(r).expanduser() for r in roots]
     if not teamstore.switched(doc, team):
         return view(team, doc, rows, head, here, None, ())
@@ -355,7 +371,7 @@ def call(
             except UNREADABLE as again:
                 unread = f"{unread}; the flow could not be read: {again}"
     rounds = audit_rounds(team, flow_doc, store, root) if unread is None else {}
-    reply = view(team, doc, rows, head, here, flow_doc, records, director=director, rounds=rounds)
+    reply = view(team, doc, rows, head, here, flow_doc, records, director=director, rounds=rounds, node_mark=node_mark)
     return {**reply, "unread": unread}
 
 

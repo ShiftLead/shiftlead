@@ -340,3 +340,18 @@ def test_a_state_branch_that_cannot_be_read_draws_no_next_clock(tmp_path, monkey
     got = team_show.call(team="t", doc=_doc(), rows={}, head=HEAD, here="home", roots=[root])
     assert "could not be read" in got["unread"]
     assert [(a["name"], a["next"]) for a in got["audits"]] == [("Docs", None)]
+
+
+def test_a_team_on_a_node_cannot_run_while_the_homes_mark_names_its_list_and_flow():
+    """§4.9d *A team on a node*, TD-2068: the mark holds until the team's list or its flow changes."""
+    mark = {"model": "opus", "logins": ["claude:a", "claude:b"], "flow": "build", "at": _TWO_HOURS_AGO}
+    got = team_show.view("t", _doc(host="node1"), {}, HEAD, "home", FLOW, (), node_mark=mark)
+    assert got["cannot_run"] == "t cannot run build: no login in its list offers opus on node1"
+    assert got["note"] == team_show.NODE_NOTE
+    for changed in ({"logins": ["claude:b"]}, {"flow": "other"}, {"model": ""}):
+        again = team_show.view("t", _doc(host="node1"), {}, HEAD, "home", FLOW, (), node_mark={**mark, **changed})
+        assert again["cannot_run"] is None, changed
+    here = team_show.view(
+        "t", _doc(), {"claude:a": _row(["opus", "fable", "sonnet"])}, HEAD, "home", FLOW, (), node_mark=mark
+    )
+    assert here["cannot_run"] is None, "a team on the home's own host is read from its logins"
