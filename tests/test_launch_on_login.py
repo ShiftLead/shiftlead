@@ -5,7 +5,9 @@ login is unchanged, and what does not fit a login is refused before anything is 
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -371,4 +373,65 @@ async def test_a_shell_or_a_resume_given_a_list_is_refused_not_picked(agent, tmp
             await person.call(
                 "create", **{**_params(tmp_path, "w", seat_model="opus", login_list=["hookstub:grind"]), **given}
             )
+    assert not launched and not agent.sessions
+
+
+def _real_rows(agent, monkeypatch, gate: dict) -> None:
+    """This host's `tools` read, two signed-in hookstub logins on two accounts that both offer opus, and `gate`'s
+    accounts as its usage gate answers them; `teamstore.login_rows` and the projection are left real (TD-2266)."""
+    (paths.home() / "logins.yml").write_text(TWO_TOOLS)
+    families = {"families": ["opus"]}
+    card = {
+        "adapter": "hookstub",
+        "accounts": [{"key": "acct-1", "models": families}, {"key": "acct-2", "models": families}],
+        "logins": [
+            {"name": "grind", "state": "signed_in", "account": "acct-1"},
+            {"name": "spare", "state": "signed_in", "account": "acct-2"},
+        ],
+    }
+    monkeypatch.setattr(agent, "rpc_tools", AsyncMock(return_value={"tools": [card]}))
+    monkeypatch.setattr(agent, "rpc_gate", AsyncMock(return_value={"accounts": gate}))
+    agent._usage, agent._usage_acct = {}, {}
+
+
+LIST = ["hookstub:grind", "hookstub:spare"]
+
+
+@pytest.mark.parametrize(("team", "login"), [("t", "hookstub:spare"), ("", "hookstub:grind")], ids=["team", "no-team"])
+async def test_a_create_for_a_team_adds_its_reserve_to_the_pick(agent, tmp_path, launched, monkeypatch, team, login):
+    """TD-2266, §4.9e *A team on a node*: the pick adds the team's reserve where this host's settings hold one, so a
+    first login under its own line but over the team's lowered one is passed over; with no team it is taken."""
+    week = {"label": "week", "pct": 60, "reserve": 20, "resets": "2099-01-01T00:00:00Z"}
+    _real_rows(agent, monkeypatch, {"acct-1": {"windows": [week]}})
+    (paths.home() / "settings.yml").write_text("teams:\n  t: {reserve: 30}\n")
+    async with LocalClient() as person:
+        made = await person.call("create", **_params(tmp_path, "w", seat_model="opus", login_list=LIST, team=team))
+    assert agent.sessions[made["id"]].login == login
+
+
+async def test_a_create_passes_over_a_login_whose_old_reading_projects_past_its_line(
+    agent, tmp_path, launched, monkeypatch
+):
+    """TD-2266: the pick reads each account's windows as the gate would at a launch (`_projected`): a reading 11 hours
+    old at 50%, rising 10 points an hour, is past its line of 80 though its held number is not."""
+    now = datetime.now(UTC)
+    at = (now - timedelta(hours=11)).isoformat()
+    history = [{"at": (now - timedelta(hours=12)).isoformat(), "pct": 40}, {"at": at, "pct": 50}]
+    week = {"label": "week", "pct": 50, "reserve": 20, "resets": "2099-01-01T00:00:00Z"}
+    _real_rows(agent, monkeypatch, {"acct-1": {"windows": [week], "profiles": []}})
+    agent._usage_acct["acct-1"] = {"windows": [{**week, "at": at, "history": history}], "fetched": at}
+    async with LocalClient() as person:
+        made = await person.call("create", **_params(tmp_path, "w", seat_model="opus", login_list=LIST))
+    assert agent.sessions[made["id"]].login == "hookstub:spare", "the projection puts the first past its line"
+
+
+async def test_a_create_given_a_list_that_is_one_string_is_refused_in_the_lists_words(
+    agent, tmp_path, launched, monkeypatch
+):
+    """TD-2266: a `login_list` that is not a list is never picked from, so it is refused as a list of keys, not in the
+    words *no login offers*, which the home reads as *cannot run* (§4.9e *A team on a node*)."""
+    _real_rows(agent, monkeypatch, {})
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="the logins' keys in order"):
+            await person.call("create", **_params(tmp_path, "w", seat_model="opus", login_list="hookstub:grind"))
     assert not launched and not agent.sessions
