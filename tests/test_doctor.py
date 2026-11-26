@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 from conftest import park_ticks
 
-from sessionorc import adapters, hosts, identity, paths
+from sessionorc import adapters, hosts, identity, paths, yamltext
 from sessionorc import settings as settings_mod
 from sessionorc.client import LocalClient
 from sessionorc.models import Session
@@ -245,9 +245,22 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
     assert [set(r) for r in ClaudeCodeAdapter().doctor_profiles()] == [{"error"}]
 
 
-async def test_a_settings_file_nested_too_deeply_is_reported_invalid(agent):
-    """TD-2154: a settings.yml nested past the YAML parser's depth raised RecursionError out of `ao doctor`."""
-    settings_mod.settings_file().write_text("teams: " + "[" * 5000 + "\n", encoding="utf-8")
+async def test_a_settings_file_nested_too_deeply_is_reported_invalid(agent, monkeypatch):
+    """TD-2154: a settings.yml nested past the YAML parser's depth raised RecursionError out of `ao doctor`.
+
+    The parser's RecursionError is raised here by a stand-in for this one text (TD-2319): the doctor reads the file in
+    a worker thread, and a real 5,000-deep parse there once crashed an xdist worker under the full suite, with no
+    traceback. The real parse is `tests/test_yamltext.py`'s, on the main thread."""
+    deep = "teams: " + "[" * 5000 + "\n"
+    real = yamltext.yaml.safe_load
+
+    def safe_load(text):
+        if text == deep:
+            raise RecursionError("maximum recursion depth exceeded")
+        return real(text)
+
+    monkeypatch.setattr(yamltext.yaml, "safe_load", safe_load)
+    settings_mod.settings_file().write_text(deep, encoding="utf-8")
     try:
         got = await agent.rpc_doctor()
         assert got["files"]["settings.yml"]["error"] == "nested too deeply to read"
