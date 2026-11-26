@@ -280,16 +280,16 @@ def launch(
 
 def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     """The `create` arguments that put the launch on its login (§4.9e *The launch on a login*): `{}` for a launch
-    as before (a job's on a node; a launch with no `pick`; a team the home's reading does
-    not show switched; a job's before the cut-over), else the login the reading picks with the model and the list —
-    the team's, or for a job the built-in set's (`on_set`, §4.9d *The login a seat starts on*, no team's reserve
-    added) — or None when nothing is to start: no login of the list usable (the usage gate holds it) or none offering
-    the model (*cannot run*)."""
+    as before (a launch with no `pick`; a team the home's reading does not show switched; a job's before the
+    cut-over), the list as names for a launch on a node (`on_node`, `on_set_node`), else the login the reading
+    picks with the model and the list — the team's, or for a job the built-in set's (`on_set`, §4.9d *The login a
+    seat starts on*, no team's reserve added) — or None when nothing is to start: no login of the list usable (the
+    usage gate holds it) or none offering the model (*cannot run*)."""
     if got.pick is None:
         return {}
     kind, key = got.pick
-    if got.launch.host:  # a built-in seat's or a job's on a node is launched as before until its slice
-        return {} if kind == "builtins" else on_node(call, team, got)
+    if got.launch.host:
+        return on_set_node(call, got, key) if kind == "builtins" else on_node(call, team, got)
     if kind == "builtins":
         shown = call("builtins_show", set=got.on_set or builtinstore.DEFAULT) or {}
         if not shown.get("cut_over"):
@@ -337,16 +337,42 @@ def on_node(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     return {"profile": "", "seat_model": got.model, "login_list": listed}
 
 
+def on_set_node(call: Any, got: StageLaunch, seat: str) -> dict[str, Any] | None:
+    """A job's session on a node (§4.9e *A team on a node*, §4.9d *Where a seat's session launches*, TD-2068): the
+    launch goes with the built-in set's list as names and the seat's model, and the node's own pick takes the login.
+    `{}` before the cut-over, None while the home's mark says the set cannot run the seat on that node
+    (`builtins_node_cannot`), or where the set's list is empty or its reading names no such seat."""
+    name = got.on_set or builtinstore.DEFAULT
+    shown = call("builtins_show", set=name) or {}
+    if not shown.get("cut_over"):
+        return {}
+    host = got.launch.host
+    row = next((r for r in shown.get("seats") or () if r.get("key") == seat), None)
+    listed = [str(lk) for lk in shown.get("order") or ()]
+    marked = ((row or {}).get("node_cannot_run") or {}).get(host)
+    if row is None or marked or not listed:
+        why = marked or ("its list is empty" if row is not None else f"its reading names no seat {seat!r}")
+        log.info("built-in set %s: nothing starts for %s on %s — %s", name, seat, host, why)
+        return None
+    return {"profile": "", "seat_model": got.model, "login_list": listed}
+
+
 def _node_refused(call: Any, team: str, got: StageLaunch, sent: Mapping[str, Any], e: AgentError) -> bool:
     """Whether a node's `create` was refused for its list (§4.9e *A team on a node*): *no login usable* is a wait, and
     *no login offers <model>* marks the team *cannot run* at the home, naming the model, until its list or its flow
-    changes. Nothing else is: the caller raises it."""
+    changes — for a job, the built-in set *cannot run* its seat on that node, until the set's list or the seat's
+    model changes. Nothing else is: the caller raises it."""
     words = str(e)
     if teamstore.NO_LOGIN_USABLE in words:
         log.info("team %s: its node holds the launch waiting — %s", team, words)
         return True
     if teamstore.NO_LOGIN_OFFERS not in words:
         return False
+    if got.pick is not None and got.pick[0] == "builtins":
+        name, seat, host = got.on_set or builtinstore.DEFAULT, got.pick[1], got.launch.host
+        call("builtins_node_cannot", set=name, seat=seat, host=host, model=got.model, logins=list(sent["login_list"]))
+        log.warning("built-in set %s cannot run %s on %s: %s", name, seat, host, words)
+        return True
     shown = call("team_show", team=team, entries=False) or {}
     flow = str((shown.get("flow") or {}).get("name") or "")
     call("team_node_cannot", team=team, model=got.model, logins=list(sent["login_list"]), flow=flow)

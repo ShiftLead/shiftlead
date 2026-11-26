@@ -182,6 +182,29 @@ def test_the_pages_prompts_seat_reads_the_login_its_fill_starts_on():
     assert now["prompts"] == "c:two" and now["tech-lead"] == "c:one"
 
 
+def test_a_seat_reads_the_homes_node_marks_while_the_list_and_the_model_are_unchanged():
+    """§4.9d *Where a seat's session launches*, TD-2068: a node's word that no login of the set's list offers the seat's
+    model stands per node while the set's list and the seat's model are the ones it was read against; the home's own
+    *cannot run* is not changed by it."""
+    doc = _doc(builtins={"default": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]}})
+    rows = {"c:one": _row()}
+    marks = {
+        "sweeper": {
+            "n": {"model": "haiku", "logins": ["c:one"]},
+            "old-list": {"model": "haiku", "logins": ["c:two"]},
+            "old-model": {"model": "opus", "logins": ["c:one"]},
+        }
+    }
+    got = team_show.builtins_view(name="default", doc=doc, rows=rows, roots=[], director=False, node_marks=marks)
+    seats = {s["key"]: s for s in got["seats"]}
+    assert seats["sweeper"]["node_cannot_run"] == {
+        "n": "default cannot run the sweeper: no login in its list offers haiku on n"
+    }
+    assert seats["sweeper"]["cannot_run"] is None and seats["tech-lead"]["node_cannot_run"] == {}
+    plain = team_show.builtins_view(name="default", doc=doc, rows=rows, roots=[], director=False)
+    assert all(s["node_cannot_run"] == {} for s in plain["seats"])
+
+
 def test_a_model_pick_under_a_director_keeps_the_stored_prompts_model_and_adds_no_package_model():
     doc = _doc(builtins={"default": {"models": {"prompts": "opus"}, "logins": []}})
     got = team_show.builtins_view(name="default", doc=doc, rows={}, roots=[], director=True)

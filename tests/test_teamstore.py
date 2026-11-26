@@ -602,3 +602,36 @@ def test_team_node_cannot_marks_a_team_on_its_host_record_and_is_the_homes_own(a
             await a.rpc_team_node_cannot(team="a", model="opus", logins=[], flow="build")
 
     asyncio.run(go())
+
+
+def test_builtins_node_cannot_marks_a_sets_seat_on_a_node_and_is_the_homes_own(agent, monkeypatch):
+    """§4.9d *Where a seat's session launches*, TD-2068: the stage pass's mark that a node found no login of a built-in
+    set's list offering a seat's model, per seat and node, on the host record's `builtins` entry with the list it was
+    read against; refused from a session, at a node, for the home itself, and for an unknown set or seat."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    ok = {"set": "default", "seat": "sweeper", "host": "n", "model": "haiku", "logins": ["claude-code:x"]}
+
+    async def go():
+        got = await a.rpc_builtins_node_cannot(**ok)
+        await a.rpc_builtins_node_cannot(**{**ok, "host": "m", "model": "opus"})
+        marks = a._host_rec["builtins"]["default"]["node_cannot_run"]["sweeper"]
+        assert {k: marks["n"][k] for k in ("model", "logins")} == {"model": "haiku", "logins": ["claude-code:x"]}
+        assert marks["m"]["model"] == "opus", "each node's mark is its own"
+        assert got["host"] == "n" and a.host_saves[-1]["builtins"]["default"]["node_cannot_run"]["sweeper"] == marks
+        for kw, words in (
+            ({"caller": "s-1"}, "never a session's"),
+            ({"set": "zz"}, "no built-in set"),
+            ({"seat": "zz"}, "is not a built-in seat"),
+            ({"host": ""}, "names the node"),
+            ({"host": "home"}, "names the node"),
+            ({"model": " "}, "names the model"),
+            ({"logins": "claude-code:x"}, "as login keys"),
+        ):
+            with pytest.raises(RpcError, match=words):
+                await a.rpc_builtins_node_cannot(**{**ok, **kw})
+        a.mode = "node"
+        with pytest.raises(RpcError, match="is a node of"):
+            await a.rpc_builtins_node_cannot(**ok)
+
+    asyncio.run(go())
