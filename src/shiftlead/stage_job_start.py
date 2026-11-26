@@ -5,8 +5,9 @@ end`, the repo's rules, and a brief — the seat's work order's words (`briefs/j
 order's kind, the record's (`briefs/job/pr/<kind>.md`, TD-2165). It is
 started on the seat's model, given by the built-in set the repo uses (`builtinstore.seat`), in the build stage's role,
 with the work order's reference as its one lane (`board:<8 hex>`, `pr:<n>`), and names no `controllers`. Its outcomes
-are `work-pushed` and `other`, and a pull request's job's also `closed-unmerged`. Launching on the set's login is
-TD-2068's, and `stage_start.start` starts nothing before the team's started mark (TD-2065).
+are `work-pushed` and `other`, and a pull request's job's also `closed-unmerged`. After the cut-over it is
+launched on the set's first usable login offering that model (TD-2068), and `stage_start.start` starts nothing before
+the team's started mark (TD-2065).
 
 A job whose record stands at one of its flow's review stages is read by that stage's own fresh session
 (`review_launch`, §4.9d *Its pull request is reviewed and merged by the team's flow*): a review stage's session as an
@@ -138,9 +139,12 @@ def launch(
     here: str,
     came: str | None = None,
     files: teams.Files | None = None,
+    on_set: str | None = None,
 ) -> StageLaunch:
     """The job's session, nothing created: in the build stage's role, on `model` (the seat's, from the built-in set the
-    repo uses), its lane the job's work order. `team` is the record's, whose host and flow the job runs under."""
+    repo uses), its lane the job's work order. `team` is the record's, whose host and flow the job runs under. With
+    `on_set`, the set's name, `stage_start.start` puts it on the set's first usable login offering the model after the
+    cut-over (§4.9d *The login a seat starts on*)."""
     seat, lane, name = str(record.get("seat")), lane_of(record), name_of(record)
     where = f"team {team.name}: {name}"
     checkout, read = teams._checkout(org, team, team.repo, host, here, files, where)
@@ -169,7 +173,7 @@ def launch(
     except ValueError as e:
         raise teams.TeamError(f"{where}: {e}") from None
     # no member's or role's profile: a job runs on the seat's model and the set's login (§4.9d *The login a seat
-    # starts on*), which TD-2068 launches on; until then the package's default adapter, never a shell
+    # starts on*); before the cut-over, and on a node until its half, the package's default adapter, never a shell
     x = teams.Launch(
         name=name,
         role=role.name,
@@ -186,7 +190,7 @@ def launch(
         prompt_from=made,
         unlisted=unlisted,
     )
-    return StageLaunch(x, model)
+    return StageLaunch(x, model, pick=("builtins", seat) if on_set else None, on_set=on_set)
 
 
 def review_name(record: Mapping[str, Any]) -> str:
