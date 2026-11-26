@@ -255,6 +255,8 @@ async def test_the_link_comes_up_drops_with_the_home_and_comes_back(home, tmp_pa
         seen = await home.host_rpc()
         assert seen["mode"] == "home" and seen["links"]["laptop"]["up"] is True
         assert seen["links"]["laptop"]["build"] == "abc123def456"  # said in the hello, kept on the link state
+        assert seen["links"]["laptop"]["switched"] is False  # no logins.yml on the node (§4.9e *The window*)
+        assert node._home_greeting["cut_over"] is None  # and the home's greeting says it is not cut over
         async with LocalClient() as c:
             mine = await c.call("host")
             assert mine["home_reachable"] is True and mine["link"]["up"] is True
@@ -777,6 +779,63 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
             assert check["verdict"] == "live" and check["holder"] == f"{rid}@laptop"  # addressed, like every reply
             await person.call("kill", id=v["id"])
             await person.call("kill", id=lead["id"])
+
+
+async def test_a_switched_node_says_so_and_launches_nothing_until_its_home_is_cut_over(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-2070, design §4.9e *The window* step 2: a node's greeting says whether it holds a `logins.yml`, the home's
+    answer says whether it is cut over, and between the node's move and the home's the node holds no profile, so
+    a create there is refused in the design's words; once the home is cut over, the next greeting says so."""
+    (tmp_path / "laptop").mkdir()
+    (tmp_path / "laptop" / "logins.yml").write_text("logins: {}\naccounts: {}\nforgotten: {}\n")
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
+        assert (await home.host_rpc())["links"]["laptop"]["switched"] is True
+        assert node._home_greeting["cut_over"] is None
+        async with LocalClient() as person:
+            with pytest.raises(AgentError, match="this host is switched and the home is not yet"):
+                await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name)
+        assert not node.sessions, "refused before anything is made"
+        home.stop()
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        (home.dir / "settings.yml").write_text("cut_over: '2026-11-26'\n")
+        await home.start()
+        assert await wait_for(
+            lambda: node.home_reachable() and (node._home_greeting or {}).get("cut_over"), timeout=15.0, step=0.05
+        ), node.home_link
+        assert node._home_greeting["cut_over"] == "2026-11-26"
+        async with LocalClient() as person:
+            made = await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name)
+            assert made["id"] in node.sessions
+            await person.call("kill", id=made["id"])
+
+
+async def test_a_switched_node_with_no_greeting_reads_its_replica_of_the_homes_marker(agent, tmp_path):
+    """TD-2070: before any greeting (the home out of reach since the node started), or from a home whose greeting
+    says nothing of the cut-over, the node reads the marker its replica of the home's `settings.yml` last held; a
+    node with no `logins.yml`, and a home, are never refused."""
+    await park_ticks(agent)
+    agent.mode = "node"
+    try:
+        assert not agent._switched_before_home(), "no logins.yml: not switched"
+        (paths.home() / "logins.yml").write_text("logins: {}\naccounts: {}\nforgotten: {}\n")
+        agent._home_greeting, agent._first_shape_off = None, False
+        assert agent._switched_before_home()
+        agent._home_greeting = {"protocol": link.PROTOCOL, "home": "kmaster"}  # an older home's greeting
+        assert agent._switched_before_home()
+        agent._first_shape_off = True
+        assert not agent._switched_before_home(), "the replica holds the marker"
+        agent._home_greeting = {"cut_over": None}
+        assert agent._switched_before_home(), "the greeting, where it says, is what the home is"
+        agent._home_greeting = {"cut_over": "2026-11-26"}
+        assert not agent._switched_before_home()
+        agent._home_greeting = {"cut_over": None}
+        agent.mode = "home"
+        assert not agent._switched_before_home(), "a home's own move writes both together"
+    finally:
+        agent.mode = "home"
+        agent._home_greeting = None
 
 
 # -- reads of a pane across the link, and a permission answered over it (step 4b.1) ------------------------

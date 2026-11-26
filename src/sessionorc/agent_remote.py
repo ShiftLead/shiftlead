@@ -705,7 +705,13 @@ class RemoteMixin:
                     old.close("replaced by a newer link from the same host")
                 self._link_muxes[host] = mux
                 self._intent_sent.pop(host, None)  # nothing is pushed to a link before its snapshot
-                self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
+                # whether the node holds a `logins.yml` (§4.9e *The window*): the home's move waits for every ssh node's
+                self.links[host] = {
+                    "up": True,
+                    "since": now_iso(),
+                    "why": "linked",
+                    "switched": bool(params.get("switched")),
+                }
                 self._note_build(host, str(params.get("build") or ""))
                 said_hello = True
                 log.info("link from %s: up", host)
@@ -714,7 +720,8 @@ class RemoteMixin:
                     self._bg.add(task)
                     task.add_done_callback(self._bg.discard)
                 await self._push_changes()  # the overlay lifts on its cards
-                return {"protocol": link.PROTOCOL, "home": self.host, "host": host}
+                # and the home says in the same greeting whether it is cut over, the marker's date or None (§4.9e)
+                return {"protocol": link.PROTOCOL, "home": self.host, "host": host, "cut_over": self._first_shape_cut}
             if not said_hello:
                 raise link.LinkError("say hello first")
             if method == "ping":

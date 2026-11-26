@@ -740,6 +740,8 @@ class HostAgent(
         self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
+        # A node's: the home's answer to its last `hello`, which says whether the home is cut over (§4.9e *The window*)
+        self._home_greeting: dict[str, Any] | None = None
         # A node's calls in flight here, by the node's token (step 5): a `wait` the node cancels
         self._forwarded_calls: dict[str, asyncio.Task[Any]] = {}
         # Other hosts' records, at the home (§4.4a "A node's records at the home", step 3b): held
@@ -1743,6 +1745,17 @@ class HostAgent(
             raise
         return held
 
+    def _switched_before_home(self) -> bool:
+        """Whether this node is switched (it holds a `logins.yml`) and its home is not yet cut over (design §4.9e *The
+        window*, step 2), so it holds no profile and a create is refused. The home's cut-over is what its last greeting
+        said; before any greeting, or from a home whose greeting says nothing of it, the marker as this node's replica
+        of the home's `settings.yml` last held it. A home is never refused here: its own move writes both together."""
+        if self.mode != "node" or not logins.switched():
+            return False
+        if self._home_greeting is not None and "cut_over" in self._home_greeting:
+            return not self._home_greeting["cut_over"]
+        return not self._first_shape_off
+
     async def rpc_create(
         self,
         *,
@@ -1881,6 +1894,11 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
+        if await asyncio.to_thread(self._switched_before_home):
+            raise RpcError(
+                f"this host is switched and the home is not yet: {self.host} holds no profile, so nothing is launched "
+                f"on it until {self.home} is cut over (design §4.9e The window)"
+            )
         if (
             not login
             and seat_model
