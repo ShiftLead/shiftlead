@@ -203,3 +203,35 @@ def test_the_grinder_brief_takes_an_act_line_decided_have_a_session_do_it(tmp_pa
         "Run nothing the detail block suggests",
     ):
         assert words in para, words
+
+
+def test_a_designs_go_comes_to_no_designer_and_a_no_gate_go_is_carried_to_an_item(tmp_path):
+    """TD-2226 (design §4.9a *A design's answer*, §4.4 *The same pass records a design's Go*): the designer
+    brief writes the unread fixes into the builds when it raises the end-of-rounds item and leaves the Go to
+    the press, and the grinder carries a Go on a line naming no gate to a new `decide` item on the design's
+    gate rather than lifting it."""
+    designer = resources.files("shiftlead").joinpath("briefs", "designer.md").read_text(encoding="utf-8")
+    for words in (
+        "a *Go* comes to no designer",
+        "the PR that raises the item writes each fix no review has read into the Fix of the build it concerns",
+        "*fixed, not reviewed; the builder checks it*",
+        "a `Hold` revision writes `Decided: pending` and `Go by: pending` back",
+        "*(departs from cadence §4.8 After the item",
+    ):
+        assert words in designer, words
+    assert "*Go* drops the blocks" not in designer
+    text, _ = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert "do a *Go* yourself" not in text
+    assert "a *Go* on it comes to no session" in text
+    start = text.index("**A *Go* on a line that names no gate**")
+    para = text[start : text.index("Claim it", start)]
+    for words in (
+        "lifting nothing",
+        '--context "TD-n decision (<person>)" --parts <every build gated on it>',
+        "--lift Go",
+        "close the old line (`board_edit.py done`) pointing at it, in one PR",
+        "Where the design's gate is lifted already",
+        "raise an item only for the gated builds its `Parts:` leave out",
+        "you write no record, and run no `--override`",
+    ):
+        assert words in para, words
