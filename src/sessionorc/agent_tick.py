@@ -1595,7 +1595,9 @@ class TickMixin:
         sender of an `ask` or `steer` still open in the moved inbox is told by a system note. A record
         that came from a `lost-brief` replay and is marked again is not replayed: it is written
         `restart_ceiling: {at, count, why: lost-brief}` and is the person's (*brief lost twice*). A replay
-        that failed after its close is retried on the next tick (`_closed_by_tick`). True when the tick
+        that failed after its close is retried on the next tick (`_closed_by_tick`), and so is one a node refused
+        for its list or the set's mark held, which counts nothing and marks the close `pending` (§4.9d *How each one
+        runs*, TD-2283); rule 3 fills no seat whose replay is pending. True when the tick
         closed the record, so the rest of the pass leaves the closed run alone (a seat is never filled
         twice)."""
         retry = self._closed_by_tick(s, "lost-brief")
@@ -1647,10 +1649,18 @@ class TickMixin:
                 stored = str(self._read_launch(self._address(s)).get("prompt") or "")
                 if f"\n\n{FILLED_FOR}" in stored:
                     closing = FILLED_FOR + stored.split(f"\n\n{FILLED_FOR}", 1)[1]
+        counted = len(s.restarts)
         await self._replay(s, "lost-brief", closing=closing, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if new is None or new is s:
-            return True  # the replay failed: its entry says so, and the next tick retries it
+            mark = s.closed_for if isinstance(s.closed_for, dict) else {}
+            if len(s.restarts) == counted and mark.get("why") == "lost-brief" and not mark.get("pending"):
+                # its node refused the list, or the set's mark held it, with nothing counted: the closed record
+                # keeps the replay pending, so the next tick sends it again and rule 3 fills nothing (TD-2283)
+                s.closed_for = {**mark, "pending": True}
+                self._save(s)
+                await self._push_changes()
+            return True  # the replay failed or was held: its entry or its mark says so, and the next tick retries it
         if s.seat:
             new.seat_filled = list(s.seat_filled)
             self._save(new)
@@ -2002,9 +2012,10 @@ class TickMixin:
         """A `closed` record the tick itself closed and failed to replay (`why` rule 2's `wanted` or rule
         7's `brief` or `flow`): it carries the tick's mark for that rule and the close the mark names is still the
         record's (`closed_at` unchanged), and the last `restarts` entry is that rule's and carries
-        `error` — both failure paths, the close's and the replay's, write one. Any other close clears the
-        mark or writes a new `closed_at`, so a person's Close is never undone (design §6 rule 2; TD-235
-        to TD-238)."""
+        `error` — both failure paths, the close's and the replay's, write one — or the mark says `pending`, a
+        lost-brief replay a node refused for its list or the set's mark held, which writes no entry (TD-2283). Any
+        other close clears the mark or writes a new `closed_at`, so a person's Close is never undone (design §6
+        rule 2; TD-235 to TD-238)."""
         last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
         mark = s.closed_for if isinstance(s.closed_for, dict) else {}
         return (
@@ -2012,8 +2023,7 @@ class TickMixin:
             and mark.get("why") == why
             and bool(s.closed_at)
             and mark.get("closed_at") == s.closed_at
-            and last.get("why") == why
-            and bool(last.get("error"))
+            and ((last.get("why") == why and bool(last.get("error"))) or bool(mark.get("pending")))
         )
 
     @staticmethod
@@ -4478,6 +4488,8 @@ class TickMixin:
             # the cause pass never fills an extra seat and the `asks` linger never closes one: the send and the
             # mover fill it, and only the eviction closes it, when a start needs its slot (§6 rule 3, TD-1547)
             return
+        if self._closed_by_tick(s, "lost-brief"):
+            return  # its lost-brief replay is rule 1's, sent again each tick: not filled here (§6 rule 3, TD-2283)
         ended = s.state in ("exited", "closed")
         # due or not, a question asks whether rule 3 would fill it (TD-1443), a built-in seat's login too (TD-2068):
         # one the fill below reads is read there

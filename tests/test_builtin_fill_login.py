@@ -7,12 +7,12 @@ cut-over a fill is as it was."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from conftest import park_ticks
 
-from sessionorc import paths, teamstore
+from sessionorc import agent_common, paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.agent_common import RpcError
 from sessionorc.client import LocalClient
@@ -612,6 +612,67 @@ async def test_a_nodes_list_refusal_of_a_replay_is_no_restart(
     await agent._replay(s, "lost-brief", keep_mail=True)
     assert len(sent) == (1 if marked else 2), "a marked node is sent nothing; a wait is asked again"
     assert s.restarts == before
+
+
+@pytest.mark.parametrize(
+    ("words", "marked"),
+    [
+        (f"{teamstore.NO_LOGIN_USABLE}: every login of the list is at its reserve", False),
+        (f"{teamstore.NO_LOGIN_OFFERS} opus", True),
+    ],
+)
+async def test_a_refused_lost_brief_replay_is_tried_again_and_never_filled(
+    agent, tmp_path, launched, rows, monkeypatch, words, marked
+):
+    """TD-2283, §4.9d *How each one runs*, §6 rule 3: a lost-brief replay a node refuses for its list stays the closed
+    record's, marked `pending`: the next pass of rule 1 sends it again (or the set's mark holds it, sending nothing,
+    until the mark goes), rule 3 fills nothing meanwhile though a question waits for the seat, and no refusal adds a
+    `restarts` entry."""
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    refused: list[str | None] = [words]
+    sent: list[dict] = []
+
+    async def route(method, params, _caller, host):
+        sent.append({"method": method, **params})
+        if method == "close":
+            s.state, s.closed_at = "closed", datetime.now(UTC).isoformat()
+            return {}
+        if refused[0]:
+            raise RpcError(refused[0])
+        return {"id": f"{sid}@{host}"}
+
+    s.host, s.state, s.first_prompt_error = "a-node", "idle", agent_common.FIRST_PROMPT_NO_HOOK
+    agent._link_muxes["a-node"] = MagicMock()
+    monkeypatch.setattr(agent, "_read_launch", lambda _address: {"name": s.name, "adapter": "hookstub", **NODE_LAUNCH})
+    monkeypatch.setattr(agent, "_route_act", route)
+    monkeypatch.setattr(agent, "_builtin_hold", lambda *_a: None)  # its team runs
+    monkeypatch.setattr(agent, "_seat_due", lambda *_a: {"at": datetime.now(UTC).isoformat(), "by": "asks"})
+    filled = AsyncMock()
+    monkeypatch.setattr(agent, "_fill", filled)
+    before = list(s.restarts)
+
+    def creates() -> int:
+        return sum(1 for p in sent if p["method"] == "create")
+
+    try:
+        assert await agent._lost_brief(s, datetime.now(UTC))
+        assert [p["method"] for p in sent] == ["close", "create"]
+        assert s.closed_for["why"] == "lost-brief" and s.closed_for["pending"], "the replay is pending"
+        await agent._seat_pass(s, datetime.now(UTC), [s])
+        filled.assert_not_awaited()  # a question waits, but the replay is rule 1's (§6 rule 3, *not filled here*)
+        assert await agent._lost_brief(s, datetime.now(UTC)), "the pending replay is taken again"
+        assert creates() == (1 if marked else 2), "a marked set sends nothing; a wait is asked again"
+        if marked:
+            agent._host_rec["builtins"] = {}  # the set's mark lifts (its list or flow changed)
+        refused[0] = None
+        assert await agent._lost_brief(s, datetime.now(UTC))
+        assert creates() == (2 if marked else 3), "sent once the node answers or the mark is gone"
+        assert s.restarts == before, "no refusal counted"
+        await agent._seat_pass(s, datetime.now(UTC), [s])
+        filled.assert_not_awaited()
+    finally:
+        del agent._link_muxes["a-node"]
 
 
 async def test_a_replay_on_a_node_of_a_record_no_built_in_seats_counts_the_refusal(
