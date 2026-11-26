@@ -283,3 +283,70 @@ async def test_a_create_replaces_an_unreadable_last_login(agent, tmp_path, launc
     async with LocalClient() as person:
         await person.call("create", **_params(tmp_path, "mine", login="grind"))
         assert await person.call("last_login") == {"hookstub": "hookstub:grind"}
+
+
+def _rows(monkeypatch, **rows) -> None:
+    """This host's login rows as the pick reads them, standing in for its `tools` read and its usage gate."""
+    from sessionorc import teamstore
+
+    full = {
+        k.replace("__", ":"): {"state": "signed_in", "account": f"a-{k}", "models": ["opus"], **v}
+        for k, v in rows.items()
+    }
+    monkeypatch.setattr(teamstore, "login_rows", lambda *a, **kw: full)
+
+
+TWO_TOOLS = """logins:
+  hookstub:grind: {folder: /c/grind, account: acct-1}
+  hookstub:spare: {folder: /c/spare, account: acct-2}
+  claude-code:other: {folder: /c/other}
+accounts: {}
+forgotten: {}
+"""
+
+
+async def test_a_create_with_a_list_and_no_login_picks_on_its_own_host(agent, tmp_path, launched, monkeypatch):
+    """§4.9e *A team on a node*: the home sends the list as names and the model, and this host's pick takes the first
+    usable login of it that offers the model; the launch runs that login's tool, whatever adapter the create named."""
+    (paths.home() / "logins.yml").write_text(TWO_TOOLS)
+    order = ["claude-code:other", "hookstub:grind", "hookstub:spare"]
+    _rows(
+        monkeypatch, claude_code__other={"models": ["sonnet"]}, hookstub__grind={"at_reserve": True}, hookstub__spare={}
+    )
+    async with LocalClient() as person:
+        made = await person.call(
+            "create", **_params(tmp_path, "build-td-2", adapter="claude-code", seat_model="opus", login_list=order)
+        )
+    s = agent.sessions[made["id"]]
+    assert (s.login, s.account, s.seat_model, s.login_list, s.adapter) == (
+        "hookstub:spare",
+        "acct-2",
+        "opus",
+        order,
+        "hookstub",
+    ), "past the one not offering opus and the one at its reserve"
+    assert launched == [{"profile": "spare", "model": "opus"}]
+
+
+@pytest.mark.parametrize(
+    ("rows", "words"),
+    [
+        ({"hookstub__grind": {"state": "limited"}, "hookstub__spare": {"at_reserve": True}}, "no login usable on "),
+        ({"hookstub__grind": {"models": ["sonnet"]}, "hookstub__spare": {"models": []}}, "no login offers opus on "),
+    ],
+    ids=["waits", "none-offers"],
+)
+async def test_a_create_whose_list_has_no_login_for_it_makes_nothing(
+    agent, tmp_path, launched, monkeypatch, rows, words
+):
+    """The two refusals the home reads by their words (§4.9e *A team on a node*): a wait for the usage gate, and a
+    model no login of the list offers, which the home marks *cannot run*. Nothing is launched and no record made."""
+    (paths.home() / "logins.yml").write_text(TWO_TOOLS)
+    _rows(monkeypatch, **rows)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match=words):
+            await person.call(
+                "create",
+                **_params(tmp_path, "w", seat_model="opus", login_list=["hookstub:grind", "hookstub:spare"]),
+            )
+    assert not launched and not agent.sessions

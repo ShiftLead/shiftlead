@@ -377,6 +377,11 @@ def reasons(order: Iterable[str], rows: Mapping[str, Mapping[str, Any]]) -> dict
     return out
 
 
+# the two refusals of a create that picks on its own host (§4.9e *A team on a node*): the home reads which by the words
+NO_LOGIN_USABLE = "no login usable"
+NO_LOGIN_OFFERS = "no login offers"
+
+
 def pick(
     order: Iterable[str], model: str, rows: Mapping[str, Mapping[str, Any]], *, unasked: bool = False
 ) -> dict[str, Any]:

@@ -1796,8 +1796,11 @@ class HostAgent(
         `logins.yml`, by its key or its bare name, so the adapter is its tool and the record's `profile` the name the
         login is read under (*A record's profile*); the record holds its key as `login` and its account as `account`.
         `seat_model`, the model family the flow or the built-in set named, is handed to the adapter's launch as its
-        `model` and kept on the record with `login_list`, the list the pick read. Both are refused without a login, a
-        login on a host with no `logins.yml`, and a `profile` or `adapter` that is not the login's.
+        `model` and kept on the record with `login_list`, the list the pick read. A `login` on a host with no
+        `logins.yml`, and a `profile` or `adapter` that is not the login's, are refused. Given `seat_model` and
+        `login_list` with no login (the home's launch on a node, §4.9e *A team on a node*), this host picks: the first
+        usable login of the list that offers the model, whose tool is the launch's; refused before anything is made as
+        *no login usable* or as *no login offers <model>* (`_pick_here`).
 
         `stage` (design §4.3, §4.9c *What a run records, for comparing flows*, TD-2158): the launch is a stage's
         session, whose create reads its tool's version as a seat's does, for its rows' `run.tool_version`; the
@@ -1878,6 +1881,11 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
+        if not login and seat_model and login_list and not held and isinstance(login_list, list):
+            # a list and a model with no login: this host picks on its own logins, as the home's pick does there,
+            # and the launch runs the picked login's tool (§4.9e *A team on a node*, TD-2068)
+            login = await self._pick_here([str(x) for x in login_list], str(seat_model), str(team or ""))
+            adapter = logins.split(login)[0]
         on_login = await asyncio.to_thread(_on_login, login, adapter, profile, seat_model, login_list, held=bool(held))
         if on_login is not None:
             profile, account = on_login["profile"], on_login["account"]

@@ -1187,6 +1187,24 @@ class SettingsMixin:
             out[key] = {**entry, "windows": rows}
         return out
 
+    async def _pick_here(self, order: list[str], model: str, team: str = "") -> str:
+        """The login a create given a list and a model but no login runs on (§4.9e *A team on a node*, TD-2068): the
+        first usable login of `order` on this host that offers `model`, by the same pick the home makes, `team`'s
+        reserve added where this host's settings hold one. Refused, before anything is made, as *no login usable*
+        (only unusable logins offer it: the caller waits) or as *no login offers <model>* (the caller cannot run it);
+        the caller reads which from the words."""
+        doc = settings_mod.load()
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        extra = settings_mod.team_extra(doc, team) if team else 0
+        rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), extra, now)
+        got = teamstore.pick(order, model, rows)
+        if got["state"] == "usable" and got.get("login"):
+            return str(got["login"])
+        if got["state"] == "waits":
+            raise RpcError(f"{teamstore.NO_LOGIN_USABLE} on {self.host} for {model}: {got['why']} (design §4.9e)")
+        raise RpcError(f"{teamstore.NO_LOGIN_OFFERS} {model} on {self.host} (design §4.9e)")
+
     async def rpc_team_show(self, team: str = "", entries: bool = True, caller: Any = None) -> dict[str, Any]:
         """`ao team show <team>` (design §4.9d *Controls and verbs*, TD-2060): what the team page shows, read only. The
         logins are this host's `tools` read with the team's reserve added; the body is `shiftlead.team_show`.
