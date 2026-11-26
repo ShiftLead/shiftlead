@@ -80,15 +80,24 @@ class LoginsMixin:
 
     def _login_listed(self, lk: str) -> list[str]:
         """The home's lists that name a login, in words. A settings file that is there and cannot be read refuses: what
-        it lists is unknown, and a forgotten login would leave a team's list naming nothing."""
+        it lists is unknown, and a forgotten login would leave a team's list naming nothing. The director's list is
+        its record's `login_list` (TD-2329), which the home writes from `org.yml`'s `director.logins`: the record of a
+        seat on `prompt` with no `builtin` (`agent_tick._director`) that no resume superseded, live or not."""
         if self.mode != "home":
             return []
         doc = settings_mod.read()
-        if doc is None:
-            if settings_mod.settings_file().exists():
-                raise logins.LoginError(f"{lk} cannot be forgotten: settings.yml cannot be read to see what lists it")
-            return []
-        return builtinstore.login_holders(doc, lk)
+        if doc is None and settings_mod.settings_file().exists():
+            raise logins.LoginError(f"{lk} cannot be forgotten: settings.yml cannot be read to see what lists it")
+        out = builtinstore.login_holders(doc, lk) if doc is not None else []
+        if any(
+            (s.seat or {}).get("trigger") == "prompt"
+            and not s.builtin
+            and not s.superseded_by
+            and lk in (s.login_list or [])
+            for s in list(self.sessions.values())  # a copy: forget reads it from the write's thread
+        ):
+            out.append("the director")
+        return out
 
     async def rpc_login_label(
         self, login: str = "", label: str | None = None, version: str | None = None, caller: Any = None
