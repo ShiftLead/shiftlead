@@ -309,7 +309,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      it is closed as before, and the PR stands among the repo's open ones — a filing PR among them an order a
      day after it opened (§4.4 *A filing PR nobody holds is a work order*, TD-1804). **The fill ceiling**:
      `FILL_CEILING` — 25 fills an hour (Paul, 2026-11-25: six stopped the tech lead on ordinary work and no runaway was ever seen) over all seats sharing a controller (the graph, not the
-     team badge), then `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 6 in
+     team badge), then `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 25 in
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
      `RESTART_CEILING`. **The ceiling is a rate, not a stop** (TD-1422): the tripping seat's
@@ -329,8 +329,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      older one is no lapse straight before, and is ignored) writes the mark with `held: true`, which never
      lapses — so a trip within two hours of a lapse is held unless it counts a fill made before the
      lapse (only in its first hour can one): fills at the ceiling straight after a lapse are a loop or
-     a load the rate cannot serve, and either is a person's. The words say which: a plain mark reads *fills exhausted · 6 in 1 h · fills
-     again after the hour*, a held one *fills exhausted · 6 in 1 h · tripped twice running — yours*. A
+     a load the rate cannot serve, and either is a person's. The words say which: a plain mark reads *fills exhausted · 25 in 1 h · fills
+     again after the hour*, a held one *fills exhausted · 25 in 1 h · tripped twice running — yours*. A
      lost brief's ceiling (`why: lost-brief`) never lapses. **A person brings a seat back** with
      Restart (§6 rule 2 *A person's restart*, `ao restart`): on a seat whose `restart_ceiling` says
      `why: fill`, plain or held, the press clears the mark and `fill_lapsed`, writes the seat's
