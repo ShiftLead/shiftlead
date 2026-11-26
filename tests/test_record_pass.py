@@ -300,3 +300,82 @@ def test_a_record_head_is_a_sweep_order_in_words_of_its_own():
     sweep = {**pr, "branch": "sweep/2026-11-25", "sweep": "sweep"}
     assert workorders.pr_order(sweep)["context"].endswith(workorders.SWEEP_CONTEXT)
     assert workorders.pr_note(sweep).startswith("sweep PR #9")
+
+
+def _add_pr(root: Path, **pr) -> None:
+    """A pull request the pass did not open, written into the fake forge's state."""
+    f = root.parent / f"{root.name}-origin.git" / "fake-gh.json"
+    state = _forge(root)
+    state["prs"][str(len(state["prs"]) + 1)] = {"base": "main", "title": "t", **pr}
+    f.write_text(json.dumps(state))
+
+
+def _pending(root: Path, put) -> None:
+    put({"docs/ledger/TD-5.md": design(5, LIFT), "docs/reviews/TD-005.md": record(5, "**Decided:** pending")})
+
+
+def test_a_dated_decided_is_left_and_one_with_no_go_by_is_owed_that_line_alone(repo):
+    """TD-2323 rules 1 and 2: *a line starting with a date is left* (§4.4), and a dated `Decided:` with no `Go by:`
+    is owed the Go all the same — the record #4848 met in `docs/reviews/TD-1829.md`."""
+    dated = record(5, "**Decided:** 2026-11-14", "**Go by:** pending")
+    assert gatesweep.write_record(dated, "paul", "2026-11-24") == dated.replace("**Go by:** pending", "**Go by:** paul")
+    root, put = repo
+    rec = record(5, "**Decided:** 2026-11-14", "**Source:** s")
+    put({"docs/ledger/TD-5.md": design(5, LIFT), "docs/reviews/TD-005.md": rec})
+    assert "TD-5" in _owed(root), "no Go by line: owed though Decided is dated"
+    assert gatesweep.record_pass(root, "origin/main", UTC) == [
+        "record: opened https://github.com/o/r/pull/1 — 1 records"
+    ]
+    assert _at(root, "record/2026-11-26", "docs/reviews/TD-005.md") == rec.replace(
+        "**Source:** s", "**Source:** s\n**Go by:** paul"
+    ), "the Go by line is added; the dated Decided is left"
+
+
+def test_the_days_branch_on_the_remote_with_no_pr_holds_the_write(repo):
+    """TD-2323 rule 3, its first half: `record/<day>` pushed with no pull request."""
+    root, put = repo
+    _pending(root, put)
+    _git("-C", str(root), "push", "-q", "origin", "HEAD:refs/heads/record/2026-11-26")
+    assert gatesweep.record_pass(root, "origin/main", UTC) == [
+        "record: record/2026-11-26 was written today already — 1 wait for tomorrow"
+    ]
+    assert _forge(root)["prs"] == {}
+
+
+def test_a_merged_pr_of_the_day_whose_branch_was_deleted_holds_the_write(repo):
+    """TD-2323 rule 3, its second half: the day's pull request merged and its branch gone from the remote."""
+    root, put = repo
+    _pending(root, put)
+    gatesweep.record_pass(root, "origin/main", UTC)
+    _set_pr(root, 1, state="merged")
+    _git("-C", str(root), "push", "-q", "origin", "--delete", "record/2026-11-26")
+    assert gatesweep.record_pass(root, "origin/main", UTC) == [
+        "record: record/2026-11-26 was written today already — 1 wait for tomorrow"
+    ]
+    assert len(_forge(root)["prs"]) == 1
+
+
+def test_a_merged_record_pr_and_a_closed_pr_on_another_head_hold_nothing(repo):
+    """TD-2323 rules 4 and 5: only a `record/` PR closed unmerged is the person's no for the window."""
+    root, put = repo
+    _pending(root, put)
+    gatesweep.record_pass(root, "origin/main", date(2026, 11, 25))
+    _set_pr(root, 1, state="merged", closed_at="2026-11-25T12:00:00Z", merged_at="2026-11-25T12:00:00Z")
+    _add_pr(root, head="sweep/2026-11-25", state="closed", closed_at="2026-11-25T12:00:00Z", body="- record: TD-5 — x")
+    assert gatesweep.record_pass(root, "origin/main", UTC) == [
+        "record: opened https://github.com/o/r/pull/3 — 1 records"
+    ]
+
+
+@pytest.mark.parametrize(
+    "closed_at",
+    [f"{(UTC - timedelta(days=gatesweep.lb.SWEEP_REASK_DAYS)).isoformat()}T12:00:00Z", None],
+    ids=["closed-the-windows-length-ago", "no-close-date"],
+)
+def test_a_record_pr_closed_on_the_windows_last_day_or_with_no_date_still_holds(repo, closed_at):
+    """TD-2323 rules 6 and 7: the window's last day is inside it, and a PR whose date the forge did not give holds."""
+    root, put = repo
+    _pending(root, put)
+    _add_pr(root, head="record/2026-10-27", state="closed", closed_at=closed_at, body="- record: TD-5 — x")
+    assert gatesweep.record_pass(root, "origin/main", UTC) == ["record TD-5: held — record PR #1 was closed unmerged"]
+    assert len(_forge(root)["prs"]) == 1
