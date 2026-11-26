@@ -210,6 +210,32 @@ def test_the_transcript_reads_as_neutral_entries(name, tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("name", AGENTS)
+def test_the_handoff_is_the_transcripts_turns_as_text_newest_last(name, tmp_path, monkeypatch):
+    """The `handoff` read (design §4.9e *The handoff is one adapter method*, TD-2069) on a captured transcript:
+    one string a turn, oldest first and newest last, each turn of a prompt opening with that prompt, as
+    many turns as the file's prompts; None for a file that is not there."""
+    harness = HARNESSES[name]
+    ad = adapters.get(name)
+    profile = harness.profile(tmp_path, monkeypatch)
+    for i, t in enumerate(_need(name, "handoff", "transcripts")):
+        sid = f"s{i}"
+        cwd = harness.place_transcript(tmp_path, fixture(name, t["file"]), sid)
+        whole = ad.read_transcript(sid, cwd, profile, turns=adapters.HANDOFF_TURNS)
+        got = ad.handoff(Path(whole.path))
+        assert isinstance(got, list) and got and all(isinstance(x, str) and x for x in got), f"{t['file']}: {got!r}"
+        prompts = [e.text for e in whole.entries if e.kind == "prompt"]
+        assert len(prompts) == t["turns"]
+        opened = [x for x in got if x.startswith("Prompt:")]
+        assert len(opened) == len(prompts), f"{t['file']}: {len(opened)} turns open with a prompt"
+        for turn, prompt in zip(opened, prompts, strict=True):
+            assert turn.startswith(f"Prompt:\n{prompt}".rstrip()), f"{t['file']}: {turn[:80]!r}"
+        assert got.index(opened[-1]) == len(got) - 1
+        text = adapters.handoff_text(got)
+        assert text.startswith(adapters.HANDOFF_HEADING) and text.endswith(got[-1])
+    assert ad.handoff(tmp_path / "no-such-transcript.jsonl") is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
 def test_context_is_the_last_turns_prompt_within_its_window(name, tmp_path, monkeypatch):
     harness = HARNESSES[name]
     ad = adapters.get(name)

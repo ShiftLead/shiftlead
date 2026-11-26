@@ -28,6 +28,7 @@ import yaml
 
 from sessionorc import cadence, identity, paths
 from sessionorc.adapters import (
+    HANDOFF_TURNS,
     Conversation,
     ExternalSession,
     LaunchSpec,
@@ -35,6 +36,7 @@ from sessionorc.adapters import (
     Prompt,
     Transcript,
     account_match,
+    handoff_turns,
     model_offer,
     oldest_first,
     plain_name,
@@ -635,7 +637,7 @@ class ClaudeCodeAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
             *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            *("models", "model_family", "new_home", "make_home"),
+            *("models", "model_family", "new_home", "make_home", "handoff"),
         }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
@@ -911,6 +913,16 @@ class ClaudeCodeAdapter:
             )
         except OSError:
             return None
+
+    def handoff(self, transcript: Path) -> list[str] | None:
+        """The session's turns as plain text, newest last, read from its transcript file (design §4.9e *The
+        handoff is one adapter method*, TD-2069): its last `HANDOFF_TURNS` turns as neutral entries, each turn
+        written by `handoff_turns`. None when the file cannot be read."""
+        try:
+            got = transcript_mod.read(Path(transcript), turns=HANDOFF_TURNS)
+        except (OSError, ValueError, AttributeError, KeyError, TypeError):  # a malformed line is no handoff
+            return None
+        return handoff_turns(got.entries)
 
     def conversations(self, cwd: Path, profile: str = "") -> list[Conversation] | None:
         """Every conversation the profile holds for `cwd` (design §4.3 `conversations`, TD-1491): each
