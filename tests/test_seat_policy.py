@@ -175,7 +175,7 @@ async def test_a_fellows_lost_brief_ceiling_does_not_trip_the_fill_ceiling(agent
 
 
 def _mins(n: int) -> list[timedelta]:
-    return [timedelta(minutes=5 * (i + 1)) for i in range(n)]
+    return [timedelta(minutes=2 * (i + 1)) for i in range(n)]  # 25 of them fit the hour
 
 
 async def test_a_plain_fill_mark_lapses_after_the_hour_and_the_seat_is_filled_when_due(agent, tmp_path):
@@ -239,7 +239,7 @@ async def test_a_trip_whose_fills_all_postdate_a_lapse_is_held_and_one_counting_
         "after": (timedelta(minutes=50), _mins(FILL_CEILING), True),
         "equal": (timedelta(minutes=50), [*_mins(FILL_CEILING - 1), timedelta(minutes=50)], True),
         "bound": (2 * FILL_WINDOW, _mins(FILL_CEILING), True),
-        "older": (timedelta(minutes=20), _mins(FILL_CEILING), False),  # fills at 25..30 min predate it
+        "older": (timedelta(minutes=20), _mins(FILL_CEILING), False),  # fills at 22..50 min predate it
         "stale": (2 * FILL_WINDOW + timedelta(minutes=1), _mins(FILL_CEILING), False),
     }
     async with LocalClient() as person:
@@ -265,7 +265,7 @@ async def test_a_trip_whose_fills_all_postdate_a_lapse_is_held_and_one_counting_
 async def test_a_persons_restart_clears_a_seats_fill_ceiling_and_its_next_fill_goes_past_the_count(agent, tmp_path):
     """§6 rule 2 *A person's restart* on a seat at its fill ceiling (TD-1429): the mark and `fill_lapsed`
     cleared, `restarts` the one `{why: person}`, no record created; the next tick fills the due seat though
-    its fellows hold six fills in the hour, and the fill after that is counted. Any other seat is refused
+    its fellows hold `FILL_CEILING` fills in the hour, and the fill after that is counted. Any other seat is refused
     as before; a suspended or superseded seat at the ceiling gets that refusal first."""
     await park_ticks(agent)
     now = datetime.now(UTC)
@@ -699,7 +699,7 @@ def test_filled_for_names_a_tag_causes_ids():
 
 @pytest.mark.parametrize(
     ("builtin", "fills", "filled"),
-    [("techlead", 24, True), ("techlead", 25, False), ("sweeper", 5, True), ("sweeper", 6, False)],
+    [("techlead", 24, True), ("techlead", 25, False), ("sweeper", 24, True), ("sweeper", 25, False)],
     ids=["techlead-under", "techlead-at", "sweeper-under", "sweeper-at"],
 )
 async def test_a_built_in_seats_fills_are_counted_alone_a_tech_leads_to_25(agent, tmp_path, builtin, fills, filled):

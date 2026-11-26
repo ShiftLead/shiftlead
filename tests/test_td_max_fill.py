@@ -207,7 +207,7 @@ async def test_each_guard_holds_a_fill_back(agent, tmp_path, monkeypatch, guard)
             agent._finished_first[TEAM] = datetime.now(UTC)
         else:
             now = datetime.now(UTC).isoformat()
-            made[3].restarts = [{"at": now, "why": "fill"}] * 6
+            made[3].restarts = [{"at": now, "why": "fill"}] * 25
         _entries(agent, repo, "TD-3")
         await _pass(agent)
         assert not _live(agent, "grind-3") and not _live(agent, "grind-4")
@@ -512,7 +512,7 @@ async def test_a_line_with_no_extra_left_forgets_its_memory(agent, tmp_path):
     async with LocalClient() as person:
         repo, made = await _line(agent, person, tmp_path)
         await _pass(agent)
-        made[3].restarts = [{"at": datetime.now(UTC).isoformat(), "why": "fill"}] * 6  # the ceiling holds it back
+        made[3].restarts = [{"at": datetime.now(UTC).isoformat(), "why": "fill"}] * 25  # the ceiling holds it back
         _entries(agent, repo, "TD-3")
         await _pass(agent)
         key = (TEAM, LINE)

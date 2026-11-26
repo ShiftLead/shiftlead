@@ -324,7 +324,7 @@ async def test_the_fill_ceilings_groups(agent, tmp_path):
     team the techlead and the auditors share one and the manager seat is alone."""
     await park_ticks(agent)
     now = datetime.now(UTC)
-    spent = [{"at": _iso(now - timedelta(minutes=5 * (i + 1))), "why": "fill"} for i in range(FILL_CEILING)]
+    spent = [{"at": _iso(now - timedelta(minutes=2 * (i + 1))), "why": "fill"} for i in range(FILL_CEILING)]
     async with LocalClient() as person:
         mgr = await _manager(person, tmp_path)
         tl = await _member(person, tmp_path, "tl", mgr, seat={"trigger": "every", "after": "6h"})
