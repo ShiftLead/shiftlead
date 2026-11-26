@@ -59,6 +59,21 @@ def test_a_filled_in_form_picks_the_login_asked_for_else_the_records_profile_els
     assert uiapp.login_prefill(opts, "", "", "gemini") == "grok:main", "no login of its tool: the last used"
 
 
+def test_a_resumes_fallback_is_its_tools_own_last_login_not_its_first():
+    """TD-2291: a tool that is not the one last used falls back to `last_login`'s line for that tool, not to the
+    first of its logins the read lists; that tool's first only where its line names no choice (§4.9e *A session the
+    person starts*: "else the newest of its tool's")."""
+    last = {"grok": "grok:main", "claude-code": "claude-code:pinned"}
+    opts = uiapp.login_options(READ, last)
+    assert [o["key"] for o in opts].index("claude-code:main") < [o["key"] for o in opts].index("claude-code:pinned")
+    assert uiapp.login_prefill(opts, "", "gone", "claude-code", last) == "claude-code:pinned"
+    assert (
+        uiapp.login_prefill(opts, "", "gone", "claude-code", {"claude-code": "claude-code:gone"}) == "claude-code:main"
+    )
+    assert uiapp.login_prefill(opts, "", "gone", "claude-code", {"claude-code": "grok:spare"}) == "claude-code:main"
+    assert uiapp.login_prefill(opts, "", "gone", "claude-code") == "claude-code:main", "none stored: its tool's first"
+
+
 def test_the_forms_launch_on_a_login_is_ao_news():
     assert uiapp.form_login("grok:main", "", "", True) == {"login": "grok:main", "adapter": "grok"}
     assert uiapp.form_login(" claude-code:main ", "opus", "", True) == {
