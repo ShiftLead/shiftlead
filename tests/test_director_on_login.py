@@ -17,6 +17,7 @@ from sessionorc import paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.agent_common import RpcError, _on_login
 from sessionorc.client import LocalClient
+from sessionorc.models import Session
 from shiftlead import org as orgmod
 from shiftlead import stage_seats, teamrun, teams
 
@@ -230,3 +231,43 @@ def test_a_director_record_on_the_keys_model_and_list_is_left_and_a_live_one_wai
     live = _Home(_stale("working", seat_model="sonnet", login_list=ORDER))
     assert stage_seats.write_director(live, org) == [] and not any(m == "create" for m, _ in live.calls)
     assert teamrun.is_director(live.records[0]), "kept until its session ends"
+
+
+def _director_session(**kw):
+    base = {"id": "ao-director", "name": "director", "kind": "interactive", "adapter": "hookstub", "dir": "/d"}
+    return Session(**{**base, "seat": {"trigger": "prompt"}, **kw})
+
+
+@pytest.mark.unit
+def test_the_pass_graph_on_another_model_writes_the_director_again_and_on_the_keys_asks_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
+    org = _org(tmp_path, monkeypatch, {"model": "opus", "logins": ORDER})
+    old = _director_session(state="closed", seat_model="sonnet", login_list=ORDER)
+    home = _Home(_stale(seat_model="sonnet", login_list=ORDER))
+    assert stage_seats.write_director(home, org, {old.id: old}) == [
+        "director: written again on the org's model and logins"
+    ]
+    assert home.calls[-1][0] == "create"
+    current = _director_session(state="closed", seat_model="opus", login_list=ORDER)
+    untouched = _Home(_stale(seat_model="opus", login_list=ORDER))
+    assert stage_seats.write_director(untouched, org, {current.id: current}) == []
+    assert untouched.calls == [], "a graph that reads as the key wants asks nothing of the home"
+
+
+@pytest.mark.unit
+def test_an_unrelated_ended_record_beside_a_live_director_on_an_old_model_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: True)
+    org = _org(tmp_path, monkeypatch, {"model": "opus", "logins": ORDER})
+    other = {"id": "ao-w", "name": "w", "state": "exited", "seat": None}
+    home = _Home(other, _stale("working", seat_model="sonnet", login_list=ORDER))
+    assert stage_seats.write_director(home, org) == []
+    assert not any(m == "create" for m, _ in home.calls)
+
+
+@pytest.mark.unit
+def test_before_the_cut_over_an_ended_director_with_no_model_or_list_is_not_written_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(teamstore, "first_shape_off", lambda: False)
+    org = _org(tmp_path, monkeypatch, {"model": "opus", "logins": ORDER})
+    home = _Home(_stale(profile="grind"))
+    assert stage_seats.write_director(home, org) == []
+    assert not any(m == "create" for m, _ in home.calls)
