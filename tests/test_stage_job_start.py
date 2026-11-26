@@ -317,7 +317,8 @@ def test_a_job_on_a_node_the_home_marked_or_with_no_list_starts_nothing(world, m
     marked["seats"][0]["node_cannot_run"] = {"n": "c cannot run the board answers: no login in its list offers sonnet"}
     elsewhere = _set_shown()
     elsewhere["seats"][0]["node_cannot_run"] = {"m": "on another node"}
-    for shown, starts in ((marked, False), ({**_set_shown(), "order": []}, False), (elsewhere, True)):
+    unnamed = _set_shown(seat="sweeper")  # TD-2277: the set's reading names no row for the job's seat
+    for shown, starts in ((marked, False), ({**_set_shown(), "order": []}, False), (unnamed, False), (elsewhere, True)):
         made_, calls = _start_job(world, monkeypatch, shown, _job_on_node(world))
         assert (made_ == {"id": "new"}) is starts and ("create" in [m for m, _ in calls]) is starts
 

@@ -657,6 +657,66 @@ def test_builtins_node_cannot_puts_the_record_back_on_a_failed_save_and_waits_fo
     asyncio.run(go())
 
 
+def test_both_node_marks_are_the_homes_alone():
+    """TD-2277: a node's forward of either call is refused, so only the home's own stage pass writes a mark."""
+    from sessionorc import modes
+
+    assert {"team_node_cannot", "builtins_node_cannot"} <= modes.HOME_ONLY
+
+
+def test_a_node_mark_refuses_a_list_with_an_entry_that_is_no_login_key(agent, monkeypatch):
+    """TD-2277: the list a mark keeps is matched against the team's or the set's list of login keys, so an entry that
+    is not a string is refused rather than stored as a mark no reading can match."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+
+    async def go():
+        with pytest.raises(RpcError, match="as login keys"):
+            await a.rpc_team_node_cannot(team="a", model="opus", logins=[1], flow="build")
+        with pytest.raises(RpcError, match="as login keys"):
+            await a.rpc_builtins_node_cannot(set="default", seat="sweeper", host="n", model="haiku", logins=[1])
+        assert not (a._host_rec.get("teams") or {}).get("a", {}).get("node_cannot_run")
+        assert not (a._host_rec.get("builtins") or {}).get("default")
+
+    asyncio.run(go())
+
+
+def test_team_node_cannot_waits_for_the_cut_over(agent, monkeypatch):
+    """TD-2277, §4.9d: before the cut-over no team runs on the pick, so its node's word marks nothing."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    monkeypatch.setattr("sessionorc.agent_settings.teamstore.cut_over", lambda _doc: None)
+    with pytest.raises(RpcError, match="no switched team"):
+        asyncio.run(a.rpc_team_node_cannot(team="a", model="opus", logins=["claude-code:x"], flow="build"))
+    assert not (a._host_rec.get("teams") or {}).get("a", {}).get("node_cannot_run")
+
+
+def test_a_failed_save_puts_back_the_teams_record_and_a_sets_earlier_marks(agent, monkeypatch):
+    """TD-2277: the record in memory never says what the file does not — the team keeps its started mark alone, and a
+    set keeps the mark it held for another node."""
+    a = _agent_on(monkeypatch, SimpleNamespace())
+    a.mode, a.host, a.home = "home", "home", "home"
+    ok = {"set": "default", "seat": "sweeper", "host": "m", "model": "haiku", "logins": ["claude-code:x"]}
+
+    def refuse(rec):
+        raise OSError("disk full")
+
+    async def go():
+        await a.rpc_team_mark(team="a", started=True)
+        await a.rpc_builtins_node_cannot(**ok)
+        before_team = dict(a._host_rec["teams"]["a"])
+        before_set = copy.deepcopy(a._host_rec["builtins"]["default"])
+        a.host_store = SimpleNamespace(save=refuse)
+        with pytest.raises(OSError):
+            await a.rpc_team_node_cannot(team="a", model="opus", logins=["claude-code:x"], flow="build")
+        assert a._host_rec["teams"]["a"] == before_team and "node_cannot_run" not in before_team
+        with pytest.raises(OSError):
+            await a.rpc_builtins_node_cannot(**{**ok, "host": "n"})
+        assert a._host_rec["builtins"]["default"] == before_set, "m's mark stays, n's is not kept"
+
+    asyncio.run(go())
+
+
 def test_builtins_show_hands_the_sets_node_marks_to_its_reading(agent, monkeypatch):
     seen = {}
     body = SimpleNamespace(builtins_view=lambda **kw: seen.update(kw) or {"set": kw["name"]})

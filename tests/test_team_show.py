@@ -342,6 +342,20 @@ def test_a_state_branch_that_cannot_be_read_draws_no_next_clock(tmp_path, monkey
     assert [(a["name"], a["next"]) for a in got["audits"]] == [("Docs", None)]
 
 
+def test_the_call_hands_the_homes_node_mark_to_the_reading(tmp_path, monkeypatch):
+    """TD-2277: `call` is the one road by which the host record's mark reaches `team_show`, so a node team's standing
+    mark makes the reading say it cannot run (§4.9d *A team on a node*)."""
+    root = tmp_path / "shiftlead"
+    root.mkdir()
+    monkeypatch.setattr(team_show, "StageStore", _AuditStore)
+    monkeypatch.setattr(team_show, "audit_rounds", lambda *a: {})
+    mark = {"model": "opus", "logins": ["claude:a", "claude:b"], "flow": "build", "at": _TWO_HOURS_AGO}
+    got = team_show.call(
+        team="t", doc=_doc(host="node1"), rows={}, head=HEAD, here="home", roots=[root], node_mark=mark
+    )
+    assert got["cannot_run"] == "t cannot run build: no login in its list offers opus on node1"
+
+
 def test_a_team_on_a_node_cannot_run_while_the_homes_mark_names_its_list_and_flow():
     """§4.9d *A team on a node*, TD-2068: the mark holds until the team's list or its flow changes."""
     mark = {"model": "opus", "logins": ["claude:a", "claude:b"], "flow": "build", "at": _TWO_HOURS_AGO}
