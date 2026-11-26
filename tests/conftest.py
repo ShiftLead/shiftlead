@@ -580,7 +580,8 @@ def _never_this_machines_home(tmp_path_factory):
     failed. Session scope on purpose: it is set up before the module- and function-scoped agent
     fixtures, which then override it with their own temp home for the tests that need one."""
     mp = pytest.MonkeyPatch()
-    mp.setenv("SHIFTLEAD_HOME", str(tmp_path_factory.mktemp("unit-home")))
+    unit_home = tmp_path_factory.mktemp("unit-home")
+    mp.setenv("SHIFTLEAD_HOME", str(unit_home))
     mp.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("unit-claude")))
     mp.delenv("SHIFTLEAD_SESSION", raising=False)  # a test run inside an ao session is not a caller
     # …nor does it hand its model to the private tmux server, whose shells would inherit it (TD-671):
@@ -593,8 +594,21 @@ def _never_this_machines_home(tmp_path_factory):
     from shiftlead import cli
 
     mp.setattr(cli, "PROC", tmp_path_factory.mktemp("no-proc"))
-    yield
+    yield unit_home
     mp.undo()
+
+
+@pytest.fixture(autouse=True)
+def _no_flow_left_in_the_unit_home(_never_this_machines_home: Path):
+    """No test leaves a flow in the session's shared `unit-home` (TD-2325): an org flow there shadows a repo's of
+    the same name for every later test in the process, so a test that writes one sets a `SHIFTLEAD_HOME` of its
+    own. A leak is removed and fails the test that left it, so the next one names itself."""
+    flows = _never_this_machines_home / "flows"
+    yield
+    left = sorted(p.name for p in flows.iterdir()) if flows.is_dir() else []
+    if left:
+        shutil.rmtree(flows)
+        pytest.fail(f"left flows in the shared unit-home: {', '.join(left)} — give the test its own SHIFTLEAD_HOME")
 
 
 # -- waiting --------------------------------------------------------------------------------------

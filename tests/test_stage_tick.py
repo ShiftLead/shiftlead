@@ -96,7 +96,10 @@ def test_a_repo_flow_runs_only_where_it_is_format_3(root: Path) -> None:
 
 
 @pytest.mark.unit
-def test_the_orgs_flow_shadows_the_repos_and_a_name_never_leaves_the_flows(root: Path) -> None:
+def test_the_orgs_flow_shadows_the_repos_and_a_name_never_leaves_the_flows(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # its org flow stays out of the shared home
     built = (flow3.PACKAGE_DIR / "build" / flow3.FILE).read_text(encoding="utf-8")
     mine, org = root / flow3.REPO_DIR / "mine", paths.home() / "flows" / "mine"
     for d in (mine, org):
