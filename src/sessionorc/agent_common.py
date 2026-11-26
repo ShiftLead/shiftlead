@@ -1269,7 +1269,8 @@ def _counted(restarts: list[Any], now: datetime, fills: bool = True, pushed: boo
     `wanted` restart that carried new work — its `done` holds something no entry in the window
     before its own held. A crash, a fill, a failed replay and a wanted restart with nothing new
     (an early one a person let run, a repeat) count; an entry written before the fields has no
-    `done` and counts. A `person` entry — the one a person's Restart leaves — never counts.
+    `done` and counts. A `person` entry — the one a person's Restart leaves — never counts,
+    nor a `login-move` that launched (§4.9e *A session moves down the list*).
     `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does. A `wanted` entry carrying a
     `pushed` sha (§4.9a *A pushed commit is new work*, TD-1900) carried new work too and is left out; with
     `pushed=True` the count is `RESTART_PUSHED_CEILING`'s: this one's entries and, beside them, those left out
@@ -1281,6 +1282,8 @@ def _counted(restarts: list[Any], now: datetime, fills: bool = True, pushed: boo
             continue
         if r.get("why") == "person":
             continue  # a person's Restart never counts toward the ceiling it lifts (§6 rule 2, TD-250)
+        if r.get("why") == "login-move" and not r.get("error"):
+            continue  # a move down the login list spends nothing (§4.9e *A session moves down the list*, TD-2069)
         if r.get("why") == "wanted" and not r.get("error"):
             try:
                 at = _parse(str(r.get("at")))

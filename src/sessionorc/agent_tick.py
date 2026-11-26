@@ -184,6 +184,8 @@ BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "
 # *How each one runs*): rule 3's fill and rule 1's lost-brief replay, which send the launch record's list; rule 1 makes
 # no crash replay of a seat, whose ending is rule 3's to fill (§6 rule 1)
 NODE_LIST_REPLAYS = ("fill", "lost-brief")
+# a `moving` mark left with no live session this long after it was set is cleared (§4.9e)
+MOVE_STALE = timedelta(minutes=10)
 
 
 def _director(s: Session) -> bool:
@@ -593,6 +595,7 @@ class TickMixin:
         await self._team_stop_marks(snapshot_at)  # after the cut-over the stop time clears the mark (TD-2065)
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)
+        await self._login_moves(snapshot_at)  # before the gate and rule 1: a move first (§4.9e, TD-2069)
         await self._enforce_usage_gate(snapshot_at)
         await self._subagent_flips(snapshot_at)
         await self._retire_anchors()
@@ -1487,6 +1490,7 @@ class TickMixin:
             and not s.suspended
             and not s.restart_ceiling
             and not s.superseded_by
+            and not s.moving
             and not s.sit_out
             and not work_mod.sat_out(s)
             and not self._profile_gated(s.profile, now, s.team)
@@ -4279,6 +4283,113 @@ class TickMixin:
         except OSError:
             log.exception("writing the home's host record failed")
 
+    def _movable(self, s: Session) -> bool:
+        """Whether `s` is one the tick may move down its login list (§4.9e *A session moves down the list*): an
+        unattended, supervised session on this host launched on a login with its `seat_model` and `login_list`,
+        running, and not superseded, suspended, already moving or at its restart ceiling. An interactive session is
+        never moved (invariant 5)."""
+        return bool(
+            s.unattended
+            and s.supervised  # a replay reads its launch record, which only a supervised create writes
+            and s.host == self.host
+            and s.seat_model
+            and s.login
+            and s.login_list
+            and s.state not in ("exited", "closed", "scheduled")
+            and not s.superseded_by
+            and not s.suspended
+            and not s.moving
+            and not s.restart_ceiling
+        )
+
+    async def _login_moves(self, now: datetime) -> None:
+        """A session moves down the list (design §4.9e, TD-2069): for each session `_movable` reads, whether its login
+        is still usable, by the pick's own rows with its team's reserve; where it is not and a later login of the list
+        it was launched with is usable and offers its model (`teamstore.next_login`), `_move_login` moves it. With
+        none it waits where it is. A `moving` mark found with no live session `MOVE_STALE` after it was set is
+        cleared, and the holder is then lost by §4.9c's own rule. The home's own host alone: a node's session's launch
+        record is the home's, so its move is the node's tick's once that reads one."""
+        if self.mode != "home":
+            return
+        stale = [s for s in self.sessions.values() if isinstance(s.moving, dict)]
+        for s in stale:
+            at = s.moving.get("at") if isinstance(s.moving, dict) else None
+            if s.state in ("exited", "closed") and (not at or not _recent(at, now, MOVE_STALE)):
+                log.warning("%s: its move to %s was left marked: the mark is cleared", s.id, s.moving.get("to"))
+                s.moving = None
+                self._save(s)
+        candidates = [s for s in list(self.sessions.values()) if self._movable(s)]
+        if not candidates:
+            return
+        try:
+            doc = settings_mod.load()
+            read, gate = await self.rpc_tools(), await self.rpc_gate()
+            accounts = self._projected(gate["accounts"], doc, now)
+        except Exception as e:  # noqa: BLE001 — no reading moves nothing; the next tick reads again
+            log.warning("the logins could not be read for a move: %s", e)
+            return
+        rows: dict[str, dict[str, Any]] = {}
+        for s in candidates:
+            team = s.team or ""
+            if team not in rows:
+                extra = settings_mod.team_extra(doc, team) if team else 0
+                rows[team] = teamstore.login_rows(read, accounts, extra, now)
+            unasked = _director(s) or s.builtin == "prompts"  # these pass over a login that asks (§4.9d)
+            to = teamstore.next_login(
+                list(s.login_list or ()), str(s.login), str(s.seat_model), rows[team], unasked=unasked
+            )
+            if to:
+                await self._move_login(s, to)
+
+    async def _move_login(self, s: Session, to: str) -> None:
+        """One move (§4.9e *A session moves down the list*): mark the record `moving`, read the handoff from the old
+        session's transcript (`adapters.handoff_of`), end the old session, and replay its launch on `to` under the
+        same record — `to`'s tool and the seat model's word on it, what its stage's session is told followed by the
+        handoff — then clear the mark and add the move to `login_moves`. A close or a launch that fails clears the
+        mark; after a failed launch the session is ended and its holder lost by §4.9c's own rule, and no crash
+        restart applies, since the tick closed it."""
+        frm, at = str(s.login), now_iso()
+        s.moving = {"at": at, "from": frm, "to": to}
+        self._save(s)
+        await self._push_changes()
+        try:
+            ad: object | None = adapters.get(s.adapter)
+        except KeyError:
+            ad = None
+        handoff = await asyncio.to_thread(adapters.handoff_of, ad, s.transcript) if ad is not None else ""
+        log.info("%s: its login %s is no longer usable: moving it to %s", s.id, frm, to)
+        try:
+            await self._close(s.id, closer={"by": "tick", "why": "login-move"}, reap=False, keep_debt=True)
+            self._mark_closed(s, "login-move")
+        except Exception as e:  # noqa: BLE001 — a close that failed moves nothing; the next tick reads it again
+            log.warning("%s: the close before its move to %s failed: %s", s.id, to, e)
+            if s.state == "closed":  # a close that failed after it marked the record: ended, its holder lost
+                self._mark_closed(s, "login-move")
+            s.moving = None
+            self._save(s)
+            await self._push_changes()
+            return
+        await self._replay(
+            s,
+            "login-move",
+            closing=handoff or None,
+            keep_mail=True,
+            scratch=s.scratch,  # a move keeps it, as every replay does (§4.6)
+            adapter=logins.split(to)[0],
+            profile="",
+            login=to,
+        )
+        new = self.sessions.get(s.id)
+        if new is None or new is s:
+            s.moving = None  # the launch failed: the session is ended, and its holder lost (§4.9c)
+            self._save(s)
+            await self._push_changes()
+            return
+        new.moving = None
+        new.login_moves = [*s.login_moves, {"at": at, "from": frm, "to": to}]
+        self._save(new)
+        await self._push_changes()
+
     async def _replay(
         self,
         s: Session,
@@ -4296,7 +4407,7 @@ class TickMixin:
         is made (`_node_list_refused`), which writes no entry and counts toward no ceiling (§4.9d *How each one
         runs*). `mark` adds to the entry (rule 8's `ids`, what a start was for).
         `closing` is a line the prompt ends with, after it is filled again or stored (a manager on
-        call's cause, `filled_for`, TD-410); no other replay adds one.
+        call's cause, `filled_for`, TD-410; a login move's handoff, §4.9e); no other replay adds one.
         `held` writes the record alone, `closed` with no pane (`create` with `held`), for rule 3 to
         fill once something is due, and the entry carries `held: true` (rule 8's start of a seat, TD-660).
         Every caller but a scheduled start (whose `start_of` moves the mail itself) passes `keep_mail`:
@@ -4349,6 +4460,8 @@ class TickMixin:
                 # the launch record keeps the prompt as this create hands it, so a stored prompt carries
                 # the last fill's line: it goes, whatever replays now, and a fill's own is added
                 params["prompt"] = params["prompt"].split(f"\n\n{FILLED_FOR}", 1)[0]
+                # and so does a move's handoff (§4.9e): the next replay hands over its own, or none
+                params["prompt"] = params["prompt"].split(f"\n\n{adapters.HANDOFF_HEADING}\n\n", 1)[0]
                 if closing:
                     params["prompt"] = f"{params['prompt']}\n\n{closing}"
             if s.host == self.host:

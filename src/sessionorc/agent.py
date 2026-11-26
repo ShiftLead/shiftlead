@@ -1208,6 +1208,7 @@ class HostAgent(
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
+        self._clear_moving()  # a move a restart cut off (§4.9e *A session moves down the list*, TD-2069)
         if self.mode == "home":
             await self._migrate_scale()  # td-max's one-time `max: off` (§4.9, TD-1545)
             # a team's flow switch a restart cut off (§4.9d, TD-2062), in the background: its push waits on the forge,
@@ -3106,6 +3107,16 @@ class HostAgent(
         if isinstance(reap, str) and not mail.is_person(caller):
             raise RpcError("a close's reap why is the home's word: a session closes with reap true or false")
         return await self._close(id, caller, closer, reap, restart)
+
+    def _clear_moving(self) -> None:
+        """A host agent that starts clears every `moving` mark its records carry (§4.9e *A mark is never left
+        standing*): a move a stop cut off is over, and where its old session ended with no new one its holder is lost
+        by §4.9c's own rule; one whose old session still runs is read again by the next tick's move."""
+        for s in self.sessions.values():
+            if s.moving:
+                log.warning("%s: a move to %s was cut off by a restart: its mark is cleared", s.id, s.moving.get("to"))
+                s.moving = None
+                self._save(s)
 
     async def _close(
         self,
