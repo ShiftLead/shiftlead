@@ -182,19 +182,30 @@ def view(
     out["logins"] = [_login_row(lk, rows, set(models), on_node, whys[lk]) for lk in order]
     if on_node:
         out["note"] = NODE_NOTE
-        out["cannot_run"] = node_cannot_run(team, name, order, node_mark, str(entry.get("host") or ""))
+        host = str(entry.get("host") or "")
+        out["cannot_run"] = node_cannot_run(team, name, order, node_mark, host, models if good else None)
     elif good:
         out["cannot_run"] = teamstore.cannot_run(team, name, models, order, rows)
     return out
 
 
-def node_cannot_run(team: str, flow: str, order: list[str], mark: Mapping[str, Any] | None, host: str) -> str | None:
+def node_cannot_run(
+    team: str,
+    flow: str,
+    order: list[str],
+    mark: Mapping[str, Any] | None,
+    host: str,
+    models: list[str] | None = None,
+) -> str | None:
     """A team on a node *cannot run* while the home's mark stands (§4.9d *A team on a node*, §4.9e, TD-2068): the node
     reported that no login of the list offers a model, and the mark holds until the team's list or its flow changes,
-    so a mark written for another list or flow is read as none."""
+    so a mark written for another list or flow is read as none — and so is one whose model no stage or audit of the
+    flow asks for any longer (`models`, the flow's as read; None, a flow not read, leaves the mark standing)."""
     if not isinstance(mark, Mapping) or not mark.get("model"):
         return None
     if str(mark.get("flow") or "") != flow or [str(x) for x in mark.get("logins") or ()] != order:
+        return None
+    if models is not None and str(mark["model"]) not in models:
         return None
     return f"{team} cannot run {flow}: no login in its list offers {mark['model']} on {host}"
 
