@@ -500,3 +500,80 @@ async def test_a_join_that_empties_an_account_moves_its_reserve(agent, tmp_path)
     import asyncio
 
     await asyncio.gather(*list(agent._bg))  # the move's push and commit, detached: done before the home is torn down
+
+
+def test_a_records_login_key_and_its_forgotten_login():
+    """TD-2288, design §4.9e *A record's `profile`*: a record's login key is its `login`, else its `profile`, else
+    `default`, taken whole where it holds a `:` and else prefixed with its adapter; a bare `default` (no `login` or
+    `profile`) is forgotten where any tool's `default` is, and counted by a Forget of any tool's `default`."""
+    assert logins.record_key("claude-code", "claude-code:grind", "x") == "claude-code:grind"
+    assert logins.record_key("claude-code", None, "grind") == "claude-code:grind"
+    assert logins.record_key("gemini", None, "claude-code:x") == "claude-code:x"  # a shared name is its key
+    assert logins.record_key("gemini", None, "") == "gemini:default"
+    d = logins.empty()
+    d["logins"]["gemini:x"] = {"folder": "/h"}
+    d["forgotten"]["claude-code:x"] = {"folder": "/h/.claude-x"}
+    assert logins.forgotten_login(d, "claude-code", None, "claude-code:x") == "claude-code:x"
+    assert logins.forgotten_login(d, "gemini", None, "claude-code:x") == "claude-code:x"
+    assert logins.forgotten_login(d, "gemini", None, "gemini:x") is None  # the live one of the shared name
+    assert logins.forgotten_login(d, "gemini", None, "x") is None
+    assert logins.forgotten_login(d, "gemini", None, "") is None  # no `default` forgotten
+    assert logins.forgotten_login(None, "gemini", None, "") is None  # not switched
+    d["forgotten"]["claude-code:default"] = {"folder": "/h/.claude"}
+    assert logins.forgotten_login(d, "gemini", None, "") == "claude-code:default"  # withheld by name across tools
+    assert logins.forgotten_login(d, "gemini", None, "default") is None  # gemini's own named `default` is not it
+    assert logins.counts_for("claude-code:x", "gemini", None, "claude-code:x")
+    assert not logins.counts_for("claude-code:x", "gemini", None, "x")
+    assert logins.counts_for("claude-code:default", "gemini", None, "")
+    assert not logins.counts_for("claude-code:grind", "claude-code", None, "")
+
+
+def test_forget_prints_the_ended_sessions_that_read_nothing(monkeypatch, capsys):
+    """TD-2288: `ao login forget` prints the reply's `ended_records` after its change, one and many in their own
+    words, nothing at none."""
+    from shiftlead import cli
+
+    p = cli.build_parser()
+    for n, said in ((0, None), (1, "1 ended session ran on this login: it reads"), (3, "3 ended sessions ran")):
+        monkeypatch.setattr(
+            cli, "call_sync", lambda m, n=n, **k: {"change": "claude-code:api forgotten", "ended_records": n}
+        )
+        a = p.parse_args(["login", "forget", "api"])
+        assert a.fn(a) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("claude-code:api forgotten")
+        assert (said in out) if said else "ended session" not in out
+
+
+@pytest.mark.integration
+async def test_forget_and_the_tools_read_count_the_logins_ended_records(agent):
+    """TD-2288, design §4.9e: the host agent counts its ended records (exited and closed) whose login key is the
+    login's, afresh on each Tools read and in Forget's reply; a live record, a shell and another login's are not."""
+    from conftest import park_ticks
+
+    from sessionorc import paths
+    from sessionorc.client import LocalClient
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    logins.save(_data(), "fixture", paths.home())
+    rows = [
+        ("a", "claude-code", "exited", {"profile": "grind"}),
+        ("b", "claude-code", "closed", {"login": "claude-code:grind"}),
+        ("c", "claude-code", "idle", {"profile": "api"}),  # live, on another login
+        ("d", "gemini", "exited", {"profile": "grind"}),  # another tool's key
+        ("e", "claude-code", "exited", {"profile": "api"}),
+        ("f", "shell", "exited", {}),
+    ]
+    for name, adapter, state, kw in rows:
+        s = Session(id=f"ao-x-{name}", name=name, kind="interactive", adapter=adapter, dir="/w")
+        s.state, s.host = state, agent.host
+        for k, v in kw.items():
+            setattr(s, k, v)
+        agent.sessions[s.id] = s
+    kept = {"switched": True, "tools": [{"adapter": "claude-code", "accounts": [], "logins": [{"name": "grind"}]}]}
+    assert (await agent._tools_gauges(kept))["tools"][0]["logins"][0]["ended_records"] == 2
+    assert "ended_records" not in kept["tools"][0]["logins"][0]  # the kept read is never written
+    async with LocalClient() as c:
+        got = await c.call("login_forget", login="grind")
+    assert got == {"change": "claude-code:grind forgotten", "ended_records": 2}

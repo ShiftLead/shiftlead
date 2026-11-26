@@ -70,6 +70,16 @@ class LoginsMixin:
                 out.append(s.id)
         return out
 
+    def _login_ended(self, lk: str) -> int:
+        """This host's ended records (closed or exited, a suspended one among them) whose login key is the login's
+        (§4.9e *A record's `profile`*, TD-2288): what a Forget leaves reading nothing until the folder is added again.
+        A `<tool>:default` counts every record with no `login` or `profile`, of any tool."""
+        return sum(
+            s.state in ENDED and logins.counts_for(lk, s.adapter, getattr(s, "login", None), s.profile)
+            for s in list(self.sessions.values())
+            if adapters.has_agent(s.adapter)
+        )
+
     def _login_listed(self, lk: str) -> list[str]:
         """The home's lists that name a login, in words. A settings file that is there and cannot be read refuses: what
         it lists is unknown, and a forgotten login would leave a team's list naming nothing."""
@@ -231,11 +241,17 @@ class LoginsMixin:
         schedule names it. A node cannot read those lists, so it is not refused for them (§4.2b *On a node*)."""
         agent_common.person_only(caller, "forget a login", SECTION, self._graph())
 
+        forgot: list[str] = []
+
         def edit(d: dict[str, Any]) -> str:  # under the logins lock: what runs on it is read as the write is made
             lk, _ = logins.resolve(d, str(login or ""))
-            return logins.forget(d, lk, version, in_use=[*self._login_users(lk), *self._login_listed(lk)])
+            words = logins.forget(d, lk, version, in_use=[*self._login_users(lk), *self._login_listed(lk)])
+            forgot.append(lk)
+            return words
 
-        return await self._login_write(edit)
+        out = await self._login_write(edit)
+        # the ended sessions that now read nothing, counted on this host, which `ao login forget` prints (TD-2288)
+        return {**out, "ended_records": self._login_ended(forgot[-1])} if forgot else out
 
     async def rpc_login_add(
         self,

@@ -947,7 +947,18 @@ def cmd_login(args: argparse.Namespace) -> int:
             print(f"ao login set: {args.value!r} does not read as a value: {e}", file=sys.stderr)
             return 2
         r = call_sync("login_set", login=args.login, key=args.key, value=value)
-    return emit(args, r, lambda: print(r.get("change") or "nothing changed"))
+    return emit(args, r, lambda: _login_said(r))
+
+
+def _login_said(r: dict[str, Any]) -> None:
+    """An `ao login` write's words: its change, and for a forget the ended sessions that now read nothing (§4.9e *A
+    record's `profile`*, TD-2288)."""
+    print(r.get("change") or "nothing changed")
+    n = r.get("ended_records") or 0
+    if n == 1:
+        print("1 ended session ran on this login: it reads nothing until its folder is added again")
+    elif n > 1:
+        print(f"{n} ended sessions ran on this login: they read nothing until its folder is added again")
 
 
 def _tools_prose(r: dict[str, Any]) -> None:

@@ -288,3 +288,37 @@ def test_a_failed_call_carries_error_and_to_dict_only_when_true(tmp_path):
     assert [e.error for e in tools] == [True, False]
     assert tools[0].to_dict()["error"] is True and "error" not in tools[1].to_dict()
     assert adapters.marks_errors(ClaudeCodeAdapter()) and not adapters.marks_errors(object())
+
+
+@pytest.mark.integration
+async def test_a_forgotten_logins_record_is_told_why_it_reads_nothing(agent, tmp_path, monkeypatch):
+    """TD-2288, design §4.9e *A record's `profile`*: where the adapter finds no file and the record's login key is one
+    `forgotten:` holds, the refusal names the login and the way back, by row and by record; a bare `default` of a
+    record with no profile names any tool's forgotten `default`; anything else keeps *the tool's file is not on*."""
+    from sessionorc import logins, paths
+    from sessionorc.client import AgentError, LocalClient
+
+    adapters.load_all()
+    monkeypatch.setitem(adapters._REGISTRY, "tstub", TranscriptStub())
+    d = logins.empty()
+    d["forgotten"]["tstub:old"] = {"folder": "/h/old"}
+    logins.save(d, "fixture", paths.home())
+    async with LocalClient() as person:
+        with pytest.raises(
+            AgentError, match=r"its login old is forgotten on .*; adding its folder again gives it back"
+        ):
+            await person.call("transcript", adapter="tstub", adapter_id="gone", dir="/d", profile="old")
+        with pytest.raises(AgentError, match="the tool's file is not on"):
+            await person.call("transcript", adapter="tstub", adapter_id="gone", dir="/d", profile="live")
+        sid = (await person.call("create", name="st", dir=str(tmp_path), adapter="tstub"))["id"]
+        s = agent.sessions[sid]
+        s.adapter_id, s.profile, s.login = "gone", "", "tstub:old"
+        with pytest.raises(AgentError, match=f"no transcript for {sid}: its login old is forgotten"):
+            await person.call("transcript", id=sid)
+        s.login = None
+        with pytest.raises(AgentError, match="the tool's file is not on"):
+            await person.call("transcript", id=sid)
+        d["forgotten"]["other:default"] = {"folder": "/h/default"}
+        logins.save(d, "fixture", paths.home())
+        with pytest.raises(AgentError, match="its login default is forgotten"):
+            await person.call("transcript", id=sid)

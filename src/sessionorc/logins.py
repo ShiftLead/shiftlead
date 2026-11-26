@@ -189,6 +189,35 @@ def profile_name(data: Mapping[str, Any], lk: str) -> str:
     return name if sum(split(other)[1] == name for other in data["logins"]) == 1 else lk
 
 
+def record_key(adapter: str, login: str | None, profile: str | None) -> str:
+    """A record's login key (§4.9e *A record's `profile`*, TD-2288): its `login`, else its `profile`, else `default`,
+    taken whole where it holds a `:` (`profile_name` writes a name two tools share as its key), else
+    `<adapter>:<name>`."""
+    name = login or profile or "default"
+    return name if ":" in name else key(adapter, name)
+
+
+def forgotten_login(data: Mapping[str, Any] | None, adapter: str, login: str | None, profile: str | None) -> str | None:
+    """The forgotten login a record's login key names, or None (§4.9e *A record's `profile`*, TD-2288): its key where
+    `forgotten:` holds it; for the bare `default` of a record with no `login` or `profile`, any tool's forgotten
+    `default`, since the placeholder is withheld by name across tools (TD-2287)."""
+    gone = (data or {}).get("forgotten") or {}
+    lk = record_key(adapter, login, profile)
+    if lk in gone:
+        return lk
+    if not (login or profile):
+        return next((k for k in sorted(gone) if split(k)[1] == "default"), None)
+    return None
+
+
+def counts_for(forgotten_key: str, adapter: str, login: str | None, profile: str | None) -> bool:
+    """Whether a record's login key is the login `forgotten_key`'s, as Forget counts it (§4.9e, TD-2288): its key is
+    that login's, or the login is a `<tool>:default` and the record has no `login` or `profile`, of any tool."""
+    if record_key(adapter, login, profile) == forgotten_key:
+        return True
+    return not (login or profile) and split(forgotten_key)[1] == "default"
+
+
 def live_keys(data: Mapping[str, Any]) -> set[str]:
     return {account_of(n, e) for n, e in data["logins"].items()}
 
