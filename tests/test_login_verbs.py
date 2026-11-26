@@ -222,7 +222,8 @@ def test_add_names_a_folder_a_login_and_a_forgotten_folder_takes_back_its_name()
         "claude-code:grind added back under claude-code:paul-k"
     )
     assert d["logins"]["claude-code:grind"]["account"] == "claude-code:paul-k" and not d["forgotten"]
-    assert logins.add(d, "gemini", Path("/h/.claude-grind"), "grind", **kw)[0] == "gemini:grind"  # per tool
+    with pytest.raises(logins.LoginError, match="grind is claude-code:grind's name on this host"):
+        logins.add(d, "gemini", Path("/h/.claude-grind"), "grind", **kw)  # unique on its host, across tools
     logins.forget(d, "claude-code:grind")
     assert (
         logins.add(d, "claude-code", Path("/h/.claude-grind"), None, "grind", **kw)[1] == "claude-code:grind added back"

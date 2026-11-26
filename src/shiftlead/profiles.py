@@ -200,7 +200,8 @@ def load(path: Path | None = None, *, with_logins: bool = True) -> tuple[dict[st
 def _from_logins(home: Path) -> dict[str, Profile]:
     """The host's logins as profiles by name (§4.9e *A record's profile*), each once, so a reader that walks every
     profile counts each login once: under its bare name, the name a launch writes on a record, or under its key
-    (`<tool>:<name>`) where two tools' logins share that name; none where the host is not switched. A `logins.yml` that
+    (`<tool>:<name>`) where two tools' logins share that name, which only a file edited by hand holds, since nothing
+    shiftlead writes makes one (TD-2232); none where the host is not switched. A `logins.yml` that
     does not read raises, as a `profiles.yml` that does not read does (`LoginError` is a `ValueError`)."""
     data = logins.load(home)
     if data is None:

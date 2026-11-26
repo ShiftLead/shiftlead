@@ -160,6 +160,43 @@ def test_one_account_on_two_tools_is_no_blocker(tmp_path):
     assert blockers == []
 
 
+def test_two_tools_logins_of_one_name_block_and_one_tools_fold_still_does(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    fakes = {"claude-code": Fake(tmp_path / "d"), "gemini": Fake(tmp_path / "e")}
+    names = {f"claude-code:{switchover.shown(a.resolve())}": "paul", f"gemini:{switchover.shown(b.resolve())}": "paul"}
+    _, blockers = run(tmp_path, [P("p", a), P("q", b, adapter="gemini")], fakes=fakes, names=names)
+    assert [x for x in blockers if "both be named 'paul'" in x.what and "another name" in x.cure]  # TD-2232
+    names = {
+        f"claude-code:{switchover.shown(a.resolve())}": "Grind",
+        f"claude-code:{switchover.shown(b.resolve())}": "grind",
+    }
+    _, blockers = run(tmp_path, [P("p", a), P("q", b)], names=names)
+    assert [x.what for x in blockers if "one name of one tool" in x.what]
+    assert not [x for x in blockers if "both be named" in x.what], "one tool's pair is the fold's alone"
+
+
+def test_a_login_named_as_a_profile_that_made_no_login_of_another_tool_blocks(tmp_path):
+    g = tmp_path / "g"
+    fakes = {"claude-code": Fake(tmp_path / "d"), "gemini": Fake(tmp_path / "e")}
+    names = {f"gemini:{switchover.shown(g.resolve())}": "sh"}
+    _, blockers = run(tmp_path, [P("sh", adapter="shell"), P("x", g, adapter="gemini")], fakes=fakes, names=names)
+    assert [x for x in blockers if "shell profile sh, which makes no login" in x.what]
+    _, blockers = run(tmp_path, [P("sh", adapter="shell"), P("x", g, adapter="gemini")], fakes=fakes)
+    assert blockers == []
+
+
+def test_a_nodes_login_named_as_a_listed_home_login_of_another_tool_blocks():
+    home = [switchover.Login("claude-code", Path("/h/.claude"), "grind", ["grind"], ["claude-code:grind"])]
+    node = [switchover.Login("gemini", Path("/shiftlead/profiles/g"), "grind", ["g"], ["gemini:g"])]
+    plan = switchover.TeamPlan("t", "r", "cm", logins=["claude-code:grind"])
+    got = switchover.node_name_blockers(home, {"cm": node}, [plan])
+    assert len(got) == 1 and got[0].where == "host cm" and "home login claude-code:grind that team t" in got[0].what
+    unlisted = switchover.TeamPlan("t", "r", "cm", logins=[])
+    assert switchover.node_name_blockers(home, {"cm": node}, [unlisted]) == []
+    elsewhere = switchover.TeamPlan("t", "r", "h", logins=["claude-code:grind"])
+    assert switchover.node_name_blockers(home, {"cm": node}, [elsewhere]) == []
+
+
 def test_each_adapter_maps_a_model_through_its_own_table():
     assert claude_code.ClaudeCodeAdapter().model_family("claude-opus-4-1") == claude_code.model_family(
         "claude-opus-4-1"
