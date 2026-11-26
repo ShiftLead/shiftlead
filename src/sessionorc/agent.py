@@ -1747,14 +1747,13 @@ class HostAgent(
 
     def _switched_before_home(self) -> bool:
         """Whether this node is switched (it holds a `logins.yml`) and its home is not yet cut over (design §4.9e *The
-        window*, step 2), so it holds no profile and a create is refused. The home's cut-over is what its last greeting
-        said; before any greeting, or from a home whose greeting says nothing of it, the marker as this node's replica
-        of the home's `settings.yml` last held it. A home is never refused here: its own move writes both together."""
+        window*, step 2), so it holds no profile and a create is refused. The home is cut over where its last greeting
+        said so, or where this node's replica of the home's `settings.yml` holds the marker: the home pushes the file
+        after each write, so the replica can be the newer of the two, and before any greeting it is the only one. A
+        home is never refused here: its own move writes both together."""
         if self.mode != "node" or not logins.switched():
             return False
-        if self._home_greeting is not None and "cut_over" in self._home_greeting:
-            return not self._home_greeting["cut_over"]
-        return not self._first_shape_off
+        return not ((self._home_greeting or {}).get("cut_over") or self._first_shape_off)
 
     async def rpc_create(
         self,

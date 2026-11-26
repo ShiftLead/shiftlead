@@ -812,9 +812,9 @@ async def test_a_switched_node_says_so_and_launches_nothing_until_its_home_is_cu
 
 
 async def test_a_switched_node_with_no_greeting_reads_its_replica_of_the_homes_marker(agent, tmp_path):
-    """TD-2070: before any greeting (the home out of reach since the node started), or from a home whose greeting
-    says nothing of the cut-over, the node reads the marker its replica of the home's `settings.yml` last held; a
-    node with no `logins.yml`, and a home, are never refused."""
+    """TD-2070: the home is cut over where its greeting said so or the node's replica of its `settings.yml` holds the
+    marker — before any greeting, or from an older home's, the replica alone; a node with no `logins.yml`, and a
+    home, are never refused."""
     await park_ticks(agent)
     agent.mode = "node"
     try:
@@ -827,9 +827,9 @@ async def test_a_switched_node_with_no_greeting_reads_its_replica_of_the_homes_m
         agent._first_shape_off = True
         assert not agent._switched_before_home(), "the replica holds the marker"
         agent._home_greeting = {"cut_over": None}
-        assert agent._switched_before_home(), "the greeting, where it says, is what the home is"
-        agent._home_greeting = {"cut_over": "2026-11-26"}
-        assert not agent._switched_before_home()
+        assert not agent._switched_before_home(), "a replica pushed after the greeting is the newer word"
+        agent._home_greeting, agent._first_shape_off = {"cut_over": "2026-11-26"}, False
+        assert not agent._switched_before_home(), "the greeting said so"
         agent._home_greeting = {"cut_over": None}
         agent.mode = "home"
         assert not agent._switched_before_home(), "a home's own move writes both together"
