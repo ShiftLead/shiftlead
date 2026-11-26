@@ -2832,8 +2832,9 @@ teams:
   adapter's (§4.3); the gate knows none of them by name.
   **After the cut-over** (§4.9d *The logins, in order*, TD-1153; the launch path is §4.9e's, TD-1976) the gate
   reads a session's login's account where it read its profile's, and **a session is held only when no
-  login in its team's list, or for a built-in seat its repo's built-in set's, is usable for its model**: one whose login reaches its line is moved to the
-  next usable login of the list first, and pauses, as above, only where there is none.
+  later login in its team's list, or for a built-in seat its repo's built-in set's, is usable for its model**: one whose login reaches its line is moved to the
+  next usable login below it in the list first, and pauses, as above, only where there is none, even while an earlier login is usable
+  (a running session never moves back up, §4.9e *A session moves down the list*).
 
   **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
   keeps a reserve of its own*). A quota is one number per account, so its reserve is too.
