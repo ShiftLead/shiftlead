@@ -225,3 +225,32 @@ def test_a_wind_downs_close_names_its_presser_from_the_mark():
     for bad in (None, "x", {"by": None}, {}):
         assert closer_words({**rec, "wind_down": bad}) == "closed by the tick · after a Wind down"
     assert closer_words({**rec, "closer": {**closer, "why": "finished"}}) == "closed by the tick · team finished"
+
+
+def test_every_why_the_tick_closes_with_has_its_words():
+    """TD-2298, §4.5 the card's ending: each `why` the code hands a close of the tick's — a literal
+    `closer = {"by": "tick", "why": …}`, a `_finished_close(…, "<why>")`, rule 7's variable whys and
+    `stage_start.end`'s sentences — reads *closed by the tick · <words>*, so no close of
+    the home's reads bare. The scan reads the source, so a new why with no words fails here."""
+    import pathlib
+
+    from shiftlead.ending import TICK_WHY, closer_words
+
+    src = pathlib.Path(__file__).resolve().parents[1] / "src"
+    text = "\n".join(p.read_text() for p in src.rglob("*.py"))
+    found = set(re.findall(r'closer(?:: [^=]+)? ?= ?\{"by": "tick", "why": "([^"]+)"\}', text))
+    found |= set(re.findall(r'_finished_close\([^)]*?"([^"]+)"\)', text))
+    found |= set(re.findall(r'_finished_close\([^)]*?why="([^"]+)"', text))
+    found |= set(re.findall(r'stage_start\.end\(call, holder, "([^"]+)"\)', text))
+    found |= set(re.findall(r'def end\(call: Any, holder: str, why: str = "([^"]+)"\)', text))
+    found |= {"finished", "brief", "flow"}  # `_finished_close`'s default, and rule 7's two variable whys
+    found -= {"wind_down"}  # its words name the presser (test_a_wind_downs_close_names_its_presser_from_the_mark)
+    assert {"login-move", "lost-brief", "host_full", "retired", "its job record no longer names it"} <= found
+    missing = sorted(w for w in found if w not in TICK_WHY)
+    assert not missing, f"tick closes with no words on the card: {missing}"
+    for why in found:
+        words = closer_words({"id": "ao-w", "closer": {"by": "tick", "why": why}})
+        assert words == f"closed by the tick · {TICK_WHY[why]}"
+    assert closer_words({"id": "ao-w", "closer": {"by": "tick", "why": "login-move"}}) == (
+        "closed by the tick · to move to another login"
+    )
