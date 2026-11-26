@@ -55,6 +55,8 @@ def test_a_filled_in_form_picks_the_login_asked_for_else_the_records_profile_els
     assert uiapp.login_prefill(opts, "", "main") == "grok:main", "a bare name two logins share: the last used"
     assert uiapp.login_prefill(opts, "", "") == "grok:main"
     assert uiapp.login_prefill([], "", "") == ""
+    assert uiapp.login_prefill(opts, "", "", "claude-code") == "claude-code:main", "never another tool's login"
+    assert uiapp.login_prefill(opts, "", "", "gemini") == "grok:main", "no login of its tool: the last used"
 
 
 def test_the_forms_launch_on_a_login_is_ao_news():
@@ -124,6 +126,11 @@ def test_after_the_cut_over_the_form_draws_a_login_pick_and_before_it_the_profil
     assert (
         '<option value="claude-code:pinned" data-here="1" data-models="sonnet" selected>'
         in c.get("/new", params={"profile": "pinned"}).text
+    )
+    # a filled-in record of one tool never lands on another tool's login
+    assert (
+        '<option value="claude-code:main" data-here="1" data-models="opus,sonnet,haiku" selected>'
+        in c.get("/new", params={"adapter": "claude-code", "prefilled": "1"}).text
     )
     state["off"] = False
     before = c.get("/new").text

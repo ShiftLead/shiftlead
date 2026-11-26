@@ -2947,10 +2947,11 @@ def login_options(read: Mapping[str, Any] | None, last: Mapping[str, Any] | None
     return sorted(opts, key=lambda o: o["key"] != newest)
 
 
-def login_prefill(opts: list[dict[str, Any]], login: str, profile: str) -> str:
+def login_prefill(opts: list[dict[str, Any]], login: str, profile: str, adapter: str = "") -> str:
     """The Login pick's choice on a form filled in (Resume with changes…, §4.5a): the `login` asked for, else the
     login a record's `profile` names — its key, or its bare name where one login has it (§4.9e *A record's
-    `profile`*) — else the first choice, the login last used; empty where there is none."""
+    `profile`*) — else the newest login of the record's tool, so a Resume never lands on another tool's login, else
+    the first choice, the login last used; empty where there is none."""
     keys = [o["key"] for o in opts]
     for want in (login, profile):
         if want in keys:
@@ -2958,7 +2959,7 @@ def login_prefill(opts: list[dict[str, Any]], login: str, profile: str) -> str:
         bare = [o["key"] for o in opts if want and o["name"] == want]
         if len(bare) == 1:
             return bare[0]
-    return keys[0] if keys else ""
+    return next((k for k in keys if k.rpartition(":")[0] == adapter), keys[0] if keys else "")
 
 
 def form_login(login: str, model: str, adapter: str, on_login: bool) -> dict[str, Any]:
@@ -3246,9 +3247,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         logins_why, login_opts = "", []
         if on_login:
             try:
-                login_opts = login_options(await call("tools"), await call("last_login"))
+                read = await call("tools")
             except HTTPException as e:
-                logins_why = f"the host agent did not serve its logins: {e.detail}"
+                read, logins_why = None, f"the host agent did not serve its logins: {e.detail}"
+            try:  # an agent that keeps no last login: none stored, the read's order
+                last = await call("last_login") if read is not None else {}
+            except HTTPException:
+                last = {}
+            login_opts = login_options(read, last)
         # registered repos (design §5 *Repos*: the home's roster and agent-cadence's, or `repos_registry`) first,
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
@@ -3329,7 +3335,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "why": why,
                     "prompt": prompt,
                     "press": press,
-                    "login": login_prefill(login_opts, login, profile) if on_login else "",
+                    "login": login_prefill(login_opts, login, profile, adapter if prefilled == "1" else "")
+                    if on_login
+                    else "",
+                    # another host's record: its login typed, as its profile names it (§4.9e *A record's `profile`*)
+                    "login_typed": (login or (profile if ":" in profile else f"{adapter}:{profile}"))
+                    if on_login and away_host(host) and (login or profile) and adapter != "shell"
+                    else "",
                 },
             },
         )

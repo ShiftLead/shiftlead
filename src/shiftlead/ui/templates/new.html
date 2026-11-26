@@ -83,7 +83,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
       {%- set login_opts = login_opts | default([]) %}
       <div class="field" id="loginfield"><label>Login</label>
         <select class="input" name="login" id="login">{% for o in login_opts %}<option value="{{ o.key }}" data-here="1" data-models="{{ o.models | join(',') }}"{% if o.key == prefill.login and prefill.adapter != "shell" %} selected{% endif %}>{{ o.key }} · {{ o.account }}</option>{% endfor %}<option value="" data-typed="1"{% if login_opts %} hidden{% endif %}{% if not login_opts and prefill.adapter != "shell" %} selected{% endif %}>a login typed below</option><option value="{{ shell_pick }}" data-adapter="shell"{% if prefill.adapter == "shell" %} selected{% endif %}>shell (no agent)</option></select>
-        <div id="typedfield"{% if login_opts %} hidden{% endif %}><input class="input mono" name="login_typed" id="logintyped" placeholder="<tool>:<name>, as that host's logins.yml names it"{% if login_opts %} disabled{% endif %}></div>
+        <div id="typedfield"{% if login_opts %} hidden{% endif %}><input class="input mono" name="login_typed" id="logintyped" value="{{ prefill.login_typed }}" placeholder="<tool>:<name>, as that host's logins.yml names it"{% if login_opts %} disabled{% endif %}></div>
         <span class="note" id="loginnote">{% if logins_why | default("") %}⚠ {{ logins_why }}: type the login · {% endif %}the login the session runs on, the one last used first — {{ fromfile("logins.yml", files.logins) }}; the list ends with <i>shell (no agent)</i></span>
         <label>Model (optional)</label>
         <input class="input mono" name="model" id="model" list="loginmodels" placeholder="the login's pin, else the tool's default">
