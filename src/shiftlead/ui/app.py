@@ -2947,11 +2947,14 @@ def login_options(read: Mapping[str, Any] | None, last: Mapping[str, Any] | None
     return sorted(opts, key=lambda o: o["key"] != newest)
 
 
-def login_prefill(opts: list[dict[str, Any]], login: str, profile: str, adapter: str = "") -> str:
+def login_prefill(
+    opts: list[dict[str, Any]], login: str, profile: str, adapter: str = "", last: Mapping[str, Any] | None = None
+) -> str:
     """The Login pick's choice on a form filled in (Resume with changes…, §4.5a): the `login` asked for, else the
     login a record's `profile` names — its key, or its bare name where one login has it (§4.9e *A record's
-    `profile`*) — else the newest login of the record's tool, so a Resume never lands on another tool's login, else
-    the first choice, the login last used; empty where there is none."""
+    `profile`*) — else the newest login of the record's tool, `last_login`'s line for that tool where it names one
+    of the choices, else that tool's first, so a Resume never lands on another tool's login (TD-2291), else the
+    first choice, the login last used; empty where there is none."""
     keys = [o["key"] for o in opts]
     for want in (login, profile):
         if want in keys:
@@ -2959,6 +2962,9 @@ def login_prefill(opts: list[dict[str, Any]], login: str, profile: str, adapter:
         bare = [o["key"] for o in opts if want and o["name"] == want]
         if len(bare) == 1:
             return bare[0]
+    newest = str((last or {}).get(adapter) or "") if adapter else ""
+    if newest in keys and newest.rpartition(":")[0] == adapter:
+        return newest
     return next((k for k in keys if k.rpartition(":")[0] == adapter), keys[0] if keys else "")
 
 
@@ -3335,7 +3341,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "why": why,
                     "prompt": prompt,
                     "press": press,
-                    "login": login_prefill(login_opts, login, profile, adapter if prefilled == "1" else "")
+                    "login": login_prefill(login_opts, login, profile, adapter if prefilled == "1" else "", last)
                     if on_login
                     else "",
                     # another host's record: its login typed, as its profile names it (§4.9e *A record's `profile`*)
