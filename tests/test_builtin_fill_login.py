@@ -32,6 +32,13 @@ builtins:
 """
 
 
+SEATS = {
+    "techlead": {"trigger": "asks"},
+    "sweeper": {"trigger": "swept", "by": "settings"},
+    "prompts": {"trigger": "prompt"},
+}
+
+
 def _row(account: str, models: list[str], **kw) -> dict:
     return {"state": "signed_in", "account": account, "pin": None, "models": models, "at_reserve": False, **kw}
 
@@ -75,7 +82,7 @@ async def _held_seat(agent, tmp_path, builtin: str = "techlead", settings: str =
                 supervised=True,
                 held=True,
                 prompt="the seat's brief",
-                seat={"trigger": "asks"} if builtin == "techlead" else {"trigger": "swept", "by": "settings"},
+                seat=SEATS[builtin],
                 builtin=builtin,
                 **({"team": "t"} if builtin == "techlead" else {}),
             )
@@ -91,7 +98,7 @@ async def _fill(agent, sid: str) -> None:
     await agent._fill(s, datetime.now(UTC), list(agent.sessions.values()))
 
 
-@pytest.mark.parametrize(("builtin", "model"), [("techlead", "opus"), ("sweeper", "haiku")])
+@pytest.mark.parametrize(("builtin", "model"), [("techlead", "opus"), ("sweeper", "haiku"), ("prompts", "sonnet")])
 async def test_a_built_in_seat_is_filled_on_its_sets_first_usable_login(
     agent, tmp_path, launched, rows, builtin, model
 ):
@@ -147,3 +154,33 @@ async def test_before_the_cut_over_a_fill_reads_no_set(agent, tmp_path, launched
     new = agent.sessions[sid]
     assert new.login is None and new.seat_model is None
     assert launched[-1] == {"profile": ""}, "launched as before: no login, no model"
+
+
+async def test_its_last_runs_gated_profile_does_not_keep_it_off_the_next_login(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """The fill's pick passes over a gated login to the next (§4.9d): the profile its last run was read under, over
+    its usage line, is no refusal of rule 3 for a built-in seat after the cut-over (review of #4717)."""
+    rows.update(
+        {"hookstub:first": _row("acct-1", ["opus"], at_reserve=True), "hookstub:second": _row("acct-2", ["opus"])}
+    )
+    sid = await _held_seat(agent, tmp_path)
+    monkeypatch.setattr(agent, "_profile_gated", lambda *a, **kw: True)
+    assert agent._unfillable_word(agent.sessions[sid], datetime.now(UTC)) is None
+    await _fill(agent, sid)
+    assert agent.sessions[sid].login == "hookstub:second"
+
+
+async def test_an_ended_seat_not_due_says_it_cannot_run_before_a_question_comes(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """Rule 3's pass reads an ended built-in seat's login due or not, so a question is routed around a seat its set
+    cannot run from the first (§4.9b *A seat that cannot answer is routed around*, review of #4717)."""
+    rows.update({"hookstub:first": _row("acct-1", ["sonnet"]), "hookstub:second": _row("acct-2", ["sonnet"])})
+    sid = await _held_seat(agent, tmp_path)
+    s = agent.sessions[sid]
+    monkeypatch.setattr(agent, "_builtin_hold", lambda *a, **kw: None)
+    monkeypatch.setattr(agent, "_seat_due", lambda *a, **kw: None)
+    s.seat_due = None
+    await agent._seat_pass(s, datetime.now(UTC), list(agent.sessions.values()))
+    assert agent.unfillable[sid] == "cannot run" and not launched
