@@ -177,6 +177,42 @@ def test_the_reach_starts_a_review_stages_session_where_the_record_stands_at_one
     ]
 
 
+def test_a_job_starts_on_the_set_its_repo_picked(monkeypatch, tmp_path):
+    """TD-2258, design §4.9d *A repo uses one set*: with the real `builtinstore`, a job of repo `r`, which names the
+    set `night`, launches on that set's model with `on_set` naming it, and one of a repo naming none on `default`'s."""
+    org = type("Org", (), {"teams": {"t": object()}})()
+    seen: list[tuple] = []
+
+    def job(read, team, doc, record, model, **kw):
+        seen.append((model, kw["on_set"]))
+        return "job-launch"
+
+    monkeypatch.setattr(stage_job_tick.stage_job_start, "launch", job)
+    monkeypatch.setattr(stage_job_tick.stage_start, "start", lambda call, read, team, got: {"id": got})
+    monkeypatch.setattr(stage_job_tick.stage_start, "holder_of", lambda got, made: made["id"])
+    sdoc = {
+        "builtins": {
+            "default": {"models": {"unheld-pull-requests": "opus"}, "logins": []},
+            "night": {"models": {"unheld-pull-requests": "haiku"}, "logins": []},
+        },
+        "repos": {"r": {"builtins": "night"}},
+    }
+    record = stage_job.new_job("unheld-pull-requests", 4, "t", "x")
+    for repo in ("r", "q"):
+        r = stage_job_tick.reach_for(
+            lambda *a, **k: None,
+            lambda: org,
+            tmp_path,
+            repo,
+            local="h",
+            hosts={},
+            docs={"t": FLOW},
+            settings=lambda: sdoc,
+        )
+        assert r.start(record, None) == "job-launch"
+    assert seen == [("haiku", "night"), ("opus", "default")]
+
+
 def test_a_job_waiting_merging_is_merged_after_the_seats_pass(store):
     record = {
         **stage_job.new_job("unheld-pull-requests", 4, "t", "2026-11-20T00:00:00Z"),
