@@ -126,19 +126,18 @@ def test_an_undeclared_or_empty_model_arg_hands_the_family(word, declared):
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("text", "want"),
     [
-        json.dumps(["grok-4.9"]),
-        json.dumps({"models": ["grok-4.9"]}),
-        json.dumps({"models": {"grok-4.9": None, "grok-4.5": {"info": {}}}}),
+        (json.dumps(["grok-4.9"]), grok.FAMILY_IDS["grok"]),
+        (json.dumps({"models": ["grok-4.9"]}), grok.FAMILY_IDS["grok"]),
+        (json.dumps({"models": {"grok-4.9": None, "grok-4.5": {"info": {}}}}), "grok-4.9"),
     ],
     ids=["file-a-list", "models-a-list", "entry-not-a-table"],
 )
-def test_groks_word_from_an_odd_cache_is_an_id_never_the_bare_family(tmp_path, text):
+def test_groks_word_from_an_odd_cache_is_an_id_never_the_bare_family(tmp_path, text, want):
     """TD-2267, §4.3: Grok Build refuses the bare family, so a cache file of an unexpected shape still gives an id —
     the table's, or the newest one listed where its entry is not a table — and never raises into the fallback."""
     (tmp_path / "g").mkdir()
     (tmp_path / "g" / grok.MODELS_CACHE).write_text(text)
-    want = "grok-4.9" if "grok-4.5" in text else grok.FAMILY_IDS["grok"]
     assert grok.model_arg("grok", tmp_path / "g") == want
     assert _model_word(adapters.get("grok"), "grok", str(tmp_path / "g")) == want != "grok"
