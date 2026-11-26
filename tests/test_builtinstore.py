@@ -234,6 +234,10 @@ def test_a_sets_tab_carries_its_standing_node_marks_and_the_page_draws_them(monk
     tabs = {x["name"]: x["dot"] for x in page["tabs"]}
     assert tabs["default"] == words and not tabs["cheap"]
     assert next(s for s in page["seats"] if s["key"] == "sweeper")["on_nodes"] == [words]
+    director = team_show.builtins_view(
+        name="cheap", doc=doc, rows=rows, roots=[], director=True, node_marks=set_marks["cheap"]
+    )
+    assert next(s for s in director["seats"] if s["key"] == "prompts")["node_cannot_run"] == {}, "the director's"
 
     async def call(method, **params):
         return {**view, "tools": {"tools": []}} if method == "builtins_show" else {}
@@ -357,3 +361,21 @@ def test_a_page_opened_at_a_node_lists_the_homes_logins_and_models(monkeypatch):
     assert "tools" not in asked
     assert "homelogin" in text and "homemodel" in text
     assert "nodelogin" not in text and "nodemodel" not in text
+
+
+def test_ao_builtins_show_says_what_the_page_says_of_a_nodes_mark(capsys):
+    """`ao builtins show` prints what the page shows (§4.9d *The page*): a set marked on a node is flagged, and the
+    seat's line is followed by the node's words."""
+    from shiftlead import cli
+
+    doc = _doc(builtins={"default": {"models": {"sweeper": "haiku"}, "logins": ["c:one"]}})
+    marks = {"sweeper": {"n": {"model": "haiku", "logins": ["c:one"]}}}
+    rows = {"c:one": _row(models=["opus", "sonnet", "haiku"])}
+    view = team_show.builtins_view(
+        name="default", doc=doc, rows=rows, roots=[], director=False, node_marks=marks, set_marks={"default": marks}
+    )
+    assert not view["sets"][0]["cannot_run"], "the home's own logins run every seat"
+    cli._builtins_show_prose(view)
+    out = capsys.readouterr().out
+    assert "sets: default (cannot run a seat)" in out
+    assert "    default cannot run the sweeper: no login in its list offers haiku on n" in out

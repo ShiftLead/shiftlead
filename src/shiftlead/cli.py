@@ -1518,7 +1518,13 @@ def _builtins_show_prose(got: dict[str, Any]) -> None:
     """`ao builtins show`'s text: the same read as `--json`, in the page's order (§4.9d *The page*)."""
     title = f"{got['set']} ({got['label']})" if got.get("label") else got["set"]
     print(f"{title}: used by {', '.join(got['used_by']) or 'no repo'}")
-    print("sets: " + ", ".join(x["name"] + (" (cannot run a seat)" if x["cannot_run"] else "") for x in got["sets"]))
+    print(
+        "sets: "
+        + ", ".join(
+            x["name"] + (" (cannot run a seat)" if x["cannot_run"] or x.get("node_cannot_run") else "")
+            for x in got["sets"]
+        )
+    )
     if got.get("note"):
         print(got["note"])
         return
@@ -1532,6 +1538,8 @@ def _builtins_show_prose(got: dict[str, Any]) -> None:
             s["now"]["login"] or {"waits": "waits for a usable login", "none": "no login offers it"}[s["now"]["state"]]
         )
         print(f"  {s['name']}  {s['model']} on {now}  acts for {s['for']}")
+        for line in (s.get("node_cannot_run") or {}).values():
+            print(f"    {line}")
     for lg in got.get("logins") or ():
         why = f" ({lg['why']})" if lg.get("why") else ""
         print(f"login {lg['login']}  {'not read here' if lg['state'] == 'not_read' else lg['state']}{why}")

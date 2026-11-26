@@ -289,7 +289,9 @@ def builtins_view(
                 "director": by_director,
                 "now": None if by_director else teamstore.pick(order, model, rows, unasked=key == builtinstore.PROMPTS),
                 "cannot_run": next((c for c in cannot if c.startswith(f"{name} cannot run {words}:")), None),
-                "node_cannot_run": set_node_cannot_run(name, words, order, model, (node_marks or {}).get(key)),
+                "node_cannot_run": {}
+                if by_director
+                else set_node_cannot_run(name, words, order, model, (node_marks or {}).get(key)),
             }
         )
     return {
