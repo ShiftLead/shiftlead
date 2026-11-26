@@ -289,3 +289,61 @@ async def test_a_reply_on_a_pair_entry_takes_the_plain_road(agent, repo, monkeyp
     _path, text = _line(repo, got["key"])
     assert "**Context:** TD-190\n" in text and "**Answers:**" not in text
     assert "**Blocked by:** decision (paul)" in _origin(repo, "docs/ledger/TD-190.md")
+
+
+# -- a late Go press where the pair is no longer offered (TD-2247) ---------------------------------------------------
+
+DESIGN_ENTRY = LEDGER_ENTRY.replace("**Status:** Open", "**Kind:** design-first\n**Status:** Open")
+BUILD_ENTRY = LEDGER_ENTRY.replace("**Status:** Open", "**Kind:** build\n**Part of:** TD-192\n**Status:** Open")
+
+
+async def _home_with_lines(agent, repo: Path, monkeypatch) -> str:
+    """`_home` over the ledger and board as the home reads them (`ledger.reading`, `workorders.read_boards`), both
+    committed on origin: TD-190 covered by an open undecided `decide` line; TD-192 a design whose closed line lists
+    its build TD-193 in `Parts:`, so TD-193 is a held build and TD-192 a design with held builds; TD-191 plain."""
+    from sessionorc import ledger, workorders
+
+    led = repo / "docs" / "ledger"
+    (led / "TD-192.md").write_text(DESIGN_ENTRY.format(n=192))
+    (led / "TD-193.md").write_text(BUILD_ENTRY.format(n=193))
+    write_board(
+        repo,
+        "# User attention\n\nFormat: `- [ ] …`\n\nPeople: paul\n\n## Needs the user\n\n"
+        "- [ ] decide 2026-11-20 (session n/a) — **Ship TD-190?** Context: TD-190 decision (paul). Due: 2026-12-20. "
+        "Answers: Ship it | Hold it.\n",
+        "# Archive\n\n- [x] decide 2026-11-14 (session n/a) — **Another round?** Context: TD-192 decision (paul). "
+        "Parts: TD-193. Due: 2026-11-20. Answers: Go | One more round. Decided: One more round (2026-11-15). "
+        "Closed: 2026-11-15 — carried to TD-099.\n",
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "lines")
+    git(repo, "push", "-q", "origin", "main")
+    root = await _home(agent, repo, monkeypatch)
+    entries = ledger.reading(root, datetime.now(UTC), with_history=False)["entries"]
+    boards = workorders.read_boards(root, fetch=False)
+    agent._repos[root].update(ledger={"entries": entries}, boards=boards)
+    return root
+
+
+@pytest.mark.parametrize(
+    "tid, why",
+    [
+        ("TD-190", "an open undecided line covers it: its answers are the line's (`boards`, `refs_open`)"),
+        ("TD-193", "a held build: its question is its design's (`held`)"),
+        ("TD-192", "a design with held builds: its Go is Go now, which lifts the set (`builds`)"),
+    ],
+    ids=["covered", "held-build", "design"],
+)
+async def test_a_late_go_press_where_the_pair_is_no_longer_offered_is_refused(agent, repo, monkeypatch, tid, why):
+    """§4.5 screen 6 *The ledger's entries that wait on you*: the pair is offered only where no open line covers the
+    entry and it is no held build and no design with held builds; a press from a page drawn before that is refused
+    (*has no answer 0*) by `_gate_pair`, writing no line and leaving the gate."""
+    root = await _home_with_lines(agent, repo, monkeypatch)
+    by = {e["id"]: e for e in agent._repos[root]["ledger"]["entries"]}
+    assert agent._gate_pair("repo", by["TD-191"]), "the plain entry is offered the pair, so the fixture reads it"
+    before = git(repo, "ls-remote", "origin", "main")
+    async with LocalClient() as me:
+        with pytest.raises(AgentError, match=f"{tid} has no answer 0"):
+            await me.call("ledger_decide", repo=root, id=tid, answer=0)
+    assert git(repo, "ls-remote", "origin", "main") == before, f"nothing written: {why}"
+    assert "**Blocked by:** decision (paul)" in _origin(repo, f"docs/ledger/{tid}.md"), why
