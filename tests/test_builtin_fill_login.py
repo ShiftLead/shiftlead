@@ -337,6 +337,7 @@ async def test_a_built_in_seat_on_a_node_sends_its_sets_list_as_names(agent, tmp
     assert agent._on_set_login(s)
     assert await agent._builtin_login(s) == {
         "profile": "",
+        "login": None,
         "seat_model": "opus",
         "login_list": ["hookstub:first", "hookstub:second"],
     }
@@ -572,3 +573,37 @@ async def test_a_replay_on_a_node_of_a_record_no_built_in_seats_counts_the_refus
     await agent._replay(s, "crash", keep_mail=True)
     assert s.restarts[-1]["why"] == "crash" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
     assert not agent._host_rec.get("builtins")
+
+
+async def test_a_replays_mark_is_read_against_the_list_it_sends(agent, tmp_path, launched, rows, monkeypatch):
+    """A replay sends its launch record's list, which may be older than the set's: the mark its refusal writes names
+    that list, and the next replay is held by it rather than asking the node again on every tick."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(
+        agent,
+        monkeypatch,
+        sid,
+        f"{teamstore.NO_LOGIN_OFFERS} opus",
+        profile="",
+        seat_model="opus",
+        login_list=["hookstub:second"],
+    )
+    s = agent.sessions[sid]
+    await agent._replay(s, "crash", keep_mail=True)
+    await agent._replay(s, "crash", keep_mail=True)
+    assert len(sent) == 1 and sent[0]["login_list"] == ["hookstub:second"] and not s.restarts
+
+
+async def test_a_replay_of_a_launch_record_with_no_list_is_sent_as_before(agent, tmp_path, launched, rows, monkeypatch):
+    """A seat launched on a node before its fill sent a list (a profile's launch) is replayed as it was handed, its
+    failure counted as before, whatever the set's mark."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, "the node's disk is full", profile="first")
+    order = ["hookstub:first", "hookstub:second"]
+    agent._host_rec["builtins"] = {
+        "default": {"node_cannot_run": {"tech-lead": {"a-node": {"model": "opus", "logins": order}}}}
+    }
+    s = agent.sessions[sid]
+    await agent._replay(s, "crash", keep_mail=True)
+    assert len(sent) == 1 and sent[0]["profile"] == "first"
+    assert s.restarts[-1]["why"] == "crash" and "disk is full" in s.restarts[-1]["error"]

@@ -4323,9 +4323,13 @@ class TickMixin:
         read: dict[str, Any] | None = None
         renamed: str | None = None
         params: dict[str, Any] = {}
-        replay = why in NODE_LIST_REPLAYS and why != "fill"
-        if replay and s.host != self.host and self._on_set_login(s) and self._node_seat_list(s) is None:
-            return  # the set's mark, or an empty list, holds it: nothing sent, nothing counted (§4.9d)
+        if why in NODE_LIST_REPLAYS and why != "fill" and s.host != self.host and self._on_set_login(s):
+            sent: dict[str, Any] = {}
+            with contextlib.suppress(Exception):  # an unreadable launch record fails below, as before
+                sent = self._read_launch(address)
+            # a launch record sending the list as names (§4.9e): the set's mark for what it sends holds it
+            if sent.get("login_list") and not sent.get("login") and self._node_seat_list(s, sent) is None:
+                return  # nothing sent, nothing counted (§4.9d *How each one runs*)
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
             if held:
@@ -4964,12 +4968,14 @@ class TickMixin:
         record or the director's, on the home's own host or on a node (where the node's own launch picks)."""
         return bool(self._first_shape_off and (BUILTIN_SEAT_KEYS.get(str(s.builtin or "")) or _director(s)))
 
-    def _node_seat_list(self, s: Session) -> dict[str, Any] | None:
+    def _node_seat_list(self, s: Session, sent: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
         """A built-in seat's or the director's fill on a node (§4.9d *Where a seat's session launches*, §4.9e *A team
         on a node*, TD-2068): the `create` arguments that send the list as names and the seat's model with no login,
         so the node's own launch takes its first usable login offering the model. None, `unfillable` *cannot run*,
         where the list is empty, the record names no model, or the home's mark says the set cannot run the seat on
-        that node (`builtins_node_cannot`, read while the set's list and the seat's model are the ones it names)."""
+        that node (`builtins_node_cannot`, read while the set's list and the seat's model are the ones it names). A
+        replay's check passes `sent`, its launch record, whose list and model are what it sends and so what a mark
+        is read against."""
         if _director(s):
             order, held, where, marked = list(s.login_list or ()), str(s.seat_model or ""), "the director's list", None
         else:
@@ -4979,6 +4985,8 @@ class TickMixin:
             name, key = builtinstore.repo_set(doc, repo), BUILTIN_SEAT_KEYS[str(s.builtin)]
             entry = builtinstore.sets(doc)[name]
             order, held, where = list(entry["logins"]), builtinstore.model(entry, key), f"built-in set {name}"
+            if sent is not None:
+                order, held = [str(x) for x in sent.get("login_list") or ()], str(sent.get("seat_model") or "")
             sets_rec = self._host_rec.get("builtins") if isinstance(self._host_rec.get("builtins"), dict) else {}
             marks = ((sets_rec.get(name) or {}).get("node_cannot_run") or {}).get(key) or {}
             mark = marks.get(s.host) if isinstance(marks, dict) else None
@@ -4993,7 +5001,8 @@ class TickMixin:
             why = marked or ("its list is empty" if not order else "its record names no model")
             log.info("%s: not filled on %s — cannot run in %s: %s", s.id, s.host, where, why)
             return None
-        return {"profile": "", "seat_model": held, "login_list": order}
+        # `login` None: a login a launch record kept from an earlier launch is never sent with the list
+        return {"profile": "", "login": None, "seat_model": held, "login_list": order}
 
     async def _node_list_refused(self, s: Session, params: Mapping[str, Any], e: Exception) -> bool:
         """Whether a node refused a built-in seat's or the director's fill, or its crash or lost-brief replay, for its
