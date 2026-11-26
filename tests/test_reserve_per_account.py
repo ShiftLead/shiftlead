@@ -580,6 +580,9 @@ async def test_a_login_s_usage_key_is_its_account_s_and_the_gate_reads_its_reser
     assert agent_common._usage_key(adapter, "claude-code", "grind") == ("claude-code:paul", "paul")
     assert agent_common._usage_key(adapter, "claude-code", "solo") == ("claude-code:solo", "solo")
     assert agent._account_key("grind") == "claude-code:paul"
+    for lk in ("claude-code:grind", "claude-code:solo"):  # the key a login's launches read (`logins.account_of`)
+        name = logins.split(lk)[1]
+        assert agent_common._usage_key(adapter, "claude-code", name)[0] == logins.account_of(lk, data["logins"][lk])
     settings_mod.save({"usage_gate": {"claude-code:paul": {"5h": 30}, "claude-code:solo": {"week": 7}}})
     whole = settings_mod.load()
     assert agent._gate_reserves(whole, "grind") == agent._gate_reserves(whole, "paul") == {"5h": 30}
