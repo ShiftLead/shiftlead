@@ -95,3 +95,50 @@ async def test_a_create_on_a_login_hands_the_tools_word_for_the_family(agent, tm
             "create", name="w", dir=str(tmp_path / "w"), adapter="hookstub", login="grind", seat_model="opus"
         )
     assert seen == ["opus@g"]
+
+
+def test_the_logins_folder_written_with_a_tilde_is_expanded(tmp_path, monkeypatch):
+    """TD-2267: a login's folder may be written `~/…` in `logins.yml`; the core reads `model_arg` against the folder it
+    names, so the cache there decides the word rather than the table's id."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    _cache(tmp_path / "g", {"grok-4.9": {"info": {}}})
+    assert _model_word(adapters.get("grok"), "grok", "~/g") == "grok-4.9"
+
+
+class _Mapper:
+    """An adapter whose `model_arg` answers `word`, declared in `implements` or not."""
+
+    def __init__(self, word, declared: bool):
+        self.word = word
+        self.implements = ("model_arg",) if declared else ()
+
+    def model_arg(self, family, home=None):
+        return self.word
+
+
+@pytest.mark.parametrize(
+    ("word", "declared"), [("its-own-id", False), (None, True), ("", True)], ids=["undeclared", "none", "empty"]
+)
+def test_an_undeclared_or_empty_model_arg_hands_the_family(word, declared):
+    """TD-2267, §4.3 *The conformance suite*: a `model_arg` the adapter does not declare is never called, and a
+    declared one that answers no word hands the family on rather than nothing."""
+    assert _model_word(_Mapper(word, declared), "opus") == "opus"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        json.dumps(["grok-4.9"]),
+        json.dumps({"models": ["grok-4.9"]}),
+        json.dumps({"models": {"grok-4.9": None, "grok-4.5": {"info": {}}}}),
+    ],
+    ids=["file-a-list", "models-a-list", "entry-not-a-table"],
+)
+def test_groks_word_from_an_odd_cache_is_an_id_never_the_bare_family(tmp_path, text):
+    """TD-2267, §4.3: Grok Build refuses the bare family, so a cache file of an unexpected shape still gives an id —
+    the table's, or the newest one listed where its entry is not a table — and never raises into the fallback."""
+    (tmp_path / "g").mkdir()
+    (tmp_path / "g" / grok.MODELS_CACHE).write_text(text)
+    want = "grok-4.9" if "grok-4.5" in text else grok.FAMILY_IDS["grok"]
+    assert grok.model_arg("grok", tmp_path / "g") == want
+    assert _model_word(adapters.get("grok"), "grok", str(tmp_path / "g")) == want != "grok"
