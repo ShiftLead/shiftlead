@@ -79,7 +79,5 @@ def test_forgets_confirm_names_the_ended_sessions_at_none_one_and_several(tmp_pa
     assert got["undefined"] == [ASK], "no count on the row: the confirm names no ended session"
     assert got["0"] == [ASK], "none ended: the confirm names no ended session"
     assert got["1"] == [f"{ASK} 1 ended session ran on this login: it reads nothing until its folder is added again."]
-    assert got["3"] == [
-        f"{ASK} 3 ended sessions ran on this login: they read nothing until its folder is added again."
-    ]
+    assert got["3"] == [f"{ASK} 3 ended sessions ran on this login: they read nothing until its folder is added again."]
     assert got["posted"] == [], "a confirm the person declines sends nothing"
