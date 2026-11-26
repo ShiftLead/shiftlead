@@ -172,3 +172,18 @@ def test_host_up_prints_each_login_it_added_and_each_it_passed_over():
     assert (
         got == "\n  login claude-code:grind added, not signed in: sign in inside once\n  clash is gemini:clash's name"
     )
+
+
+def test_host_up_without_json_prints_its_login_lines(world, monkeypatch, capsys):
+    """TD-2303: the login lines are in the prose alone, so the command is run without `--json`."""
+
+    def host_up(name, rebuild=False):
+        logins = {"added": ["claude-code:grind"], "passed": ["clash is gemini:clash's name"]}
+        return {"node": name, "container": "new123456789abc", "user": "dev", "wheel": "w.whl", "started": True,
+                "pid": None, "logins": logins}  # fmt: skip
+
+    monkeypatch.setattr(containers, "host_up", host_up)
+    assert cli.main(["host", "up", "cm"]) == 0
+    out = capsys.readouterr().out
+    assert "\n  login claude-code:grind added, not signed in: sign in inside once\n" in out
+    assert out.rstrip().endswith("\n  clash is gemini:clash's name")
