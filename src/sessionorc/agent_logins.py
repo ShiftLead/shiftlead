@@ -59,16 +59,14 @@ class LoginsMixin:
         return None
 
     def _login_users(self, lk: str) -> list[str]:
-        """What runs on a login (§4.2b *⋯ on a login*): each live session of this host whose record names it — its
-        `login`, or, before the cut-over writes one, its `profile` by the login's name."""
-        tool, name = logins.split(lk)
-        out = []
-        for s in list(self.sessions.values()):  # a copy: forget reads it from the write's thread
-            if s.state in ENDED or s.adapter != tool:
-                continue
-            if (getattr(s, "login", None) or s.profile) == name:
-                out.append(s.id)
-        return out
+        """What runs on a login (§4.2b *⋯ on a login*): each live session of this host whose record's login key is the
+        login's (§4.9e *A record's `profile`*): its `login`, which a launch writes as the key, else its `profile`, else
+        `default` (TD-2320)."""
+        return [
+            s.id
+            for s in list(self.sessions.values())  # a copy: forget reads it from the write's thread
+            if s.state not in ENDED and logins.record_key(s.adapter, getattr(s, "login", None), s.profile) == lk
+        ]
 
     def _login_ended(self, lk: str) -> int:
         """This host's ended records (closed or exited, a suspended one among them) whose login key is the login's
