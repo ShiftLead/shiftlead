@@ -84,6 +84,7 @@ class Mux:
         self._serving: set[asyncio.Task[None]] = set()
         self._heard = time.monotonic()
         self.closed = False
+        self.greeting: dict[str, Any] = {}  # the other end's answer to `hello`, on the dialling end
 
     async def run(self) -> str:
         """Read frames until the link ends; return why, in words. Always leaves the link closed and
@@ -282,15 +283,17 @@ async def dial(
     silence: float | None = None,
     first: float = BACKOFF_FIRST,
     top: float = BACKOFF_MAX,
+    say: Callable[[], dict[str, Any]] | None = None,
 ) -> None:
     """Keep a link to the home up, forever: open `target` (run a command, or connect to a socket),
     say `hello`, ping, and when it ends say why and try again. `on_state(up, why, mux)` is called
-    on every change. Runs until cancelled."""
+    on every change. `say()` gives what else `hello` carries, read at each dial (a node's `switched`, §4.9e), and
+    the home's answer is kept on the mux as `greeting`. Runs until cancelled."""
     delays = backoff_delays(first, top)
     while True:
         try:
             was_up, why = await _dial_once(
-                target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence
+                target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence, say=say
             )
         except asyncio.CancelledError:
             raise
@@ -312,11 +315,16 @@ async def _dial_once(
     on_state: Callable[[bool, str, Mux | None], None],
     ping: float | None,
     silence: float | None,
+    say: Callable[[], dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
     """One attempt: whether the link came up, and why it is down now."""
     if isinstance(target, Path):
-        return await _dial_socket(target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence)
-    return await _dial_command(target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence)
+        return await _dial_socket(
+            target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence, say=say
+        )
+    return await _dial_command(
+        target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence, say=say
+    )
 
 
 async def _dial_socket(
@@ -327,6 +335,7 @@ async def _dial_socket(
     on_state: Callable[[bool, str, Mux | None], None],
     ping: float | None,
     silence: float | None,
+    say: Callable[[], dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
     """A container node's attempt (§4.4a): the home's per-node socket, straight to `_serve_link` at
     its end — there is no bridge, so *agent down* and *ssh failed* collapse into *cannot connect*:
@@ -341,7 +350,9 @@ async def _dial_socket(
 
     mux = Mux(reader, writer, handler, silence=silence)
     try:
-        return await _converse(mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early)
+        return await _converse(
+            mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early, say=say
+        )
     finally:
         with contextlib.suppress(Exception):
             writer.close()
@@ -355,6 +366,7 @@ async def _dial_command(
     on_state: Callable[[bool, str, Mux | None], None],
     ping: float | None,
     silence: float | None,
+    say: Callable[[], dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
     """An ssh node's attempt: run the transport, whose far end is the bridge."""
     try:
@@ -390,7 +402,9 @@ async def _dial_command(
 
     mux = Mux(proc.stdout, _PipeWriter(proc), handler, silence=silence, stray=stray)
     try:
-        return await _converse(mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early)
+        return await _converse(
+            mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early, say=say
+        )
     finally:
         drain.cancel()
         with contextlib.suppress(ProcessLookupError, OSError):
@@ -407,6 +421,7 @@ async def _converse(
     ping: float | None,
     silence: float | None,
     closed_early: Callable[[], Awaitable[str]],
+    say: Callable[[], dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
     """The link itself, whatever carries it: `hello`, then ping until it ends. `closed_early` names
     the reason when the other end went away before answering hello."""
@@ -421,11 +436,13 @@ async def _converse(
                 protocol=PROTOCOL,
                 host=host,
                 build=os.environ.get("SHIFTLEAD_BUILD", ""),
+                **(say() if say else {}),
             )
         except LinkError as e:
             return False, f"refused: {e}"
         except (LinkClosed, TimeoutError):
             return False, await closed_early()
+        mux.greeting = answer if isinstance(answer, dict) else {}
         on_state(True, f"linked to {(answer or {}).get('home', 'home')} as {(answer or {}).get('host', host)}", mux)
         pinger = asyncio.ensure_future(_ping(mux, LINK_PING if ping is None else ping))
         try:

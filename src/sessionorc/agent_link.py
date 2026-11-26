@@ -18,6 +18,7 @@ from sessionorc import (
     containers,
     hosts,
     link,
+    logins,
     mail,
     naming,
     shots,
@@ -186,6 +187,8 @@ class LinkMixin:
             self._snapshot_sent = False
             self._spend_link.clear()  # the first `spend` on a new link reads the home's cursors again
             self._seat_link.clear()  # and the first `seat_spend` (TD-833)
+            if up and mux is not None:  # whether the home is cut over, as its greeting said (§4.9e *The window*)
+                self._home_greeting = dict(mux.greeting)
             if up:
                 task = asyncio.ensure_future(self._send_snapshot(mux))
                 self._bg.add(task)
@@ -198,6 +201,7 @@ class LinkMixin:
             on_state=on_state,
             first=link.BACKOFF_FIRST,
             top=link.BACKOFF_MAX,
+            say=lambda: {"switched": logins.switched()},  # read at each dial: the window's move writes it (§4.9e)
         )
 
     async def _send_snapshot(self, mux: link.Mux | None) -> None:
