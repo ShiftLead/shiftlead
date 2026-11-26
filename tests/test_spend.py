@@ -551,3 +551,57 @@ async def test_a_switched_nodes_spend_names_the_login_and_the_home_keeps_it_besi
     assert agent._spend["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:api"}
     async with LocalClient() as person:
         await person.call("kill", id=w["id"])
+
+
+async def _node_pass(agent, hookstub, tmp_path, monkeypatch, profiles: list[str], logins_text: str) -> list[dict]:
+    """TD-2306: one node pass's `spend` sends, each metered profile of `profiles` one account's (`hookstub:key`) with a
+    session of its own, on a node whose `logins.yml` holds `logins_text`."""
+    from sessionorc import paths
+
+    await park_ticks(agent)
+    hookstub.billing = {p: {"billing": "metered", "prices": {"input": 1.0}} for p in profiles}
+    hookstub.accounts = dict.fromkeys(profiles, "key")
+    at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    hookstub.spend_turns = [_t("u0", at, 0, source="t1", inp=5)]
+    async with LocalClient() as person:
+        for p in profiles:
+            (tmp_path / p).mkdir(exist_ok=True)
+            await person.call("create", name=f"w-{p}", dir=str(tmp_path / p), adapter="hookstub", profile=p)
+    (paths.home() / "logins.yml").write_text(logins_text)
+    sent: list[dict] = []
+
+    class Mux:
+        async def request(self, method, timeout=None, **params):
+            sent.append({"method": method, **params})
+            return {"cursors": params.get("cursors") or {}, "seeded": True, "sums": {}}
+
+    monkeypatch.setattr(agent, "mode", "node")
+    monkeypatch.setattr(agent, "_home_mux", Mux())
+    monkeypatch.setattr(agent, "_snapshot_sent", True)
+    await agent._refresh_spend_inner()
+    return [m for m in sent if m["method"] == "spend"]
+
+
+async def test_a_node_whose_logins_file_does_not_read_still_sends_its_spend_naming_no_login(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """TD-2306, §4.4a: a `logins.yml` the person is mid-edit on never stops the pass: the spend goes, with no login."""
+    sent = await _node_pass(agent, hookstub, tmp_path, monkeypatch, ["api"], "logins: [unclosed\n")
+    assert sent and all(m["profile"] == "api" and "login" not in m for m in sent), sent
+
+
+async def test_two_profiles_of_one_account_are_each_sent_with_their_own_login(agent, hookstub, tmp_path, monkeypatch):
+    """TD-2306, §4.4a and §4.9e *A team on a node*: an account's group keeps the login of each of its profiles."""
+    text = "logins:\n  hookstub:api: {account: hookstub:key}\n  hookstub:work: {account: hookstub:key}\nforgotten: {}\n"
+    sent = await _node_pass(agent, hookstub, tmp_path, monkeypatch, ["api", "work"], text)
+    assert {m["profile"]: m.get("login") for m in sent} == {"api": "hookstub:api", "work": "hookstub:work"}, sent
+
+
+async def test_a_later_login_for_a_profile_replaces_the_one_the_home_kept(agent):
+    """TD-2306, §4.4a: the home keeps the login a node's profile is now, in memory and on disk, not the first one."""
+    await park_ticks(agent)
+    head = {"account": "hookstub:key", "profile": "api", "prices": {}, "turns": [], "cursors": {}}
+    await agent._take_spend("laptop", head | {"login": "hookstub:api"})
+    await agent._take_spend("laptop", head | {"login": "hookstub:other"})
+    assert agent._spend["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:other"}
+    assert agent.spend_store.load()["hookstub:key"]["hosts"]["laptop"]["logins"] == {"api": "hookstub:other"}
