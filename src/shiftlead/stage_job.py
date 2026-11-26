@@ -31,7 +31,7 @@ from shiftlead.stagerecord import JOB_KEY
 SEATS = ("board-answers", "unheld-pull-requests")
 
 JobActName = Literal["reconcile", "offer", "offer-again"]
-PR_KINDS = ("red", "filing", "sync", "lift", "sweep")  # the orders a pull request's job is (§4.9c)
+PR_KINDS = ("red", "filing", "sync", "lift", "sweep", "record")  # the orders a pull request's job is (§4.9c)
 
 
 class PrObject(NamedTuple):
@@ -289,7 +289,10 @@ def pr_objects(
             continue  # no pull request's number: never a job, and never a raise that stops the pass
         kind = next((k for k in ("sync", "lift", "sweep", "filing") if o.get(k)), "red")
         reason = str(o.get("reason") or "") if kind == "sync" else ""
-        out[key] = PrObject(str(o.get(f"{kind}_since") or ""), kind, reason)
+        since = str(o.get(f"{kind}_since") or "")
+        if kind == "sweep" and o.get("sweep") == "record":
+            kind = "record"  # the sweep's record PR, its time still `sweep_since` (§4.4, TD-2225)
+        out[key] = PrObject(since, kind, reason)
     return out
 
 

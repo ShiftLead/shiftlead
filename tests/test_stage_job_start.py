@@ -197,6 +197,7 @@ def test_only_a_pull_request_jobs_session_is_told_closed_unmerged():
         ("sync", "**A sync pull request**"),
         ("lift", "**A lift pull request**"),
         ("sweep", "**A sweep pull request**"),
+        ("record", "**A record pull request**"),
     ],
 )
 def test_a_pull_request_jobs_brief_is_its_orders_words_by_its_kind(world, kind, words):
@@ -211,6 +212,7 @@ def test_a_pull_request_jobs_brief_is_its_orders_words_by_its_kind(world, kind, 
             ("sync", "**A sync"),
             ("lift", "**A lift"),
             ("sweep", "**A sweep"),
+            ("record", "**A record"),
         )
         if k != kind
     ]

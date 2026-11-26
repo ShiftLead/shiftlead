@@ -417,3 +417,23 @@ def test_the_repo_page_tags_a_lift_and_a_sweep_pr(tmp_path, monkeypatch):
     assert ">lift 2h 0m · held by" not in html and ">lift 2h 0m</span>" in html
     assert "the gate sweep&#39;s board items, open since" in html and ">sweep 2h 0m</span>" in html
     assert ">· 3 red</span>" in c.get("/").text
+
+
+def test_a_record_prs_row_and_red_pr_say_its_own_words():
+    """§4.4 *The same pass records a design's Go* (TD-2225): the sweep's record PR is a sweep order in words of its
+    own, picked by the mark's value, its key words (`sweep`, `sweep_since`) the sweep's."""
+    from sessionorc import workorders
+    from shiftlead import teamrun
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    since = _iso(now() - timedelta(hours=2))
+    pr = {"number": 1960, "title": "reviews: record pass 2026-11-16 — 2 records", "branch": "record/2026-11-16", "url": "https://x/1960", "author": "eye", "checks": "green", "failing": [], "conflicting": False, "red_since": since, "sweep": "record", "sweep_since": since}  # fmt: skip
+    (row,) = red_pr_rows({root: reading(root, orders=[workorders.pr_order(pr)])}, [], now())
+    assert row["text"] == f"samscrape #1960 · record {row['age']} · the gate sweep's record of designs' Go · eye"
+    assert row["sweep"] == "record", "the mark's value is copied on, never True"
+    r = reading(root, orders=[])
+    r["prs"]["open"] += [pr]
+    r["pr_orders"]["gate"] = [1960]
+    got = {x["number"]: x for x in teamrun.red_prs(r, [rec("g1", root)], now())}[1960]
+    assert (got["word"], got["what"], got["sweep_since"]) == ("sweep", "the gate sweep's record of designs' Go", since)
