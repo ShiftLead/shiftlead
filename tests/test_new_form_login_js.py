@@ -62,7 +62,8 @@ const typedIn = el({ parentElement: typedField, disabled: true });
 const model = el(), models = el();
 const host = select([opt("home"), opt("node-a")], 0);
 const role = select([opt("", { interactive: "1" }), opt("worker")], 0);
-const team = select([opt(""), opt("t", { lines: JSON.stringify([{ role: "worker", line: "w" }]), dirs: '["/r"]', roles: "worker" })], 0);
+const lines = JSON.stringify([{ role: "worker", line: "w" }]);
+const team = select([opt(""), opt("t", { lines, dirs: '["/r"]', roles: "worker" })], 0);
 const repo = select([opt("/r", { name: "r" }), opt("", { other: "1" })], 0);
 const linePick = select([], -1);
 const els = {
