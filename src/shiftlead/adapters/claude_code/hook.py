@@ -229,9 +229,20 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
 def _stop_failure(out: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
     """A turn ended on an API error (design §4.2): an account's error is a question for the person in the
     terminal, its text the tool's own words (*Login expired · Please run /login*, TD-1747); a rate limit reads
-    `limited`; any other code `idle`, the turn over (TD-1748)."""
+    `limited`; any other code `idle`, the turn over (TD-1748).
+
+    A subagent's (its payload carries `agent_id`) is that subagent's end, which no `SubagentStop` follows, so the
+    event hands its id on as `subagent_stopped`, the count-down a `TaskStop` of it sends; and it never writes the
+    main thread's state (TD-2315). An account's error is still the session's question, since the login is the
+    session's: it goes out as the main thread's, without `subagent` (and without the subagent's `cwd`), so the
+    next main-thread prompt ends it. A rate limit or any other code is the subagent's alone: no state."""
     error = str(payload.get("error") or "")
     said = " ".join(str(payload.get("last_assistant_message") or payload.get("error_details") or error).split())
+    if sub := out.pop("subagent", None):
+        out.pop("cwd", None)
+        out["subagent_stopped"] = sub
+        if error not in ACCOUNT_ERRORS:
+            return out
     if error == "rate_limit":
         return {**out, "state": "limited", "pending": {"kind": "limit", "text": f"Claude Code: {said[:200]}"}}
     if error not in ACCOUNT_ERRORS:

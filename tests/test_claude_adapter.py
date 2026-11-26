@@ -1448,6 +1448,58 @@ def test_a_turn_ended_on_any_other_api_error_reads_idle_and_a_rate_limit_limited
     assert bare["state"] == "limited" and bare["pending"]["text"] == "Claude Code: rate_limit"
 
 
+def test_a_subagents_stop_failure_counts_it_down_and_writes_no_main_thread_state():
+    """TD-2315, design §4.2: a subagent's `StopFailure` (it carries `agent_id`) is that subagent's end, which no
+    `SubagentStop` follows, so it hands the id on as `subagent_stopped`. An account's error is the session's
+    question, sent as the main thread's: no `subagent`, and no `cwd` of the subagent's. A rate limit or any other
+    code writes no state at all. The same events with no `agent_id` read as before."""
+    sub = {**LOGIN_EXPIRED, "agent_id": "a1", "cwd": "/elsewhere"}
+    got = translate(sub)
+    assert got["state"] == "needs-you" and got["subagent_stopped"] == "a1"
+    assert "subagent" not in got and "cwd" not in got
+    assert got["pending"]["text"].startswith("Claude Code wants a login: Login expired")
+    for error in ("rate_limit", *TURN_OVER_ERRORS):
+        assert translate({**sub, "error": error}) == {"adapter_id": "u1", "subagent_stopped": "a1"}, error
+    plain = translate({**LOGIN_EXPIRED, "cwd": "/here"})
+    assert "subagent_stopped" not in plain and plain["cwd"] == "/here" and plain["state"] == "needs-you"
+
+
+async def test_a_dead_subagents_login_question_ends_at_the_next_main_thread_prompt(agent, hookstub, tmp_path):
+    """TD-2315: through the host agent — designer-ao-1's 2026-11-26 run. A subagent dies on the login's
+    `StopFailure`: the question is the main thread's and the subagent is no longer counted, so the person's next
+    prompt reads `working` with nothing open. With a second subagent counted, one's failure counts down only
+    itself and ends no prompt of the other; a subagent's rate limit or other code leaves the main state as it was."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        for a in ("a1", "a2"):
+            await _hook(sid, hook_event_name="SubagentStart", session_id="u1", agent_id=a, agent_type="general")
+        await _hook(
+            sid,
+            hook_event_name="Notification",
+            session_id="u1",
+            agent_id="a2",
+            notification_type="agent_needs_input",
+            message="a2 asks",
+        )
+        await _hook(sid, **LOGIN_EXPIRED, agent_id="a1")
+        s = agent.sessions[sid]
+        assert (s.subagents, s.subagent_ids) == (1, ["a2"])
+        assert [(p.subagent, p.kind) for p in s.pendings] == [("a2", "question"), (None, "question")]
+        assert "Please run /login" in s.pendings[-1].text
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        assert [p.subagent for p in s.pendings] == ["a2"]  # the login ended, a2's own question stands
+        await _hook(sid, hook_event_name="SubagentStop", session_id="u1", agent_id="a2")
+        rec = await c.call("get", id=sid)
+        assert (rec["state"], rec["pending"], rec["subagents"]) == ("working", None, 0)
+        for error in ("rate_limit", "overloaded"):
+            await _hook(sid, hook_event_name="SubagentStart", session_id="u1", agent_id="a3", agent_type="general")
+            await _hook(sid, hook_event_name="StopFailure", session_id="u1", agent_id="a3", error=error)
+            rec = await c.call("get", id=sid)
+            assert (rec["state"], rec["pending"], rec["subagents"]) == ("working", None, 0), error
+            assert s.limited_hook_at is None
+
+
 async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle(agent, hookstub, tmp_path):
     """TD-1748: through the host agent — the `rate_limit` `StopFailure` reads `limited` (`hook`). A reading
     fetched before it lifts nothing, since it cannot have seen the cap; a later one with a cap keeps it and
