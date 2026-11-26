@@ -446,6 +446,42 @@ async def test_forget_and_naming_an_account_read_what_runs_and_what_is_retired(a
         )
 
 
+@pytest.mark.integration
+async def test_forget_is_refused_while_the_directors_record_lists_the_login(agent):
+    """TD-2329, design §4.2b *⋯ on a login*: the home reads `director:`'s list from the director's record (a seat on
+    `prompt` with no `builtin`), live or not; a superseded record's old list and a built-in prompts seat's do not
+    refuse, and a node is not refused for the home's lists."""
+    from conftest import park_ticks
+
+    from sessionorc import paths
+    from sessionorc.client import AgentError, LocalClient
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    logins.save(_data(), "fixture", paths.home())
+
+    def record(name: str, **kw) -> Session:
+        s = Session(id=f"ao-x-{name}", name=name, kind="interactive", adapter="claude-code", dir="/w")
+        s.state, s.host, s.seat, s.seat_model = "exited", agent.host, {"trigger": "prompt"}, "opus"
+        for k, v in kw.items():
+            setattr(s, k, v)
+        agent.sessions[s.id] = s
+        return s
+
+    record("old", login_list=["claude-code:api"], superseded_by="ao-x-director")  # a resume's old list
+    record("prompts", login_list=["claude-code:api"], builtin="prompts")  # a built-in seat on prompt
+    record("director", login_list=["claude-code:grind"])  # between fills: no session live
+    async with LocalClient() as c:
+        with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while the director use it"):
+            await c.call("login_forget", login="grind")
+        assert (await c.call("login_forget", login="api"))["change"] == "claude-code:api forgotten"
+        mode, agent.mode = agent.mode, "node"  # a node cannot read the home's lists: not refused for them
+        try:
+            assert (await c.call("login_forget", login="grind"))["change"] == "claude-code:grind forgotten"
+        finally:
+            agent.mode = mode
+
+
 def test_a_reserve_moves_to_the_account_its_last_login_joins():
     from sessionorc import settings
 
