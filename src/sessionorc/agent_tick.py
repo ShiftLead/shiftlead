@@ -4943,9 +4943,9 @@ class TickMixin:
     async def _builtin_login(self, s: Session) -> dict[str, Any] | None:
         """The `create` arguments that put a built-in seat's fill on its login (§4.9d *The login a seat starts on*,
         §4.9e *The launch on a login*, TD-2068): `{}` for a fill as before — before the cut-over, a record that is no
-        built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the list of the
-        set its repo uses that offers the seat's model, with that model and the list, by `builtinstore.seat`, no team's
-        reserve added. None where nothing is to be filled now, `unfillable` saying why: *no login usable* (the usage
+        built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the
+        list of the set its repo uses that offers the seat's model, with that model and the list, by
+        `builtinstore.seat`, no team's reserve added. None where nothing is to be filled now, `unfillable` saying why: *no login usable* (the usage
         gate holds it) or *cannot run* (no login of the list offers the model)."""
         key = BUILTIN_SEAT_KEYS.get(str(s.builtin or ""))
         if not (self._first_shape_off and key) or (s.host and s.host != self.host):

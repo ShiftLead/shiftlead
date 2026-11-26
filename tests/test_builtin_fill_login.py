@@ -92,7 +92,9 @@ async def _fill(agent, sid: str) -> None:
 
 
 @pytest.mark.parametrize(("builtin", "model"), [("techlead", "opus"), ("sweeper", "haiku")])
-async def test_a_built_in_seat_is_filled_on_its_sets_first_usable_login(agent, tmp_path, launched, rows, builtin, model):
+async def test_a_built_in_seat_is_filled_on_its_sets_first_usable_login(
+    agent, tmp_path, launched, rows, builtin, model
+):
     rows.update({"hookstub:first": _row("acct-1", [model]), "hookstub:second": _row("acct-2", [model])})
     sid = await _held_seat(agent, tmp_path, builtin)
     old = agent.sessions[sid]
