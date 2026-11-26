@@ -721,3 +721,94 @@ async def test_a_replay_of_a_launch_record_with_no_list_is_sent_as_before(agent,
     await agent._replay(s, "lost-brief", keep_mail=True)
     assert len(sent) == 1 and sent[0]["profile"] == "first"
     assert s.restarts[-1]["why"] == "lost-brief" and "disk is full" in s.restarts[-1]["error"]
+
+
+def _mark(agent, model: str, order: list[str]) -> None:
+    """The home's mark that the default set cannot run the tech lead seat on `a-node` (§4.9d *How each one runs*)."""
+    agent._host_rec["builtins"] = {
+        "default": {"node_cannot_run": {"tech-lead": {"a-node": {"model": model, "logins": order}}}}
+    }
+
+
+async def test_a_held_work_replay_of_a_nodes_seat_is_sent_under_a_standing_mark(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2284: only rule 1's lost-brief replay is checked against the set's mark before its send (§4.9d *How each one
+    runs*); rule 8's held `work` write of the seat is sent whatever the mark."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, None, **NODE_LAUNCH)
+    _mark(agent, "opus", NODE_LAUNCH["login_list"])
+    await agent._replay(agent.sessions[sid], "work", held=True, keep_mail=True)
+    assert len(sent) == 1 and sent[0]["held"]
+
+
+async def test_a_replay_under_another_cause_refused_for_its_list_is_counted(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2284: a node's refusal of the list is no restart only for a fill and a lost-brief replay; a replay of the
+    seat under any other cause, refused so, is a failed restart that counts, and marks nothing."""
+    sid = await _held_seat(agent, tmp_path)
+    _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} opus", **NODE_LAUNCH)
+    s = agent.sessions[sid]
+    await agent._replay(s, "restart", keep_mail=True)
+    assert s.restarts[-1]["why"] == "restart" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
+    assert sid not in agent.unfillable and not agent._host_rec.get("builtins")
+
+
+async def test_a_fill_is_sent_under_a_mark_naming_only_its_launch_records_older_list(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2284: a fill is not held by the mark its launch record's list draws (the fill sends the set's list, read
+    by `_builtin_login`): a mark naming only the older list sends it."""
+    sid = await _held_seat(agent, tmp_path)
+    older = ["hookstub:second"]
+    sent = _on_a_node(agent, monkeypatch, sid, None, profile="", seat_model="opus", login_list=older)
+    _mark(agent, "opus", older)
+    await agent._replay(agent.sessions[sid], "fill", keep_mail=True)
+    assert len(sent) == 1
+
+
+async def test_a_replays_mark_is_read_against_the_model_its_launch_record_sends(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2284: a launch record whose model is not the set's sends its own model; the mark its refusal writes names
+    that model, so the next lost-brief replay is held by it rather than asking the node again."""
+    sid = await _held_seat(agent, tmp_path)
+    launch = {**NODE_LAUNCH, "seat_model": "haiku"}
+    sent = _on_a_node(agent, monkeypatch, sid, f"{teamstore.NO_LOGIN_OFFERS} haiku", **launch)
+    s = agent.sessions[sid]
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    assert len(sent) == 1 and sent[0]["seat_model"] == "haiku" and not s.restarts
+
+
+async def test_a_lost_brief_replay_whose_launch_record_cannot_be_read_is_counted(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """TD-2284: a launch record that cannot be read is a failed restart, counted (§6), not an error out of `_replay`."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, None)
+
+    def unreadable(_address):
+        raise RpcError("no launch record for it: nothing to replay (design §6)")
+
+    monkeypatch.setattr(agent, "_read_launch", unreadable)
+    s = agent.sessions[sid]
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    assert not sent and s.restarts[-1]["why"] == "lost-brief" and "no launch record" in s.restarts[-1]["error"]
+
+
+@pytest.mark.parametrize("refused", [None, f"{teamstore.NO_LOGIN_OFFERS} opus"])
+async def test_a_lost_brief_replay_naming_a_login_beside_its_list_is_sent_as_handed(
+    agent, tmp_path, launched, rows, monkeypatch, refused
+):
+    """TD-2284: a launch record naming a login beside its list is no list sent as names: the mark does not hold its
+    replay, and a refusal of it is a failed restart that counts."""
+    sid = await _held_seat(agent, tmp_path)
+    sent = _on_a_node(agent, monkeypatch, sid, refused, **NODE_LAUNCH, login="hookstub:first")
+    _mark(agent, "opus", NODE_LAUNCH["login_list"])
+    s = agent.sessions[sid]
+    await agent._replay(s, "lost-brief", keep_mail=True)
+    assert len(sent) == 1 and sent[0]["login"] == "hookstub:first"
+    if refused:
+        assert s.restarts[-1]["why"] == "lost-brief" and teamstore.NO_LOGIN_OFFERS in s.restarts[-1]["error"]
