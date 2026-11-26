@@ -141,6 +141,18 @@ def test_a_record_with_no_holder_is_offered_through_the_start_and_the_claim(stor
     assert world.ended == []
 
 
+def test_an_offer_keeps_the_spend_the_reach_reads_for_its_holder(store):
+    """§4.9c *Each holder leaves a `run`* (TD-2228): the pass hands `offer` the reach's `spent`, so the record keeps
+    the holder's sums at the offer under its bare id."""
+    world = World(started="s2@node")
+    asked: list[str] = []
+    sums = {"opus": {"input": 10, "output": 2}}
+    reach = replace(world.reach, spent=lambda sid: asked.append(sid) or sums)
+    got = step(store, put(store, holder=None), facts(may_start=True, within_size=True), reach)
+    assert got.act.name == "offer" and got.made.made and asked == ["s2"]
+    assert store.entry(TID)["spent_before"] == {"s2": sums}
+
+
 def test_an_offer_whose_claim_is_refused_ends_the_session_it_started(store):
     world = World(refused="over its line")
     got = step(store, put(store, holder=None), facts(may_start=True, within_size=True), world.reach)
