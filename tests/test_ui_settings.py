@@ -873,6 +873,9 @@ def test_the_settings_page_s_profile_cards_hold_no_login(client, subprocess_agen
     finally:
         (home / "logins.yml").unlink()
         (home / "profiles.yml").unlink()
+        # the module's agent keeps the tools read the page made while the host was switched: read it again, or a
+        # later test of this module finds the host switched (TD-2246)
+        assert client.post("/api/tools/check").status_code == 200
 
 
 def test_schedule_card_offers_the_profiles_and_their_windows():
