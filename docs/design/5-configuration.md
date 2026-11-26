@@ -109,8 +109,10 @@ reach:                                        # §4.5b *The setting*: the person
   (§4.9e) and gates the team page's writes. **`sweep:` after the cut-over** keeps `on`, `every` and each
   repo's `repos.<repo>.sweep` switch; **`profile` goes**, the sweeper being a built-in seat that runs
   on the model and a login of the built-in set its repo uses. Whether a team is
-  started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped and a
-  flow switch under way (§4.9d *When it runs*). All but the running settings are written by the team page's own calls
+  started is not here: it is a mark on the home's `host` record, with when and by whom it was stopped, a
+  flow switch under way (§4.9d *When it runs*), and, for a team on a node, `node_cannot_run: {model, logins, flow,
+  at}`, the node's word that no login of the list offers a model, which a changed list or flow clears (§4.9d *A team
+  on a node*). All but the running settings are written by the team page's own calls
   (`team_new`, `team_delete`, `team_switch`, `team_set`), never by `set_settings`.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
