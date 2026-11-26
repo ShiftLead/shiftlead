@@ -740,6 +740,37 @@ BOARD_WAIT_DAYS = 3
 # re-ask, one constant for the word and the sweep (§4.4 *The card's status*, TD-1368)
 REASK_DAYS = lb.SWEEP_REASK_DAYS
 _GATE = f"decision ({PERSON})"
+# the gate's own pair, the sweep's line's answers (§4.5 screen 6 *The ledger's entries that wait on you*, TD-2172,
+# built by TD-2186): `Go` lifts, `Not yet` keeps it waiting
+GATE_PAIR = tuple(lb.SWEEP_DECISION_ANSWERS)
+
+
+def gate_pair(
+    e: Mapping[str, Any],
+    *,
+    fact: Any = (),
+    held: bool = False,
+    builds: Any = (),
+    boards: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+    refs_open: Mapping[str, str] | None = None,
+) -> bool:
+    """Whether a ledger entry is offered **the gate's own pair**, `Go | Not yet` (§4.5 screen 6 *The ledger's
+    entries that wait on you*, TD-2172, built by TD-2186): it carries `decision (paul)`, has an `**Ask:**` and no
+    `**Answers:**`, has no fact (`fact`, its counted open work, TD-1926), is no `Owner: paul` entry (its **Done** the
+    answer), no design with a question (`builds`, its held builds: its Go is **Go now**) and no held build (`held`:
+    its design's question is the one asked, TD-2021), and no open undecided line covers it (`covered_by_open_line`
+    over `boards`, by repo name, linked through `refs_open`): that line is its question, answered in its place. `e`
+    carries its `repo`. One test, which the Inbox's reading and the home's `ledger_decide` both make."""
+    return bool(
+        ledger_mod.decided_by(dict(e), PERSON)
+        and str(e.get("ask") or "").strip()
+        and not any(str(a).strip() for a in e.get("answers") or ())
+        and str(e.get("owner") or "").strip().lower() != PERSON
+        and not fact
+        and not held
+        and not builds
+        and not (boards and covered_by_open_line(e, _board_lines(boards), refs_open or {}))
+    )
 
 
 def _civil(v: Any) -> date | None:

@@ -1179,7 +1179,11 @@ class InboxMixin:
         is a work order at once. `repo` is the checkout the home's repo facts key it by; the entry is
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
         already names it. An answer writes no ledger file and lifts no gate: on an entry carrying `decision (<p>)` the
-        gate stands while its session acts on the line (§4.4 *Every other answer leaves the gate standing*). `lift`
+        gate stands while its session acts on the line (§4.4 *Every other answer leaves the gate standing*) — save the
+        gate's own pair (`queue.gate_pair`, TD-2186): on an entry with an `**Ask:**` and no `**Answers:**`, `answer`
+        0 is **Go** and 1 **Not yet**, written as the gate sweep's own line decided (`board.add_gate_decided`), so a
+        Go is the decide lift and a Not yet closes the line `— kept waiting.`; the Reply's words take the road above.
+        `lift`
         is **Lift the hold**'s press alone (§4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829):
         it writes no line and lifts the gate itself (`_press_lift`), refused beside a `road`, an `answer` or `go`.
         `builds` is the held builds a page's **Go now** drew (an empty list where it drew a plain **Lift the hold**,
@@ -1227,6 +1231,11 @@ class InboxMixin:
         answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
         d = e.get("default")
         default = d if isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers) else None
+        # the gate's own pair, `Go | Not yet`, on a held question with no answers of its own (§4.5 screen 6, TD-2172,
+        # built by TD-2186): an `answer` is read against it, and written as the sweep's own line, decided
+        pair = answer is not None and not go and self._gate_pair(name, e)
+        if pair:
+            answers, default = list(queue_mod.GATE_PAIR), None
         if go:
             if default is None:
                 raise RpcError(f"{id} marks no answer (default): pick one of its answers, or Reply")
@@ -1252,9 +1261,20 @@ class InboxMixin:
             today = datetime.now().date().isoformat()
             async with self._applying_mark(root, f"ledger:{queue_mod.qid(name, id)}", "decide", said):  # TD-1508
                 try:
-                    done = await asyncio.to_thread(
-                        board_mod.add_decided, root, str(e.get("title") or ""), id, answers, default, said, today
-                    )
+                    if pair:
+                        done = await asyncio.to_thread(
+                            board_mod.add_gate_decided,
+                            root,
+                            id,
+                            str(e.get("title") or ""),
+                            str(e.get("ask") or ""),
+                            said,
+                            today,
+                        )
+                    else:
+                        done = await asyncio.to_thread(
+                            board_mod.add_decided, root, str(e.get("title") or ""), id, answers, default, said, today
+                        )
                 except board_mod.Refused as err:
                     raise RpcError(str(err)) from None
                 log.info("board %s: %s", root, done["message"])
@@ -1264,6 +1284,26 @@ class InboxMixin:
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
+
+    def _gate_pair(self, name: str, e: Mapping[str, Any]) -> bool:
+        """Whether entry `e` of repo `name` is offered the gate's own pair (`queue.gate_pair`, TD-2186), as the
+        Inbox's reading stamps it: no fact, no held build, no design with held builds, no open undecided line
+        covering it."""
+        me = queue_mod.qid(name, str(e.get("id") or ""))
+        opens, work, linked, held, _ = self._open_work()
+        boards = {
+            str(r.get("name") or Path(k).name): list((r.get("boards") or {}).get("boards") or ())
+            for k, r in self._repos.items()
+            if isinstance(r, dict)
+        }
+        return queue_mod.gate_pair(
+            {**e, "repo": name},
+            fact=work.get(me),
+            held=me in held,
+            builds=queue_mod.go_builds(held, opens).get(me) or [],
+            boards=boards,
+            refs_open=linked,
+        )
 
     async def _press_lift(
         self,

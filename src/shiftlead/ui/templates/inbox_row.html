@@ -240,6 +240,13 @@
 the hold stays{% if e.home == 'queue' and e.lift_item %}; {{ 'Go now' if e.go_builds else 'Lift the hold' }} lifts it{% endif %}
 {%- endmacro %}
 
+{#- a ledger answer's title (§4.5 screen 6 *The ledger's entries that wait on you*, TD-2172, built by TD-2186): on the
+    gate's own pair **Go** lifts the hold and **Not yet** keeps it, asked again in `queue.REASK_DAYS`; any other answer
+    leaves the hold standing (`hold_stays`) -#}
+{% macro ledger_title(e, i) -%}
+{%- if e.gate_pair and i == 0 %}lifts the hold on {{ e.id }}{% elif e.gate_pair %}the hold stays; asked again in {{ e.reask_days }} days{% else %}{{ hold_stays(e) }}{% endif %}
+{%- endmacro %}
+
 {% macro answer_row(e, how, gwi='') -%}
 {%- set raw = e.get('answers') if how != 'owed' else [] %}{% set raw = raw if raw is sequence and raw is not string else [] %}
 {%- set cs = e.get('consequences') %}{% set cs = cs if cs is sequence and cs is not string else [] %}
@@ -269,7 +276,7 @@ the hold stays{% if e.home == 'queue' and e.lift_item %}; {{ 'Go now' if e.go_bu
   {%- elif how == 'board' and form %} {{ board_form(e, i, begun, where) }}
   {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ a }}"
   {%- elif form %} data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ begun }}" data-form="{{ i }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"
-  {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ hold_stays(e) }}"
+  {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ ledger_title(e, i) }}"
   {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% elif head %}{{ head }}…{% else %}{{ cap_first(a) }}{% endif %}</span></button>
   {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
   {%- endif %}{% endfor %}
@@ -1798,7 +1805,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- set hs = e.heads if e.heads is sequence and e.heads is not string and e.heads | length == e.answers | length else [] %}
   {%- for a in e.answers %}
   {%- set head = hs[loop.index0] if loop.index0 < hs | length and hs[loop.index0] is string else '' %}
-  <button class="btn sm answer" {% if head %}data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ head }}: " data-form="{{ loop.index0 }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"><span class="alabel">{{ head }}…</span>{% else %}data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ hold_stays(e) }}"><span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if head %}data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ head }}: " data-form="{{ loop.index0 }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"><span class="alabel">{{ head }}…</span>{% else %}data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ ledger_title(e, loop.index0) }}"><span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}

@@ -1109,6 +1109,60 @@ def add_decided(
     return _insert(root, plan, lambda p: message(head, "append", id=p.info["id"], session=session))
 
 
+def add_gate_decided(
+    root: str | Path, tid: str, title: str, ask: str, said: str, today: str, person: str = ledger_mod.PERSON_OWNER
+) -> dict[str, Any]:
+    """The gate's own pair pressed (design §4.5 screen 6 *The ledger's entries that wait on you*, TD-2172, built by
+    TD-2186): the gate sweep's own line for `tid`'s `decision (<person>)` (ledgerboard's `_sweep_item`, *uncovered*:
+    `Context: TD-n decision (<person>)`, `Answers: Go | Not yet`, no default, `Go` its lift, the `ask` its words),
+    written by `plan_add` open and undecided, then decided `said` by `plan_edit` on the same tree with the repo's
+    ledger — the two-file decide lift (§4.4 *Board write-back*), never `board_only`: a `Go` lifts the gate, a
+    `Not yet` closes the line `— kept waiting.` and logs it on the entry — both landed in one commit, as an edit is.
+    `plan_add(decided=…)` takes no lift, so the line is added and then decided.
+    Returns `{commit, message, pr, id, key, decided}`."""
+    root = Path(root)
+    gate = f"decision ({person})"
+    item = ledgerboard._sweep_item("uncovered", tid, tid, gate, ask=ask, title=title)
+    lifts = [a for a in ledgerboard.SWEEP_DECISION_ANSWERS if not ledgerboard.waiting_only(a)]
+    with _EDIT:
+        clock = _Clock()
+        if shutil.which("gh") is None:
+            raise unreachable("gh is not installed")
+
+        def press() -> dict[str, Any]:
+            t, want = _tree(root, clock)
+            rel = workorders.board_rel(root)
+            stub = t / rel
+            p = _plan(
+                lb_board.plan_add, str(stub), item["text"], due=today, context=item["context"], kind=item["kind"],
+                answers=item["answers"], default=item["default"], detail=item["detail"], lifts=lifts, today=today,
+                tool=TOOL,
+            )  # fmt: skip
+            _apply(p)
+            new = str(p.info["id"])
+            b = _board(t, rel)
+            it = _find(b, workorders.PREFIX + new[-8:])
+            if it is None:  # the add was just written: only a writer that read it back otherwise gets here
+                _reset(t, want)
+                raise Refused(MOVED)
+            q = _plan(
+                lb_board.plan_edit, str(stub), "decide", it.id, answer=said, by=answerer(root, b) or None,
+                today=today, tool=TOOL, ledger=_lift_ledger(t, it),
+            )  # fmt: skip
+            _apply(q)
+            under = [(t / x).resolve() for x in board_files(rel)]
+            also = sorted(
+                os.path.relpath(x, t)
+                for x in q.changes
+                if not any(Path(x).resolve() == u or Path(x).resolve().is_relative_to(u) for u in under)
+            )
+            msg = message(it.words, "decide", id=new, answer=said)
+            landed = _land(root, t, want, msg, clock, lambda: True, also=also)
+            return {**landed, "id": new, "key": workorders.PREFIX + new[-8:], "decided": said}
+
+        return _twice(press)
+
+
 def _insert(root: Path, plan: Any, msg: Callable[[lb_board.Plan], str]) -> dict[str, Any]:
     """An add's press: `plan(stub)` — ledgerboard's `plan_add` on the board whose stub is `stub` in the host
     agent's own tree, reset to origin's head — written there, committed under `msg(plan)` (the subject carries
