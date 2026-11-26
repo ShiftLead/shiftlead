@@ -153,6 +153,9 @@ def test_org_yml_reads_a_directors_model_and_logins(tmp_path, monkeypatch):
     assert d is not None and (d.model, d.logins, d.profile) == ("opus", ORDER, None)
     with pytest.raises(ValueError, match="logins' keys in order"):
         _org(tmp_path, monkeypatch, {"model": "opus", "logins": "hookstub:first"})
+    for bad in ([1], [""]):
+        with pytest.raises(ValueError, match="logins' keys in order"):
+            _org(tmp_path, monkeypatch, {"model": "opus", "logins": bad})
 
 
 @pytest.mark.unit
@@ -271,3 +274,11 @@ def test_before_the_cut_over_an_ended_director_with_no_model_or_list_is_not_writ
     home = _Home(_stale(profile="grind"))
     assert stage_seats.write_director(home, org) == []
     assert not any(m == "create" for m, _ in home.calls)
+
+
+@pytest.mark.unit
+def test_a_held_records_seat_model_and_list_of_the_wrong_type_are_refused(tmp_path):
+    with pytest.raises(RpcError, match="seat_model is a model family's name"):
+        _on_login(None, "hookstub", "", 5, ORDER, tmp_path, held=True)
+    with pytest.raises(RpcError, match="login_list is the logins' keys in order"):
+        _on_login(None, "hookstub", "", "opus", "hookstub:first", tmp_path, held=True)
