@@ -311,7 +311,7 @@ def holder_on(s: Session | None, tid: str, now: datetime, *, open_ask: bool = Fa
     return Holder(
         ended=ended,
         lease_lapsed=_lapsed(s, tid, now),
-        held=bool(s.suspended) or (not ended and live_hold),
+        held=bool(s.suspended or s.moving) or (not ended and live_hold),  # a move's mark: neither lost nor silent
         stopped=ended and work._how_stopped(s) is not None,
         person=not ended and not s.unattended,
         idle_for=_idle_for(s, now),

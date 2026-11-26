@@ -145,6 +145,8 @@ NODE_OWNED = frozenset(
         "tool_version",
         "login",
         "account",
+        "moving",
+        "login_moves",
         "first_prompt",
         "first_prompt_sent_at",
         "first_prompt_tries",
@@ -1562,6 +1564,11 @@ class Session:
     account: str | None = None
     seat_model: str | None = None
     login_list: list[str] | None = None
+    # A session's move down its login list (§4.9e *A session moves down the list*, TD-2069): `moving`, `{at, from, to}`
+    # while the tick of its host ends the old session and launches the new one under this record, which no other rule
+    # acts on, and `login_moves`, one `{at, from, to}` per move made. Both the node's, written by the host it runs on.
+    moving: dict[str, Any] | None = None
+    login_moves: list[dict[str, Any]] = field(default_factory=list)
     # What the home read of this member's PRs with `scripts/check_cadence.py` (design §6 rule 10,
     # TD-258): one entry per PR, `{pr, at, sha, verdict, failed}` — the head it was read at, the
     # script's verdict and the `rule` of each failed row — with `merged` once the PR is, `told`
