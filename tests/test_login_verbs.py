@@ -422,6 +422,9 @@ async def test_forget_and_naming_an_account_read_what_runs_and_what_is_retired(a
     async with LocalClient() as c:
         with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while ao-x-run use it"):
             await c.call("login_forget", login="grind")
+        s.profile, s.login = None, "claude-code:grind"  # a launch on the login writes its key (TD-2320)
+        with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while ao-x-run use it"):
+            await c.call("login_forget", login="grind")
         s.state = "exited"  # ended: nothing runs on it
         assert (await c.call("login_forget", login="grind"))["change"] == "claude-code:grind forgotten"
         for name in ("old", "gone"):  # a reserve's key and a forgotten login's: retired, refused by name
