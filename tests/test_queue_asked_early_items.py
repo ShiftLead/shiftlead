@@ -154,3 +154,30 @@ def test_the_early_press_line_is_grey_and_amber_on_a_waiting_card():
     css = (Path(ui.__file__).parent / "static" / "app.css").read_text()
     assert ".qpress.qearly { border-left-color: var(--muted); }" in css
     assert ".qcard.g-waiting .qpress.qearly { border-left-color: var(--needs); }" in css
+
+
+@pytest.mark.unit
+def test_a_line_over_early_members_with_different_lines_names_the_lowest_keys():
+    """TD-2243: the line names the first covered member's `early_line` in key order, not in the line's own order."""
+    every = {
+        **_early(51, line_of="once TD-060 closes"),
+        "r#TD-052": {**ENTRIES["r#TD-052"], "early_line": "once TD-061 closes"},
+    }
+    assert line_early(line("**Go?**", parts=("TD-052", "TD-051")), every) == "once TD-060 closes"
+    assert line_early(line("**Go?**", parts=("TD-051", "TD-052")), every) == "once TD-060 closes"
+
+
+@pytest.mark.unit
+def test_an_ungated_entry_in_a_lines_parts_leaves_it_early():
+    """TD-2243: only covered `decision (paul)` members are read; an ungated TD-055 in `Parts:` is no member."""
+    assert line_early(line("**Go?**", parts=("TD-051", "TD-055")), _early(51)) == EARLY
+
+
+@pytest.mark.unit
+def test_an_orphaned_lifting_ask_is_not_early_and_one_with_no_repo_reads_its_askers():
+    """TD-2243: an orphaned ask is asked as any; an ask with no stamped `repo` takes its asker's repo for a bare id."""
+    work = _early(51)
+    assert mail_early(_lift_ask(orphaned=True), {}, work) is None
+    bare = {k: v for k, v in _lift_ask().items() if k != "repo"}
+    assert mail_early(bare, {"m-9": "r"}, work) == EARLY
+    assert mail_early(bare, {}, work) is None, "with no repo to read a bare id in, no entry"
