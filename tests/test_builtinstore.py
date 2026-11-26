@@ -172,6 +172,16 @@ def test_the_pages_read_says_what_each_band_draws():
         team_show.builtins_view(name="gone", doc=doc, rows=rows, roots=[], director=False)
 
 
+def test_the_pages_prompts_seat_reads_the_login_its_fill_starts_on():
+    """The page's *now* for the prompts seat passes over a login that leaves its prompts on, as its fill does (§4.9d
+    *How each one runs*, review of #4724); the other seats' read no such mark."""
+    doc = _doc(builtins={"default": {"logins": ["c:one", "c:two"]}})
+    rows = {"c:one": _row(account="a1", asks=True), "c:two": _row(account="a2")}
+    got = team_show.builtins_view(name="default", doc=doc, rows=rows, roots=[], director=False)
+    now = {s["key"]: s["now"]["login"] for s in got["seats"]}
+    assert now["prompts"] == "c:two" and now["tech-lead"] == "c:one"
+
+
 def test_a_model_pick_under_a_director_keeps_the_stored_prompts_model_and_adds_no_package_model():
     doc = _doc(builtins={"default": {"models": {"prompts": "opus"}, "logins": []}})
     got = team_show.builtins_view(name="default", doc=doc, rows={}, roots=[], director=True)
