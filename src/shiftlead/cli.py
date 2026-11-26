@@ -5812,6 +5812,7 @@ def cmd_host(args: argparse.Namespace) -> int:
                     + ("agent started" if out["started"] else f"agent already running (pid {out['pid']})")
                     + " — `ao status` shows its card once it dials in"
                     + _ended_words(out)
+                    + _node_login_words(out)
                 ),
             )
         if args.action == "forget":
@@ -5925,6 +5926,14 @@ def _clear_node(args: argparse.Namespace) -> tuple[list[dict[str, Any]] | None, 
             args, msg, 1, hint="run it again once they settle, or --force", sessions=[s["id"] for s in left]
         )
     return [], None
+
+
+def _node_login_words(out: dict) -> str:
+    """What `ao host up` did to a container node's `logins.yml` after the cut-over (§4.9e *A container node's
+    `logins.yml`*): each login added, not signed in, and each one passed over, a line each."""
+    got = out.get("logins") or {}
+    lines = [f"login {lk} added, not signed in: sign in inside once" for lk in got.get("added") or ()]
+    return "".join(f"\n  {line}" for line in [*lines, *(got.get("passed") or ())])
 
 
 def _ended_words(out: dict[str, Any]) -> str:
