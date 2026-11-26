@@ -1659,7 +1659,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
        `ended`, each in `unanswered.words`' fixed words — a seat the exited or closed branch finds
        unfillable is this rule's own reason instead, built from `agent.unfillable[r.id]` (its words —
-       *suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*), stored as
+       *suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*, and after the cut-over a built-in
+       seat's *no login usable* and *cannot run*, §4.9d *The login a seat starts on*), stored as
        `{state: "unfillable", why}` and drawn as `why`, never through `words` (the `stuck` shape check takes
        any `state` string); and
        three whose words are this rule's own, for which

@@ -26,6 +26,7 @@ from sessionorc import (
     adapters,
     agent_common,
     branchsweep,
+    builtinstore,
     cachesweep,
     containers,
     diskbook,
@@ -33,6 +34,7 @@ from sessionorc import (
     homesweep,
     hosts,
     link,
+    logins,
     mail,
     naming,
     paths,
@@ -176,6 +178,8 @@ FILLED_FOR = "[shiftlead] you are filled for: "
 # `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
 # person's Restart, and a team's start by a schedule or by rule 8
 NOT_RESTARTS = ("person", "start", "schedule", "work")
+# a built-in seat's record mark → the seat's key in a built-in set (§4.9d *The store*)
+BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "prompts"}
 
 
 def _person_cleared(restarts: list[Any]) -> bool:
@@ -4913,6 +4917,9 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
             return
+        on_login = await self._builtin_login(s)
+        if on_login is None:
+            return  # no login of its set's list can run it now: `unfillable` says why (§4.9d)
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
         seat = s.seat or {}
         tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
@@ -4924,12 +4931,46 @@ class TickMixin:
         said = filled_for(cause)
         if cause and any(e.id == cause.get("ask") and e.handed_entry for e in s.inbox):
             cause = None  # an entry the person handed it fills the seat while it owes, as any seat's (TD-218)
-        await self._replay(s, "fill", mark={"for": "seat_due"} if said else None, closing=said, keep_mail=True)
+        await self._replay(
+            s, "fill", mark={"for": "seat_due"} if said else None, closing=said, keep_mail=True, **on_login
+        )
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if cause and new is not None and new is not s:
             # the fill was made: the cause is remembered on the record that took the seat
             new.seat_filled = [*s.seat_filled, {**{k: v for k, v in cause.items() if k != "at"}, "at": now_iso()}]
             self._save(new)
+
+    async def _builtin_login(self, s: Session) -> dict[str, Any] | None:
+        """The `create` arguments that put a built-in seat's fill on its login (§4.9d *The login a seat starts on*,
+        §4.9e *The launch on a login*, TD-2068): `{}` for a fill as before — before the cut-over, a record that is no
+        built-in seat's, or one on a node, launched as before until the node half — else the first usable login of the list of the
+        set its repo uses that offers the seat's model, with that model and the list, by `builtinstore.seat`, no team's
+        reserve added. None where nothing is to be filled now, `unfillable` saying why: *no login usable* (the usage
+        gate holds it) or *cannot run* (no login of the list offers the model)."""
+        key = BUILTIN_SEAT_KEYS.get(str(s.builtin or ""))
+        if not (self._first_shape_off and key) or (s.host and s.host != self.host):
+            return {}
+        doc = settings_mod.load()
+        root = str(s.repo or "")
+        repo = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+        read, gate = await self.rpc_tools(), await self.rpc_gate()
+        now = datetime.now(UTC)
+        rows = teamstore.login_rows(read, self._projected(gate["accounts"], doc, now), 0, now)
+        got = builtinstore.seat(doc, repo, key, rows)
+        pick = got["now"]
+        if pick["state"] != "usable" or not pick.get("login"):
+            why = "no login usable" if pick["state"] == "waits" else "cannot run"
+            self.unfillable[s.id] = why
+            log.info("%s: not filled — %s in built-in set %s: %s", s.id, why, got["set"], pick.get("why"))
+            return None
+        login = str(pick["login"])
+        return {
+            "login": login,
+            "adapter": logins.split(login)[0],
+            "profile": "",
+            "seat_model": got["model"],
+            "login_list": list(builtinstore.sets(doc)[got["set"]]["logins"]),
+        }
 
     def _seat_prs(self, s: Session, records: list[Session]) -> list[str]:
         """What of its own an idle seat may be waiting on (§6 rule 3, TD-366): an open PR on the branch
