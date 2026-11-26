@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sessionorc import logins, teamstore
+from sessionorc import builtinstore, logins, teamstore
 from sessionorc.client import AgentError, AgentUnavailable
 from shiftlead import flow3, repoconfig, teams
 from shiftlead import org as orgmod
@@ -84,12 +84,14 @@ class Work:
 @dataclass(frozen=True)
 class StageLaunch:
     """A stage's session as it would be created, with the model its stage names. `pick` says where the team's
-    `team_show` reading names the login it starts on: `("stages", <stage key>)` or `("audits", <audit key>)`; None
-    for a launch that reads no team's list (a job's, TD-2068's later slice)."""
+    `team_show` reading names the login it starts on: `("stages", <stage key>)` or `("audits", <audit key>)`, or where
+    the home's `builtins_show` reading of the set `on_set` names it: `("builtins", <seat key>)`, a job's (§4.9d *The
+    login a seat starts on*); None for a launch that reads no list."""
 
     launch: teams.Launch
     model: str
     pick: tuple[str, str] | None = None
+    on_set: str | None = None
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments: a team session's, supervised, so the tick's nudge and context bound reach it
@@ -278,20 +280,31 @@ def launch(
 def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
     """The `create` arguments that put the launch on its login (§4.9e *The launch on a login*): `{}` for a launch
     as before (a team on a node, whose host picks for itself; a launch with no `pick`; a team the home's reading does
-    not show switched), else the login the team's reading picks with the model and the list, or None when nothing is
-    to start: no login of the list usable (the usage gate holds it) or none offering the model (*cannot run*)."""
+    not show switched; a job's before the cut-over), else the login the reading picks with the model and the list —
+    the team's, or for a job the built-in set's (`on_set`, §4.9d *The login a seat starts on*, no team's reserve
+    added) — or None when nothing is to start: no login of the list usable (the usage gate holds it) or none offering
+    the model (*cannot run*)."""
     if got.launch.host or got.pick is None:
         return {}
-    shown = call("team_show", team=team, entries=False) or {}
-    if not shown.get("switched"):
-        return {}
     kind, key = got.pick
-    rows = (shown.get("flow") or {}).get("stages") if kind == "stages" else shown.get("audits")
+    if kind == "builtins":
+        shown = call("builtins_show", set=got.on_set or builtinstore.DEFAULT) or {}
+        if not shown.get("cut_over"):
+            return {}
+        rows, listed = shown.get("seats"), [str(lk) for lk in shown.get("order") or ()]
+        where = f"built-in set {got.on_set or builtinstore.DEFAULT}"
+    else:
+        shown = call("team_show", team=team, entries=False) or {}
+        if not shown.get("switched"):
+            return {}
+        rows = (shown.get("flow") or {}).get("stages") if kind == "stages" else shown.get("audits")
+        listed = [str(r["login"]) for r in shown.get("logins") or () if r.get("login")]
+        where = f"team {team}"
     row = next(
-        (r for r in rows or () if (r.get("key") if kind == "stages" else flow3.key_of(r.get("name"))) == key), None
+        (r for r in rows or () if (flow3.key_of(r.get("name")) if kind == "audits" else r.get("key")) == key), None
     )
-    if row is None:  # the home's reading of the team's flow names no such stage or audit: nothing to pick from
-        log.warning("team %s: its reading names no %s %r, so no login is picked and nothing starts", team, kind, key)
+    if row is None:  # the home's reading names no such stage, audit or seat: nothing to pick from
+        log.warning("%s: its reading names no %s %r, so no login is picked and nothing starts", where, kind, key)
         return None
     now = row.get("now") or {}
     if now.get("state") != "usable" or not now.get("login"):
@@ -302,7 +315,7 @@ def on_login(call: Any, team: str, got: StageLaunch) -> dict[str, Any] | None:
         "adapter": logins.split(login)[0],
         "profile": "",
         "seat_model": got.model,
-        "login_list": [str(r["login"]) for r in shown.get("logins") or () if r.get("login")],
+        "login_list": listed,
     }
 
 

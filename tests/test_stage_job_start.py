@@ -242,3 +242,64 @@ def test_the_closing_words_each_kind_ends_on_are_its_outcomes():
     assert "a fresh gate <new> in place of <old>" in lift and "never by `ledger.py lift`" in lift
     assert "end `other` with what you read" in lift
     assert "`gh pr ready <n>`" in stage_job_start.brief_of("unheld-pull-requests", "sync")
+
+
+# --- the launch on the set's login (design §4.9d *The login a seat starts on*, TD-2068) -----------------------------
+
+SET_ORDER = ["claude-code:main", "gemini:g"]
+
+
+def _set_shown(state="usable", login="claude-code:main", *, cut_over="2026-12-01", seat="board-answers"):
+    """The home's `builtins_show` reading of a set: each seat's `now` the pick of its list."""
+    now = {"login": login if state == "usable" else None, "state": state, "why": None}
+    return {"cut_over": cut_over, "seats": [{"key": seat, "now": now}], "order": SET_ORDER}
+
+
+def _start_job(world, monkeypatch, shown, got):
+    org, team, _ = world
+    monkeypatch.setattr(stage_start, "team_started", lambda *_a: True)
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **kw):
+        calls.append((method, kw))
+        return {"name_check": {"verdict": "free"}, "builtins_show": shown}.get(method, {"id": "new"})
+
+    return stage_start.start(call, org, team, got), calls
+
+
+def test_a_job_with_its_set_named_picks_its_seat_from_that_sets_reading(world):
+    assert made(world, BOARD, on_set="cheap").pick == ("builtins", "board-answers")
+    assert made(world, PR, on_set="cheap").on_set == "cheap"
+    assert made(world, BOARD).pick is None, "no set named: a launch as before"
+
+
+def test_after_the_cut_over_a_job_starts_on_its_sets_login_with_the_seats_model_and_the_list(world, monkeypatch):
+    made_, calls = _start_job(world, monkeypatch, _set_shown(login="gemini:g"), made(world, BOARD, on_set="cheap"))
+    assert made_ == {"id": "new"}
+    assert ("builtins_show", {"set": "cheap"}) in calls and "team_show" not in [m for m, _ in calls]
+    create = calls[-1][1]
+    assert (create["login"], create["adapter"], create["profile"]) == ("gemini:g", "gemini", "")
+    assert create["seat_model"] == "sonnet" and create["login_list"] == SET_ORDER
+
+
+@pytest.mark.parametrize("state", ["waits", "none"])
+def test_a_job_whose_set_has_no_usable_login_starts_nothing(world, monkeypatch, state):
+    made_, calls = _start_job(world, monkeypatch, _set_shown(state), made(world, BOARD, on_set="cheap"))
+    assert made_ is None and "create" not in [m for m, _ in calls]
+
+
+def test_a_job_before_the_cut_over_or_on_a_node_launches_as_before(world, monkeypatch):
+    org, team, _ = world
+    before, _ = _start_job(world, monkeypatch, _set_shown(cut_over=None), made(world, BOARD, on_set="cheap"))
+    assert before == {"id": "new"}
+    on_node = stage_job_start.launch(
+        org, team, builtin("build-review"), BOARD, "sonnet", host="n", here="h", on_set="c"
+    )
+    made_, calls = _start_job(world, monkeypatch, _set_shown(), on_node)
+    assert made_ == {"id": "new"} and "builtins_show" not in [m for m, _ in calls]
+    assert "login" not in calls[-1][1] and "seat_model" not in calls[-1][1]
+
+
+def test_a_seat_the_sets_reading_does_not_name_starts_nothing(world, monkeypatch):
+    made_, calls = _start_job(world, monkeypatch, _set_shown(seat="sweeper"), made(world, PR, on_set="cheap"))
+    assert made_ is None and "create" not in [m for m, _ in calls]

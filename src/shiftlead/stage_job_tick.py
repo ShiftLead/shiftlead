@@ -105,9 +105,11 @@ def reach_for(
             )
         else:
             sdoc = settings() or {}
-            entry = builtinstore.sets(sdoc)[builtinstore.repo_set(sdoc, repo)]
-            model = builtinstore.model(entry, str(record["seat"]))
-            got = stage_job_start.launch(read, teamdef, dict(doc), record, model, host=host, here=local, came=came)
+            name = builtinstore.repo_set(sdoc, repo)
+            model = builtinstore.model(builtinstore.sets(sdoc)[name], str(record["seat"]))
+            got = stage_job_start.launch(
+                read, teamdef, dict(doc), record, model, host=host, here=local, came=came, on_set=name
+            )
         made = stage_start.start(call, read, teamdef, got)
         return stage_start.holder_of(got, made) if made else None
 

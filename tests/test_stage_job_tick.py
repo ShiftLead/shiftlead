@@ -145,7 +145,7 @@ def test_the_reach_starts_a_review_stages_session_where_the_record_stands_at_one
         return "review-launch"
 
     def job(read, team, doc, record, model, **kw):
-        seen.append(("job", record["stage"], model))
+        seen.append(("job", record["stage"], model, kw["on_set"]))
         return "job-launch"
 
     monkeypatch.setattr(stage_job_tick.stage_job_start, "review_launch", review)
@@ -172,8 +172,8 @@ def test_the_reach_starts_a_review_stages_session_where_the_record_stands_at_one
     assert r.start(record, None) == "job-launch"
     assert seen == [
         ("review", "review", "pushed", "repo", tmp_path / "f"),
-        ("job", "build", "haiku"),
-        ("job", None, "haiku"),
+        ("job", "build", "haiku", "s"),
+        ("job", None, "haiku", "s"),
     ]
 
 
