@@ -5,6 +5,7 @@ switch-over makes*, TD-2071)."""
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -197,6 +198,31 @@ def test_a_nodes_login_named_as_a_listed_home_login_of_another_tool_blocks():
     assert switchover.node_name_blockers(home, {"cm": node}, [elsewhere]) == []
 
 
+def test_a_login_named_as_an_unregistered_adapters_profile_blocks(tmp_path):
+    """TD-2294: a profile whose adapter is not registered makes no login, and its name stays taken, as a shell
+    profile's does (§4.2b **Names are fixed**)."""
+    g = tmp_path / "g"
+    fakes = {"claude-code": Fake(tmp_path / "d"), "gemini": Fake(tmp_path / "e")}
+    names = {f"gemini:{switchover.shown(g.resolve())}": "x"}
+    _, blockers = run(
+        tmp_path, [P("x", tmp_path / "x", adapter="nope"), P("y", g, adapter="gemini")], fakes=fakes, names=names
+    )
+    assert [b for b in blockers if "nope profile x, which makes no login" in b.what], blockers
+
+
+def test_two_teams_listing_one_home_login_block_once_and_a_node_login_of_its_own_tool_not_at_all():
+    """TD-2294: the clash is one per node, node login and listed home login, however many teams list it; and a node
+    login of the listed login's own tool and name is the login itself, which `ao host up` keeps, never a clash."""
+    home = [switchover.Login("claude-code", Path("/h/.claude"), "grind", ["grind"], ["claude-code:grind"])]
+    node = [switchover.Login("gemini", Path("/shiftlead/profiles/g"), "grind", ["g"], ["gemini:g"])]
+    plans = [switchover.TeamPlan(t, "r", "cm", logins=["claude-code:grind"]) for t in ("t", "u")]
+    assert len(switchover.node_name_blockers(home, {"cm": node}, plans)) == 1
+    same = [
+        switchover.Login("claude-code", Path("/shiftlead/profiles/grind"), "grind", ["grind"], ["claude-code:grind"])
+    ]
+    assert switchover.node_name_blockers(home, {"cm": same}, plans) == []
+
+
 def test_each_adapter_maps_a_model_through_its_own_table():
     assert claude_code.ClaudeCodeAdapter().model_family("claude-opus-4-1") == claude_code.model_family(
         "claude-opus-4-1"
@@ -284,6 +310,35 @@ def test_the_check_names_each_team_with_what_the_answers_give_it(home, tmp_path,
     assert cli.main(["switch-over", "check"]) == 1
     out = capsys.readouterr().out
     assert "lists claude-code:gone, a login h would not have" in out
+
+
+def test_the_check_prints_a_container_nodes_login_named_as_a_listed_home_login(home, tmp_path, capsys, monkeypatch):
+    """TD-2294: `ao switch-over check` names the clash and its cure, a container node's login of another tool taking
+    the name of a home login a team on that node lists (§4.9e *Blockers*); its exit alone does not tell, since another
+    blocker can stand beside it."""
+    a = tmp_path / "a"
+    (home / "profiles.yml").write_text(f"profiles:\n  p: {{config_dir: {a}}}\n")
+    team = {"repo": "r", "manager": {"role": "person"}, "members": [{"role": "grinder"}]}
+    (home / "org.yml").write_text(yaml.safe_dump({"teams": {"grind": team}}))
+    found = {f"claude-code:{a}": {"name": "paul"}}
+    pick = {"flow": "design-wise", "logins": ["claude-code:paul"]}
+    sets = {"default": {"logins": ["claude-code:paul"]}}
+    answers(home, {"hosts": {"h": {"logins": found}}, "teams": {"grind": pick}, "builtins": sets})
+    node = [switchover.Login("gemini", Path("/shiftlead/profiles/g"), "paul", ["g"], ["gemini:g"])]
+    monkeypatch.setattr(switchover, "node_logins", lambda _answers, **_kw: ({"cm": node}, []))
+    real = switchover.teams
+
+    def on_cm(*args, **kw):
+        plans, blockers = real(*args, **kw)
+        return [replace(p, host="cm") for p in plans], blockers
+
+    monkeypatch.setattr(switchover, "teams", on_cm)
+    assert cli.main(["switch-over", "check"]) == 1
+    out = capsys.readouterr().out
+    assert (
+        "would be named 'paul', the name of the home login claude-code:paul that team grind on this node lists" in out
+    )
+    assert "give one of them another name in the answers file" in out
 
 
 def test_no_answers_file_a_bad_one_and_one_not_a_mapping_each_block(tmp_path):
