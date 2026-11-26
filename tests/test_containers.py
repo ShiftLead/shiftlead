@@ -17,6 +17,7 @@ from conftest import wait_for_sync
 from sessionorc import containers, logins, paths
 from sessionorc.client import LocalClient
 from sessionorc.containers import ContainerError, ContainerNode, Runner
+from sessionorc.store import HostStore
 
 pytestmark = pytest.mark.unit
 
@@ -441,6 +442,50 @@ def test_after_the_cut_over_a_node_with_no_logins_file_is_given_one_and_before_i
     (n.node_dir / "home" / "logins.yml").write_text("logins: [broken\n")
     told = containers.host_up("contractmatch", Fake())["logins"]
     assert told["added"] == [] and told["passed"][0].startswith("no login added to contractmatch: ")
+
+
+def test_a_switched_home_before_the_cut_over_still_writes_the_nodes_profiles(home):
+    """TD-2303: a home with a `logins.yml` is switched, but until the cut-over's marker a node gets its profiles and
+    no `logins.yml`, though a team on it lists logins (§4.9e *What decides which shape runs*)."""
+    (home / "settings.yml").write_text(CUT_OVER.replace("cut_over: '2026-11-26'\n", ""))
+    (home / "logins.yml").write_text(HOME_LOGINS)
+    n = containers.node("contractmatch")
+    out = containers.host_up("contractmatch", Fake())
+    assert "logins" not in out
+    assert (n.node_dir / "home" / "profiles.yml").is_file() and not logins.switched(n.node_dir / "home")
+
+
+def test_an_unreadable_settings_file_after_the_cut_over_adds_no_login_and_says_so(home):
+    """TD-2303: where `settings.yml` does not read, the home's last reading says the first shape is off, and the lists
+    cannot be read: no login is added, one line says why, and no profile is written."""
+    (home / "settings.yml").write_text("teams: [broken\n")
+    (home / "logins.yml").write_text(HOME_LOGINS)
+    HostStore().save({"first_shape_off": True})
+    n = containers.node("contractmatch")
+    out = containers.host_up("contractmatch", Fake())
+    assert out["logins"] == {"added": [], "passed": ["no login added to contractmatch: settings.yml cannot be read"]}
+    assert not (n.node_dir / "home" / "profiles.yml").exists()
+
+
+def test_an_unreadable_home_logins_file_adds_no_login_and_host_up_goes_on(home):
+    """TD-2303: the home's own `logins.yml` broken after the cut-over is a line, never an error that ends `host up`."""
+    (home / "settings.yml").write_text(CUT_OVER)
+    (home / "logins.yml").write_text("logins: [broken\n")
+    out = containers.host_up("contractmatch", Fake())
+    assert out["started"] and out["logins"]["added"] == []
+    assert [line.startswith("no login added to contractmatch: ") for line in out["logins"]["passed"]] == [True]
+
+
+def test_host_up_logs_each_login_it_added_and_each_it_passed_over(home):
+    """TD-2303: what `provision` did to the node's `logins.yml` is in the runner's log, a line each."""
+    (home / "settings.yml").write_text(CUT_OVER)
+    (home / "logins.yml").write_text(HOME_LOGINS)
+    r = Fake()
+    said: list[str] = []
+    r.log = said.append
+    containers.host_up("contractmatch", r)
+    assert "login claude-code:grind added to contractmatch, not signed in" in said
+    assert "gemini:absent is no login of kmaster: nothing to copy to contractmatch" in said
 
 
 def _pinned_node(monkeypatch, tmp_path, *, resolves=True):
