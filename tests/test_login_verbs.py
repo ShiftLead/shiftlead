@@ -450,10 +450,11 @@ async def test_forget_and_naming_an_account_read_what_runs_and_what_is_retired(a
 async def test_forget_is_refused_while_the_directors_record_lists_the_login(agent):
     """TD-2329, design §4.2b *⋯ on a login*: the home reads `director:`'s list from the director's record (a seat on
     `prompt` with no `builtin`), live or not; a superseded record's old list and a built-in prompts seat's do not
-    refuse, and a node is not refused for the home's lists."""
+    refuse, nor does a seat on another trigger; a home with no settings file still reads the record (TD-2330); and a
+    node is not refused for the home's lists."""
     from conftest import park_ticks
 
-    from sessionorc import paths
+    from sessionorc import paths, settings
     from sessionorc.client import AgentError, LocalClient
     from sessionorc.models import Session
 
@@ -470,8 +471,13 @@ async def test_forget_is_refused_while_the_directors_record_lists_the_login(agen
 
     record("old", login_list=["claude-code:api"], superseded_by="ao-x-director")  # a resume's old list
     record("prompts", login_list=["claude-code:api"], builtin="prompts")  # a built-in seat on prompt
+    record("stage", login_list=["claude-code:api"], seat={"trigger": "prs"})  # a seat on another trigger (TD-2330)
     record("director", login_list=["claude-code:grind"])  # between fills: no session live
     async with LocalClient() as c:
+        with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while the director use it"):
+            await c.call("login_forget", login="grind")
+        # no settings.yml: the director's record is still read (TD-2330)
+        settings.settings_file().unlink(missing_ok=True)
         with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while the director use it"):
             await c.call("login_forget", login="grind")
         assert (await c.call("login_forget", login="api"))["change"] == "claude-code:api forgotten"
