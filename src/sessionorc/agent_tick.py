@@ -4329,6 +4329,9 @@ class TickMixin:
                 s.moving = None
                 self._save(s)
         candidates = [s for s in list(self.sessions.values()) if self._movable(s)]
+        if self.mode == "node":  # a move the home did not make is asked again once MOVE_STALE has passed, not each tick
+            held = time.monotonic() - MOVE_STALE.total_seconds()
+            candidates = [s for s in candidates if self._node_move_failed.get(s.id, held) <= held]
         if not candidates or (self.mode == "node" and self._home_mux is None):
             return  # a node with no link moves nothing: the home holds what a move replays
         try:
@@ -4380,11 +4383,13 @@ class TickMixin:
             # read from the records, not the reply: a reply lost after the home's launch still leaves the move made
             new.moving = None
             new.login_moves = [*s.login_moves, {"at": at, "from": frm, "to": to}]
+            self._node_move_failed.pop(s.id, None)
             self._save(new)
             await self._push_changes()
             return
         why = reply.get("why") if isinstance(reply, dict) else None
         log.warning("%s: its move to %s was not made: %s", s.id, to, why or "no new session runs on it")
+        self._node_move_failed[s.id] = time.monotonic()
         s.moving = None
         self._save(s)
         await self._push_changes()

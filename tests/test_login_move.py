@@ -15,7 +15,7 @@ import pytest
 from _stubs import HookFedStub
 from conftest import kill_private_server, park_ticks, private_socket_name, wait_for
 
-from sessionorc import adapters, agent_common, hosts, paths, teamstore
+from sessionorc import adapters, agent_common, agent_tick, hosts, paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
@@ -680,6 +680,16 @@ async def test_a_nodes_move_the_home_did_not_make_leaves_no_mark(agent, tmp_path
     assert len(launched) == count
     assert len(mux.sent) == (0 if case == "no-link" else 1)
     assert (s.state == "closed") == (case == "no-launch"), "only the home's close ends it"
+    if case == "refused":  # asked again once MOVE_STALE has passed, not on the next tick
+        agent._home_mux = mux
+        try:
+            await agent._login_moves(datetime.now(UTC))
+            assert len(mux.sent) == 1, "not asked again on the next tick"
+            agent._node_move_failed[sid] -= agent_tick.MOVE_STALE.total_seconds() + 1
+            await agent._login_moves(datetime.now(UTC))
+            assert len(mux.sent) == 2, "asked again once the wait has passed"
+        finally:
+            agent._home_mux = None
 
 
 def _node_record(agent, **kw) -> Session:
