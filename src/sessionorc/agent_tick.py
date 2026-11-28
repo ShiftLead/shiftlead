@@ -186,6 +186,8 @@ BUILTIN_SEAT_KEYS = {"techlead": "tech-lead", "sweeper": "sweeper", "prompts": "
 NODE_LIST_REPLAYS = ("fill", "lost-brief")
 # a `moving` mark left with no live session this long after it was set is cleared (§4.9e)
 MOVE_STALE = timedelta(minutes=10)
+# how long a node's tick waits on the home's `login_move`: a routed close, then a routed create (§4.9e, TD-2070)
+MOVE_WAIT = 2 * agent_common.ACT_TIMEOUT + 30.0
 
 
 def _director(s: Session) -> bool:
@@ -4317,10 +4319,8 @@ class TickMixin:
         is still usable, by the pick's own rows with its team's reserve; where it is not and a later login of the list
         it was launched with is usable and offers its model (`teamstore.next_login`), `_move_login` moves it. With
         none it waits where it is. A `moving` mark found with no live session `MOVE_STALE` after it was set is
-        cleared, and the holder is then lost by §4.9c's own rule. The home's own host alone: a node's session's launch
-        record is the home's, so its move is the node's tick's once that reads one."""
-        if self.mode != "home":
-            return
+        cleared, and the holder is then lost by §4.9c's own rule. On a node the reading is the node's own, over its own
+        logins, and the move is `_node_move`'s: the launch record is the home's (TD-2070)."""
         stale = [s for s in self.sessions.values() if isinstance(s.moving, dict)]
         for s in stale:
             at = s.moving.get("at") if isinstance(s.moving, dict) else None
@@ -4329,8 +4329,11 @@ class TickMixin:
                 s.moving = None
                 self._save(s)
         candidates = [s for s in list(self.sessions.values()) if self._movable(s)]
-        if not candidates:
-            return
+        if self.mode == "node":  # a move the home did not make is asked again once MOVE_STALE has passed, not each tick
+            held = time.monotonic() - MOVE_STALE.total_seconds()
+            candidates = [s for s in candidates if self._node_move_failed.get(s.id, held) <= held]
+        if not candidates or (self.mode == "node" and self._home_mux is None):
+            return  # a node with no link moves nothing: the home holds what a move replays
         try:
             doc = settings_mod.load()
             read, gate = await self.rpc_tools(), await self.rpc_gate()
@@ -4349,7 +4352,99 @@ class TickMixin:
                 list(s.login_list or ()), str(s.login), str(s.seat_model), rows[team], unasked=unasked
             )
             if to:
-                await self._move_login(s, to)
+                await (self._move_login(s, to) if self.mode == "home" else self._node_move(s, to))
+
+    async def _node_move(self, s: Session, to: str) -> None:
+        """A node's move (§4.9e *A session moves down the list*, §4.4a *A login move from a node*, TD-2070): the node
+        marks its record `moving`, reads the handoff from the old session's transcript, which lies on its disk, and
+        asks the home `login_move {id, to, handoff}`; the home, which holds the launch record, ends the old session
+        and launches the new one here on `to`, through `act`. The node then writes what is its own: the mark cleared
+        and the move added to `login_moves` on the new record, or, where no new session runs on `to` (a home that
+        refused, a link that failed, a launch that failed), the mark cleared on the old one."""
+        mux = self._home_mux
+        if mux is None:
+            return
+        frm, at = str(s.login), now_iso()
+        s.moving = {"at": at, "from": frm, "to": to}
+        self._save(s)
+        await self._push_changes()
+        try:
+            ad: object | None = adapters.get(s.adapter)
+        except KeyError:
+            ad = None
+        handoff = await asyncio.to_thread(adapters.handoff_of, ad, s.transcript) if ad is not None else ""
+        log.info("%s: its login %s is no longer usable: asking %s to move it to %s", s.id, frm, self.home, to)
+        try:
+            reply = await mux.request("login_move", timeout=MOVE_WAIT, id=s.id, to=to, handoff=handoff)
+        except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
+            reply = {"moved": False, "why": str(e) or type(e).__name__}
+        new = self.sessions.get(s.id)
+        if new is not None and new is not s and new.login == to:
+            # read from the records, not the reply: a reply lost after the home's launch still leaves the move made
+            new.moving = None
+            new.login_moves = [*s.login_moves, {"at": at, "from": frm, "to": to}]
+            self._node_move_failed.pop(s.id, None)
+            self._save(new)
+            await self._push_changes()
+            return
+        why = reply.get("why") if isinstance(reply, dict) else None
+        log.warning("%s: its move to %s was not made: %s", s.id, to, why or "no new session runs on it")
+        self._node_move_failed[s.id] = time.monotonic()
+        s.moving = None
+        self._save(s)
+        await self._push_changes()
+
+    async def _take_login_move(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A node's `login_move {id, to, handoff}` (§4.4a *A login move from a node*, TD-2070): the node read that its
+        session's login is no longer usable and that `to`, below it on the list it was launched with, is; the home,
+        which holds the launch record, ends the old session and replays the launch on `to` under the same record, the
+        handoff after what its stage's session is told, both through `act`, as `_move_login` does at the home. The
+        mark and `login_moves` are the node's own (§4.9e *Who owns each field*), so the home writes neither. Refused
+        whole for a record that is not that link's host's, or one no move applies to; answers `{moved}`, with `why`
+        where the close or the launch failed."""
+        rid, to, handoff = params.get("id"), params.get("to"), params.get("handoff")
+        if not isinstance(rid, str) or not rid or "@" in rid or not isinstance(to, str) or not to:
+            raise link.LinkError("login_move carries no bare id and login")
+        if handoff is not None and not isinstance(handoff, str):
+            raise link.LinkError("login_move's handoff is not text")
+        s = self.remote.get(host, {}).get(rid)
+        if s is None:
+            raise link.LinkError(f"no session {rid}@{host}")
+        order = [str(x) for x in s.login_list or ()]
+        why = None
+        if not (s.unattended and s.supervised and s.seat_model and order and s.login):
+            why = "it is not an unattended session launched on a list"
+        elif s.state in ("exited", "closed", "scheduled") or s.superseded_by or s.suspended or s.restart_ceiling:
+            why = f"it is {s.state}" if s.state in ("exited", "closed", "scheduled") else "no rule acts on it"
+        elif to not in order or str(s.login) not in order or order.index(to) <= order.index(str(s.login)):
+            why = f"{to} is not below {s.login} on the list it was launched with"
+        if why:
+            raise link.LinkError(f"{rid}@{host}: no move to {to}: {why} (design §4.9e)")
+        log.info("%s@%s: its login %s is no longer usable there: moving it to %s", rid, host, s.login, to)
+        try:
+            await self._route_act(
+                "close", {"id": rid, "closer": {"by": "tick", "why": "login-move"}, "reap": False}, None, host
+            )
+            self._mark_closed(s, "login-move")
+        except Exception as e:  # noqa: BLE001 — a close that failed moves nothing; the node's next tick reads again
+            log.warning("%s@%s: the close before its move to %s failed: %s", rid, host, to, e)
+            if s.state == "closed":  # a close that failed after it marked the record: ended, its holder lost
+                self._mark_closed(s, "login-move")
+            return {"moved": False, "why": f"close: {e}"}
+        before = len(s.restarts)
+        await self._replay(
+            s,
+            "login-move",
+            closing=handoff or None,
+            keep_mail=True,
+            scratch=s.scratch,  # a move keeps it, as every replay does (§4.6)
+            adapter=logins.split(to)[0],
+            profile="",
+            login=to,
+        )
+        if len(s.restarts) > before:  # a failed replay keeps its entry on the old record; a launch writes the new
+            return {"moved": False, "why": str(s.restarts[-1].get("error") or "the launch failed")}
+        return {"moved": True}
 
     async def _move_login(self, s: Session, to: str) -> None:
         """One move (§4.9e *A session moves down the list*): mark the record `moving`, read the handoff from the old

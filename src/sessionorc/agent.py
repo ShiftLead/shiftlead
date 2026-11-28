@@ -743,6 +743,7 @@ class HostAgent(
         self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
+        self._node_move_failed: dict[str, float] = {}  # a node's move not made, by record, when (§4.9e, TD-2070)
         # A node's: the home's answer to its last `hello`, which says whether the home is cut over (§4.9e *The window*)
         self._home_greeting: dict[str, Any] | None = None
         # A node's calls in flight here, by the node's token (step 5): a `wait` the node cancels

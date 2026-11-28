@@ -15,7 +15,7 @@ import pytest
 from _stubs import HookFedStub
 from conftest import kill_private_server, park_ticks, private_socket_name, wait_for
 
-from sessionorc import adapters, agent_common, hosts, paths, teamstore
+from sessionorc import adapters, agent_common, agent_tick, hosts, paths, teamstore
 from sessionorc.adapters import LaunchSpec
 from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
@@ -595,3 +595,205 @@ def test_a_failed_move_counts_toward_the_ceiling_and_a_launched_one_does_not():
     failed = {"why": "login-move", "at": at, "error": "no launch"}
     assert agent_common._counted([failed], now) == [failed]
     assert agent_common._counted([{"why": "login-move", "at": at}], now) == []
+
+
+class _HomeMux:
+    """A node's link to its home, answering `login_move` as the home does (TD-2070): it ends the node's old session
+    and launches the new one on `to` here, through the node's own close and create, unless told to fail."""
+
+    def __init__(self, agent, repo, *, fails: Exception | None = None, launch: bool = True):
+        self.agent, self.repo, self.fails, self.launch = agent, repo, fails, launch
+        self.sent: list[dict] = []
+        self.marked: list = []
+
+    async def request(self, method, timeout=None, **params):
+        if method != "login_move":
+            return {}
+        self.sent.append({"method": method, **params})
+        self.marked.append(self.agent.sessions[params["id"]].moving)
+        if self.fails is not None:
+            raise self.fails
+        s = self.agent.sessions[params["id"]]
+        await self.agent._close(s.id, closer={"by": "tick", "why": "login-move"}, reap=False, keep_debt=True)
+        if not self.launch:
+            return {"moved": False, "why": "no launch"}
+        await self.agent.rpc_create(
+            name=s.name,
+            dir=str(self.repo),
+            adapter="hookstub",
+            profile="",
+            login=params["to"],
+            seat_model="opus",
+            login_list=ORDER,
+            unattended=True,
+            supervised=True,
+            prompt=f"the stage's words\n\n{params['handoff']}",
+            team="t",
+            keep_mail=True,
+        )
+        return {"moved": True}
+
+
+@pytest.mark.integration
+async def test_a_nodes_tick_asks_the_home_to_move_and_writes_the_move_on_its_new_record(
+    agent, tmp_path, launched, rows, monkeypatch
+):
+    """§4.9e, §4.4a *A login move from a node* (TD-2070): a node's tick reads its own logins, marks the record
+    `moving` before it asks, and sends the home `login_move {id, to, handoff}`; once a new session runs on `to` the
+    node clears the mark and adds the move to `login_moves`, which are its own fields."""
+    sid = await _stage_session(agent, tmp_path)
+    monkeypatch.setattr(agent, "mode", "node")
+    monkeypatch.setattr(agent, "_switched_before_home", lambda: False)  # a switched node of a home cut over
+    agent._home_mux = mux = _HomeMux(agent, tmp_path / "repo")
+    try:
+        await agent._login_moves(datetime.now(UTC))
+    finally:
+        agent._home_mux = None
+    assert mux.sent == [{"method": "login_move", "id": sid, "to": "hookstub:second", "handoff": HANDOFF}]
+    assert mux.marked[0]["from"] == "hookstub:first" and mux.marked[0]["to"] == "hookstub:second"
+    new = agent.sessions[sid]
+    assert new.login == "hookstub:second" and new.moving is None
+    assert [(m["from"], m["to"]) for m in new.login_moves] == [("hookstub:first", "hookstub:second")]
+    assert launched[-1]["prompt"].endswith(HANDOFF)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("case", ["refused", "no-launch", "no-link"])
+async def test_a_nodes_move_the_home_did_not_make_leaves_no_mark(agent, tmp_path, launched, rows, monkeypatch, case):
+    """A home that refuses (an older build: *unknown link method*), a launch that failed, or no link: no session runs
+    on the next login, so the node clears its mark on the old record and writes no move."""
+    from sessionorc import link
+
+    sid = await _stage_session(agent, tmp_path)
+    s = agent.sessions[sid]
+    monkeypatch.setattr(agent, "mode", "node")
+    monkeypatch.setattr(agent, "_switched_before_home", lambda: False)
+    fails = link.LinkError("unknown link method 'login_move'") if case == "refused" else None
+    mux = _HomeMux(agent, tmp_path / "repo", fails=fails, launch=case != "no-launch")
+    agent._home_mux = None if case == "no-link" else mux
+    count = len(launched)
+    try:
+        await agent._login_moves(datetime.now(UTC))
+    finally:
+        agent._home_mux = None
+    assert agent.sessions[sid] is s and s.moving is None and s.login_moves == []
+    assert len(launched) == count
+    assert len(mux.sent) == (0 if case == "no-link" else 1)
+    assert (s.state == "closed") == (case == "no-launch"), "only the home's close ends it"
+    if case == "refused":  # asked again once MOVE_STALE has passed, not on the next tick
+        agent._home_mux = mux
+        try:
+            await agent._login_moves(datetime.now(UTC))
+            assert len(mux.sent) == 1, "not asked again on the next tick"
+            agent._node_move_failed[sid] -= agent_tick.MOVE_STALE.total_seconds() + 1
+            await agent._login_moves(datetime.now(UTC))
+            assert len(mux.sent) == 2, "asked again once the wait has passed"
+        finally:
+            agent._home_mux = None
+
+
+def _node_record(agent, **kw) -> Session:
+    """A stage's session on node `laptop` as the home holds it, with its launch record at the home."""
+    import json
+
+    s = Session(id="ao-build", name="build", kind="claude", adapter="hookstub", dir="/w", state="limited")
+    s.host, s.supervised, s.unattended, s.team = "laptop", True, True, "t"
+    s.login, s.seat_model, s.login_list = "hookstub:first", "opus", list(ORDER)
+    for k, v in kw.items():
+        setattr(s, k, v)
+    agent.remote["laptop"] = {s.id: s}
+    paths.launch_dir().mkdir(parents=True, exist_ok=True)
+    launch = {"name": "build", "dir": "/w", "adapter": "hookstub", "profile": "", "prompt": "the stage's words"}
+    launch |= {"unattended": True, "team": "t", "seat_model": "opus", "login_list": ORDER}
+    (paths.launch_dir() / "ao-build@laptop.json").write_text(json.dumps(launch))
+    return s
+
+
+@pytest.mark.integration
+async def test_the_home_moves_a_nodes_session_through_act_and_writes_none_of_the_nodes_fields(agent, monkeypatch):
+    """The home takes `login_move` (§4.4a, TD-2070): it ends the old session at the node and replays its launch
+    record there on `to`, the handoff after its stage's words, under the same record; `moving` and `login_moves`
+    are the node's, so the home's answer is `{moved}` and nothing more."""
+    await park_ticks(agent)
+    s = _node_record(agent)
+    acts: list[tuple[str, dict]] = []
+
+    async def route(method, params, caller, host):
+        acts.append((method, params))
+        assert host == "laptop"
+        if method == "close":
+            s.state = "closed"
+            return s.view()
+        new = Session(id="ao-build", name="build", kind="claude", adapter="hookstub", dir="/w", state="working")
+        new.host, new.login = "laptop", params["login"]
+        agent.remote["laptop"]["ao-build"] = new
+        return {"id": "ao-build@laptop"}
+
+    monkeypatch.setattr(agent, "_route_act", route)
+    got = await agent._take_login_move("laptop", {"id": "ao-build", "to": "hookstub:third", "handoff": HANDOFF})
+    assert got == {"moved": True}
+    (m1, close), (m2, create) = acts
+    assert (m1, close["id"], close["closer"]["why"], close["reap"]) == ("close", "ao-build", "login-move", False)
+    assert (m2, create["login"], create["adapter"], create["profile"]) == ("create", "hookstub:third", "hookstub", "")
+    assert create["prompt"] == f"the stage's words\n\n{HANDOFF}" and create["host"] == "laptop"
+    new = agent.remote["laptop"]["ao-build"]
+    assert new is not s and new.restarts[-1]["why"] == "login-move"
+    assert new.moving is None and new.login_moves == [], "the node's fields, written there"
+    assert s.closed_for["why"] == "login-move"
+
+
+@pytest.mark.integration
+async def test_a_failed_launch_of_a_nodes_move_is_answered_not_moved(agent, monkeypatch):
+    await park_ticks(agent)
+    s = _node_record(agent)
+
+    async def route(method, params, caller, host):
+        if method == "close":
+            s.state = "closed"
+            return s.view()
+        raise RuntimeError("no launch there")
+
+    monkeypatch.setattr(agent, "_route_act", route)
+    got = await agent._take_login_move("laptop", {"id": "ao-build", "to": "hookstub:second", "handoff": ""})
+    assert got["moved"] is False and "no launch there" in got["why"]
+    assert agent.remote["laptop"]["ao-build"] is s and s.restarts[-1]["error"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("params", "kw"),
+    [
+        ({"id": "ao-gone", "to": "hookstub:second"}, {}),
+        ({"id": "ao-build@laptop", "to": "hookstub:second"}, {}),
+        ({"id": "ao-build"}, {}),
+        ({"id": "ao-build", "to": "hookstub:second", "handoff": 3}, {}),
+        ({"id": "ao-build", "to": "hookstub:other"}, {}),
+        ({"id": "ao-build", "to": "hookstub:first"}, {"login": "hookstub:second"}),
+        ({"id": "ao-build", "to": "hookstub:second"}, {"state": "closed"}),
+        ({"id": "ao-build", "to": "hookstub:second"}, {"unattended": False}),
+        ({"id": "ao-build", "to": "hookstub:second"}, {"superseded_by": "ao-later"}),
+        ({"id": "ao-build", "to": "hookstub:second"}, {"login_list": []}),
+    ],
+    ids=[
+        "no-record",
+        "address",
+        "no-login",
+        "handoff-not-text",
+        "not-listed",
+        "up-the-list",
+        "closed",
+        "interactive",
+        "superseded",
+        "no-list",
+    ],  # fmt: skip
+)
+async def test_the_home_refuses_a_login_move_no_move_applies_to(agent, monkeypatch, params, kw):
+    from sessionorc import link
+
+    await park_ticks(agent)
+    _node_record(agent, **kw)
+    routed = AsyncMock()
+    monkeypatch.setattr(agent, "_route_act", routed)
+    with pytest.raises(link.LinkError):
+        await agent._take_login_move("laptop", params)
+    routed.assert_not_called()

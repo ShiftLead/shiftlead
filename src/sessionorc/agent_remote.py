@@ -755,6 +755,8 @@ class RemoteMixin:
                 return await self._take_answered_by_rule(host, params)
             if method == "missed":
                 return await self._take_missed(host, params)
+            if method == "login_move":
+                return await self._take_login_move(host, params)
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":
